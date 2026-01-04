@@ -105,28 +105,48 @@
         </div>
 
         <!-- Grid Layout for < 4 events -->
-        <div v-else class="events-grid" :style="{ gap: events.length === 2 ? '0' : '1.5rem' }">
+        <div v-else class="events-grid" :class="{
+          'grid-1': events.length === 1,
+          'grid-2': events.length === 2,
+          'grid-3': events.length === 3
+        }">
           <v-card
             v-for="(event, index) in events"
             :key="index"
             :class="`event-card event-card-${index + 1}`"
-            :style="{ flex: events.length === 1 ? '0 0 100%' : events.length === 2 ? '0 0 50%' : events.length === 3 ? '0 0 calc(33.333% - 1rem)' : '0 0 calc(25% - 1rem)' }"
+            height="384"
             elevation="4"
             hover
           >
             <div
-              class="event-image"
-              :style="{ backgroundImage: event.imageUrl ? `url('${event.imageUrl}')` : 'url(/img/events.jpg)' }"
+              class="event-background"
+              :style="{
+                backgroundImage: event.imageUrl
+                  ? `url(${event.imageUrl})`
+                  : `url(/img/events.jpg)`,
+              }"
             ></div>
             <div class="event-overlay"></div>
             <div class="event-content">
-              <h3 class="event-title">{{ event.eventName }}</h3>
-              <p class="event-date">{{ event.start_date }} - {{ event.end_date }}</p>
-              <p class="event-location">{{ event.location }}</p>
+              <h3
+                class="text-h5 font-weight-bold text-white mb-4"
+                style="font-family: 'Georgia', serif; font-style: italic"
+              >
+                {{ event.eventName }}
+              </h3>
+              <p class="text-white mb-6 text-body-2">
+                {{
+                  event.description.length > 150
+                    ? event.description.substring(0, 150) + "..."
+                    : event.description
+                }}
+              </p>
               <v-btn
-                color="white"
+                color="rgba(255, 255, 255, 0.2)"
                 variant="outlined"
-                class="mt-4"
+                class="text-white"
+                size="small"
+                rounded
                 @click="goToLearnMore(event)"
               >
                 Learn More
@@ -406,10 +426,35 @@ onBeforeUnmount(() => {
 }
 
 .events-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 1.5rem;
   justify-content: center;
+  align-items: start;
+}
+
+.events-grid.grid-1 {
+  grid-template-columns: 1fr;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.events-grid.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.events-grid.grid-3 {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: auto auto;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.events-grid.grid-3 .event-card:nth-child(3) {
+  grid-column: 1 / -1;
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .event-card {
@@ -419,8 +464,9 @@ onBeforeUnmount(() => {
   border-radius: 1rem;
   animation: fadeInUp 0.6s ease-out both;
   transition: all 0.3s ease;
-  flex: 0 0 calc(33.333% - 1rem);
-  min-width: 0;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .event-card-1 {
@@ -537,19 +583,35 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1024px) {
-  .event-card {
-    flex: 0 0 calc(50% - 0.75rem);
+  .events-grid.grid-2,
+  .events-grid.grid-3 {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+
+  .events-grid.grid-3 .event-card:nth-child(3) {
+    grid-column: auto;
   }
 }
 
 @media (max-width: 640px) {
   .event-card {
-    flex: 0 0 100%;
     height: 320px;
   }
 
   .events-grid {
     gap: 1rem;
+  }
+
+  .events-grid.grid-1,
+  .events-grid.grid-2,
+  .events-grid.grid-3 {
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+
+  .events-grid.grid-3 .event-card:nth-child(3) {
+    grid-column: auto;
   }
 }
 
