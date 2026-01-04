@@ -111,17 +111,10 @@
                   <el-icon><Lock /></el-icon>
                   <span>Change Password</span>
                 </el-dropdown-item>
-                <el-divider />
-                <el-dropdown-item @click="navigateTo('/services')" class="menu-item">
-                  <el-icon><Coin /></el-icon>
-                  <span>Services</span>
-                </el-dropdown-item>
-                <el-divider />
                 <el-dropdown-item @click="navigateTo('/landpage/transactions')" class="menu-item">
                   <el-icon><Clock /></el-icon>
                   <span>View Transactions</span>
                 </el-dropdown-item>
-                <el-divider />
                 <el-dropdown-item @click="navigateTo('/schedule-change')" class="menu-item">
                   <el-icon><Calendar /></el-icon>
                   <span>Request Schedule Change</span>
@@ -130,7 +123,6 @@
                   <el-icon><Message /></el-icon>
                   <span>Submit Prayer Request</span>
                 </el-dropdown-item>
-                <el-divider />
                 <el-dropdown-item @click="handleLogout" class="menu-item">
                   <el-icon><SwitchButton /></el-icon>
                   <span>Logout</span>
@@ -225,10 +217,6 @@
               <div class="mobile-menu-item" @click="handleChangePassword">
                 <el-icon><Lock /></el-icon>
                 <span>Change Password</span>
-              </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/services' })">
-                <el-icon><Coin /></el-icon>
-                <span>Services</span>
               </div>
               <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/landpage/transactions' })">
                 <el-icon><Clock /></el-icon>
@@ -340,12 +328,7 @@ const defaultHeaderData = {
     {label: 'Ministry', value: 'ministry',to:'/ministries', children:[
         { label:'All Ministries', value: 'all-ministries',to:'/ministries'},
     ]},
-    {label: 'Services', value: 'services',to:'/services' ,children:[
-        {label: 'Water Baptism', value: 'water-baptism',to:'/services/water-baptism'},
-        {label: 'Burial Service', value: 'burial-service',to:'/services/burial-service'},
-        // {label: 'Marriage Service', value: 'marriage-service',to:'/services/marriage-service'},
-        {label: 'Child Dedication', value: 'child-dedication',to:'/services/child-dedication'},
-    ]},
+    {label: 'Services', value: 'services',to:'/services'},
     {label: 'Sermons', value: 'sermons',to:'/live'}
   ],
   hoverColor: '#14b8a6',
@@ -918,6 +901,7 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 16px !important; /* Reduced padding for tighter spacing */
 }
 
 /* Ensure nested dropdowns also have proper z-index */

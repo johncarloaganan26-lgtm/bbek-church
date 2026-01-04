@@ -1,9 +1,9 @@
   <template>
     <div class="transactions-wrapper">
-     
-     <div class="transactions">
+        <div class="transactions-container">
+          <div class="transactions">
       <div class="d-flex justify-space-between align-center mb-6">
-        <h1 class="text-h4 font-weight-bold">My Services</h1>
+        <h1 class="text-h4 font-weight-bold">    </h1>
       </div>
 
     <!-- Summary Cards -->
@@ -79,7 +79,7 @@
       <!-- Services Tables Section -->
       <v-card class="mt-6" elevation="2">
         <v-card-title class="d-flex justify-space-between align-center mb-4">
-          <span class="text-h5 font-weight-bold">My Services</span>
+          <span class="text-h5 font-weight-bold">My Transactions</span>
           <v-select
             v-model="selectedServiceTypeFilter"
             :items="serviceTypeSelectOptions"
@@ -102,6 +102,54 @@
             <p>Child Dedication: {{ childDedicationServices.length }} items</p>
           </div>
           <v-row>
+            <!-- All Transactions Table -->
+            <v-col v-if="selectedServiceTypeFilter === 'all'" cols="12">
+              <v-card variant="outlined" class="mx-auto" style="max-width: 1200px;">
+                <v-card-title class="text-h6 font-weight-bold text-center">All My Services</v-card-title>
+                <v-card-text>
+                  <v-table density="compact" sort-by="[{ key: 'sort_date', order: 'desc' }]">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Service Type</th>
+                        <th class="text-left">Service ID</th>
+                        <th class="text-left">Name</th>
+                        <th class="text-left">Status</th>
+                        <th class="text-left">Date Created</th>
+                        <th class="text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-if="allTransactions.length === 0">
+                        <td colspan="6" class="text-center py-4 text-grey">No transactions found</td>
+                      </tr>
+                      <tr v-for="transaction in allTransactions" :key="`${transaction.service_type}-${transaction.service_id}`">
+                        <td>{{ transaction.service_type }}</td>
+                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ transaction.service_id }}</td>
+                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ transaction.display_name }}</td>
+                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">
+                          <v-chip size="small" :color="getStatusColor(transaction.status)">
+                            {{ transaction.status }}
+                          </v-chip>
+                        </td>
+                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ formatDateTime(transaction.date_created) }}</td>
+                        <td>
+                          <v-btn
+                            v-if="transaction.status?.toLowerCase() === 'completed'"
+                            icon="mdi-certificate"
+                            variant="text"
+                            size="small"
+                            color="primary"
+                            @click.stop="viewServiceCertificate(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))"
+                            title="View Certificate"
+                          ></v-btn>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </v-card-text>
+              </v-card>
+            </v-col>
+
             <!-- Water Baptism Table -->
             <v-col v-if="selectedServiceTypeFilter === 'water_baptism'" cols="12">
               <v-card variant="outlined">
@@ -567,8 +615,9 @@
         </v-card>
       </v-dialog>
     </div>
-  </div>
-</template>
+    </div>
+    </div>
+    </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
@@ -582,6 +631,7 @@ const memberId = computed(() => user.value?.member?.member_id || null)
 
 // Service type select options for services section
 const serviceTypeSelectOptions = [
+  { title: 'All Transactions', value: 'all' },
   { title: 'Water Baptism', value: 'water_baptism' },
   { title: 'Marriage Service', value: 'marriage' },
   { title: 'Burial Service', value: 'burial' },
@@ -589,7 +639,49 @@ const serviceTypeSelectOptions = [
 ]
 
 // Selected service type for services display
-const selectedServiceTypeFilter = ref('water_baptism')
+const selectedServiceTypeFilter = ref('all')
+
+// Combined all transactions
+const allTransactions = computed(() => {
+  const transactions = []
+  waterBaptismServices.value.forEach(service => {
+    transactions.push({
+      ...service,
+      service_type: 'Water Baptism',
+      service_id: service.baptism_id,
+      display_name: service.fullname,
+      sort_date: new Date(service.date_created || service.baptism_date || 0)
+    })
+  })
+  marriageServices.value.forEach(service => {
+    transactions.push({
+      ...service,
+      service_type: 'Marriage Service',
+      service_id: service.marriage_id,
+      display_name: `${getGroomDisplayName(service)} & ${getBrideDisplayName(service)}`,
+      sort_date: new Date(service.date_created || service.marriage_date || 0)
+    })
+  })
+  burialServices.value.forEach(service => {
+    transactions.push({
+      ...service,
+      service_type: 'Burial Service',
+      service_id: service.burial_id,
+      display_name: service.fullname,
+      sort_date: new Date(service.date_created || service.service_date || 0)
+    })
+  })
+  childDedicationServices.value.forEach(service => {
+    transactions.push({
+      ...service,
+      service_type: 'Child Dedication',
+      service_id: service.child_id,
+      display_name: service.child_fullname || `${service.child_firstname || ''} ${service.child_lastname || ''}`.trim(),
+      sort_date: new Date(service.date_created || service.preferred_dedication_date || 0)
+    })
+  })
+  return transactions.sort((a, b) => b.sort_date - a.sort_date) // Sort by date descending
+})
 
 // Dialog state
 const certificateDialog = ref(false)
@@ -868,6 +960,8 @@ onMounted(async () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .full-width-nav {
@@ -878,9 +972,17 @@ onMounted(async () => {
   width: 100%;
 }
 
-.transactions {
+.transactions-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
   padding: 24px;
+}
+
+.transactions {
   flex: 1;
+  max-width: 1400px;
+  width: 100%;
 }
 
 .summary-card {
@@ -909,7 +1011,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .transactions {
+  .transactions-container {
     padding: 16px;
   }
 
@@ -923,7 +1025,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
-  .transactions {
+  .transactions-container {
     padding: 12px;
   }
 
