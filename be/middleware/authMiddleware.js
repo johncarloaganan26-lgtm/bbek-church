@@ -33,6 +33,7 @@ const publicRoutes = [
   '/api/church-records/members/getAllMembersWithoutPastorsForSelect',
   '/api/church-records/members/getAllPastorsForSelect',
   '/api/church-records/members/getMemberById',
+  '/api/church-records/members/importCSV',
   '/api/church-records/events/getAllEvents',
   '/api/church-records/ministries/getAllMinistries',
   '/api/member-registration/register/water-baptism',
