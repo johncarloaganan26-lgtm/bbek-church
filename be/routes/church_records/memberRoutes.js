@@ -1,8 +1,5 @@
 const express = require('express');
 const moment = require('moment');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const {
   createMember,
   getAllMembers,
@@ -10,45 +7,15 @@ const {
   updateMember,
   deleteMember,
   exportMembersToExcel,
+  exportMembersToCSV,
   getAllMembersForSelect,
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
-  getAllMembersWithoutPastorsForSelect,
-  importMembersFromCSV
+  getAllMembersWithoutPastorsForSelect
 } = require('../../dbHelpers/church_records/memberRecords');
 
 const router = express.Router();
 
-// Configure multer for CSV file uploads
-const csvUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      // Use uploads directory or create temp directory
-      const uploadDir = path.join(__dirname, '../../uploads/temp');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-      // Generate unique filename
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, 'csv-import-' + uniqueSuffix + path.extname(file.originalname));
-    }
-  }),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    // Check if file is CSV
-    if (file.mimetype === 'text/csv' || file.mimetype === 'application/vnd.ms-excel' ||
-        path.extname(file.originalname).toLowerCase() === '.csv') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'), false);
-    }
-  }
-});
 
 /**
  * CREATE - Insert a new member record
@@ -321,120 +288,24 @@ router.post('/exportExcel', async (req, res) => {
   }
 })
 
-/**
- * IMPORT - Import members from CSV file
- * POST /api/church-records/members/importCSV
- * 
- * Response structure:
- * {
- *   success: boolean,
- *   message: string,
- *   summary: {
- *     totalRows: number,
- *     imported: number,
- *     duplicates: number,
- *     invalid: number,
- *     processingTimeMs: number
- *   },
- *   data: {
- *     imported: [{rowNumber, member_id, name}, ...],
- *     duplicates: [{rowNumber, data, duplicateDetails}, ...],
- *     invalid: [{rowNumber, data, errors}, ...]
- *   }
- * }
- */
-router.post('/importCSV', csvUpload.single('csvFile'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No CSV file uploaded',
-        error: 'No file provided',
-        summary: {
-          totalRows: 0,
-          imported: 0,
-          duplicates: 0,
-          invalid: 0
-        },
-        data: {
-          imported: [],
-          duplicates: [],
-          invalid: []
-        }
-      });
-    }
 
-    const filePath = req.file.path;
 
-    // Import members from CSV
-    const result = await importMembersFromCSV(filePath);
-
-    // Clean up uploaded file
-    try {
-      fs.unlinkSync(filePath);
-    } catch (cleanupError) {
-      console.warn('Failed to clean up uploaded file:', cleanupError);
-    }
-
-    // Always return consistent response structure
-    const statusCode = result.success ? 200 : 207; // 207 Multi-Status for partial success
-    
-    res.status(statusCode).json({
-      success: result.success,
-      message: result.message,
-      summary: result.summary || {},
-      data: result.data || {
-        imported: [],
-        duplicates: [],
-        invalid: []
-      }
-    });
-  } catch (error) {
-    console.error('Error importing members from CSV:', error);
-
-    // Clean up file if it exists
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.warn('Failed to clean up uploaded file after error:', cleanupError);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to import members from CSV',
-      message: `Import failed: ${error.message}`,
-      summary: {
-        totalRows: 0,
-        imported: 0,
-        duplicates: 0,
-        invalid: 0
-      },
-      data: {
-        imported: [],
-        duplicates: [],
-        invalid: []
-      }
-    });
-  }
-});
 
 router.post('/exportExcel', async (req, res) => {
   try {
     // Get parameters from request body (payload)
     const options = req.body;
     const excelBuffer = await exportMembersToExcel(options);
-    
+
     // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
     const filename = `members_export_${timestamp}.xlsx`;
-    
+
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', excelBuffer.length);
-    
+
     // Send the Excel file
     res.send(excelBuffer);
   } catch (error) {
@@ -442,6 +313,88 @@ router.post('/exportExcel', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to export members to Excel'
+    });
+  }
+});
+
+/**
+ * EXPORT - Export member records to CSV
+ * GET /api/church-records/members/exportCSV (query params)
+ * POST /api/church-records/members/exportCSV (body payload)
+ * Parameters: search, ageRange, joinMonth, sortBy (same as getAllMembers, but no pagination)
+ */
+router.get('/exportCSV', async (req, res) => {
+  try {
+    // Get parameters from query string
+    const options = req.query;
+
+    console.log('CSV Export request with options:', options);
+
+    const csvContent = await exportMembersToCSV(options);
+
+    if (!csvContent || csvContent.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to generate CSV file'
+      });
+    }
+
+    // Generate filename with timestamp
+    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+    const filename = `members_export_${timestamp}.csv`;
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', Buffer.byteLength(csvContent, 'utf8'));
+
+    console.log(`Sending CSV file: ${filename} (${csvContent.length} characters)`);
+
+    // Send the CSV file
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting members to CSV:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to export members to CSV'
+    });
+  }
+});
+
+router.post('/exportCSV', async (req, res) => {
+  try {
+    // Get parameters from request body (payload)
+    const options = req.body;
+
+    console.log('CSV Export POST request with options:', options);
+
+    const csvContent = await exportMembersToCSV(options);
+
+    if (!csvContent || csvContent.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to generate CSV file'
+      });
+    }
+
+    // Generate filename with timestamp
+    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+    const filename = `members_export_${timestamp}.csv`;
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', Buffer.byteLength(csvContent, 'utf8'));
+
+    console.log(`Sending CSV file: ${filename} (${csvContent.length} characters)`);
+
+    // Send the CSV file
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting members to CSV (POST):', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to export members to CSV'
     });
   }
 });

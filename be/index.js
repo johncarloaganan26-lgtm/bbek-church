@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 /**
- * Church Management System Backend API
+ * Bible Baptist Ekklesia of Kawit Backend API
  * 
  * Environment Configuration:
  * ===========================
@@ -166,12 +166,27 @@ app.use((req, res, next) => {
 // Health check endpoint (public route - no auth required)
 // Used by cloud platforms for health monitoring
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
+  res.status(200).json({
+    status: 'ok',
     message: 'Church backend is running',
     environment: NODE_ENV,
     timestamp: new Date().toISOString()
   });
+});
+
+// Email configuration test endpoint (public route - no auth required)
+app.get('/api/test-email', async (req, res) => {
+  try {
+    const { testEmailConfiguration } = require('./dbHelpers/emailHelper');
+    const result = await testEmailConfiguration();
+    res.status(result.success ? 200 : 500).json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Email test failed',
+      error: error.message
+    });
+  }
 });
 
 // Database pool status endpoint (for debugging - requires auth in production)
@@ -195,8 +210,8 @@ app.get('/api/db-status', (req, res) => {
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Church Management System API',
+  res.json({
+    message: 'Bible Baptist Ekklesia of Kawit API',
     version: '1.0.0',
     environment: NODE_ENV,
     status: 'running'
@@ -331,7 +346,7 @@ app.use((err, req, res, next) => {
 // This works for both local (localhost) and cloud deployments
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('='.repeat(60));
-  console.log(`🚀 Church Management System API Server`);
+  console.log(`🚀 Bible Baptist Ekklesia of Kawit API Server`);
   console.log('='.repeat(60));
   console.log(`📦 Environment: ${NODE_ENV.toUpperCase()}`);
   console.log(`🌐 Server URL: http://0.0.0.0:${PORT}`);

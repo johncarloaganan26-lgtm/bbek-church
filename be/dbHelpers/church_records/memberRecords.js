@@ -1,10 +1,10 @@
-const { query } = require('../../database/db');
+const { query, pool } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { archiveRecord } = require('../archiveRecords');
-const { parseCSVFile, processBatches, sanitizeRow } = require('../../utils/csvParser');
+const { parseCSVFile, processBatches, sanitizeRow, getCSVHeaders, autoMapMemberHeaders } = require('../../utils/csvParser');
 /**
  * Member Records CRUD Operations
  * Based on tbl_members schema:
@@ -21,6 +21,33 @@ const { parseCSVFile, processBatches, sanitizeRow } = require('../../utils/csvPa
  * - position (VARCHAR(45), NN, default: 'member')
  * - date_created (DATETIME, NN)
  */
+
+/**
+ * Normalize phone number by removing non-digit characters and standardizing prefixes
+ * @param {String} phoneNumber - Raw phone number
+ * @returns {String} Normalized phone number
+ */
+function normalizePhoneNumber(phoneNumber) {
+  if (!phoneNumber) return '';
+
+  // Remove all non-digit characters
+  let normalized = phoneNumber.replace(/\D/g, '');
+
+  // If it starts with 63 (country code without +), add +
+  if (normalized.startsWith('63')) {
+    normalized = '+' + normalized;
+  }
+  // If it starts with 9 (Philippine mobile), add +63
+  else if (normalized.startsWith('9') && normalized.length === 10) {
+    normalized = '+63' + normalized;
+  }
+  // If it doesn't have country code and is 10 digits starting with 9, add +63
+  else if (normalized.length === 10 && normalized.startsWith('9')) {
+    normalized = '+63' + normalized;
+  }
+
+  return normalized;
+}
 
 /**
  * Check if a member with the same data already exists
@@ -44,11 +71,11 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
       params.push(email);
     }
 
-    // Check for duplicate phone number (normalize by handling +63 prefix)
+    // Check for duplicate phone number (normalize by removing non-digits and standardizing prefixes)
     if (phone_number) {
-      const normalizedPhone = phone_number.trim();
-      // Check both formats: with +63 and without (database may store either format)
-      conditions.push('(REPLACE(phone_number, "+63", "") = REPLACE(?, "+63", "") OR phone_number = ?)');
+      const normalizedPhone = normalizePhoneNumber(phone_number);
+      // Check both normalized and original formats for backward compatibility
+      conditions.push('(phone_number = ? OR REPLACE(phone_number, "+63", "") = REPLACE(?, "+63", ""))');
       params.push(normalizedPhone, normalizedPhone);
     }
 
@@ -95,10 +122,10 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
         duplicateFields.push('email');
       }
       
-      // Normalize phone numbers for comparison (remove +63 prefix)
+      // Normalize phone numbers for comparison (using new normalization function)
       if (phone_number && member.phone_number) {
-        const normalizedInput = phone_number.trim().replace(/^\+63/, '');
-        const normalizedMember = member.phone_number.trim().replace(/^\+63/, '');
+        const normalizedInput = normalizePhoneNumber(phone_number);
+        const normalizedMember = normalizePhoneNumber(member.phone_number);
         if (normalizedInput === normalizedMember) {
           matches.push('phone_number');
           duplicateFields.push('phone_number');
@@ -200,6 +227,9 @@ async function createMember(memberData) {
     // Ensure member_id is set
     const final_member_id = member_id || new_member_id;
 
+    // Normalize phone number before insertion
+    const normalizedPhoneNumber = normalizePhoneNumber(phone_number);
+
     const sql = `
       INSERT INTO tbl_members
         (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, date_created)
@@ -216,7 +246,7 @@ async function createMember(memberData) {
       gender,
       address,
       email,
-      phone_number,
+      normalizedPhoneNumber,
       memberData.civil_status || null,
       position,
       memberData.guardian_name || null,
@@ -241,13 +271,121 @@ async function createMember(memberData) {
         gender,
         address,
         email,
-        phone_number,
+        phone_number: normalizedPhoneNumber,
         position,
         date_created
       }
     };
   } catch (error) {
     console.error('Error creating member:', error);
+    throw error;
+  }
+}
+
+/**
+ * CREATE - Insert a new member record with transaction connection
+ * @param {Object} memberData - Member data object
+ * @param {Object} connection - Database connection for transaction
+ * @returns {Promise<Object>} Result object with insertId
+ */
+async function createMemberWithConnection(memberData, connection) {
+  try {
+    // Get next member_id if not provided
+    const new_member_id = await getNextMemberId();
+    const {
+      member_id = new_member_id,
+      firstname,
+      lastname,
+      middle_name = null,
+      birthdate,
+      age,
+      gender,
+      address,
+      email,
+      phone_number,
+      position = 'member',
+      date_created = new Date()
+    } = memberData;
+
+    // Validate required fields
+    if (!firstname || !lastname || !birthdate || !age || !gender || !address || !email || !phone_number) {
+      throw new Error('Missing required fields: firstname, lastname, birthdate, age, gender, address, email, phone_number');
+    }
+
+    // Check for duplicate member before creating
+    const duplicateCheck = await checkDuplicateMember(memberData);
+    if (duplicateCheck.isDuplicate) {
+      const duplicateMessages = [];
+      if (duplicateCheck.duplicateFields.includes('email')) {
+        duplicateMessages.push('Email address already exists');
+      }
+      if (duplicateCheck.duplicateFields.includes('phone_number')) {
+        duplicateMessages.push('Phone number already exists');
+      }
+      if (duplicateCheck.duplicateFields.includes('name_birthdate')) {
+        duplicateMessages.push('A member with the same name and birthdate already exists');
+      }
+      return {
+        success: false,
+        message: `Duplicate member detected: ${duplicateMessages.join(', ')}`,
+        error: duplicateMessages.join(', '),
+        duplicateDetails: duplicateCheck.duplicateDetails
+      };
+    }
+
+    // Ensure member_id is set
+    const final_member_id = member_id || new_member_id;
+
+    // Normalize phone number before insertion
+    const normalizedPhoneNumber = normalizePhoneNumber(phone_number);
+
+    const sql = `
+      INSERT INTO tbl_members
+        (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, date_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const params = [
+      final_member_id,
+      firstname,
+      lastname,
+      middle_name,
+      birthdate,
+      age,
+      gender,
+      address,
+      email,
+      normalizedPhoneNumber,
+      memberData.civil_status || null,
+      position,
+      memberData.guardian_name || null,
+      memberData.guardian_contact || null,
+      memberData.guardian_relationship || null,
+      date_created
+    ];
+
+    const [result] = await connection.query(sql, params);
+
+    return {
+      success: true,
+      message: 'Member created successfully',
+      data: {
+        member_id: final_member_id,
+        firstname,
+        lastname,
+        middle_name,
+        birthdate,
+        age,
+        gender,
+        address,
+        email,
+        phone_number: normalizedPhoneNumber,
+        position,
+        date_created
+      }
+    };
+  } catch (error) {
+    console.error('Error creating member with connection:', error);
     throw error;
   }
 }
@@ -352,7 +490,7 @@ async function updateMember(memberId, memberData) {
     }
     if (phone_number !== undefined) {
       fields.push('phone_number = ?');
-      params.push(phone_number);
+      params.push(normalizePhoneNumber(phone_number));
     }
     if (civil_status !== undefined) {
       fields.push('civil_status = ?');
@@ -703,6 +841,76 @@ async function getMemberById(memberId) {
   }
   
 /**
+ * EXPORT - Export member records to CSV
+ * @param {Object} options - Optional query parameters (same as getAllMembers: search, ageRange, joinMonth, sortBy)
+ * @returns {Promise<String>} CSV content as string
+ */
+async function exportMembersToCSV(options = {}) {
+  try {
+    // Get all members matching the filters (without pagination for export)
+    const exportOptions = { ...options };
+    // Remove pagination to get all records
+    delete exportOptions.limit;
+    delete exportOptions.offset;
+    delete exportOptions.page;
+    delete exportOptions.pageSize;
+
+    const result = await getAllMembers(exportOptions);
+
+    if (!result.success || !result.data || result.data.length === 0) {
+      throw new Error('No members found to export');
+    }
+
+    const members = result.data;
+
+    // CSV headers
+    const headers = [
+      'Member ID',
+      'First Name',
+      'Last Name',
+      'Middle Name',
+      'Birthdate',
+      'Age',
+      'Gender',
+      'Address',
+      'Email',
+      'Phone Number',
+      'Civil Status',
+      'Position',
+      'Date Created'
+    ];
+
+    // Create CSV content
+    let csvContent = headers.join(',') + '\n';
+
+    members.forEach(member => {
+      const row = [
+        member.member_id || '',
+        `"${(member.firstname || '').replace(/"/g, '""')}"`, // Escape quotes
+        `"${(member.lastname || '').replace(/"/g, '""')}"`,
+        `"${(member.middle_name || '').replace(/"/g, '""')}"`,
+        member.birthdate ? moment(member.birthdate).format('YYYY-MM-DD') : '',
+        member.age || '',
+        member.gender || '',
+        `"${(member.address || '').replace(/"/g, '""')}"`,
+        member.email || '',
+        member.phone_number || '',
+        member.civil_status || '',
+        member.position || '',
+        member.date_created ? moment(member.date_created).format('YYYY-MM-DD HH:mm:ss') : ''
+      ];
+
+      csvContent += row.join(',') + '\n';
+    });
+
+    return csvContent;
+  } catch (error) {
+    console.error('Error exporting members to CSV:', error);
+    throw error;
+  }
+}
+
+/**
  * EXPORT - Export member records to Excel
  * @param {Object} options - Optional query parameters (same as getAllMembers: search, ageRange, joinMonth, sortBy)
  * @returns {Promise<Buffer>} Excel file buffer
@@ -991,219 +1199,8 @@ async function getAllDepartmentMembersForSelect() {
   }
 }
 
-/**
- * IMPORT - Import members from CSV file with improved batch processing
- * Uses streaming for large files and batch processing for better performance
- * @param {String} filePath - Path to the uploaded CSV file
- * @returns {Promise<Object>} Result object with import summary
- */
-async function importMembersFromCSV(filePath) {
-  const startTime = Date.now();
-  const batchSize = 50; // Process members in batches of 50
-  
-  try {
-    // Step 1: Parse CSV with validation
-    const csvData = await parseCSVFile(filePath, {
-      requiredFields: ['firstname', 'lastname', 'birthdate', 'age', 'gender', 'address', 'email', 'phone_number'],
-      validationFn: validateMemberRow,
-      transformFn: sanitizeRow,
-      batchSize
-    });
 
-    if (!csvData.success) {
-      throw new Error(csvData.message);
-    }
 
-    console.log(`CSV parsed: ${csvData.stats.totalRows} total rows, ${csvData.stats.validRows} valid, ${csvData.stats.invalidRows} invalid`);
-
-    // Step 2: Separate valid rows for duplicate checking
-    const validRows = csvData.rows.filter(row => row.valid);
-    const invalidRowsFromParsing = csvData.rows.filter(row => !row.valid);
-
-    // Step 3: Check for duplicates in batches
-    const duplicateMembers = [];
-    for (let i = 0; i < validRows.length; i += batchSize) {
-      const batch = validRows.slice(i, i + batchSize);
-      
-      for (const row of batch) {
-        const duplicateCheck = await checkDuplicateMember(row.data);
-        if (duplicateCheck.isDuplicate) {
-          duplicateMembers.push({
-            rowNumber: row.rowNumber,
-            data: row.data,
-            duplicateDetails: duplicateCheck.duplicateDetails
-          });
-        }
-      }
-    }
-
-    // Step 4: Filter to only non-duplicate valid members
-    const membersToInsert = validRows.filter(row => 
-      !duplicateMembers.some(dup => dup.rowNumber === row.rowNumber)
-    );
-
-    // Step 5: Process members in batches for database insertion
-    const insertedMembers = [];
-    const insertionErrors = [];
-
-    for (let i = 0; i < membersToInsert.length; i += batchSize) {
-      const batch = membersToInsert.slice(i, i + batchSize);
-      
-      // Insert batch members in parallel for better performance
-      const insertPromises = batch.map(row => 
-        createMember(row.data)
-          .then(result => {
-            if (result.success) {
-              return {
-                success: true,
-                rowNumber: row.rowNumber,
-                member_id: result.data.member_id,
-                name: `${result.data.firstname} ${result.data.lastname}`
-              };
-            } else {
-              return {
-                success: false,
-                rowNumber: row.rowNumber,
-                error: result.message || 'Failed to insert member'
-              };
-            }
-          })
-          .catch(error => ({
-            success: false,
-            rowNumber: row.rowNumber,
-            error: error.message || 'Database insertion error'
-          }))
-      );
-
-      const batchResults = await Promise.all(insertPromises);
-      
-      batchResults.forEach(result => {
-        if (result.success) {
-          insertedMembers.push(result);
-        } else {
-          insertionErrors.push({
-            rowNumber: result.rowNumber,
-            error: result.error
-          });
-        }
-      });
-    }
-
-    // Step 6: Compile comprehensive results
-    const totalInvalidMembers = invalidRowsFromParsing.concat(
-      insertionErrors.map(err => ({
-        rowNumber: err.rowNumber,
-        data: membersToInsert.find(m => m.rowNumber === err.rowNumber)?.data || {},
-        errors: [err.error]
-      }))
-    );
-
-    const processingTime = Date.now() - startTime;
-    const totalProcessed = csvData.stats.totalRows;
-    const totalSuccessful = insertedMembers.length;
-    const totalDuplicates = duplicateMembers.length;
-    const totalInvalid = totalInvalidMembers.length;
-
-    return {
-      success: totalSuccessful > 0,
-      message: `Import completed in ${processingTime}ms. ${totalSuccessful} members imported successfully.`,
-      summary: {
-        totalRows: totalProcessed,
-        imported: totalSuccessful,
-        duplicates: totalDuplicates,
-        invalid: totalInvalid,
-        processingTimeMs: processingTime
-      },
-      data: {
-        imported: insertedMembers,
-        duplicates: duplicateMembers.map(d => ({
-          rowNumber: d.rowNumber,
-          data: d.data,
-          duplicateDetails: d.duplicateDetails
-        })),
-        invalid: totalInvalidMembers
-      }
-    };
-  } catch (error) {
-    console.error('Error importing members from CSV:', error);
-    return {
-      success: false,
-      message: `Import failed: ${error.message}`,
-      error: error.message,
-      summary: {
-        totalRows: 0,
-        imported: 0,
-        duplicates: 0,
-        invalid: 0
-      },
-      data: {
-        imported: [],
-        duplicates: [],
-        invalid: []
-      }
-    };
-  }
-}
-
-/**
- * Validate a member row from CSV
- * @param {Object} rowData - Row data from CSV
- * @param {Number} rowNumber - Row number for error reporting
- * @returns {Array} Array of validation error messages
- */
-function validateMemberRow(rowData, rowNumber = null) {
-  const errors = [];
-
-  // Required fields
-  const requiredFields = ['firstname', 'lastname', 'birthdate', 'age', 'gender', 'address', 'email', 'phone_number'];
-  for (const field of requiredFields) {
-    if (!rowData[field] || rowData[field].trim() === '') {
-      errors.push(`Missing required field: ${field}`);
-    }
-  }
-
-  // Validate email format
-  if (rowData.email && rowData.email.trim() !== '') {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(rowData.email.trim())) {
-      errors.push('Invalid email format');
-    }
-  }
-
-  // Validate birthdate format
-  if (rowData.birthdate && rowData.birthdate.trim() !== '') {
-    const birthdate = moment(rowData.birthdate.trim(), ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY'], true);
-    if (!birthdate.isValid()) {
-      errors.push('Invalid birthdate format (use YYYY-MM-DD, MM/DD/YYYY, or DD/MM/YYYY)');
-    }
-  }
-
-  // Validate gender
-  if (rowData.gender && rowData.gender.trim() !== '') {
-    const gender = rowData.gender.trim().toUpperCase();
-    if (!['M', 'F', 'O'].includes(gender)) {
-      errors.push('Invalid gender (must be M, F, or O)');
-    }
-  }
-
-  // Validate age (should be positive number)
-  if (rowData.age && rowData.age.trim() !== '') {
-    const age = parseInt(rowData.age.trim());
-    if (isNaN(age) || age < 0 || age > 150) {
-      errors.push('Invalid age (must be a number between 0 and 150)');
-    }
-  }
-
-  // Validate phone number format (basic validation)
-  if (rowData.phone_number && rowData.phone_number.trim() !== '') {
-    const phoneRegex = /^[\d\s\-\+\(\)]+$/;
-    if (!phoneRegex.test(rowData.phone_number.trim())) {
-      errors.push('Invalid phone number format');
-    }
-  }
-
-  return errors;
-}
 
 module.exports = {
   createMember,
@@ -1213,12 +1210,12 @@ module.exports = {
   deleteMember,
   getNextMemberId,
   exportMembersToExcel,
+  exportMembersToCSV,
   getAllMembersForSelect,
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
   getAllMembersWithoutPastorsForSelect,
-  getSpecificMemberByEmailAndStatus,
-  importMembersFromCSV
+  getSpecificMemberByEmailAndStatus
 };
 
 

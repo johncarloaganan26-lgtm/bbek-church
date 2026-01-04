@@ -3,9 +3,6 @@ a<template>
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Church Members</h1>
       <div class="d-flex gap-2">
-        <v-btn color="primary" prepend-icon="mdi-upload" size="small" @click="csvImportDialog = true">
-          Import CSV
-        </v-btn>
         <v-btn color="success" prepend-icon="mdi-account-plus" size="small" @click="openMemberDialog">
           Add New Member
         </v-btn>
@@ -184,13 +181,6 @@ a<template>
       @update:model-value="memberDialog = $event"
       @success="handleMemberSuccess"
     />
-    <CsvImportDialog
-      v-model="csvImportDialog"
-      :upload-url="'/api/church-records/members/importCSV'"
-      :upload-headers="uploadHeaders"
-      @upload-success="handleImportSuccess"
-      @upload-error="handleImportError"
-    />
   </div>
 </template>
 
@@ -198,7 +188,6 @@ a<template>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
 import MemberDialog from '../../Dialogs/MemberDialog.vue'
-import CsvImportDialog from '../../Dialogs/CsvImportDialog.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // Pinia Store
@@ -207,7 +196,6 @@ const memberStore = useMemberRecordStore()
 // Component state
 const memberDialog = ref(false)
 const memberData = ref(null)
-const csvImportDialog = ref(false)
 
 // Filter options
 const ageRangeOptions = ['All Ages', '0-18', '19-30', '31-50', '51+']
@@ -222,9 +210,6 @@ const searchQuery = computed({
   }
 })
 
-const uploadHeaders = computed(() => ({
-  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
-}))
 
 const currentPage = computed({
   get: () => memberStore.currentPage,
@@ -295,22 +280,6 @@ const handleMemberSuccess = () => {
   })
 }
 
-const handleImportSuccess = (response) => {
-  // Refresh the member list after successful import
-  memberStore.fetchMembers({
-    page: memberStore.currentPage,
-    pageSize: memberStore.itemsPerPage,
-    search: memberStore.searchQuery,
-    ageRange: memberStore.filters.ageRange,
-    joinMonth: memberStore.filters.joinMonth,
-    sortBy: memberStore.filters.sortBy
-  })
-  ElMessage.success('Members imported successfully')
-}
-
-const handleImportError = (error) => {
-  ElMessage.error('Failed to import members: ' + error.message)
-}
 
 const handlePageChange = (page) => {
   memberStore.setCurrentPage(page)

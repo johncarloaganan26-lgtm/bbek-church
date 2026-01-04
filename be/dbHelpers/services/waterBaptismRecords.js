@@ -2,7 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
-const { sendWaterBaptismDetails } = require('../emailHelperSendGrid');
+const { sendWaterBaptismDetails } = require('../emailHelper');
 
 /**
  * Water Baptism Records CRUD Operations

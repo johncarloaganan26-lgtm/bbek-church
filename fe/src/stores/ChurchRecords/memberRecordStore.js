@@ -374,7 +374,8 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         }
 
         // Make request with responseType: 'blob' to handle binary data
-        const response = await axios.get(`/api/church-records/members/exportExcel?${params}`, {
+        // Note: axios baseURL is already '/api', so use relative path
+        const response = await axios.get(`/church-records/members/exportExcel?${params}`, {
           responseType: 'blob',
           headers: {
             'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

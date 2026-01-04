@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+  const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 require('dotenv').config();
 
@@ -74,8 +74,8 @@ const sendAccountDetails = async (accountDetails) => {
     let subject, title, mainMessage, buttonText, importantNotes;
 
     if (emailType === 'new_account') {
-      subject = 'Welcome! Set Your Password - Church Management System';
-      title = 'Welcome to Church Management System';
+      subject = 'Welcome! Set Your Password - Bible Baptist Ekklesia of Kawit';
+      title = 'Welcome to Bible Baptist Ekklesia of Kawit';
       mainMessage = `Your account has been successfully created! To get started, please set your password by clicking the link below.`;
       buttonText = 'Set Password';
       importantNotes = `
@@ -89,9 +89,9 @@ const sendAccountDetails = async (accountDetails) => {
       `;
     } else {
       // forgot_password
-      subject = 'Password Reset Request - Church Management System';
+      subject = 'Password Reset Request - Bible Baptist Ekklesia of Kawit';
       title = 'Password Reset Request';
-      mainMessage = `You have requested to reset your password for your Church Management System account.`;
+      mainMessage = `You have requested to reset your password for your Bible Baptist Ekklesia of Kawit account.`;
       buttonText = 'Reset Password';
       importantNotes = `
         <p><strong>Important:</strong></p>
@@ -104,7 +104,7 @@ const sendAccountDetails = async (accountDetails) => {
     }
 
     const mailOptions = {
-      from: `"Church Management System Administrator"`,
+      from: `"Bible Baptist Ekklesia of Kawit Administrator"`,
       to: accountDetails.email,
       subject: subject,
       html: `
@@ -207,7 +207,7 @@ const sendMarriageDetails = async (marriageDetails) => {
     const location = marriageDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: marriageDetails.email,
       subject: `Marriage Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -261,7 +261,7 @@ const sendMarriageDetails = async (marriageDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -271,7 +271,7 @@ const sendMarriageDetails = async (marriageDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Marriage details email sent successfully',
@@ -326,7 +326,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
     const location = baptismDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: baptismDetails.email,
       subject: `Water Baptism Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -376,7 +376,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -386,7 +386,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Water baptism details email sent successfully',
@@ -443,7 +443,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     const location = dedicationDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: dedicationDetails.email,
       subject: `Child Dedication Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -497,7 +497,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -507,7 +507,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Child dedication details email sent successfully',
@@ -560,9 +560,9 @@ const sendBurialServiceRequestNotification = async (requestDetails) => {
       : 'N/A';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: requestDetails.email,
-      subject: 'Burial Service Request Received - Church Management System',
+      subject: 'Burial Service Request Received - Bible Baptist Ekklesia of Kawit',
       html: `
         <!DOCTYPE html>
         <html>
@@ -629,7 +629,7 @@ const sendBurialServiceRequestNotification = async (requestDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email. For inquiries, please contact the church administration.
             </p>
           </div>
@@ -639,7 +639,7 @@ const sendBurialServiceRequestNotification = async (requestDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Burial service request notification email sent successfully',
@@ -696,7 +696,7 @@ const sendBurialDetails = async (burialDetails) => {
     const location = burialDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: burialDetails.email,
       subject: `Burial Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -750,7 +750,7 @@ const sendBurialDetails = async (burialDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -798,9 +798,9 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: approvalDetails.email,
-      subject: `${typeLabel} Join Request Received - Church Management System`,
+      subject: `${typeLabel} Join Request Received - Bible Baptist Ekklesia of Kawit`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -858,7 +858,7 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email. For inquiries, please contact the church administration.
             </p>
           </div>
@@ -868,7 +868,7 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Approval request notification email sent successfully',
@@ -904,7 +904,7 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
     const status = approvalDetails.status.toLowerCase();
     const statusColors = {
       pending: '#f39c12',
-      approved: '#27ae60',
+      read: '#27ae60',
       rejected: '#e74c3c',
     };
     const statusMessages = {
@@ -919,9 +919,9 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: approvalDetails.email,
-      subject: `${typeLabel} Join Request ${status.charAt(0).toUpperCase() + status.slice(1)} - Church Management System`,
+      subject: `${typeLabel} Join Request ${status.charAt(0).toUpperCase() + status.slice(1)} - Bible Baptist Ekklesia of Kawit`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -980,7 +980,7 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -990,7 +990,7 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Approval status update email sent successfully',
@@ -1048,9 +1048,9 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
     }).format(totalAmount);
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: transactionDetails.email,
-      subject: `Transaction Completed - ${serviceTypeLabel} - Church Management System`,
+      subject: `Transaction Completed - ${serviceTypeLabel} - Bible Baptist Ekklesia of Kawit`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -1112,7 +1112,7 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email. For inquiries, please contact the church administration.
             </p>
           </div>
@@ -1122,7 +1122,7 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Transaction completion notification email sent successfully',
@@ -1167,7 +1167,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     
     // Build form details HTML based on form type
     let formDetailsHtml = '';
-    
+
     if (formType === 'schedule_change' && formDetails.formData) {
       const serviceTypeLabels = {
         'water-baptism': 'Water Baptism',
@@ -1177,22 +1177,22 @@ const sendFormSubmissionNotification = async (formDetails) => {
       };
       const serviceType = formDetails.formData.serviceType || 'N/A';
       const serviceTypeLabel = serviceTypeLabels[serviceType] || serviceType;
-      const originalDate = formDetails.formData.originalDate 
-        ? new Date(formDetails.formData.originalDate).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+      const originalDate = formDetails.formData.originalDate
+        ? new Date(formDetails.formData.originalDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           })
         : 'N/A';
       const requestedDate = formDetails.formData.requestedDate
-        ? new Date(formDetails.formData.requestedDate).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        ? new Date(formDetails.formData.requestedDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           })
         : 'N/A';
       const reason = formDetails.formData.reason || 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Schedule Change Request Details</h3>
@@ -1219,7 +1219,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     } else if (formType === 'prayer_request' && formDetails.formData) {
       const request = formDetails.formData.request || 'N/A';
       const isAnonymous = formDetails.formData.anonymous || false;
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Prayer Request Details</h3>
@@ -1235,12 +1235,38 @@ const sendFormSubmissionNotification = async (formDetails) => {
           </table>
         </div>
       `;
+    } else if (formType === 'message' && formDetails.formData) {
+      const firstName = formDetails.formData.firstName || '';
+      const lastName = formDetails.formData.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      const subject = formDetails.formData.subject || 'No subject';
+      const message = formDetails.formData.message || 'No message';
+
+      formDetailsHtml = `
+        <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #2c3e50; margin-top: 0;">Message Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>From:</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${fullName || 'Anonymous'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Subject:</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${subject}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;"><strong>Message:</strong></td>
+              <td style="padding: 8px 0;">${message}</td>
+            </tr>
+          </table>
+        </div>
+      `;
     }
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: formDetails.email,
-      subject: `${formTypeLabel} Received - Church Management System`,
+      subject: `${formTypeLabel} Received - Bible Baptist Ekklesia of Kawit`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -1252,36 +1278,63 @@ const sendFormSubmissionNotification = async (formDetails) => {
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
             <h2 style="color: #2c3e50; margin-top: 0;">${formTypeLabel} Received</h2>
-            
+
             <p>Dear ${recipientName},</p>
-            
-            <p>We have received your ${formTypeLabel.toLowerCase()}. Thank you for reaching out to us!</p>
-            
+
+            <p>Thank you for submitting your ${formTypeLabel.toLowerCase()}. We have received it and our team will review it carefully.</p>
+
             <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f39c12;">
-              <p style="margin: 0 0 10px 0;"><strong>Request Status:</strong> 
+              <p style="margin: 0 0 10px 0;"><strong>Request Status:</strong>
                 <span style="color: #f39c12; font-weight: bold; text-transform: uppercase;">
                   Pending Review
                 </span>
               </p>
+              <p style="margin: 0; font-size: 14px; color: #666;">
+                Your submission is currently being reviewed by our admin/staff team. Please wait for their reply.
+              </p>
             </div>
-            
+
             ${formDetailsHtml}
-            
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0 0 10px 0;"><strong>What You Submitted:</strong></p>
+              ${formType === 'prayer_request' && formDetails.formData ?
+                `<div>
+                  <p style="margin: 0 0 8px 0; font-style: italic; color: #555;">"${formDetails.formData.request}"</p>
+                  ${formDetails.formData.anonymous ? '<p style="margin: 0; font-size: 12px; color: #666;"><em>Submitted anonymously</em></p>' : ''}
+                </div>` :
+                formType === 'message' && formDetails.formData ?
+                `<div>
+                  <p style="margin: 0 0 5px 0; font-weight: bold; color: #333;">Subject: ${formDetails.formData.subject || 'No subject'}</p>
+                  <p style="margin: 0; color: #555;">${formDetails.formData.message || 'No message'}</p>
+                </div>` :
+                formType === 'schedule_change' && formDetails.formData ?
+                `<div>
+                  <p style="margin: 0 0 5px 0; color: #555;">Schedule change request</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">Service: ${formDetails.formData.serviceType || 'N/A'}</p>
+                  <p style="margin: 0; font-size: 12px; color: #666;">From: ${formDetails.formData.originalDate || 'N/A'} To: ${formDetails.formData.requestedDate || 'N/A'}</p>
+                  ${formDetails.formData.reason ? `<p style="margin: 0; font-size: 12px; color: #666;">Reason: ${formDetails.formData.reason}</p>` : ''}
+                </div>` :
+                `<p style="margin: 0; color: #555;">${formTypeLabel} submission</p>`
+              }
+            </div>
+
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
               <p style="margin: 0;"><strong>Next Steps:</strong></p>
               <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Our team will review your request within 24-48 hours</li>
-                <li>You will receive a follow-up email once your request has been reviewed</li>
-                <li>If you have any questions, please contact the church administration</li>
+                <li>Our admin/staff team will review your request</li>
+                <li>You will receive a follow-up email once reviewed</li>
+                <li>Please wait patiently for their response</li>
+                <li>Thank you for your patience and understanding</li>
               </ul>
             </div>
-            
-            <p>We appreciate your submission and will get back to you as soon as possible.</p>
-            
+
+            <p>We truly appreciate you reaching out to us. Your ${formTypeLabel.toLowerCase()} is important to us, and we will respond as soon as possible.</p>
+
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
+
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email. For inquiries, please contact the church administration.
             </p>
           </div>
@@ -1291,7 +1344,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Form submission notification email sent successfully',
@@ -1333,7 +1386,7 @@ const sendFormStatusUpdate = async (formDetails) => {
     };
     const statusMessages = {
       pending: 'Your request is currently pending review.',
-      approved: 'Great news! Your request has been approved.',
+      read: 'Thank you! Your request has been read and is being processed.',
       rejected: 'We regret to inform you that your request has been rejected.',
     };
 
@@ -1350,7 +1403,7 @@ const sendFormStatusUpdate = async (formDetails) => {
     
     // Build form details HTML based on form type
     let formDetailsHtml = '';
-    
+
     if (formType === 'schedule_change' && formDetails.formData) {
       const serviceTypeLabels = {
         'water-baptism': 'Water Baptism',
@@ -1360,21 +1413,21 @@ const sendFormStatusUpdate = async (formDetails) => {
       };
       const serviceType = formDetails.formData.serviceType || 'N/A';
       const serviceTypeLabel = serviceTypeLabels[serviceType] || serviceType;
-      const originalDate = formDetails.formData.originalDate 
-        ? new Date(formDetails.formData.originalDate).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+      const originalDate = formDetails.formData.originalDate
+        ? new Date(formDetails.formData.originalDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           })
         : 'N/A';
       const requestedDate = formDetails.formData.requestedDate
-        ? new Date(formDetails.formData.requestedDate).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        ? new Date(formDetails.formData.requestedDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           })
         : 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Schedule Change Request Details</h3>
@@ -1396,11 +1449,37 @@ const sendFormStatusUpdate = async (formDetails) => {
       `;
     } else if (formType === 'prayer_request' && formDetails.formData) {
       const request = formDetails.formData.request || 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Prayer Request Details</h3>
           <p style="margin: 0;">${request}</p>
+        </div>
+      `;
+    } else if (formType === 'message' && formDetails.formData) {
+      const firstName = formDetails.formData.firstName || '';
+      const lastName = formDetails.formData.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      const subject = formDetails.formData.subject || 'No subject';
+      const message = formDetails.formData.message || 'No message';
+
+      formDetailsHtml = `
+        <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #2c3e50; margin-top: 0;">Message Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>From:</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${fullName || 'Anonymous'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Subject:</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${subject}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0;"><strong>Message:</strong></td>
+              <td style="padding: 8px 0;">${message}</td>
+            </tr>
+          </table>
         </div>
       `;
     }
@@ -1417,20 +1496,20 @@ const sendFormStatusUpdate = async (formDetails) => {
     }
 
     const mailOptions = {
-      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
       to: formDetails.email,
-      subject: `${formTypeLabel} ${status.charAt(0).toUpperCase() + status.slice(1)} - Church Management System`,
+      subject: `${formTypeLabel} ${status === 'read' ? 'Read' : status.charAt(0).toUpperCase() + status.slice(1)} - Bible Baptist Ekklesia of Kawit`,
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${formTypeLabel} ${status.charAt(0).toUpperCase() + status.slice(1)}</title>
+          <title>${formTypeLabel} ${status === 'read' ? 'Read' : status.charAt(0).toUpperCase() + status.slice(1)}</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">${formTypeLabel} Update</h2>
+            <h2 style="color: #2c3e50; margin-top: 0;">${formTypeLabel} ${status === 'read' ? 'Read' : status.charAt(0).toUpperCase() + status.slice(1)}</h2>
             
             <p>Dear ${recipientName},</p>
             
@@ -1448,12 +1527,12 @@ const sendFormStatusUpdate = async (formDetails) => {
             
             ${adminNotesHtml}
             
-            ${status === 'approved' && formType === 'schedule_change' ? `
+            ${status === 'read' && formType === 'schedule_change' ? `
             <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
               <p style="margin: 0;"><strong>What's Next:</strong></p>
               <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Your service date has been updated as requested</li>
-                <li>Please mark the new date on your calendar</li>
+                <li>Your service date change request has been read and is being processed</li>
+                <li>You will receive confirmation once the change is approved</li>
                 <li>If you have any questions, please contact the church administration</li>
               </ul>
             </div>
@@ -1471,7 +1550,7 @@ const sendFormStatusUpdate = async (formDetails) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Church Management System.<br>
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
               Please do not reply to this email.
             </p>
           </div>
@@ -1481,7 +1560,7 @@ const sendFormStatusUpdate = async (formDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Form status update email sent successfully',
@@ -1490,6 +1569,92 @@ const sendFormStatusUpdate = async (formDetails) => {
   } catch (error) {
     console.error('Error sending form status update email:', error);
     return buildErrorResult('Failed to send form status update email', error);
+  }
+};
+
+/**
+ * Test email configuration
+ * @returns {Promise<Object>} - Test result
+ */
+const testEmailConfiguration = async () => {
+  try {
+    console.log('🔧 Testing email configuration...');
+    console.log('📧 Email User:', process.env.EMAIL_USER);
+    console.log('🌐 SMTP Host:', process.env.EMAIL_HOST);
+    console.log('🔌 Port:', process.env.EMAIL_PORT);
+
+    const transporter = createTransporter();
+
+    // Verify connection
+    console.log('🔗 Verifying SMTP connection...');
+    await transporter.verify();
+    console.log('✅ SMTP connection verified');
+
+    // Send test email
+    const mailOptions = {
+      from: `"Church Management System" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER, // Send to self for testing
+      subject: '🧪 Email Configuration Test - Bible Baptist Ekklesia of Kawit',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Email Test</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+            <h2 style="color: #2c3e50; margin-top: 0;">✅ Email Configuration Successful!</h2>
+            <p>Your Bible Baptist Ekklesia of Kawit email configuration is working correctly.</p>
+            <p><strong>Test Details:</strong></p>
+            <ul>
+              <li>SMTP Host: ${process.env.EMAIL_HOST || 'smtp.gmail.com'}</li>
+              <li>Port: ${process.env.EMAIL_PORT || '587'}</li>
+              <li>Email: ${process.env.EMAIL_USER}</li>
+              <li>Time: ${new Date().toLocaleString()}</li>
+              <li>App Password: ${process.env.EMAIL_PASS ? 'Set (hidden)' : 'Not set'}</li>
+            </ul>
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>📋 Troubleshooting Tips:</strong></p>
+              <ul style="margin: 10px 0 0 20px;">
+                <li>Check your Gmail inbox and spam folder</li>
+                <li>Verify 2FA is enabled on your Google account</li>
+                <li>Confirm the app password is correct (16 characters, no spaces)</li>
+                <li>Try regenerating the app password if issues persist</li>
+              </ul>
+            </div>
+            <p>This is an automated test message.</p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    console.log('📤 Sending test email...');
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully:', info.messageId);
+
+    return {
+      success: true,
+      message: 'Email configuration test successful! Check your inbox (and spam folder) for the test email.',
+      messageId: info.messageId,
+      details: {
+        to: process.env.EMAIL_USER,
+        from: process.env.EMAIL_USER,
+        smtpHost: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT
+      }
+    };
+  } catch (error) {
+    console.error('❌ Email configuration test failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+      responseCode: error.responseCode
+    });
+    return buildErrorResult('Email configuration test failed', error);
   }
 };
 
@@ -1505,6 +1670,7 @@ module.exports = {
   sendTransactionCompletionNotification,
   sendFormSubmissionNotification,
   sendFormStatusUpdate,
+  testEmailConfiguration,
   generateResetToken,
 };
 
