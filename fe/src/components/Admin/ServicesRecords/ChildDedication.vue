@@ -153,6 +153,8 @@
             <th class="text-left font-weight-bold">Child Name</th>
             <th class="text-left font-weight-bold">Requester</th>
             <th class="text-left font-weight-bold">Preferred Date</th>
+            <th class="text-left font-weight-bold">Pastor</th>
+            <th class="text-left font-weight-bold">Location</th>
             <th class="text-left font-weight-bold">Father</th>
             <th class="text-left font-weight-bold">Mother</th>
             <th class="text-left font-weight-bold">Status</th>
@@ -162,7 +164,7 @@
         </thead>
         <tbody>
           <tr v-if="!loading && dedications.length === 0">
-            <td colspan="8" class="text-center py-12">
+            <td colspan="10" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
@@ -171,6 +173,8 @@
             <td>{{ dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() }}</td>
             <td>{{ dedication.requester_fullname || dedication.requested_by }}</td>
             <td>{{ formatDateTime(dedication.preferred_dedication_date) }}</td>
+            <td>{{ dedication.pastor || 'N/A' }}</td>
+            <td>{{ dedication.location || 'N/A' }}</td>
             <td>{{ getFatherDisplayName(dedication) }}</td>
             <td>{{ getMotherDisplayName(dedication) }}</td>
             <td>
@@ -317,6 +321,8 @@ const editDedication = (dedication) => {
     mother_phone_number: dedication.mother_phone_number,
     mother_email: dedication.mother_email,
     mother_address: dedication.mother_address,
+    pastor: dedication.pastor,
+    location: dedication.location,
     status: dedication.status
   }
   childDedicationDialog.value = true
@@ -491,17 +497,21 @@ const getStatusColor = (status) => {
 
 const handlePrint = () => {
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Child Name', 'Requester', 'Preferred Date', 'Father', 'Mother', 'Status', 'Date Created']
-  
+  const tableHeaders = ['Child Name', 'Requester', 'Preferred Date', 'Pastor', 'Location', 'Father', 'Mother', 'Status', 'Date Created']
+
   let tableRows = ''
   dedications.value.forEach((dedication) => {
     const childName = dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() || 'N/A'
     const requesterName = dedication.requester_fullname || dedication.requested_by || 'N/A'
+    const pastorName = dedication.pastor || 'N/A'
+    const locationName = dedication.location || 'N/A'
     tableRows += `
       <tr>
         <td>${childName}</td>
         <td>${requesterName}</td>
         <td>${formatDateTime(dedication.preferred_dedication_date)}</td>
+        <td>${pastorName}</td>
+        <td>${locationName}</td>
         <td>${getFatherDisplayName(dedication)}</td>
         <td>${getMotherDisplayName(dedication)}</td>
         <td>${formatStatus(dedication.status)}</td>

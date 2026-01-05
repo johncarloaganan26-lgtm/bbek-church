@@ -2,7 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
-const { sendChildDedicationDetails } = require('../emailHelperSendGrid');
+const { sendChildDedicationDetails } = require('../emailHelper');
 
 /**
  * Child Dedication Records CRUD Operations
@@ -22,6 +22,8 @@ const { sendChildDedicationDetails } = require('../emailHelperSendGrid');
  * - father_firstname, father_lastname, father_middle_name, father_phone_number, father_email, father_address (optional)
  * - mother_firstname, mother_lastname, mother_middle_name, mother_phone_number, mother_email, mother_address (optional)
  * - sponsors (VARCHAR(1000), NULL) - JSON stringified array of sponsor objects
+ * - pastor (VARCHAR(255), NULL) - Name of the pastor conducting the dedication
+ * - location (VARCHAR(255), NULL) - Location where the dedication will take place
  * - status (VARCHAR(45), NN, default: 'pending')
  * - date_created (DATETIME, NN)
  */
@@ -205,6 +207,8 @@ async function createChildDedication(dedicationData) {
       mother_email = null,
       mother_address = null,
       sponsors = null,
+      pastor = null,
+      location = null,
       status = 'pending',
       date_created = new Date()
     } = dedicationData;
@@ -236,6 +240,31 @@ async function createChildDedication(dedicationData) {
     }
     if (!contact_address || !contact_address.trim()) {
       throw new Error('Missing required field: contact_address');
+    }
+
+    // Validate pastor and location if provided (admin/staff fields)
+    if (pastor !== undefined && pastor !== null) {
+      if (!pastor || !pastor.trim()) {
+        throw new Error('Missing required field: pastor');
+      }
+      if (typeof pastor !== 'string') {
+        throw new Error('Invalid field: pastor must be a string');
+      }
+      if (pastor.length > 255) {
+        throw new Error('Invalid field: pastor name exceeds maximum length of 255 characters');
+      }
+    }
+
+    if (location !== undefined && location !== null) {
+      if (!location || !location.trim()) {
+        throw new Error('Missing required field: location');
+      }
+      if (typeof location !== 'string') {
+        throw new Error('Invalid field: location must be a string');
+      }
+      if (location.length > 255) {
+        throw new Error('Invalid field: location exceeds maximum length of 255 characters');
+      }
     }
 
     // Convert sponsors array to JSON string if provided
@@ -310,14 +339,14 @@ async function createChildDedication(dedicationData) {
     const normalizedGender = gender.toUpperCase();
 
     const sql = `
-      INSERT INTO tbl_childdedications 
-        (child_id, requested_by, child_firstname, child_lastname, child_middle_name, 
+      INSERT INTO tbl_childdedications
+        (child_id, requested_by, child_firstname, child_lastname, child_middle_name,
          date_of_birth, place_of_birth, gender, preferred_dedication_date,
          contact_phone_number, contact_email, contact_address,
          father_firstname, father_lastname, father_middle_name, father_phone_number, father_email, father_address,
          mother_firstname, mother_lastname, mother_middle_name, mother_phone_number, mother_email, mother_address,
-         sponsors, status, date_created)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         sponsors, pastor, location, status, date_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -346,14 +375,32 @@ async function createChildDedication(dedicationData) {
       mother_email ? mother_email.trim() : null,
       mother_address ? mother_address.trim() : null,
       sponsorsJson,
+      pastor ? pastor.trim() : null,
+      location ? location.trim() : null,
       status,
       formattedDateCreated
     ];
 
-    const [result] = await query(sql, params);
-    
+    let result;
+    try {
+      [result] = await query(sql, params);
+    } catch (dbError) {
+      console.error('Database error creating child dedication:', dbError);
+      throw new Error(`Failed to create child dedication record: ${dbError.message}`);
+    }
+
     // Fetch the created dedication
-    const createdDedication = await getChildDedicationById(final_child_id);
+    let createdDedication;
+    try {
+      createdDedication = await getChildDedicationById(final_child_id);
+      if (!createdDedication.success) {
+        console.warn('Warning: Created dedication not found after creation');
+        // Continue with email sending even if fetch fails
+      }
+    } catch (fetchError) {
+      console.error('Error fetching created dedication:', fetchError);
+      // Continue with email sending even if fetch fails
+    }
 
     // Send email notifications to all relevant recipients (best-effort; do not fail creation)
     try {
@@ -870,6 +917,8 @@ async function updateChildDedication(childId, dedicationData) {
       mother_email,
       mother_address,
       sponsors,
+      pastor,
+      location,
       status,
       date_created
     } = dedicationData;
@@ -919,6 +968,58 @@ async function updateChildDedication(childId, dedicationData) {
       }
       fields.push('gender = ?');
       params.push(gender.toUpperCase());
+    }
+
+    if (pastor !== undefined) {
+      if (pastor !== null && (!pastor || !pastor.trim())) {
+        return {
+          success: false,
+          message: 'Missing required field: pastor',
+          error: 'Pastor is required'
+        };
+      }
+      if (pastor !== null && typeof pastor !== 'string') {
+        return {
+          success: false,
+          message: 'Invalid field: pastor must be a string',
+          error: 'Invalid pastor field'
+        };
+      }
+      if (pastor !== null && pastor.length > 255) {
+        return {
+          success: false,
+          message: 'Invalid field: pastor name exceeds maximum length of 255 characters',
+          error: 'Pastor name too long'
+        };
+      }
+      fields.push('pastor = ?');
+      params.push(pastor !== null ? pastor.trim() : null);
+    }
+
+    if (location !== undefined) {
+      if (location !== null && (!location || !location.trim())) {
+        return {
+          success: false,
+          message: 'Missing required field: location',
+          error: 'Location is required'
+        };
+      }
+      if (location !== null && typeof location !== 'string') {
+        return {
+          success: false,
+          message: 'Invalid field: location must be a string',
+          error: 'Invalid location field'
+        };
+      }
+      if (location !== null && location.length > 255) {
+        return {
+          success: false,
+          message: 'Invalid field: location exceeds maximum length of 255 characters',
+          error: 'Location too long'
+        };
+      }
+      fields.push('location = ?');
+      params.push(location !== null ? location.trim() : null);
     }
 
     if (preferred_dedication_date !== undefined) {
@@ -1129,7 +1230,13 @@ async function updateChildDedication(childId, dedicationData) {
       WHERE child_id = ?
     `;
 
-    const [result] = await query(sql, params);
+    let result;
+    try {
+      [result] = await query(sql, params);
+    } catch (dbError) {
+      console.error('Database error updating child dedication:', dbError);
+      throw new Error(`Failed to update child dedication record: ${dbError.message}`);
+    }
 
     if (result.affectedRows === 0) {
       return {
@@ -1140,7 +1247,17 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     // Fetch updated dedication
-    const updatedDedication = await getChildDedicationById(childId);
+    let updatedDedication;
+    try {
+      updatedDedication = await getChildDedicationById(childId);
+      if (!updatedDedication.success) {
+        console.warn('Warning: Updated dedication not found after update');
+        // Continue with email sending even if fetch fails
+      }
+    } catch (fetchError) {
+      console.error('Error fetching updated dedication:', fetchError);
+      // Continue with email sending even if fetch fails
+    }
 
     // Send email notifications to all relevant recipients (best-effort; do not fail update)
     try {

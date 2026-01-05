@@ -1,0 +1,11 @@
+-- ============================================
+-- Keep Pastor and Location Fields Optional for Members
+-- ============================================
+-- The pastor and location fields remain NULLABLE since they are only
+-- required for admin/staff users, not for regular members.
+-- No database changes needed - fields should remain as NULL
+-- ============================================
+
+-- Note: Fields remain nullable as they are only required for admin/staff
+-- Regular members do not need to provide these fields
+-- No ALTER TABLE statements needed

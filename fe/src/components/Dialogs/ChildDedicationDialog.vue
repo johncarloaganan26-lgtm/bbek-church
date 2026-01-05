@@ -435,6 +435,38 @@
         />
       </el-form-item>
 
+      <!-- Pastor (Admin/Staff only) -->
+      <el-form-item v-if="!isMemberUser" label="Pastor" prop="pastor" required>
+        <el-select
+          v-model="formData.pastor"
+          placeholder="Select pastor"
+          size="large"
+          style="width: 100%"
+          clearable
+          filterable
+          :disabled="loading"
+          @change="onPastorChange"
+        >
+          <el-option
+            v-for="option in pastorOptions"
+            :key="option.id"
+            :label="option.name"
+            :value="option.name"
+          />
+        </el-select>
+      </el-form-item>
+
+      <!-- Location (Admin/Staff only) -->
+      <el-form-item v-if="!isMemberUser" label="Location" prop="location" required>
+        <el-input
+          v-model="formData.location"
+          placeholder="Enter dedication location"
+          size="large"
+          clearable
+          :disabled="loading"
+        />
+      </el-form-item>
+
       <!-- Status -->
       <el-form-item label="Status" prop="status">
         <el-select
@@ -530,6 +562,9 @@ const isEditMode = computed(() => !!props.dedicationData)
 // Member options - will be fetched from API
 const memberOptions = ref([])
 
+// Pastor options - will be fetched from API
+const pastorOptions = ref([])
+
 // Check if user is a member
 const isMemberUser = computed(() => {
   return userInfo.value?.account?.position === 'member'
@@ -554,6 +589,24 @@ const fetchMemberOptions = async () => {
   } catch (error) {
     console.error('Error fetching member options:', error)
   }
+}
+
+// Fetch pastor options on mount
+const fetchPastorOptions = async () => {
+  try {
+    const response = await axios.get('/church-records/church-leaders/getAllChurchLeadersForSelect')
+    if (response.data.success && response.data.data) {
+      pastorOptions.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching pastor options:', error)
+  }
+}
+
+// Handle pastor selection change
+const onPastorChange = (pastorName) => {
+  // Optional: Could auto-fill location based on pastor, but keeping it simple for now
+  console.log('Pastor selected:', pastorName)
 }
 
 // Handle member selection change - auto-fill contact details
@@ -607,6 +660,8 @@ const formData = reactive({
   mother_email: '',
   mother_address: '',
   sponsors: [],
+  pastor: '',
+  location: '',
   status: 'pending'
 })
 
@@ -727,6 +782,40 @@ const rules = {
       trigger: 'change'
     }
   ],
+  pastor: [
+    {
+      validator: (rule, value, callback) => {
+        // Only require pastor for admin/staff users
+        if (!isMemberUser.value && (!value || !value.trim())) {
+          callback(new Error('Pastor is required'))
+          return
+        }
+        if (value && value.length > 255) {
+          callback(new Error('Pastor name must not exceed 255 characters'))
+          return
+        }
+        callback()
+      },
+      trigger: ['change', 'blur']
+    }
+  ],
+  location: [
+    {
+      validator: (rule, value, callback) => {
+        // Only require location for admin/staff users
+        if (!isMemberUser.value && (!value || !value.trim())) {
+          callback(new Error('Location is required'))
+          return
+        }
+        if (value && value.length > 255) {
+          callback(new Error('Location must not exceed 255 characters'))
+          return
+        }
+        callback()
+      },
+      trigger: ['blur', 'change']
+    }
+  ],
   status: [
     { required: true, message: 'Status is required', trigger: 'change' }
   ]
@@ -767,6 +856,8 @@ watch(() => props.dedicationData, (newData) => {
           address: s.address || ''
         }))
       : []
+    formData.pastor = newData.pastor || ''
+    formData.location = newData.location || ''
     formData.status = newData.status || 'pending'
   }
 }, { immediate: true })
@@ -781,10 +872,11 @@ watch(() => props.modelValue, async (isOpen) => {
     // Refresh userInfo from localStorage
     const freshUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
     userInfo.value = freshUserInfo
-    
-    // Fetch member options when dialog opens
+
+    // Fetch member options and pastor options when dialog opens
     await fetchMemberOptions()
-    
+    await fetchPastorOptions()
+
     if (props.dedicationData) {
       // Populate form when dialog opens in edit mode
       const data = props.dedicationData
@@ -820,15 +912,17 @@ watch(() => props.modelValue, async (isOpen) => {
             address: s.address || ''
           }))
         : []
+      formData.pastor = data.pastor || ''
+      formData.location = data.location || ''
       formData.status = data.status || 'pending'
     } else {
       // Reset form for add mode
       resetForm()
-      
+
       // Auto-fill requested_by if user is a member
       if (isMemberUser.value && userInfo.value?.member?.member_id) {
         formData.requested_by = userInfo.value.member.member_id
-        
+
         // Auto-fill contact details from member info if available
         if (userInfo.value.member.phone_number) {
           formData.contact_phone_number = userInfo.value.member.phone_number
@@ -844,9 +938,10 @@ watch(() => props.modelValue, async (isOpen) => {
   }
 })
 
-// Fetch member options when component mounts
+// Fetch member and pastor options when component mounts
 onMounted(async () => {
   await fetchMemberOptions()
+  await fetchPastorOptions()
 })
 
 // Reset form
@@ -875,6 +970,8 @@ const resetForm = () => {
   formData.mother_email = ''
   formData.mother_address = ''
   formData.sponsors = []
+  formData.pastor = ''
+  formData.location = ''
   formData.status = 'pending'
 
   // Clear validation
@@ -951,6 +1048,12 @@ const handleSubmit = async () => {
           })).filter(s => s.firstname && s.lastname && s.phone_number && s.address) // Only include complete sponsors
         : [],
       status: formData.status
+    }
+
+    // Only include pastor and location for admin/staff users
+    if (!isMemberUser.value) {
+      submitData.pastor = formData.pastor ? formData.pastor.trim() : null
+      submitData.location = formData.location ? formData.location.trim() : null
     }
 
     // Emit submit event with data
