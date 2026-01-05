@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const { archiveBeforeDelete } = require('../archiveHelper');
 const  {getSpecificWaterBaptismDataByMemberIdIfBaptized} = require('../services/waterBaptismRecords');
 const { getSpecificMemberByEmailAndStatus } = require('../church_records/memberRecords');
-const { sendAccountDetails } = require('../emailHelper');
+const { sendAccountDetails } = require('../emailHelperSendGrid');
 
 /**
  * Account Records CRUD Operations

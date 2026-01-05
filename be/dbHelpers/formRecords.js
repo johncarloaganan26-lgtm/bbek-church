@@ -1,6 +1,6 @@
 const { query } = require('../database/db');
 const moment = require('moment');
-const { sendFormSubmissionNotification, sendFormStatusUpdate } = require('./emailHelper');
+const { sendFormSubmissionNotification, sendFormStatusUpdate } = require('./emailHelperSendGrid');
 
 /**
  * CREATE - Create a new form submission

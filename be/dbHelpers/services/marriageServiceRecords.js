@@ -2,7 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
-const { sendMarriageDetails } = require('../emailHelper');
+const { sendMarriageDetails } = require('../emailHelperSendGrid');
 
 /**
  * Update civil status of groom and bride to 'married' when marriage is completed
