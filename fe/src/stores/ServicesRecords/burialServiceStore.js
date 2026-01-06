@@ -23,6 +23,9 @@ export const useBurialServiceStore = defineStore('burialService', {
       scheduled: 0,
       completed: 0,
       pending: 0,
+      approved: 0,
+      disapproved: 0,
+      cancelled: 0,
       ongoing: 0
     }
   }),
@@ -93,6 +96,9 @@ export const useBurialServiceStore = defineStore('burialService', {
             scheduled: 0,
             completed: 0,
             pending: 0,
+            approved: 0,
+            disapproved: 0,
+            cancelled: 0,
             ongoing: 0
           }
         } else {

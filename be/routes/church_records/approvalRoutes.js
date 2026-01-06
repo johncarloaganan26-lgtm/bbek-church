@@ -5,7 +5,8 @@ const {
   getApprovalById,
   updateApprovalStatus,
   deleteApproval,
-  checkMemberApprovalExists
+  checkMemberApprovalExists,
+  checkMemberApprovalStatus
 } = require('../../dbHelpers/church_records/approvalRecord');
 
 const router = express.Router();
@@ -192,6 +193,38 @@ router.get('/checkMemberApprovalExists', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Failed to check member approval'
+    });
+  }
+});
+
+/**
+ * CHECK - Check member approval status (returns actual status)
+ * GET /api/church-records/approvals/checkMemberApprovalStatus
+ * Query params: email, type, request_id
+ */
+router.get('/checkMemberApprovalStatus', async (req, res) => {
+  try {
+    const { email, type, request_id } = req.query;
+    const result = await checkMemberApprovalStatus(email, type, request_id);
+    
+    if (result.success) {
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    }
+    
+    return res.status(400).json({
+      success: false,
+      message: result.message,
+      error: result.message
+    });
+  } catch (error) {
+    console.error('Error checking member approval status:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to check member approval status'
     });
   }
 });

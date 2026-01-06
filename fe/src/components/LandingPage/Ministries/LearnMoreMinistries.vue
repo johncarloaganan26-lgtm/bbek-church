@@ -39,86 +39,153 @@
     </div>
 
     <div v-else class="w-full min-h-screen relative" :style="{ backgroundColor: learnMoreMinistryData.backgroundColor || '#ffffff' }">
-      <!-- Content Section -->
-      <section class="content-section relative w-full py-20 pt-32">
-        <v-container>
-          <!-- Ministry Title -->
-          <h1 class="text-4xl md:text-5xl lg:text-6xl font-weight-bold text-black mb-6" style="font-family: 'Georgia', serif; font-style: italic; text-transform: uppercase;">
-            {{ model?.ministryName || 'Ministry Details' }}
-          </h1>
+      <!-- Hero Section -->
+      <section
+        class="hero-section"
+        :style="{ backgroundImage: learnMoreMinistryData.heroImage ? `url(${learnMoreMinistryData.heroImage})` : `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('/img/youth (4).jpg')` }"
+      >
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <h1 class="hero-title">{{ model?.ministryName || model?.ministry_name || 'Ministry Details' }}</h1>
+          <p class="hero-subtitle">
+            {{ learnMoreMinistryData.heroSubtitle || 'Discover more about this ministry and join us in serving God.' }}
+          </p>
+        </div>
+      </section>
 
-          <v-row>
+      <!-- Content Section -->
+      <section class="content-section relative w-full py-20">
+        <v-container>
+          <v-row align="center" class="gap-12">
             <!-- Left Side - Description and Info -->
             <v-col cols="12" lg="6">
               <div class="space-y-6">
+                <h2 class="text-3xl md:text-4xl font-weight-bold text-black mb-4" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                  {{ learnMoreMinistryData.aboutTitle || 'About This Ministry' }}
+                </h2>
                 <p class="text-lg text-black leading-relaxed font-normal">
                   {{ model?.description || learnMoreMinistryData.defaultDescription || "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives." }}
                 </p>
 
-                <div class="d-flex align-start gap-3">
-                  <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
-                  <div>
-                    <p class="font-weight-bold text-black">Schedule</p>
-                    <p class="text-black font-normal">{{ formatDate(model?.schedule) || 'Weekly meetings' }}</p>
-                  </div>
-                </div>
-
-                <div class="d-flex align-start gap-3">
-                  <v-icon color="black" size="24" class="mt-1">mdi-clock-outline</v-icon>
-                  <div>
-                    <p class="font-weight-bold text-black">Time</p>
-                    <p class="text-black font-normal">{{ formatTime(model?.schedule) }}</p>
-                  </div>
-                </div>
-
-                <div class="d-flex align-start gap-3">
-                  <v-icon color="black" size="24" class="mt-1">mdi-account</v-icon>
-                  <div>
-                    <p class="font-weight-bold text-black">Leader</p>
-                    <p class="text-black font-normal">{{ model?.leader || 'Ministry Leader' }}</p>
-                  </div>
-                </div>
-
-                <v-btn
-                  v-if="userInfo?.member?.member_id"
-                  :loading="loading"
-                  size="large"
-                  :class="hasAlreadyJoined ? 'disabled-btn' : 'join-btn'"
-                  :style="hasAlreadyJoined 
-                    ? { '--btn-bg': '#9ca3af', '--btn-color': 'white', '--btn-border': '#9ca3af' }
-                    : { '--btn-bg': learnMoreMinistryData.buttonColor || '#ffffff', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#ffffff' }"
-                  :disabled="hasAlreadyJoined"
-                  @click="handleJoinMinistry"
+                <v-card
+                  class="mb-4 ministry-card ministry-card-1"
+                  variant="flat"
+                  color="teal-lighten-5"
                 >
-                  {{ hasAlreadyJoined ? (learnMoreMinistryData.alreadyJoinedText || 'Already Joined') : (learnMoreMinistryData.joinButtonText || 'Join Us') }}
-                </v-btn>
-                <v-btn
-                  v-else
-                  size="large"
-                  class="join-btn"
-                  :style="{ '--btn-bg': learnMoreMinistryData.buttonColor || '#ffffff', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#ffffff' }"
-                  @click="handleJoinAsGuest"
+                  <v-card-text>
+                    <div class="d-flex align-start gap-3">
+                      <v-icon color="teal-darken-3" size="24" class="mt-1">mdi-calendar</v-icon>
+                      <div>
+                        <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">Schedule</h3>
+                        <p class="text-teal-darken-2">{{ formatDate(model?.schedule) || 'Weekly meetings' }}</p>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
+
+                <v-card
+                  class="mb-4 ministry-card ministry-card-2"
+                  variant="flat"
+                  color="teal-lighten-5"
                 >
-                  {{ learnMoreMinistryData.joinButtonText || 'Join Us' }}
-                </v-btn>
+                  <v-card-text>
+                    <div class="d-flex align-start gap-3">
+                      <v-icon color="teal-darken-3" size="24" class="mt-1">mdi-clock-outline</v-icon>
+                      <div>
+                        <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">Time</h3>
+                        <p class="text-teal-darken-2">{{ formatTime(model?.schedule) }}</p>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
+
+                <v-card
+                  class="mb-4 ministry-card ministry-card-3"
+                  variant="flat"
+                  color="teal-lighten-5"
+                >
+                  <v-card-text>
+                    <div class="d-flex align-start gap-3">
+                      <v-icon color="teal-darken-3" size="24" class="mt-1">mdi-account</v-icon>
+                      <div>
+                        <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">Leader</h3>
+                        <p class="text-teal-darken-2">{{ model?.leader || 'Ministry Leader' }}</p>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
+
+                <v-card
+                  class="mb-4 ministry-card ministry-card-4"
+                  variant="flat"
+                  color="teal-lighten-5"
+                >
+                  <v-card-text>
+                    <v-btn
+                      v-if="userInfo?.member?.member_id"
+                      :loading="loading"
+                      size="large"
+                      :class="getButtonClass"
+                      :style="{ '--btn-bg': getButtonColor, '--btn-color': 'white', '--btn-border': getButtonColor }"
+                      :disabled="getButtonDisabled"
+                      @click="handleJoinMinistry"
+                      block
+                    >
+                      {{ getButtonText }}
+                    </v-btn>
+                    <v-btn
+                      v-else
+                      size="large"
+                      class="join-btn"
+                      :style="{ '--btn-bg': learnMoreMinistryData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#16a34a' }"
+                      @click="handleJoinAsGuest"
+                      block
+                    >
+                      Become a Member
+                    </v-btn>
+                  </v-card-text>
+                </v-card>
               </div>
             </v-col>
 
             <!-- Right Side - Image -->
             <v-col cols="12" lg="6">
-              <div class="relative overflow-hidden" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-                <v-img
-                  :src="`${model?.imageUrl}`"
-                  :alt="model?.ministry_name || 'Ministry'"
-                  height="500"
-                  cover
-                ></v-img>
-              </div>
+              <v-img
+                :src="`${model?.imageUrl}`"
+                :alt="model?.ministry_name || 'Ministry'"
+                height="80vh"
+                cover
+                class="rounded-lg ministry-image"
+              ></v-img>
             </v-col>
           </v-row>
         </v-container>
       </section>
+
+      <!-- Join Community Section -->
+      <section class="join-section py-16 bg-white text-black">
+        <v-container>
+          <div class="text-center">
+            <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+              {{ learnMoreMinistryData.joinCommunityTitle || 'Join Our Community' }}
+            </h2>
+            <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+              {{ learnMoreMinistryData.joinCommunityText || 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.' }}
+            </p>
+            <v-btn
+              size="large"
+              rounded
+              class="text-white join-community-btn"
+              :style="{ backgroundColor: learnMoreMinistryData.joinButtonColor || '#14b8a6', borderColor: learnMoreMinistryData.joinButtonColor || '#14b8a6', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
+              @click="$router.push('/beoneofus/accept-jesus')"
+            >
+              Become a Member
+            </v-btn>
+          </div>
+        </v-container>
+      </section>
     </div>
+    
     <AcceptJesusChristDialog 
       :modelValue="showJoinEvent" 
       :type="'ministry'" 
@@ -130,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -144,14 +211,15 @@ const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const isMemberLandPage = ref(false)
 const showJoinEvent = ref(false)
 const model = ref(null)
-const loading = ref(true)
-const hasAlreadyJoined = ref(false)
+const loading = ref(false)
+const approvalStatus = ref(null)
 const checkingStatus = ref(false)
+
 // In Vue Router, state is accessed via query params
 const ministryModelFromState = ref(
   route.query?.ministryModel ? JSON.parse(decodeURIComponent(route.query.ministryModel)) : null
 )
-console.log(ministryModelFromState.value ,'ministryModelFromState')
+
 const floatingElements = ref([
   { style: { top: '80px', left: '80px', width: '48px', height: '48px', animationDelay: '0s' } },
   { style: { top: '33%', right: '64px', width: '32px', height: '32px', animationDelay: '1.5s' } },
@@ -168,29 +236,20 @@ const formatTime = (time) => {
   if(!time) return 'TBA'
   return dayjs(time).format('h:mm A')
 }
+
 const formatDate = (date) => {
   if (!date) return 'TBA'
-  return dayjs(date).format(' MMMM D, YYYY')
+  return dayjs(date).format('MMMM D, YYYY')
 }
+
 const fetchMinistryData = async () => {
   try {
     loading.value = true
-    // TODO: Replace with actual API call
-    // const response = await MinistryRepo().getMinistryById(parseInt(id))
-    // if (response && response.data) {
-    //   model.value = response.data
-    // } else {
-    //   router.push('/ministries')
-    //   return
-    // }
-    
     // For now, use the model from state if available
     if (ministryModelFromState.value) {
       model.value = ministryModelFromState.value
       loading.value = false
     } else {
-      // If no state, would fetch from API
-      // For now, set loading to false and model to null to show error
       loading.value = false
       model.value = null
     }
@@ -202,7 +261,7 @@ const fetchMinistryData = async () => {
 
 const handleJoinMinistry = async () => {
   // Don't allow joining if already has approval (pending, approved, or rejected)
-  if (hasAlreadyJoined.value) {
+  if (approvalStatus.value !== null) {
     ElMessage.warning('You have already submitted a request for this ministry.')
     return
   }
@@ -210,7 +269,7 @@ const handleJoinMinistry = async () => {
   // Show confirmation dialog before submitting
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to join "${model.value?.ministryName || 'this ministry'}"? Your request will be reviewed by an admin.`,
+      `Are you sure you want to join "${model.value?.ministryName || model?.ministry_name || 'this ministry'}"? Your request will be reviewed by an admin.`,
       'Confirm Join Request',
       {
         confirmButtonText: 'Join',
@@ -219,11 +278,6 @@ const handleJoinMinistry = async () => {
       }
     )
   } catch (error) {
-    // User cancelled the confirmation
-    if (error === 'cancel') {
-      return
-    }
-    console.error('Error showing confirmation:', error)
     return
   }
   
@@ -239,7 +293,7 @@ const handleJoinMinistry = async () => {
     const response = await axios.post('/church-records/approvals/createApproval', approvalData)
     if (response.data.success) {
       ElMessage.success('Your request to join has been submitted. An admin will review and approve your request.')
-      hasAlreadyJoined.value = true
+      approvalStatus.value = 'pending'
     } else {
       ElMessage.error(response.data.message || 'Failed to submit join request')
     }
@@ -258,7 +312,7 @@ const handleJoinAsGuest = () => {
 
 const handleApprovalCreated = () => {
   // When approval is created in dialog, update the status
-  hasAlreadyJoined.value = true
+  approvalStatus.value = 'pending'
   // Re-check to get the latest approval info
   checkIfAlreadyJoined()
 }
@@ -269,14 +323,14 @@ const checkIfAlreadyJoined = async () => {
     return
   }
 
-  // Don't check if already marked as joined
-  if (hasAlreadyJoined.value) {
+  // Don't check if already have a status
+  if (approvalStatus.value !== null) {
     return
   }
 
   checkingStatus.value = true
   try {
-    const response = await axios.get('/church-records/approvals/checkMemberApprovalExists', {
+    const response = await axios.get('/church-records/approvals/checkMemberApprovalStatus', {
       params: {
         email: userInfo.value.account.email,
         type: 'ministry',
@@ -284,16 +338,14 @@ const checkIfAlreadyJoined = async () => {
       }
     })
 
-    if (response.data.success && response.data.data?.exists) {
-      hasAlreadyJoined.value = true
+    if (response.data.success && response.data.data?.status) {
+      approvalStatus.value = response.data.data.status
     } else {
-      // Explicitly set to false if no approval exists
-      hasAlreadyJoined.value = false
+      approvalStatus.value = null
     }
   } catch (error) {
     console.error('Error checking approval status:', error)
-    // Don't block the UI if check fails, just log the error
-    // Keep hasAlreadyJoined as false on error to allow user to try
+    approvalStatus.value = null
   } finally {
     checkingStatus.value = false
   }
@@ -319,7 +371,48 @@ const learnMoreMinistryData = ref({
   defaultDescription: "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives.",
   detailsTitle: 'Ministry Details',
   joinButtonText: 'Join Us',
-  alreadyJoinedText: 'Already Joined'
+  pendingText: 'Pending Request',
+  approvedText: 'You Already Join',
+  rejectedText: 'Request Rejected',
+  heroImage: null,
+  heroSubtitle: 'Discover more about this ministry and join us in serving God.',
+  joinCommunityTitle: 'Join Our Community',
+  joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.',
+  joinButtonColor: '#14b8a6'
+})
+
+// Computed properties for button states
+const getButtonText = computed(() => {
+  if (approvalStatus.value === 'pending') {
+    return learnMoreMinistryData.value.pendingText || 'Pending Request'
+  } else if (approvalStatus.value === 'approved') {
+    return learnMoreMinistryData.value.approvedText || 'You Already Join'
+  } else if (approvalStatus.value === 'rejected') {
+    return learnMoreMinistryData.value.rejectedText || 'Request Rejected'
+  }
+  return learnMoreMinistryData.value.joinButtonText || 'Join Us'
+})
+
+const getButtonClass = computed(() => {
+  if (approvalStatus.value === null) {
+    return 'join-btn'
+  }
+  return 'disabled-btn'
+})
+
+const getButtonColor = computed(() => {
+  if (approvalStatus.value === 'pending') {
+    return '#f59e0b'
+  } else if (approvalStatus.value === 'approved') {
+    return '#10b981'
+  } else if (approvalStatus.value === 'rejected') {
+    return '#ef4444'
+  }
+  return learnMoreMinistryData.value.buttonColor || '#16a34a'
+})
+
+const getButtonDisabled = computed(() => {
+  return approvalStatus.value !== null
 })
 
 // Fetch learn more ministry data from CMS
@@ -333,29 +426,32 @@ const fetchLearnMoreMinistryData = async () => {
       console.log('CMS Response - Learn More Ministry:', { content, cmsImages })
       
       // Update learn more ministry data from content
-      // Handle all possible fields that might be in CMS
       if (content.aboutTitle) learnMoreMinistryData.value.aboutTitle = content.aboutTitle
       if (content.defaultDescription) learnMoreMinistryData.value.defaultDescription = content.defaultDescription
       if (content.detailsTitle) learnMoreMinistryData.value.detailsTitle = content.detailsTitle
       if (content.joinButtonText) learnMoreMinistryData.value.joinButtonText = content.joinButtonText
       if (content.alreadyJoinedText) learnMoreMinistryData.value.alreadyJoinedText = content.alreadyJoinedText
+      if (content.heroSubtitle) learnMoreMinistryData.value.heroSubtitle = content.heroSubtitle
+      if (content.joinCommunityTitle) learnMoreMinistryData.value.joinCommunityTitle = content.joinCommunityTitle
+      if (content.joinCommunityText) learnMoreMinistryData.value.joinCommunityText = content.joinCommunityText
       
-      // Handle background color and button color if they exist
       if (content.backgroundColor) {
         learnMoreMinistryData.value.backgroundColor = content.backgroundColor
-        console.log('Background color from CMS:', content.backgroundColor)
       }
       if (content.buttonColor) {
         learnMoreMinistryData.value.buttonColor = content.buttonColor
-        console.log('Button color from CMS:', content.buttonColor)
+      }
+      if (content.joinButtonColor) {
+        learnMoreMinistryData.value.joinButtonColor = content.joinButtonColor
       }
       
-      // Handle images if they exist (stored as BLOB, returned as base64)
-      // Images are in cmsImages object with field names like "images[0].image"
-      if (cmsImages && typeof cmsImages === 'object') {
-        console.log('Images found in CMS:', Object.keys(cmsImages))
-        // Process images if needed for this component
-        // Currently this component doesn't use images, but we log them for debugging
+      // Handle hero image
+      if (cmsImages && typeof cmsImages === 'object' && cmsImages.heroImage) {
+        const heroImageBase64 = cmsImages.heroImage
+        if (heroImageBase64 && typeof heroImageBase64 === 'string' && heroImageBase64.startsWith('data:image/')) {
+          learnMoreMinistryData.value.heroImage = heroImageBase64
+          console.log('✅ Hero image loaded from CMS (BLOB converted to base64)')
+        }
       }
       
       console.log('✅ Learn More Ministry CMS data loaded successfully')
@@ -400,6 +496,55 @@ onMounted(async () => {
   margin-top: 64px;
 }
 
+.hero-section {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+}
+
+@media (min-width: 960px) {
+  .hero-section {
+    height: 70vh;
+    min-height: 500px;
+  }
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+}
+
+.hero-content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  color: white;
+  padding: 40px;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.hero-subtitle {
+  font-size: 1.125rem;
+  max-width: 42rem;
+  margin: 0 auto;
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
 .floating-elements {
   position: absolute;
   inset: 0;
@@ -409,7 +554,7 @@ onMounted(async () => {
 
 .floating-element {
   position: absolute;
-  background: rgba(20, 184, 166, 0.1);
+  background: rgba(63, 211, 194, 0.62);
   border-radius: 50%;
   animation: float 3.5s ease-in-out infinite;
 }
@@ -432,11 +577,50 @@ onMounted(async () => {
   margin-top: 1.5rem;
 }
 
+.ministry-card {
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out both;
+}
+
+.ministry-card-1 {
+  animation-delay: 200ms;
+}
+
+.ministry-card-2 {
+  animation-delay: 300ms;
+}
+
+.ministry-card-3 {
+  animation-delay: 400ms;
+}
+
+.ministry-card-4 {
+  animation-delay: 500ms;
+}
+
+.ministry-card:hover {
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left-width: 6px;
+}
+
+.ministry-image {
+  transition: transform 0.5s ease;
+}
+
+.ministry-image:hover {
+  transform: scale(1.05);
+}
+
 .join-btn {
   transition: all 0.3s ease;
   background-color: var(--btn-bg) !important;
   color: var(--btn-color) !important;
   border: 1px solid var(--btn-border) !important;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .join-btn:hover {
@@ -449,6 +633,66 @@ onMounted(async () => {
   color: var(--btn-color) !important;
   border: 1px solid var(--btn-border) !important;
   cursor: not-allowed !important;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.join-section {
+  position: relative;
+  z-index: 2;
+}
+
+.join-community-btn {
+  transition: all 0.3s ease;
+}
+
+.join-community-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 960px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+  
+  .content-section {
+    padding: 48px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-title {
+    font-size: 1.75rem;
+  }
+  
+  .hero-section {
+    height: 50vh;
+    min-height: 350px;
+  }
+  
+  .hero-content {
+    padding: 24px 16px;
+  }
+  
+  .content-section {
+    padding: 32px 0;
+  }
 }
 </style>
-

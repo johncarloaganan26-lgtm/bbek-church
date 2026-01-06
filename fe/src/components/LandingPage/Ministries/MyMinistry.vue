@@ -14,15 +14,14 @@
     <div class="w-screen h-auto relative overflow-hidden">
       <!-- Hero Section -->
       <section
-        class="hero-section relative w-full"
-        :style="{ backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('/img/youth (4).jpg')` }"
+        class="hero-section"
+        :style="{ backgroundImage: ministryDataConfig.heroImage ? `url(${ministryDataConfig.heroImage})` : `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('/img/youth (4).jpg')` }"
       >
-        <div class="hero-content relative z-10 text-center px-4 max-w-5xl mx-auto w-full flex flex-col items-center justify-center">
-          <h1 class="hero-title text-3xl md:text-5xl font-weight-bold text-white mb-4">
-            MY MINISTRY
-          </h1>
-          <p class="hero-subtitle text-lg md:text-xl text-white font-weight-light">
-            Discover the ministries you've joined and continue to grow in faith and serve our community.
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <h1 class="hero-title">{{ ministryDataConfig.heroTitle || 'JOINED MINISTRIES' }}</h1>
+          <p class="hero-subtitle">
+            {{ ministryDataConfig.heroSubtitle || 'Discover the ministries you\'ve joined and continue to grow in faith and serve our community.' }}
           </p>
         </div>
       </section>
@@ -40,11 +39,11 @@
         </div>
 
         <div class="max-w-7xl mx-auto">
-          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-            My Ministry
+          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center" style="font-size: 1.5rem; font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            Joined Ministries
           </h2>
           <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-            Discover the ministries you've joined and continue to grow in faith and serve our community.
+            {{ ministryDataConfig.sectionSubtitle || 'Discover the ministries you\'ve joined and continue to grow in faith and serve our community.' }}
           </p>
 
           <!-- Loading State -->
@@ -133,8 +132,10 @@
           <div v-if="!loading && ministryData.length === 0" class="text-center py-16 flex flex-col items-center justify-center">
             <p class="text-lg text-grey">No ministries found. Join a ministry to see it here.</p>
             <v-btn
-              color="#14b8a6"
-              class="mt-4 text-white"
+              size="large"
+              rounded
+              class="text-white mt-4"
+              :style="{ backgroundColor: ministryDataConfig.joinButtonColor || '#14b8a6', borderColor: ministryDataConfig.joinButtonColor || '#14b8a6', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
               @click="$router.push('/ministries')"
             >
               Browse Ministries
@@ -169,20 +170,19 @@
         <v-container>
           <div class="text-center">
             <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-              Join Our Community
+              {{ ministryDataConfig.joinCommunityTitle || 'Join Our Community' }}
             </h2>
             <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-              We invite you to be a part of our church family. Come worship with us and experience the love of Christ.
+              {{ ministryDataConfig.joinCommunityText || 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.' }}
             </p>
             <v-btn
-              color="#14b8a6"
               size="large"
               rounded
-              class="text-white"
-              style="font-family: 'Georgia', serif; font-style: italic;"
+              class="text-white join-community-btn"
+              :style="{ backgroundColor: ministryDataConfig.joinButtonColor || '#14b8a6', borderColor: ministryDataConfig.joinButtonColor || '#14b8a6', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
               @click="$router.push('/beoneofus/accept-jesus')"
             >
-              Become a Member
+              {{ ministryDataConfig.joinButtonText || 'Become a Member' }}
             </v-btn>
           </div>
         </v-container>
@@ -195,9 +195,66 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMinistriesStore } from '@/stores/ChurchRecords/ministriesStore'
+import axios from '@/api/axios'
 
 const router = useRouter()
 const ministriesStore = useMinistriesStore()
+
+const ministryDataConfig = ref({
+  heroTitle: 'JOINED MINISTRIES',
+  heroSubtitle: 'Discover the ministries you\'ve joined and continue to grow in faith and serve our community.',
+  heroImage: null,
+  sectionTitle: 'Joined Ministries',
+  sectionSubtitle: 'Discover the ministries you\'ve joined and continue to grow in faith and serve our community.',
+  joinCommunityTitle: 'Join Our Community',
+  joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.',
+  joinButtonText: 'Become a Member',
+  joinButtonColor: '#14b8a6'
+})
+
+// Fetch ministries page data from CMS
+const fetchMinistriesData = async () => {
+  try {
+    const response = await axios.get('/cms/ministries/full')
+    if (response.data.success && response.data.data) {
+      const { page, images: cmsImages } = response.data.data
+      const content = page?.content || {}
+      
+      console.log('CMS Response - Ministries (User):', { content, cmsImages })
+      
+      if (content.heroTitle) ministryDataConfig.value.heroTitle = content.heroTitle
+      if (content.heroSubtitle) ministryDataConfig.value.heroSubtitle = content.heroSubtitle
+      if (content.sectionSubtitle) ministryDataConfig.value.sectionSubtitle = content.sectionSubtitle
+      if (content.joinCommunityTitle) ministryDataConfig.value.joinCommunityTitle = content.joinCommunityTitle
+      if (content.joinCommunityText) ministryDataConfig.value.joinCommunityText = content.joinCommunityText
+      if (content.joinButtonText) ministryDataConfig.value.joinButtonText = content.joinButtonText
+      if (content.joinButtonColor) ministryDataConfig.value.joinButtonColor = content.joinButtonColor
+      
+      // Handle hero image
+      if (cmsImages && typeof cmsImages === 'object' && cmsImages.heroImage) {
+        const heroImageBase64 = cmsImages.heroImage
+        if (heroImageBase64 && typeof heroImageBase64 === 'string' && heroImageBase64.startsWith('data:image/')) {
+          ministryDataConfig.value.heroImage = heroImageBase64
+          console.log('✅ Hero image loaded from CMS (BLOB converted to base64)')
+        } else {
+          console.log('⚠️ Hero image in CMS is not a valid base64 image')
+        }
+      } else {
+        console.log('ℹ️ No hero image found in CMS, using default')
+      }
+      
+      console.log('✅ Ministries CMS data loaded successfully (User page)')
+    } else {
+      console.log('⚠️ No CMS data found for Ministries, using defaults')
+    }
+  } catch (error) {
+    if (error.response?.status !== 404) {
+      console.error('Error fetching ministries data from CMS:', error)
+    } else {
+      console.log('CMS page not found (404), using default values')
+    }
+  }
+}
 
 const ministryData = ref([])
 const showSort = ref(false)
@@ -344,8 +401,18 @@ watch(selectedStatus, () => {
   refresh.value = true
 })
 
-onMounted(() => {
-  fetchMinistryData()
+onMounted(async () => {
+  // Load user info from localStorage
+  const storedUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  userInfo.value = storedUserInfo
+  
+  // Fetch CMS data first
+  await fetchMinistriesData()
+  
+  // Fetch ministries on mount
+  if (userInfo.value?.member?.member_id) {
+    fetchMinistryData()
+  }
 })
 </script>
 
@@ -358,36 +425,41 @@ onMounted(() => {
 
 .hero-section {
   position: relative;
-  height: 50vh;
-  min-height: 400px;
+  width: 100%;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  margin-top: 64px;
 }
 
-@media (min-width: 960px) {
-  .hero-section {
-    height: 60vh;
-    min-height: 600px;
-  }
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
 }
 
 .hero-content {
   position: relative;
   z-index: 10;
+  text-align: center;
+  color: white;
+  padding: 40px;
 }
 
 .hero-title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .hero-subtitle {
+  font-size: 1.125rem;
+  max-width: 42rem;
+  margin: 0 auto;
   font-family: 'Poppins', 'Inter', sans-serif;
 }
 
@@ -419,43 +491,10 @@ onMounted(() => {
 }
 
 .ministries-grid {
-  display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
-  max-height: calc(100vh - 400px);
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-
-@media (min-width: 768px) {
-  .ministries-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .ministries-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* Custom scrollbar styling */
-.ministries-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.ministries-grid::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.ministries-grid::-webkit-scrollbar-thumb {
-  background: #14b8a6;
-  border-radius: 10px;
-}
-
-.ministries-grid::-webkit-scrollbar-thumb:hover {
-  background: #0fa08f;
+  justify-content: flex-start;
 }
 
 .ministry-card {
@@ -463,8 +502,62 @@ onMounted(() => {
   height: 384px;
   overflow: hidden;
   border-radius: 1rem;
-  width: 100%;
-  max-width: 100%;
+  animation: fadeInUp 0.6s ease-out both;
+  transition: all 0.3s ease;
+  flex: 0 0 calc(33.333% - 1rem);
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .ministry-card {
+    flex: 0 0 calc(50% - 0.75rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .all-ministries-user-page {
+    margin-top: 64px;
+  }
+
+  .hero-section {
+    height: 60vh;
+    min-height: 400px;
+  }
+
+  .hero-content {
+    padding: 24px 16px;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    max-width: 100%;
+  }
+
+  .ministry-card {
+    flex: 0 0 100%;
+    height: 320px;
+  }
+
+  .ministries-grid {
+    gap: 1rem;
+  }
+
+  .floating-element {
+    display: none;
+  }
+}
+
+.ministry-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.ministry-card:hover .ministry-image {
+  transform: scale(1.1);
 }
 
 .ministry-image {
@@ -472,6 +565,7 @@ onMounted(() => {
   inset: 0;
   background-size: cover;
   background-position: center;
+  transition: transform 0.5s ease;
 }
 
 .ministry-overlay {
@@ -500,7 +594,6 @@ onMounted(() => {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-
 .join-section {
   position: relative;
   z-index: 2;
@@ -516,4 +609,3 @@ onMounted(() => {
   }
 }
 </style>
-

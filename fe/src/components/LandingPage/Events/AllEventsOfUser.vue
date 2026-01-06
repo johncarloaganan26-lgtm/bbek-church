@@ -19,7 +19,7 @@
       >
         <div class="hero-overlay"></div>
         <div class="hero-content">
-          <h1 class="hero-title">{{ eventsData.heroTitle || 'MY EVENTS' }}</h1>
+          <h1 class="hero-title">{{ eventsData.heroTitle || 'JOINED EVENTS' }}</h1>
           <p class="hero-subtitle">
             {{ eventsData.heroSubtitle || 'Join us for exciting upcoming events that bring our community together in faith and fellowship.' }}
           </p>
@@ -40,57 +40,11 @@
 
         <div class="max-w-7xl mx-auto">
           <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
-            My Events
+            Joined Events
           </h2>
           <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
             {{ eventsData.sectionSubtitle || 'Join us for exciting upcoming events that bring our community together in faith and fellowship.' }}
           </p>
-
-          <!-- Search and Filter -->
-          <div class="max-w-4xl mx-auto mt-8">
-            <div class="d-flex align-center gap-2">
-              <v-text-field
-                v-model="query"
-                placeholder="Search events..."
-                variant="outlined"
-                density="compact"
-                hide-details
-                class="flex-grow-1"
-                @update:model-value="handleQueryChange"
-              ></v-text-field>
-              <div class="relative">
-                <v-btn
-                  icon
-                  variant="text"
-                  @click="toggleSort"
-                >
-                  <v-icon>mdi-filter</v-icon>
-                </v-btn>
-                <v-menu
-                  v-model="showSort"
-                  location="bottom end"
-                >
-                  <v-list>
-                    <v-list-item
-                      @click="setSelectedStatus(''); toggleSort()"
-                    >
-                      <v-list-item-title>Upcoming Events</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item
-                      @click="setSelectedStatus('regular'); toggleSort()"
-                    >
-                      <v-list-item-title>Regular Schedule</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item
-                      @click="setSelectedStatus('yearly'); toggleSort()"
-                    >
-                      <v-list-item-title>Yearly Events</v-list-item-title>
-                    </v-list-item>
-                  </v-list>
-                </v-menu>
-              </div>
-            </div>
-          </div>
 
           <!-- Events Grid -->
           <div
@@ -185,10 +139,10 @@ const router = useRouter()
 const eventsStore = useEventsRecordsStore()
 
 const eventsData = ref({
-  heroTitle: 'MY EVENTS',
+  heroTitle: 'JOINED EVENTS',
   heroSubtitle: 'Join us for exciting upcoming events that bring our community together in faith and fellowship.',
   heroImage: null,
-  sectionTitle: 'My Events',
+  sectionTitle: 'Joined Events',
   sectionSubtitle: 'Join us for exciting upcoming events that bring our community together in faith and fellowship.',
   sectionBackgroundColor: '#ffffff',
   joinCommunityTitle: 'Join Our Community',
@@ -208,11 +162,11 @@ const fetchEventsData = async () => {
       console.log('CMS Response - Events (User):', { content, cmsImages })
       
       // Update events data from content
-      // Note: For user events page, we keep "My Events" as the section title (user-specific)
+      // Note: For user events page, we keep "Joined Events" as the section title (user-specific)
       // but use other CMS fields like hero image, colors, and join section
       if (content.heroTitle) eventsData.value.heroTitle = content.heroTitle
       if (content.heroSubtitle) eventsData.value.heroSubtitle = content.heroSubtitle
-      // Don't override sectionTitle - keep it as "My Events" for user page
+      // Don't override sectionTitle - keep it as "Joined Events" for user page
       // But use sectionSubtitle from CMS if available
       if (content.upcomingEventsText) eventsData.value.sectionSubtitle = content.upcomingEventsText
       if (content.sectionBackgroundColor) {
@@ -254,13 +208,9 @@ const fetchEventsData = async () => {
 }
 
 const eventData = ref([])
-const showSort = ref(false)
-const query = ref('')
 const pageNumber = ref(1)
 const totalPage = ref(1)
 const refresh = ref(true)
-const selectedStatus = ref('')
-const isMemberLandPage = ref(false)
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const loading = ref(false)
 
@@ -291,19 +241,6 @@ const sectionFloatingElements = ref([
   { style: { bottom: '50%', left: '25%', width: '52px', height: '52px', animationDelay: '0.9s' } }
 ])
 
-const toggleSort = () => {
-  showSort.value = !showSort.value
-}
-
-const setSelectedStatus = (status) => {
-  selectedStatus.value = status
-  refresh.value = true
-}
-
-const handleQueryChange = () => {
-  refresh.value = true
-}
-
 const fetchEventData = async () => {
   try {
     // Check if user is logged in and has member ID
@@ -317,24 +254,9 @@ const fetchEventData = async () => {
     const memberId = userInfo.value.member.member_id
     loading.value = true
 
-    // Map selectedStatus to type filter if needed
-    // For now, we'll use it as a type filter or status filter based on your needs
-    let typeFilter = ''
-    let statusFilter = ''
-    
-    if (selectedStatus.value === 'regular') {
-      typeFilter = 'regular' // Adjust based on your event types
-    } else if (selectedStatus.value === 'yearly') {
-      typeFilter = 'yearly' // Adjust based on your event types
-    }
-
     const result = await eventsStore.fetchUserEvents(memberId, {
       page: pageNumber.value,
-      pageSize: 10, // Adjust page size as needed
-      search: query.value,
-      status: statusFilter,
-      type: typeFilter,
-      sortBy: 'Start Date (Newest)'
+      pageSize: 10 // Adjust page size as needed
     })
 
     if (result.success) {
@@ -385,21 +307,6 @@ watch([refresh, pageNumber], () => {
     fetchEventData()
     refresh.value = false
   }
-})
-
-// Watch query separately with debounce for search
-let searchTimeout = null
-watch(query, () => {
-  // Clear previous timeout
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-  
-  // Set new timeout to debounce search
-  searchTimeout = setTimeout(() => {
-    pageNumber.value = 1
-    refresh.value = true
-  }, 500) // 500ms debounce delay
 })
 
 onMounted(async () => {
@@ -492,43 +399,10 @@ onMounted(async () => {
 }
 
 .events-grid {
-  display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.5rem;
-  max-height: calc(100vh - 400px);
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-
-@media (min-width: 768px) {
-  .events-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .events-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* Custom scrollbar styling */
-.events-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.events-grid::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-}
-
-.events-grid::-webkit-scrollbar-thumb {
-  background: #14b8a6;
-  border-radius: 10px;
-}
-
-.events-grid::-webkit-scrollbar-thumb:hover {
-  background: #0fa08f;
+  justify-content: flex-start;
 }
 
 .event-card {
@@ -536,6 +410,62 @@ onMounted(async () => {
   height: 384px;
   overflow: hidden;
   border-radius: 1rem;
+  animation: fadeInUp 0.6s ease-out both;
+  transition: all 0.3s ease;
+  flex: 0 0 calc(33.333% - 1rem);
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .event-card {
+    flex: 0 0 calc(50% - 0.75rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .all-events-user-page {
+    margin-top: 64px;
+  }
+
+  .hero-section {
+    height: 60vh;
+    min-height: 400px;
+  }
+
+  .hero-content {
+    padding: 24px 16px;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    max-width: 100%;
+  }
+
+  .event-card {
+    flex: 0 0 100%;
+    height: 320px;
+  }
+
+  .events-grid {
+    gap: 1rem;
+  }
+
+  .floating-element {
+    display: none;
+  }
+}
+
+.event-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.event-card:hover .event-image {
+  transform: scale(1.1);
 }
 
 .event-image {
@@ -543,6 +473,7 @@ onMounted(async () => {
   inset: 0;
   background-size: cover;
   background-position: center;
+  transition: transform 0.5s ease;
 }
 
 .event-overlay {
@@ -595,4 +526,5 @@ onMounted(async () => {
   }
 }
 </style>
+
 

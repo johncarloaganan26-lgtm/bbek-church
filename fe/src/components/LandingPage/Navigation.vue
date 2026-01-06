@@ -338,9 +338,7 @@ const defaultHeaderData = {
      
     ]},
     {label: 'Give', value: 'give',to:'/give'},
-    {label: 'Events', value: 'events',to:'/events',children:[
-        { label:'All Events', value: 'all-events',to:'/events/all-events'},
-    ]},
+    {label: 'Events', value: 'events',to:'/events/all-events'},
     {label: 'Ministry', value: 'ministry',to:'/ministries', children:[
         { label:'All Ministries', value: 'all-ministries',to:'/ministries'},
     ]},
@@ -409,6 +407,14 @@ const fetchHeaderData = async () => {
 
       // Filter out "I'm New" menu item
       menus = menus.filter(menu => menu.label !== "I'm New" && menu.value !== 'im-new')
+      
+      // Force Events menu to be a single button (no dropdown) - override CMS data
+      menus = menus.map(menu => {
+        if (menu.value === 'events' || menu.label === 'Events') {
+          return { label: 'Events', value: 'events', to: '/events/all-events' }
+        }
+        return menu
+      })
       
       // Merge fetched data with defaults
       headerData.value = {

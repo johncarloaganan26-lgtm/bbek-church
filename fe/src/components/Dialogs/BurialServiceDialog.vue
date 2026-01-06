@@ -21,167 +21,170 @@
     >
      <!-- Member -->
      <el-form-item label="Member" prop="member_id">
-        <el-select
-          v-model="formData.member_id"
-          placeholder="Select member"
-          size="large"
-          style="width: 100%"
-          clearable
-          :disabled="loading || (userInfo.account.position !== 'admin' && userInfo.account.position !== 'staff')"
-        >
-          <el-option
-            v-for="member in memberOptions"
-            :key="member.id || member.member_id"
-            :label="member.name || (member.firstname + ' ' + member.lastname)"
-            :value="member.id || member.member_id"
-          />
-        </el-select>
-      </el-form-item>
+       <template #label>
+         <span>Member <span class="required">*</span></span>
+       </template>
+       <el-select
+         v-model="formData.member_id"
+         placeholder="Select member"
+         size="large"
+         style="width: 100%"
+         clearable
+         :disabled="loading || (userInfo.account.position !== 'admin' && userInfo.account.position !== 'staff')"
+       >
+         <el-option
+           v-for="member in memberOptions"
+           :key="member.id || member.member_id"
+           :label="member.name || (member.firstname + ' ' + member.lastname)"
+           :value="member.id || member.member_id"
+         />
+       </el-select>
+     </el-form-item>
 
-      <!-- Deceased Name -->
-      <el-form-item label="Deceased Name" prop="deceased_name">
-        <template #label>
-          <span>Deceased Name <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-input
-          v-model="formData.deceased_name"
-          placeholder="Enter deceased full name"
-          size="large"
-          clearable
-          :disabled="loading"
-        />
-      </el-form-item>
+     <!-- Deceased Name -->
+     <el-form-item label="Deceased Name" prop="deceased_name">
+       <template #label>
+         <span>Deceased Name <span class="required">*</span></span>
+       </template>
+       <el-input
+         v-model="formData.deceased_name"
+         placeholder="Enter deceased full name"
+         size="large"
+         clearable
+         :disabled="loading"
+       />
+     </el-form-item>
 
-      <!-- Deceased Birthdate -->
-      <el-form-item label="Deceased Birthdate" prop="deceased_birthdate">
-        <template #label>
-          <span>Deceased Birthdate <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-date-picker
-          v-model="formData.deceased_birthdate"
-          type="date"
-          placeholder="Select birthdate"
-          size="large"
-          format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD"
-          style="width: 100%"
-          :disabled="loading"
-        />
-      </el-form-item>
+     <!-- Deceased Birthdate -->
+     <el-form-item label="Deceased Birthdate" prop="deceased_birthdate">
+       <template #label>
+         <span>Deceased Birthdate <span class="required">*</span></span>
+       </template>
+       <el-date-picker
+         v-model="formData.deceased_birthdate"
+         type="date"
+         placeholder="Select birthdate"
+         size="large"
+         format="YYYY-MM-DD"
+         value-format="YYYY-MM-DD"
+         style="width: 100%"
+         :disabled="loading"
+       />
+     </el-form-item>
 
-      <!-- Date of Death -->
-      <el-form-item label="Date of Death" prop="date_death">
-        <template #label>
-          <span>Date of Death <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-date-picker
-          v-model="formData.date_death"
-          type="datetime"
-          placeholder="Select date and time of death"
-          size="large"
-          format="YYYY-MM-DD HH:mm"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          style="width: 100%"
-          :disabled="loading"
-        />
-      </el-form-item>
+     <!-- Date of Death -->
+     <el-form-item label="Date of Death" prop="date_death">
+       <template #label>
+         <span>Date of Death <span class="required">*</span></span>
+       </template>
+       <el-date-picker
+         v-model="formData.date_death"
+         type="datetime"
+         placeholder="Select date and time of death"
+         size="large"
+         format="YYYY-MM-DD HH:mm"
+         value-format="YYYY-MM-DD HH:mm:ss"
+         style="width: 100%"
+         :disabled="loading"
+       />
+     </el-form-item>
 
-      <!-- Relationship -->
-      <el-form-item label="Relationship" prop="relationship">
-        <template #label>
-          <span>Relationship <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-select
-          v-model="formData.relationship"
-          placeholder="Select relationship"
-          size="large"
-          style="width: 100%"
-          clearable
-          :disabled="loading"
-        >
-          <el-option
-            v-for="rel in relationshipOptions"
-            :key="rel"
-            :label="rel"
-            :value="rel"
-          />
-        </el-select>
-      </el-form-item>
+     <!-- Relationship -->
+     <el-form-item label="Relationship" prop="relationship">
+       <template #label>
+         <span>Relationship <span class="required">*</span></span>
+       </template>
+       <el-select
+         v-model="formData.relationship"
+         placeholder="Select relationship"
+         size="large"
+         style="width: 100%"
+         clearable
+         :disabled="loading"
+       >
+         <el-option
+           v-for="rel in relationshipOptions"
+           :key="rel"
+           :label="rel"
+           :value="rel"
+         />
+       </el-select>
+     </el-form-item>
 
-      <!-- Location -->
-      <el-form-item label="Location" prop="location" >
-        <template #label>
-          <span>Location <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-input
-          v-model="formData.location"
-          placeholder="Enter service location"
-          size="large"
-          clearable
-          :disabled="loading"
-        />
-      </el-form-item>
+     <!-- Location -->
+     <el-form-item label="Location" prop="location" >
+       <template #label>
+         <span>Location <span class="required">*</span></span>
+       </template>
+       <el-input
+         v-model="formData.location"
+         placeholder="Enter service location"
+         size="large"
+         clearable
+         :disabled="loading"
+       />
+     </el-form-item>
 
-      <!-- Pastor -->
-      <el-form-item label="Pastor" prop="pastor_name" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
-        <template #label>
-          <span>Pastor <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-select
-          v-model="formData.pastor_name"
-          placeholder="Select pastor"
-          size="large"
-          style="width: 100%"
-          clearable
-          :disabled="loading"
-        >
-          <el-option
-            v-for="pastor in pastorOptions"
-            :key="pastor.name"
-            :label="pastor.name"
-            :value="pastor.name"
-          />
-        </el-select>
-      </el-form-item>
+     <!-- Pastor -->
+     <el-form-item label="Pastor" prop="pastor_name" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+       <template #label>
+         <span>Pastor <span class="required">*</span></span>
+       </template>
+       <el-select
+         v-model="formData.pastor_name"
+         placeholder="Select pastor"
+         size="large"
+         style="width: 100%"
+         clearable
+         :disabled="loading"
+       >
+         <el-option
+           v-for="pastor in pastorOptions"
+           :key="pastor.name"
+           :label="pastor.name"
+           :value="pastor.name"
+         />
+       </el-select>
+     </el-form-item>
 
-      <!-- Service Date & Time -->
-      <el-form-item label="Service Date & Time" prop="service_date" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
-        <template #label>
-          <span>Service Date & Time <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-date-picker
-          v-model="formData.service_date"
-          type="datetime"
-          placeholder="Select service date and time"
-          size="large"
-          format="YYYY-MM-DD HH:mm"
-          value-format="YYYY-MM-DD HH:mm:ss"
-          style="width: 100%"
-          :disabled="loading"
-          @change="updateStatusFromServiceDate"
-        />
-      </el-form-item>
+     <!-- Service Date & Time -->
+     <el-form-item label="Service Date & Time" prop="service_date" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+       <template #label>
+         <span>Service Date & Time <span class="required">*</span></span>
+       </template>
+       <el-date-picker
+         v-model="formData.service_date"
+         type="datetime"
+         placeholder="Select service date and time"
+         size="large"
+         format="YYYY-MM-DD HH:mm"
+         value-format="YYYY-MM-DD HH:mm:ss"
+         style="width: 100%"
+         :disabled="loading"
+         @change="updateStatusFromServiceDate"
+       />
+     </el-form-item>
 
-      <!-- Status -->
-      <el-form-item label="Status" prop="status" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
-        <template #label>
-          <span>Status <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
-        <el-select
-          v-model="formData.status"
-          placeholder="Status"
-          size="large"
-          style="width: 100%"
-          :disabled="loading"
-        >
-          <el-option
-            v-for="opt in statusOptions"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
-        </el-select>
-      </el-form-item>
+     <!-- Status -->
+     <el-form-item label="Status" prop="status" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+       <template #label>
+         <span>Status <span class="required">*</span></span>
+       </template>
+       <el-select
+         v-model="formData.status"
+         placeholder="Status"
+         size="large"
+         style="width: 100%"
+         :disabled="loading"
+       >
+         <el-option
+           v-for="opt in statusOptions"
+           :key="opt.value"
+           :label="opt.label"
+           :value="opt.value"
+         />
+       </el-select>
+     </el-form-item>
     </el-form>
 
     <template #footer>
@@ -363,7 +366,7 @@ watch(
       formData.location = newData.location || ''
       formData.pastor_name = newData.pastor_name ?? null
       formData.service_date = (newData.service_date === null || newData.service_date === '' || !newData.service_date) ? null : newData.service_date
-      
+       
 
       // Derive status from date if not explicitly set
       if (newData.status) {
@@ -537,13 +540,6 @@ defineExpose({
   color: #ef4444;
 }
 
-.required-text {
-  color: #ef4444;
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin-left: 4px;
-}
-
 .burial-service-dialog :deep(.el-input__wrapper) {
   border-radius: 8px;
   transition: all 0.2s ease;
@@ -666,5 +662,3 @@ defineExpose({
   }
 }
 </style>
-
-

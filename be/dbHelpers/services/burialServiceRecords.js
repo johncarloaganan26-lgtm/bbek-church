@@ -210,7 +210,7 @@ async function getAllBurialServices(options = {}) {
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
-    const useFulltext = options.useFulltext !== false; // Default to true for better performance
+    const useFulltext = options.useFulltext === true; // Default to false for broader compatibility
 
     // Build base query for counting total records (with JOIN for accurate count)
     let countSql = 'SELECT COUNT(*) as total FROM tbl_burialservice bs INNER JOIN tbl_members m ON bs.member_id = m.member_id';
@@ -385,7 +385,9 @@ async function getAllBurialServices(options = {}) {
       pending: 0,
       approved: 0,
       disapproved: 0,
-      cancelled: 0
+      cancelled: 0,
+      scheduled: 0,
+      ongoing: 0
     };
     
     // Get total count of all records

@@ -675,6 +675,79 @@ module.exports = {
   getApprovalById,
   updateApprovalStatus,
   deleteApproval,
-  checkMemberApprovalExists
+  checkMemberApprovalExists,
+  checkMemberApprovalStatus
 };
+
+/**
+ * CHECK - Check member approval status (returns actual status)
+ * @param {string} email - Member email
+ * @param {string} type - Type of request ('event' or 'ministry')
+ * @param {number} request_id - Request ID (event_id or ministry_id)
+ * @returns {Promise<Object>} Result object with status
+ */
+async function checkMemberApprovalStatus(email, type, request_id) {
+  try {
+    if (!email || !email.trim()) {
+      return {
+        success: false,
+        message: 'Email is required',
+        data: { status: null }
+      };
+    }
+
+    if (!type || !request_id) {
+      return {
+        success: false,
+        message: 'Type and request_id are required',
+        data: { status: null }
+      };
+    }
+
+    const normalizedType = type.toLowerCase().trim();
+    const requestIdInt = parseInt(request_id);
+    
+    if (isNaN(requestIdInt)) {
+      return {
+        success: false,
+        message: 'Request ID must be a valid integer',
+        data: { status: null }
+      };
+    }
+
+    // Check if approval record exists and get its status
+    const [approvalRows] = await query(
+      `SELECT approval_id, status 
+       FROM tbl_approval 
+       WHERE email = ? AND type = ? AND request_id = ?`,
+      [email.trim(), normalizedType, requestIdInt]
+    );
+
+    // If approval exists, return the status
+    if (approvalRows.length > 0) {
+      return {
+        success: true,
+        message: 'Member approval status found',
+        data: {
+          status: approvalRows[0].status,
+          approval_id: approvalRows[0].approval_id
+        }
+      };
+    }
+
+    // No approval found
+    return {
+      success: true,
+      message: 'No approval found for member',
+      data: { status: null }
+    };
+  } catch (error) {
+    console.error('Error checking member approval status:', error);
+    return {
+      success: false,
+      message: 'Failed to check member approval status: ' + error.message,
+      data: { status: null }
+    };
+  }
+}
 

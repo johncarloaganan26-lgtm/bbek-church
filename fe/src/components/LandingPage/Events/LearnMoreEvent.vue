@@ -1,94 +1,114 @@
 <template>
   <div class="learn-more-event-page">
-    
-    <!-- Floating Elements -->
-    <div class="floating-elements">
-      <div
-        v-for="(element, index) in floatingElements"
-        :key="index"
-        class="floating-element"
-        :style="element.style"
-      ></div>
-    </div>
+    <section class="event-section" style="position: relative;">
+      <!-- Loading overlay -->
+      <v-overlay :model-value="loading" contained class="align-center justify-center" style="z-index: 10;">
+        <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+      </v-overlay>
+      
+      <v-container>
+        <v-row align="center" class="gap-12">
+          <!-- Left Side - Event Details -->
+          <v-col cols="12" md="6">
+            <!-- Event Title -->
+            <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6" style="font-family: 'Georgia', serif; font-style: italic;">
+              {{ eventModel?.eventName || 'Event Details' }}
+            </h2>
+            
+            <!-- Event Description -->
+            <p class="text-h6 text-grey-darken-1 mb-6">
+              {{ eventModel?.description || learnMoreEventsData.noDescriptionText || "No description available" }}
+            </p>
 
-    <div class="w-full min-h-screen relative" :style="{ backgroundColor: learnMoreEventsData.backgroundColor || '#ffffff' }">
-      <!-- Content Section -->
-      <section class="content-section relative w-full py-20 pt-32">
-        <v-container>
-          <v-row>
-            <!-- Left Side - Title and Description and Info -->
-            <v-col cols="12" lg="6">
-              <!-- Event Title -->
-              <h1 class="text-4xl md:text-5xl lg:text-6xl font-weight-bold text-black mb-6" style="font-family: 'Georgia', serif; font-style: italic; text-transform: uppercase;">
-                {{ eventModel?.eventName || 'Event Details' }}
-              </h1>
-              
-              <div class="space-y-6">
-                <p class="text-lg text-black leading-relaxed font-normal">
-                  {{ eventModel?.description || learnMoreEventsData.noDescriptionText || "No description available" }}
-                </p>
-
-                <div class="d-flex align-start gap-3">
-                  <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
-                  <div>
-                    <p class="font-weight-bold text-black">Date & Time</p>
-                    <p class="text-black font-normal">
-                      <strong>Start Date:</strong> {{ formatDate(eventModel?.start_date)  || 'TBA' }} 
-                    </p>
-                    <p class="text-black font-normal">
-                      <strong>End Date:</strong> {{ formatDate(eventModel?.end_date) || 'TBA' }}
-                    </p>
+            <!-- Event Info Cards -->
+            <div class="event-items">
+              <!-- Date & Time -->
+              <v-card
+                class="mb-4 event-card event-card-1"
+                variant="flat"
+                color="teal-lighten-5"
+              >
+                <v-card-text>
+                  <div class="d-flex align-start gap-3">
+                    <v-icon color="teal-darken-3" size="24" class="mt-1">mdi-calendar</v-icon>
+                    <div>
+                      <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">Date & Time</h3>
+                      <p class="text-teal-darken-2">
+                        <strong>Start:</strong> {{ formatDate(eventModel?.start_date) || 'TBA' }}
+                      </p>
+                      <p class="text-teal-darken-2">
+                        <strong>End:</strong> {{ formatDate(eventModel?.end_date) || 'TBA' }}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                </v-card-text>
+              </v-card>
 
-                <div class="d-flex align-start gap-3">
-                  <v-icon color="black" size="24" class="mt-1">mdi-map-marker</v-icon>
-                  <div>
-                    <p class="font-weight-bold text-black">Location</p>
-                    <p class="text-black font-normal">{{ eventModel?.location || 'TBA' }}</p>
+              <!-- Location -->
+              <v-card
+                class="mb-4 event-card event-card-2"
+                variant="flat"
+                color="teal-lighten-5"
+              >
+                <v-card-text>
+                  <div class="d-flex align-start gap-3">
+                    <v-icon color="teal-darken-3" size="24" class="mt-1">mdi-map-marker</v-icon>
+                    <div>
+                      <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">Location</h3>
+                      <p class="text-teal-darken-2">{{ eventModel?.location || 'TBA' }}</p>
+                    </div>
                   </div>
-                </div>
+                </v-card-text>
+              </v-card>
 
-                <v-btn
-                  v-if="userInfo?.member?.member_id"
-                  :loading="loading"
-                  size="large"
-                  :class="hasAlreadyJoined ? 'disabled-btn' : 'join-btn'"
-                  :style="hasAlreadyJoined 
-                    ? { '--btn-bg': '#9ca3af', '--btn-color': 'white', '--btn-border': '#9ca3af' }
-                    : { '--btn-bg': learnMoreEventsData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#16a34a' }"
-                  :disabled="hasAlreadyJoined"
-                  @click="handleJoinEvent"
-                >
-                  {{ hasAlreadyJoined ? (learnMoreEventsData.alreadyJoinedText || 'Already Joined') : (learnMoreEventsData.joinButtonText || 'Join Us') }}
-                </v-btn>
-                <v-btn
-                  v-else
-                  size="large"
-                  class="join-btn"
-                  :style="{ '--btn-bg': learnMoreEventsData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#16a34a' }"
-                  @click="handleJoinAsGuest"
-                >
-                  {{ learnMoreEventsData.joinButtonText || 'Join Us' }}
-                </v-btn>
-              </div>
-            </v-col>
+              <!-- Join Button -->
+              <v-card
+                class="mb-4 event-card event-card-3"
+                variant="flat"
+                color="teal-lighten-5"
+              >
+                <v-card-text>
+                  <v-btn
+                    v-if="userInfo?.member?.member_id"
+                    :loading="loading"
+                    :class="getButtonClass"
+                    :style="{ '--btn-bg': getButtonColor, '--btn-color': 'white', '--btn-border': getButtonColor }"
+                    :disabled="getButtonDisabled"
+                    @click="handleJoinEvent"
+                    size="large"
+                    block
+                  >
+                    {{ getButtonText }}
+                  </v-btn>
+                  <v-btn
+                    v-else
+                    size="large"
+                    block
+                    :style="{ '--btn-bg': learnMoreEventsData.buttonColor || '#14b8a6', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#14b8a6' }"
+                    class="join-btn"
+                    @click="handleJoinAsGuest"
+                  >
+                    {{ learnMoreEventsData.joinButtonText || 'Join Us' }}
+                  </v-btn>
+                </v-card-text>
+              </v-card>
+            </div>
+          </v-col>
 
-            <!-- Right Side - Image -->
-            <v-col cols="12" lg="6">
-              <div class="relative overflow-hidden" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-                <v-img
-                  :src="`${eventModel?.imageUrl}`"
-                  :alt="eventModel?.eventName || 'Event'"
-                  height="500"
-                  cover
-                ></v-img>
-              </div>
-            </v-col>
-          </v-row>
-        </v-container>
-      </section>
-    </div>
+          <!-- Right Side - Image -->
+          <v-col cols="12" md="6">
+            <v-img
+              :src="`${eventModel?.imageUrl}`"
+              :alt="eventModel?.eventName || 'Event'"
+              height="80vh"
+              cover
+              class="rounded-lg event-image"
+            ></v-img>
+          </v-col>
+        </v-row>
+      </v-container>
+    </section>
+
     <AcceptJesusChristDialog 
       :modelValue="showJoinEvent" 
       :type="'event'" 
@@ -100,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import axios from '@/api/axios'
@@ -110,42 +130,22 @@ import AcceptJesusChristDialog from '../Dialog/AcceptJesusChristDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
-// In Vue Router, state is accessed via history.state or we can use query params
-// For now, we'll use a ref that can be set from navigation
 const eventModel = ref(route.query?.eventModel ? JSON.parse(decodeURIComponent(route.query.eventModel)) : {})
-console.log(eventModel.value)
-const isMemberLandPage = ref(false)
+
 const showJoinEvent = ref(false)
-const hasAlreadyJoined = ref(false)
-const checkingStatus = ref(false)
+const approvalStatus = ref(null)
 const loading = ref(false)
 
-const floatingElements = ref([
-  { style: { top: '80px', left: '80px', width: '48px', height: '48px', animationDelay: '0s' } },
-  { style: { top: '33%', right: '64px', width: '32px', height: '32px', animationDelay: '1.5s' } },
-  { style: { bottom: '33%', left: '64px', width: '40px', height: '40px', animationDelay: '2s' } },
-  { style: { bottom: '80px', right: '80px', width: '24px', height: '24px', animationDelay: '0.8s' } },
-  { style: { top: '50%', left: '25%', width: '28px', height: '28px', animationDelay: '1.2s' } },
-  { style: { bottom: '25%', right: '33%', width: '36px', height: '36px', animationDelay: '2.5s' } },
-  { style: { top: '25%', left: '33%', width: '16px', height: '16px', animationDelay: '1.8s' } },
-  { style: { top: '75%', right: '25%', width: '44px', height: '44px', animationDelay: '0.3s' } },
-  { style: { bottom: '50%', left: '16%', width: '20px', height: '20px', animationDelay: '2.1s' } }
-])
-
 const formatDate = (date) => {
-  console.log(dayjs(date).format('MMMM D, YYYY - h:mm A') ,' date')
-  // if (!date) return 'TBA'
-  return dayjs(date).format(' MMMM D, YYYY - h:mm A')
+  return dayjs(date).format('MMMM D, YYYY - h:mm A')
 }
 
 const handleJoinEvent = async () => {
-  // Don't allow joining if already has approval (pending, approved, or rejected)
-  if (hasAlreadyJoined.value) {
+  if (approvalStatus.value !== null) {
     ElMessage.warning('You have already submitted a request for this event.')
     return
   }
   
-  // Show confirmation dialog before submitting
   try {
     await ElMessageBox.confirm(
       `Are you sure you want to join "${eventModel.value?.eventName || 'this event'}"? Your request will be reviewed by an admin.`,
@@ -157,15 +157,9 @@ const handleJoinEvent = async () => {
       }
     )
   } catch (error) {
-    // User cancelled the confirmation
-    if (error === 'cancel') {
-      return
-    }
-    console.error('Error showing confirmation:', error)
     return
   }
   
-  // create approval
   try {
     loading.value = true
     const approvalData = {
@@ -177,7 +171,7 @@ const handleJoinEvent = async () => {
     const response = await axios.post('/church-records/approvals/createApproval', approvalData)
     if (response.data.success) {
       ElMessage.success('Your request to join has been submitted. An admin will review and approve your request.')
-      hasAlreadyJoined.value = true
+      approvalStatus.value = 'pending'
     } else {
       ElMessage.error(response.data.message || 'Failed to submit join request')
     }
@@ -190,17 +184,13 @@ const handleJoinEvent = async () => {
 }
 
 const handleJoinAsGuest = () => {
-    // Navigate to Accept Jesus Christ page for non-logged in users
   showJoinEvent.value = true
 }
 
 const handleApprovalCreated = () => {
-  // When approval is created in dialog, update the status
-  hasAlreadyJoined.value = true
-  // Re-check to get the latest approval info
+  approvalStatus.value = 'pending'
   checkIfAlreadyJoined()
 }
-
 
 const checkIfAlreadyJoined = async () => {
   const eventId = eventModel.value?.event_id || eventModel.value?.id
@@ -208,14 +198,12 @@ const checkIfAlreadyJoined = async () => {
     return
   }
 
-  // Don't check if already marked as joined
-  if (hasAlreadyJoined.value) {
+  if (approvalStatus.value !== null) {
     return
   }
 
-  checkingStatus.value = true
   try {
-    const response = await axios.get('/church-records/approvals/checkMemberApprovalExists', {
+    const response = await axios.get('/church-records/approvals/checkMemberApprovalStatus', {
       params: {
         email: userInfo.value.account.email,
         type: 'event',
@@ -223,86 +211,63 @@ const checkIfAlreadyJoined = async () => {
       }
     })
 
-    if (response.data.success && response.data.data?.exists) {
-      hasAlreadyJoined.value = true
+    if (response.data.success && response.data.data?.status) {
+      approvalStatus.value = response.data.data.status
     } else {
-      // Explicitly set to false if no approval exists
-      hasAlreadyJoined.value = false
+      approvalStatus.value = null
     }
   } catch (error) {
     console.error('Error checking approval status:', error)
-    // Don't block the UI if check fails, just log the error
-    // Keep hasAlreadyJoined as false on error to allow user to try
-  } finally {
-    checkingStatus.value = false
+    approvalStatus.value = null
   }
 }
 
 const learnMoreEventsData = ref({
   backgroundColor: '#ffffff',
-  buttonColor: '#16a34a',
+  buttonColor: '#14b8a6',
   aboutTitle: 'About This Event',
   noDescriptionText: 'No description available',
   detailsTitle: 'Event Details',
   joinButtonText: 'Join Us',
-  alreadyJoinedText: 'Already Joined'
+  pendingText: 'Pending Request',
+  approvedText: 'You Already Join'
 })
 
-// Fetch learn more events data from CMS
-const fetchLearnMoreEventsData = async () => {
-  try {
-    const response = await axios.get('/cms/learnmoreevents/full')
-    if (response.data.success && response.data.data) {
-      const { page, images: cmsImages } = response.data.data
-      const content = page?.content || {}
-      
-      console.log('CMS Response - Learn More Events:', { content, cmsImages })
-      
-      // Update learn more events data from content
-      // Handle all possible fields that might be in CMS
-      if (content.aboutTitle) learnMoreEventsData.value.aboutTitle = content.aboutTitle
-      if (content.noDescriptionText) learnMoreEventsData.value.noDescriptionText = content.noDescriptionText
-      if (content.detailsTitle) learnMoreEventsData.value.detailsTitle = content.detailsTitle
-      if (content.joinButtonText) learnMoreEventsData.value.joinButtonText = content.joinButtonText
-      if (content.alreadyJoinedText) learnMoreEventsData.value.alreadyJoinedText = content.alreadyJoinedText
-      
-      // Handle background color and button color if they exist
-      if (content.backgroundColor) {
-        learnMoreEventsData.value.backgroundColor = content.backgroundColor
-        console.log('Background color from CMS:', content.backgroundColor)
-      }
-      if (content.buttonColor) {
-        learnMoreEventsData.value.buttonColor = content.buttonColor
-        console.log('Button color from CMS:', content.buttonColor)
-      }
-      
-      // Handle images if they exist (stored as BLOB, returned as base64)
-      // Images are in cmsImages object with field names like "images[0].image"
-      if (cmsImages && typeof cmsImages === 'object') {
-        console.log('Images found in CMS:', Object.keys(cmsImages))
-        // Process images if needed for this component
-        // Currently this component doesn't use images, but we log them for debugging
-      }
-      
-      console.log('✅ Learn More Events CMS data loaded successfully')
-    } else {
-      console.log('⚠️ No CMS data found for Learn More Events, using defaults')
-    }
-  } catch (error) {
-    if (error.response?.status !== 404) {
-      console.error('Error fetching learn more events data from CMS:', error)
-    } else {
-      console.log('CMS page not found (404), using default values')
-    }
+// Computed properties for button states
+const getButtonText = computed(() => {
+  if (approvalStatus.value === 'pending') {
+    return learnMoreEventsData.value.pendingText || 'Pending Request'
+  } else if (approvalStatus.value === 'approved') {
+    return learnMoreEventsData.value.approvedText || 'You Already Join'
+  } else if (approvalStatus.value === 'rejected') {
+    return 'Request Rejected'
   }
-}
+  return learnMoreEventsData.value.joinButtonText || 'Join Us'
+})
+
+const getButtonClass = computed(() => {
+  if (approvalStatus.value === null) {
+    return 'join-btn'
+  }
+  return 'disabled-btn'
+})
+
+const getButtonColor = computed(() => {
+  if (approvalStatus.value === 'pending') {
+    return '#f59e0b'
+  } else if (approvalStatus.value === 'approved') {
+    return '#10b981'
+  } else if (approvalStatus.value === 'rejected') {
+    return '#ef4444'
+  }
+  return learnMoreEventsData.value.buttonColor || '#14b8a6'
+})
+
+const getButtonDisabled = computed(() => {
+  return approvalStatus.value !== null
+})
 
 onMounted(async () => {
-  await fetchLearnMoreEventsData()
-  const isMember = sessionStorage.getItem('isMember') === 'true'
-  isMemberLandPage.value = isMember
-  
-  // Check if member has already joined
   const eventId = eventModel.value?.event_id || eventModel.value?.id
   if (userInfo.value?.member?.member_id && eventId) {
     checkIfAlreadyJoined()
@@ -317,36 +282,42 @@ onMounted(async () => {
   margin-top: 64px;
 }
 
-.floating-elements {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
+.event-section {
+  padding: 80px 0;
+  margin-bottom: 80px;
+  background-color: #ffffff;
 }
 
-.floating-element {
-  position: absolute;
-  background: rgba(20, 184, 166, 0.1);
-  border-radius: 50%;
-  animation: float 3.5s ease-in-out infinite;
+.event-card {
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out both;
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(180deg);
-  }
+.event-card-1 {
+  animation-delay: 200ms;
 }
 
-.content-section {
-  position: relative;
-  z-index: 2;
+.event-card-2 {
+  animation-delay: 300ms;
 }
 
-.space-y-6 > * + * {
-  margin-top: 1.5rem;
+.event-card-3 {
+  animation-delay: 400ms;
+}
+
+.event-card:hover {
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left-width: 6px;
+}
+
+.event-image {
+  transition: transform 0.5s ease;
+}
+
+.event-image:hover {
+  transform: scale(1.05);
 }
 
 .join-btn {
@@ -354,6 +325,9 @@ onMounted(async () => {
   background-color: var(--btn-bg) !important;
   color: var(--btn-color) !important;
   border: 1px solid var(--btn-border) !important;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .join-btn:hover {
@@ -366,5 +340,42 @@ onMounted(async () => {
   color: var(--btn-color) !important;
   border: 1px solid var(--btn-border) !important;
   cursor: not-allowed !important;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 960px) {
+  .event-section {
+    padding: 48px 0;
+    margin-bottom: 48px;
+  }
+
+  .event-image {
+    height: 400px !important;
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .event-section {
+    padding: 32px 0;
+    margin-bottom: 32px;
+  }
+
+  .event-image {
+    height: 300px !important;
+  }
 }
 </style>

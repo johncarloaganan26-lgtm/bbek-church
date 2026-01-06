@@ -465,6 +465,16 @@ const formatDateTime = (dateString) => {
   })
 }
 
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
 const formatStatus = (status) => {
   const statusMap = {
     'pending': 'Pending',

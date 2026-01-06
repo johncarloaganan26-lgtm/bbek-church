@@ -79,7 +79,7 @@
       <!-- Services Tables Section -->
       <v-card class="mt-6" elevation="2">
         <v-card-title class="d-flex justify-space-between align-center mb-4">
-          <span class="text-h5 font-weight-bold">My Transactions</span>
+          <span class="text-h5 font-weight-bold">All Transactions Records</span>
           <v-select
             v-model="selectedServiceTypeFilter"
             :items="serviceTypeSelectOptions"
@@ -105,7 +105,7 @@
             <!-- All Transactions Table -->
             <v-col v-if="selectedServiceTypeFilter === 'all'" cols="12">
               <v-card variant="outlined" class="mx-auto" style="max-width: 1200px;">
-                <v-card-title class="text-h6 font-weight-bold text-center">All My Services</v-card-title>
+                <v-card-title class="text-h6 font-weight-bold text-center">Recent Transactions</v-card-title>
                 <v-card-text>
                   <v-table density="compact" sort-by="[{ key: 'sort_date', order: 'desc' }]">
                     <thead>
