@@ -25,7 +25,7 @@ if (import.meta.env.PROD) {
 // Create axios instance with base configuration
 const instance = axios.create({
   baseURL: API_URL,
-  timeout: 300000, // 5 minutes timeout for large uploads (video/images)
+  timeout: 60000, // 60 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
