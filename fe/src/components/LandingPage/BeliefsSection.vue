@@ -1,5 +1,5 @@
 <template>
-  <section class="beliefs-section py-20" :style="{ backgroundColor: beliefData.beliefsBgColor || '#ffffff' }">
+  <section class="beliefs-section pt-20 pb-10" :style="{ backgroundColor: beliefData.beliefsBgColor || '#ffffff' }">
     <v-container>
       <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16 fade-in-up">
         {{ beliefData.doctrinalTitle || 'Doctrinal Statement' }}
@@ -112,7 +112,8 @@ onMounted(async () => {
 
 <style scoped>
 .beliefs-section {
-  margin-bottom: 40px; /* Short gap between beliefs and services */
+  margin-top: 80px; /* Push down from hero section */
+  margin-bottom: 40px;
 }
 
 .belief-card,
