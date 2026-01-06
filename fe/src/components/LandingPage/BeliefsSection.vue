@@ -5,33 +5,33 @@
         {{ beliefData.doctrinalTitle || 'Doctrinal Statement' }}
       </h2>
       <v-card class="pa-12 mb-16" elevation="2">
-        <p class="text-h6 text-grey-darken-1 text-center mb-12">
+        <p class="text-h6 text-grey-darken-1 text-center mb-8">
           {{ beliefData.doctrinalText || 'We believe that doctrine matters — not because it divides, but because it anchors our faith in truth. While misunderstandings can create division, essential biblical teachings are non-negotiable for us. At the same time, we honor freedom in areas where Scripture allows for diversity. Above all, we strive to grow in love.' }}
         </p>
         <v-row>
           <v-col cols="12" md="4">
-            <v-card class="text-center pa-8 belief-card belief-card-1" elevation="2" hover>
-              <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">{{ beliefData.essentialsTitle || 'In essentials, unity.' }}</h3>
-              <p class="text-body-1 text-grey-darken-1">
+            <div class="text-center pa-4">
+              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.essentialsTitle || 'In essentials, unity.' }}</h3>
+              <p class="text-body-2 text-grey-darken-1">
                 {{ beliefData.essentialsText || 'We hold tightly to core Christian truths.' }}
               </p>
-            </v-card>
+            </div>
           </v-col>
           <v-col cols="12" md="4">
-            <v-card class="text-center pa-8 belief-card belief-card-2" elevation="2" hover>
-              <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">{{ beliefData.libertyTitle || 'In non-essentials, liberty.' }}</h3>
-              <p class="text-body-1 text-grey-darken-1">
+            <div class="text-center pa-4">
+              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.libertyTitle || 'In non-essentials, liberty.' }}</h3>
+              <p class="text-body-2 text-grey-darken-1">
                 {{ beliefData.libertyText || 'We give grace for secondary theological convictions.' }}
               </p>
-            </v-card>
+            </div>
           </v-col>
           <v-col cols="12" md="4">
-            <v-card class="text-center pa-8 belief-card belief-card-3" elevation="2" hover>
-              <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">{{ beliefData.loveTitle || 'In all things, love.' }}</h3>
-              <p class="text-body-1 text-grey-darken-1">
+            <div class="text-center pa-4">
+              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.loveTitle || 'In all things, love.' }}</h3>
+              <p class="text-body-2 text-grey-darken-1">
                 {{ beliefData.loveText || 'Everything we believe and do is rooted in the love of Christ.' }}
               </p>
-            </v-card>
+            </div>
           </v-col>
         </v-row>
       </v-card>
