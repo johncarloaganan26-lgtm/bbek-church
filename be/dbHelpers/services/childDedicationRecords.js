@@ -603,6 +603,25 @@ async function getAllChildDedications(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(cd.preferred_dedication_date) = ? AND YEAR(cd.preferred_dedication_date) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(cd.preferred_dedication_date) = MONTH(CURDATE()) AND YEAR(cd.preferred_dedication_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(cd.preferred_dedication_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(cd.preferred_dedication_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -612,7 +631,6 @@ async function getAllChildDedications(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Child ID (A-Z)':
         orderByClause += 'cd.child_id ASC';
@@ -640,6 +658,16 @@ async function getAllChildDedications(options = {}) {
         break;
       case 'Status (A-Z)':
         orderByClause += 'cd.status ASC';
+        break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE cd.status 
+          WHEN 'Pending' THEN 1 
+          WHEN 'Approved' THEN 2 
+          WHEN 'Disapproved' THEN 3 
+          WHEN 'Completed' THEN 4 
+          WHEN 'Cancelled' THEN 5 
+          ELSE 6 
+        END, cd.date_created DESC`;
         break;
       default:
         orderByClause += 'cd.date_created DESC'; // Default sorting

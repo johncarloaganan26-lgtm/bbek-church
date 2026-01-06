@@ -270,6 +270,25 @@ async function getAllBurialServices(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(bs.service_date) = ? AND YEAR(bs.service_date) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(bs.service_date) = MONTH(CURDATE()) AND YEAR(bs.service_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(bs.service_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(bs.service_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -279,7 +298,6 @@ async function getAllBurialServices(options = {}) {
 
     // Add sorting with FULLTEXT relevance support
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Burial ID (A-Z)':
         orderByClause += 'bs.burial_id ASC';
@@ -301,6 +319,16 @@ async function getAllBurialServices(options = {}) {
         break;
       case 'Status (A-Z)':
         orderByClause += 'bs.status ASC';
+        break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE bs.status 
+          WHEN 'Pending' THEN 1 
+          WHEN 'Approved' THEN 2 
+          WHEN 'Disapproved' THEN 3 
+          WHEN 'Completed' THEN 4 
+          WHEN 'Cancelled' THEN 5 
+          ELSE 6 
+        END, bs.date_created DESC`;
         break;
       case 'Pastor Name (A-Z)':
         orderByClause += 'bs.pastor_name ASC';

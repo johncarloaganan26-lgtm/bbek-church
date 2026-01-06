@@ -83,6 +83,7 @@
               density="compact"
               :disabled="loading"
               hide-details
+              @update:model-value="handleSearchChange"
             ></v-text-field>
           </v-col>
           <v-col cols="12" md="2">
@@ -98,16 +99,16 @@
           </v-col>
           <v-col cols="12" md="2">
             <v-select
-              v-model="filters.status"
-              :items="statusOptions"
-              label="Status"
+              v-model="filters.donationType"
+              :items="donationTypeOptions"
+              label="Donation Type"
               variant="outlined"
               density="compact"
               :disabled="loading"
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
+          <v-col cols="12" md="3">
             <v-select
               v-model="filters.sortBy"
               :items="sortByOptions"
@@ -118,7 +119,7 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="3" class="d-flex align-center gap-2">
+          <v-col cols="12" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
@@ -166,23 +167,22 @@
         <thead>
           <tr>
             <th class="text-left font-weight-bold">Member Name</th>
-            <th class="text-left font-weight-bold">Amount</th>
+            <th class="text-left font-weight-bold">Donation Type</th>
+            <th class="text-left font-weight-bold">Amount/Items</th>
             <th class="text-left font-weight-bold">Date Created</th>
             <th class="text-left font-weight-bold">Type</th>
             <th class="text-left font-weight-bold">Payment Method</th>
-            <th class="text-left font-weight-bold">Status</th>
-            <th class="text-left font-weight-bold">Notes</th>
             <th class="text-left font-weight-bold">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!loading && donations.length === 0">
-            <td colspan="8" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="8" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -191,25 +191,47 @@
             </td>
           </tr>
           <tr v-for="donation in donations" :key="donation.tithes_id" v-show="!loading">
-            <td>{{ donation.fullname || 'N/A' }}</td>
-            <td class="font-weight-bold">P{{ parseFloat(donation.amount || 0).toLocaleString() }}</td>
+            <td>
+              <div v-if="donation.is_anonymous" class="d-flex align-center">
+                <v-icon size="small" class="mr-1" color="grey">mdi-incognito</v-icon>
+                <span class="text-grey">Anonymous</span>
+              </div>
+              <span v-else>{{ donation.fullname || 'N/A' }}</span>
+            </td>
+            <td>
+              <v-chip :color="donation.donation_type === 'money' ? 'green' : 'blue'" size="small" variant="flat">
+                <v-icon start size="small">{{ donation.donation_type === 'money' ? 'mdi-cash' : 'mdi-package-variant' }}</v-icon>
+                {{ donation.donation_type === 'money' ? 'Money' : 'In-Kind' }}
+              </v-chip>
+            </td>
+            <td>
+              <div v-if="donation.donation_type === 'money'" class="font-weight-bold">
+                P{{ parseFloat(donation.amount || 0).toLocaleString() }}
+              </div>
+              <div v-else class="text-body-2">
+                <v-tooltip :text="formatDonationItems(donation.donation_items)" location="top">
+                  <template v-slot:activator="{ props }">
+                    <span v-bind="props" class="text-truncate d-inline-block" style="max-width: 150px;">
+                      {{ formatDonationItems(donation.donation_items) || 'N/A' }}
+                    </span>
+                  </template>
+                </v-tooltip>
+              </div>
+            </td>
             <td>{{ donation.date_created }}</td>
             <td>
               <v-chip :color="getTypeColor(donation.type)" size="small" variant="flat">
                 {{ formatType(donation.type) }}
               </v-chip>
             </td>
-            <td>{{ donation.payment_method }}</td>
             <td>
-              <v-chip 
-                :color="donation.status === 'completed' ? 'success' : donation.status === 'pending' ? 'warning' : 'error'" 
-                size="small" 
-                variant="flat"
-              >
-                {{ donation.status }}
-              </v-chip>
+              <div v-if="donation.donation_type === 'money'">
+                {{ donation.payment_method }}
+              </div>
+              <div v-else class="text-grey">
+                -
+              </div>
             </td>
-            <td>{{ donation.notes || '-' }}</td>
             <td>
               <v-tooltip text="Edit Donation" location="top">
                 <template v-slot:activator="{ props }">
@@ -327,29 +349,47 @@ const sortByOptions = [
   'Date Created (Newest)',
   'Date Created (Oldest)',
   'Type (A-Z)',
-  'Status (A-Z)',
   'Name (A-Z)',
-  'Name (Z-A)'
+  'Name (Z-A)',
+  'This Month',
+  'Last Month',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ]
-const typeOptions = ['All Types', 'tithe', 'offering', 'missions', 'love_gift', 'building_fund', 'donation', 'other']
-const statusOptions = ['All Statuses', 'pending', 'completed', 'cancelled']
+const typeOptions = [
+  'All Types',
+  // Money donation types
+  'tithe', 'offering', 'missions', 'love_gift', 'building_fund', 'donation', 'other',
+  // In-kind donation types
+  'food', 'clothing', 'medical', 'school', 'furniture', 'electronics', 'household'
+]
 
-// Watch for filter changes
+const donationTypeOptions = ['all', 'money', 'inkind']
+
+// Watch for filter changes with toast notifications
 watch(() => filters.value.sortBy, (newSortBy) => {
+  ElMessage.info(`Sorted by: ${newSortBy || 'Default'}`)
   tithesOfferingsStore.setFilters({ sortBy: newSortBy })
 })
 
 watch(() => filters.value.type, (newType) => {
+  ElMessage.info(`Filtering by type: ${newType === 'All Types' ? 'All Types' : formatType(newType)}`)
   tithesOfferingsStore.setFilters({ type: newType })
 })
 
-watch(() => filters.value.status, (newStatus) => {
-  tithesOfferingsStore.setFilters({ status: newStatus })
+watch(() => filters.value.donationType, (newDonationType) => {
+  ElMessage.info(`Filtering by donation type: ${newDonationType === 'all' ? 'All Types' : newDonationType === 'money' ? 'Money' : 'In-Kind'}`)
+  tithesOfferingsStore.setFilters({ donationType: newDonationType })
 })
 
 const handleTithesOfferingsDialog = () => {
   tithesOfferingsData.value = null
   tithesOfferingsDialog.value = true
+}
+
+const handleSearchChange = (value) => {
+  ElMessage.info('Searching donations...')
+  tithesOfferingsStore.setSearchQuery(value)
 }
 
 const editDonation = (donation) => {
@@ -413,6 +453,7 @@ const handleSubmit = async (data) => {
 }
 
 const handlePageSizeChange = (pageSize) => {
+  ElMessage.info(`Showing ${pageSize} items per page`)
   tithesOfferingsStore.setPageSize(pageSize)
 }
 
@@ -424,6 +465,16 @@ const getStartIndex = () => {
 const getEndIndex = () => {
   const end = currentPage.value * itemsPerPage.value
   return Math.min(end, totalCount.value)
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
 }
 
 const getTypeColor = (type) => {
@@ -441,15 +492,38 @@ const getTypeColor = (type) => {
 
 const formatType = (type) => {
   const typeMap = {
+    // Money donation types
     'tithe': 'Tithe',
     'offering': 'Offering',
     'missions': 'Missions',
     'love_gift': 'Love Gift',
     'building_fund': 'Building Fund',
     'donation': 'Donation',
-    'other': 'Other'
+    'other': 'Other',
+    // In-kind donation types
+    'food': 'Food Items',
+    'clothing': 'Clothing',
+    'medical': 'Medical Supplies',
+    'school': 'School Supplies',
+    'furniture': 'Furniture',
+    'electronics': 'Electronics',
+    'household': 'Household Items'
   }
   return typeMap[type] || type
+}
+
+// Safely format donation items (handle Buffer or object)
+const formatDonationItems = (items) => {
+  if (!items) return ''
+  if (typeof items === 'string') return items
+  if (typeof items === 'object') {
+    // Check if it's a Buffer-like object
+    if (items.type === 'Buffer' && Array.isArray(items.data)) {
+      return String.fromCharCode(...items.data)
+    }
+    return JSON.stringify(items)
+  }
+  return String(items)
 }
 
 // Handle Excel export
@@ -468,23 +542,41 @@ const handleExportExcel = async () => {
 }
 
 const handlePrint = () => {
+  ElMessage.info('Preparing print preview...')
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Member Name', 'Amount', 'Date Created', 'Type', 'Payment Method', 'Status', 'Notes']
+  if (!printWindow) {
+    ElMessage.error('Could not open print preview. Check browser pop-up settings.')
+    return
+  }
+  
+  // Get current user info for printed by
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const printedBy = userInfo?.member 
+    ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
+    : userInfo?.account?.email || 'Admin'
+  
+  ElMessage.success('Print preview opened. Please check your browser tabs.')
+  const tableHeaders = ['Member Name', 'Donation Type', 'Amount/Items', 'Date Created', 'Type/Category']
   
   let tableRows = ''
   donations.value.forEach((donation) => {
+    const memberName = donation.is_anonymous ? 'Anonymous' : (donation.fullname || 'N/A')
+    const amountOrItems = donation.donation_type === 'money' 
+      ? `P${parseFloat(donation.amount || 0).toLocaleString()}`
+      : (formatDonationItems(donation.donation_items) || 'N/A')
+    
     tableRows += `
       <tr>
-        <td>${donation.fullname || 'N/A'}</td>
-        <td>P${parseFloat(donation.amount || 0).toLocaleString()}</td>
+        <td>${memberName}</td>
+        <td>${donation.donation_type === 'money' ? 'Money' : 'In-Kind'}</td>
+        <td>${amountOrItems}</td>
         <td>${donation.date_created || 'N/A'}</td>
         <td>${formatType(donation.type)}</td>
-        <td>${donation.payment_method || 'N/A'}</td>
-        <td>${donation.status || 'N/A'}</td>
-        <td>${donation.notes || '-'}</td>
       </tr>
     `
   })
+  
+  const currentDate = new Date().toLocaleString()
   
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -499,9 +591,27 @@ const handlePrint = () => {
             font-family: Arial, sans-serif;
             margin: 20px;
           }
-          h1 {
-            text-align: center;
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+          }
+          .header img {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .header .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
           }
           table {
             width: 100%;
@@ -520,16 +630,28 @@ const handlePrint = () => {
           tr:nth-child(even) {
             background-color: #f9f9f9;
           }
-          .print-date {
-            text-align: right;
-            margin-bottom: 10px;
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             color: #666;
+          }
+          .footer-info {
+            text-align: right;
           }
         </style>
       </head>
       <body>
-        <h1>Tithes & Offerings</h1>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="header">
+          <img src="/logo.png" alt="Church Logo" />
+          <div>
+            <h1>Tithes & Offerings</h1>
+            <div class="subtitle">Biblical Bread Ministries</div>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -540,6 +662,13 @@ const handlePrint = () => {
             ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
           </tbody>
         </table>
+        <div class="footer">
+          <div>Total Records: ${donations.value.length}</div>
+          <div class="footer-info">
+            <div>Printed on: ${currentDate}</div>
+            <div>Printed by: ${printedBy}</div>
+          </div>
+        </div>
       </body>
     </html>
   `)

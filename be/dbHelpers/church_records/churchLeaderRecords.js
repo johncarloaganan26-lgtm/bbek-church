@@ -164,6 +164,25 @@ async function getAllChurchLeaders(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(cl.date_created) = ? AND YEAR(cl.date_created) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(cl.date_created) = MONTH(CURDATE()) AND YEAR(cl.date_created) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(cl.date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(cl.date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -173,7 +192,6 @@ async function getAllChurchLeaders(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Leader ID (Low to High)':
         orderByClause += 'cl.leader_id ASC';

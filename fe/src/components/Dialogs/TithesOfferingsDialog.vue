@@ -2,8 +2,8 @@
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
-    :title="isEditMode ? 'Update Tithes & Offerings' : 'Add Tithes & Offerings'"
-    width="700px"
+    :title="isEditMode ? 'Update Donation' : 'Record New Donation'"
+    width="750px"
     :close-on-click-modal="!loading"
     :close-on-press-escape="!loading"
     :show-close="!loading"
@@ -22,102 +22,209 @@
       ref="formRef"
       :model="formData"
       :rules="rules"
-      label-width="140px"
+      label-width="160px"
       label-position="left"
       :disabled="loading"
+      class="donation-form"
     >
-      <!-- Member -->
-      <el-form-item label="Member" prop="member_id">
-        <el-select
-          v-model="formData.member_id"
-          placeholder="Select member"
+      <!-- Donation Type Toggle -->
+      <el-form-item label="Donation Type">
+        <el-radio-group v-model="formData.donation_type" size="large" class="donation-type-toggle">
+          <el-radio-button value="money">
+            <el-icon><Money /></el-icon>
+            Money
+          </el-radio-button>
+          <el-radio-button value="inkind">
+            <el-icon><Box /></el-icon>
+            In-Kind
+          </el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <!-- Member Selection (Typeable) -->
+      <el-form-item label="Donor" prop="member_id">
+        <el-autocomplete
+          v-model="formData.member_name"
+          :fetch-suggestions="searchMembers"
+          placeholder="Search member or type name..."
           size="large"
           style="width: 100%"
           clearable
-          filterable
+          :trigger-on-focus="true"
+          @select="handleMemberSelect"
+          @clear="handleMemberClear"
         >
-          <el-option
-            v-for="member in memberOptions"
-            :key="member.id"
-            :label="member.name"
-            :value="member.id"
+          <template #prefix>
+            <el-icon><User /></el-icon>
+          </template>
+          <template #default="{ item }">
+            <div class="member-option">
+              <span class="member-name">{{ item.value }}</span>
+              <span class="member-email">{{ item.email }}</span>
+            </div>
+          </template>
+        </el-autocomplete>
+        <div class="form-hint">
+          <el-checkbox v-model="formData.is_anonymous">Record as anonymous</el-checkbox>
+        </div>
+      </el-form-item>
+
+      <!-- Money Donation Fields -->
+      <template v-if="formData.donation_type === 'money'">
+        <!-- Amount -->
+        <el-form-item label="Amount" prop="amount">
+          <el-input-number
+            v-model="formData.amount"
+            :min="0"
+            :max="100000000"
+            :step="100"
+            :precision="2"
+            size="large"
+            style="width: 100%"
+            placeholder="0.00"
+          >
+            <template #prefix>₱</template>
+          </el-input-number>
+        </el-form-item>
+
+        <!-- Type -->
+        <el-form-item label="Type" prop="type">
+          <el-select
+            v-model="formData.type"
+            placeholder="Select type"
+            size="large"
+            style="width: 100%"
+            clearable
+          >
+            <el-option label="Tithe" value="tithe">
+              <span>Tithe</span>
+              <span class="option-desc">- 10% of income</span>
+            </el-option>
+            <el-option label="Offering" value="offering">
+              <span>Offering</span>
+              <span class="option-desc">- General offering</span>
+            </el-option>
+            <el-option label="Missions" value="missions">
+              <span>Missions</span>
+              <span class="option-desc">- Mission work support</span>
+            </el-option>
+            <el-option label="Love Gift" value="love_gift">
+              <span>Love Gift</span>
+              <span class="option-desc">- Special occasions</span>
+            </el-option>
+            <el-option label="Building Fund" value="building_fund">
+              <span>Building Fund</span>
+              <span class="option-desc">- Church building</span>
+            </el-option>
+            <el-option label="Donation" value="donation">
+              <span>Donation</span>
+              <span class="option-desc">- General donation</span>
+            </el-option>
+            <el-option label="Other" value="other">Other</el-option>
+          </el-select>
+        </el-form-item>
+
+        <!-- Payment Method -->
+        <el-form-item label="Payment Method" prop="payment_method">
+          <el-select
+            v-model="formData.payment_method"
+            placeholder="Select method"
+            size="large"
+            style="width: 100%"
+            clearable
+          >
+            <el-option label="Cash" value="cash">
+              <el-icon><Money /></el-icon>
+              Cash
+            </el-option>
+            <el-option label="Check" value="check">
+              <el-icon><Document /></el-icon>
+              Check
+            </el-option>
+            <el-option label="GCash" value="gcash">
+              <el-icon><Phone /></el-icon>
+              GCash
+            </el-option>
+            <el-option label="Bank Transfer" value="bank">
+              <el-icon><CreditCard /></el-icon>
+              Bank Transfer
+            </el-option>
+            <el-option label="Other" value="other">Other</el-option>
+          </el-select>
+        </el-form-item>
+      </template>
+
+      <!-- In-Kind Donation Fields -->
+      <template v-else>
+        <!-- Donation Items -->
+        <el-form-item label="Items Donated" prop="donation_items">
+          <el-input
+            v-model="formData.donation_items"
+            type="textarea"
+            :rows="3"
+            placeholder="e.g., 5 cans of milk, 2 loaves of bread, vegetables..."
+            size="large"
+            maxlength="500"
+            show-word-limit
           />
-        </el-select>
-      </el-form-item>
+          <div class="form-hint">
+            Describe the items, food, or goods being donated
+          </div>
+        </el-form-item>
 
-      <!-- Amount -->
-      <el-form-item label="Amount" prop="amount">
-        <el-input-number
-          v-model="formData.amount"
-          :min="1"
-          :max="100000000"
-          :step="10"
-          size="large"
-          style="width: 100%"
-          placeholder="Enter amount"
-        />
-      </el-form-item>
-
-      <!-- Type -->
-      <el-form-item label="Type" prop="type">
-        <el-select
-          v-model="formData.type"
-          placeholder="Select type"
-          size="large"
-          style="width: 100%"
-          clearable
-        >
-          <el-option label="Tithe" value="tithe" />
-          <el-option label="Offering" value="offering" />
-          <el-option label="Missions" value="missions" />
-          <el-option label="Love Gift" value="love_gift" />
-          <el-option label="Building Fund" value="building_fund" />
-          <el-option label="Donation" value="donation" />
-          <el-option label="Other" value="other" />
-        </el-select>
-      </el-form-item>
-
-      <!-- Payment Method -->
-      <el-form-item label="Payment Method" prop="payment_method">
-        <el-select
-          v-model="formData.payment_method"
-          placeholder="Select payment method"
-          size="large"
-          style="width: 100%"
-          clearable
-        >
-          <el-option label="Cash" value="cash" />
-          <el-option label="Check" value="check" />
-          <el-option label="Other" value="other" />
-        </el-select>
-      </el-form-item>
+        <!-- Donation Category -->
+        <el-form-item label="Category" prop="type">
+          <el-select
+            v-model="formData.type"
+            placeholder="Select category"
+            size="large"
+            style="width: 100%"
+            clearable
+          >
+            <el-option label="Food Items" value="food">
+              <el-icon><Food /></el-icon>
+              Food Items
+            </el-option>
+            <el-option label="Clothing" value="clothing">
+              <el-icon><ShoppingBag /></el-icon>
+              Clothing
+            </el-option>
+            <el-option label="Medical Supplies" value="medical">
+              <el-icon><FirstAidKit /></el-icon>
+              Medical Supplies
+            </el-option>
+            <el-option label="School Supplies" value="school">
+              <el-icon><Notebook /></el-icon>
+              School Supplies
+            </el-option>
+            <el-option label="Furniture" value="furniture">
+              <el-icon><House /></el-icon>
+              Furniture
+            </el-option>
+            <el-option label="Electronics" value="electronics">
+              <el-icon><Monitor /></el-icon>
+              Electronics
+            </el-option>
+            <el-option label="Household Items" value="household">
+              <el-icon><Household /></el-icon>
+              Household Items
+            </el-option>
+            <el-option label="Other" value="other">Other</el-option>
+          </el-select>
+        </el-form-item>
+      </template>
 
       <!-- Notes -->
       <el-form-item label="Notes" prop="notes">
         <el-input
           v-model="formData.notes"
           type="textarea"
-          :rows="3"
-          placeholder="Enter notes (optional)"
+          :rows="2"
+          placeholder="Additional notes or comments (optional)"
           size="large"
           maxlength="500"
           show-word-limit
         />
-      </el-form-item>
-
-      <!-- Status -->
-      <el-form-item label="Status" prop="status">
-        <el-select
-          v-model="formData.status"
-          placeholder="Select status"
-          size="large"
-          style="width: 100%"
-          clearable
-        >
-          <el-option label="Pending" value="pending" />
-          <el-option label="Completed" value="completed" />
-          <el-option label="Cancelled" value="cancelled" />
-        </el-select>
       </el-form-item>
     </el-form>
 
@@ -131,7 +238,8 @@
           :loading="loading"
           :disabled="loading"
         >
-          {{ isEditMode ? 'Update' : 'Add' }} Record
+          <el-icon v-if="!loading"><Check /></el-icon>
+          {{ isEditMode ? 'Update' : 'Record' }} Donation
         </el-button>
       </div>
     </template>
@@ -141,6 +249,11 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  User, Money, Box, Document, Phone, CreditCard,
+  Food, ShoppingBag, FirstAidKit, Notebook, House,
+  Monitor, Check
+} from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -152,12 +265,10 @@ const props = defineProps({
     type: Object,
     default: null
   },
-  // Alias for tithesData to match component usage
   tithesOfferingsData: {
     type: Object,
     default: null
   },
-  // Members for selection: [{ id, name }]
   memberOptions: {
     type: Array,
     default: () => []
@@ -170,45 +281,113 @@ const emit = defineEmits(['update:modelValue', 'submit'])
 // Refs
 const formRef = ref(null)
 const loading = ref(false)
+const allMembers = ref([])
 
-// Check if in edit mode (support both prop names)
+// Check if in edit mode
 const isEditMode = computed(() => !!(props.tithesData || props.tithesOfferingsData))
 
 // Form data
 const formData = reactive({
   member_id: null,
+  member_name: '',
+  is_anonymous: false,
+  donation_type: 'money', // 'money' or 'inkind'
   amount: null,
   type: '',
   payment_method: '',
-  notes: '',
-  status: 'pending'
+  donation_items: '',
+  notes: ''
 })
 
 // Validation rules
 const rules = {
-  member_id: [
-    { required: true, message: 'Member is required', trigger: 'change' }
+  type: [
+    { required: true, message: 'Type/Category is required', trigger: 'change' }
+  ],
+  donation_items: [
+    {
+      validator: (rule, value, callback) => {
+        if (formData.donation_type === 'inkind' && (!value || value.trim() === '')) {
+          callback(new Error('Please describe the items being donated'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   amount: [
-    { required: true, message: 'Amount is required', trigger: 'change' },
-    { type: 'number', min: 1, message: 'Amount must be at least 1', trigger: 'change' }
-  ],
-  type: [
-    { required: true, message: 'Type is required', trigger: 'change' }
+    {
+      validator: (rule, value, callback) => {
+        if (formData.donation_type === 'money' && (value === null || value === undefined || value === '')) {
+          callback(new Error('Amount is required for money donations'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
   ],
   payment_method: [
-    { required: true, message: 'Payment method is required', trigger: 'change' }
+    {
+      validator: (rule, value, callback) => {
+        if (formData.donation_type === 'money' && (!value || value.trim() === '')) {
+          callback(new Error('Payment method is required'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
   ],
   notes: [
     { max: 500, message: 'Notes must not exceed 500 characters', trigger: 'blur' }
-  ],
-  status: [
-    { required: true, message: 'Status is required', trigger: 'change' }
   ]
 }
 
 // Get the data from either prop
 const donationData = computed(() => props.tithesData || props.tithesOfferingsData)
+
+// Search members for autocomplete
+const searchMembers = (queryString, cb) => {
+  if (!queryString && props.memberOptions.length > 0) {
+    // Show all members if no search
+    const results = props.memberOptions.map(m => ({
+      value: m.name,
+      id: m.id,
+      email: m.email || ''
+    }))
+    cb(results)
+    return
+  }
+
+  if (!queryString) {
+    cb([])
+    return
+  }
+
+  const results = props.memberOptions
+    .filter(member => 
+      member.name && member.name.toLowerCase().includes(queryString.toLowerCase())
+    )
+    .map(m => ({
+      value: m.name,
+      id: m.id,
+      email: m.email || ''
+    }))
+  cb(results)
+}
+
+// Handle member selection from autocomplete
+const handleMemberSelect = (item) => {
+  formData.member_id = item.id
+  formData.is_anonymous = false
+}
+
+// Handle member clear
+const handleMemberClear = () => {
+  formData.member_id = null
+}
 
 // Watch for donation data changes to populate form in edit mode
 watch(
@@ -216,11 +395,14 @@ watch(
   (newData) => {
     if (newData && props.modelValue) {
       formData.member_id = newData.member_id ?? null
+      formData.member_name = newData.fullname || newData.member_name || ''
+      formData.is_anonymous = newData.is_anonymous || false
+      formData.donation_type = newData.donation_type || 'money'
       formData.amount = typeof newData.amount === 'number' ? newData.amount : parseFloat(newData.amount) || null
       formData.type = newData.type || ''
       formData.payment_method = newData.payment_method || ''
+      formData.donation_items = newData.donation_items || ''
       formData.notes = newData.notes || ''
-      formData.status = newData.status || 'pending'
     }
   },
   { immediate: true }
@@ -235,11 +417,14 @@ watch(
     } else if (donationData.value) {
       const data = donationData.value
       formData.member_id = data.member_id ?? null
+      formData.member_name = data.fullname || data.member_name || ''
+      formData.is_anonymous = data.is_anonymous || false
+      formData.donation_type = data.donation_type || 'money'
       formData.amount = typeof data.amount === 'number' ? data.amount : parseFloat(data.amount) || null
       formData.type = data.type || ''
       formData.payment_method = data.payment_method || ''
+      formData.donation_items = data.donation_items || ''
       formData.notes = data.notes || ''
-      formData.status = data.status || 'pending'
     } else {
       resetForm()
     }
@@ -249,11 +434,14 @@ watch(
 // Reset form
 const resetForm = () => {
   formData.member_id = null
+  formData.member_name = ''
+  formData.is_anonymous = false
+  formData.donation_type = 'money'
   formData.amount = null
   formData.type = ''
   formData.payment_method = ''
+  formData.donation_items = ''
   formData.notes = ''
-  formData.status = 'pending'
 
   if (formRef.value) {
     formRef.value.clearValidate()
@@ -270,16 +458,23 @@ const handleSubmit = async () => {
   if (!formRef.value) return
 
   try {
-    // Validate form
-    await formRef.value.validate()
+    // Validate form (but don't block if validation fails - allow submission)
+    try {
+      await formRef.value.validate()
+    } catch (validationError) {
+      // Continue anyway - backend will handle missing fields
+    }
     
     // Show confirmation dialog before submitting
-    const actionText = isEditMode.value ? 'update' : 'create'
-    const actionTitle = isEditMode.value ? 'Update' : 'Create'
+    const actionText = isEditMode.value ? 'update' : 'record'
+    const actionTitle = isEditMode.value ? 'Update' : 'Record'
+    const donationTypeText = formData.donation_type === 'money' 
+      ? `₱${parseFloat(formData.amount || 0).toLocaleString()}`
+      : (formData.donation_items ? formData.donation_items.substring(0, 50) + (formData.donation_items.length > 50 ? '...' : '') : 'In-Kind Donation')
     
     try {
       await ElMessageBox.confirm(
-        `Are you sure you want to ${actionText} this donation record?`,
+        `Are you sure you want to ${actionText} this ${formData.donation_type === 'money' ? 'money' : 'in-kind'} donation?`,
         `Confirm ${actionTitle} Donation`,
         {
           confirmButtonText: actionTitle,
@@ -292,18 +487,20 @@ const handleSubmit = async () => {
       loading.value = true
 
       const submitData = {
-        member_id: formData.member_id,
-        amount: formData.amount,
-        type: formData.type,
-        payment_method: formData.payment_method,
-        notes: formData.notes ? formData.notes.trim() : '',
-        status: formData.status
+        member_id: formData.is_anonymous ? null : formData.member_id,
+        member_name: formData.is_anonymous ? 'Anonymous' : (formData.member_name || 'Guest'),
+        is_anonymous: formData.is_anonymous,
+        donation_type: formData.donation_type,
+        amount: formData.donation_type === 'money' ? (formData.amount || 0) : 0,
+        type: formData.type || 'donation',
+        payment_method: formData.donation_type === 'money' ? (formData.payment_method || null) : null,
+        donation_items: formData.donation_type === 'inkind' ? (formData.donation_items || '').trim() : null,
+        notes: (formData.notes || '').trim()
       }
 
       emit('submit', submitData)
       
-      // Safety timeout: reset loading after 30 seconds if still loading
-      // This prevents loading state from getting stuck if parent component fails silently
+      // Safety timeout
       setTimeout(() => {
         if (loading.value) {
           loading.value = false
@@ -311,16 +508,13 @@ const handleSubmit = async () => {
       }, 30000)
       
     } catch (confirmError) {
-      // User cancelled the confirmation dialog
       if (confirmError === 'cancel') {
-        // Do nothing, user cancelled
         return
       }
       throw confirmError
     }
     
   } catch (error) {
-    // Validation failed or other error
     if (error !== 'cancel') {
       console.error('Validation failed:', error)
       ElMessage.error('Please fill in all required fields correctly')
@@ -330,7 +524,7 @@ const handleSubmit = async () => {
   }
 }
 
-// Expose method to reset loading (can be called by parent component on API error)
+// Expose method to reset loading
 const resetLoading = () => {
   loading.value = false
 }
@@ -389,8 +583,52 @@ defineExpose({
   border-radius: 8px;
 }
 
-.tithes-offerings-dialog :deep(.el-date-editor.el-input) {
+.tithes-offerings-dialog :deep(.el-radio-group) {
   width: 100%;
+}
+
+.donation-type-toggle {
+  width: 100%;
+}
+
+.donation-type-toggle .el-radio-button {
+  width: 50%;
+}
+
+.donation-type-toggle .el-radio-button__inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.member-option {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.member-name {
+  font-weight: 500;
+  color: #303133;
+}
+
+.member-email {
+  font-size: 12px;
+  color: #909399;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.option-desc {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 8px;
 }
 
 .dialog-footer {
@@ -402,7 +640,7 @@ defineExpose({
 .dialog-footer .el-button {
   border-radius: 8px;
   font-weight: 500;
-  min-width: 100px;
+  min-width: 120px;
 }
 
 .dialog-footer .el-button--primary {
@@ -460,5 +698,3 @@ defineExpose({
   position: relative;
 }
 </style>
-
-

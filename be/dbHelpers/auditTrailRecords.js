@@ -2,6 +2,110 @@ const { query } = require('../database/db');
 const moment = require('moment');
 
 /**
+ * Safely convert Buffer or any value to plain text string
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string representation
+ */
+function safeToString(value, defaultValue = null) {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  return String(value);
+}
+
+/**
+ * Convert any value to plain text (handles Buffer conversion)
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string
+ */
+function toPlainText(value, defaultValue = '') {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  // Handle Buffer - convert to UTF-8 string (like tithesRecords.js)
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8').trim();
+  }
+  
+  // Handle objects - convert to readable text
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  // Handle numbers - convert to string
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  
+  // Handle booleans - convert to string
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  
+  // Handle strings - trim and return
+  return String(value).trim();
+}
+
+/**
+ * Convert all Buffer fields in a row to text (for reading data)
+ * @param {Object} row - Database row
+ * @returns {Object} Row with all Buffers converted to text
+ */
+function convertRowBuffersToText(row) {
+  if (!row || typeof row !== 'object') {
+    return row;
+  }
+  
+  const converted = {};
+  for (const [key, value] of Object.entries(row)) {
+    converted[key] = toPlainText(value);
+  }
+  return converted;
+}
+
+/**
+ * Convert an object to plain text values (no Buffers, no IDs)
+ * @param {Object} obj - Object to convert
+ * @returns {Object} Object with plain text values
+ */
+function convertToPlainTextObject(obj) {
+  if (!obj || typeof obj !== 'object') {
+    return toPlainText(obj);
+  }
+
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip sensitive fields
+    if (['password', 'token', 'secret', 'key', 'acc_password'].includes(key.toLowerCase())) {
+      result[key] = '[REDACTED]';
+    } else {
+      result[key] = toPlainText(value);
+    }
+  }
+  return result;
+}
+
+/**
  * Audit Trail Records CRUD Operations
  * Based on tbl_audit_trail schema:
  * - audit_id (INT, PK, AI, NN) - Auto-incrementing
@@ -24,6 +128,7 @@ const moment = require('moment');
 
 /**
  * CREATE - Insert a new audit trail record
+ * All data is stored as plain text (no Buffers, no IDs)
  * @param {Object} auditData - Audit trail data object
  * @returns {Promise<Object>} Result object
  */
@@ -61,16 +166,32 @@ async function createAuditLog(auditData) {
     // Format date_created
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
-    // Convert old_values and new_values to JSON strings if they are objects
+    // Convert all values to plain text (no Buffers, no IDs)
+    const plainUserId = toPlainText(user_id);
+    const plainUserEmail = toPlainText(user_email);
+    const plainUserName = toPlainText(user_name);
+    const plainUserPosition = toPlainText(user_position);
+    const plainActionType = toPlainText(action_type).toUpperCase();
+    const plainEntityType = toPlainText(entity_type);
+    const plainEntityId = toPlainText(entity_id); // This now stores description text, not ID
+    const plainDescription = toPlainText(description);
+    const plainIpAddress = toPlainText(ip_address);
+    const plainUserAgent = toPlainText(user_agent);
+    const plainStatus = toPlainText(status).toLowerCase();
+    const plainErrorMessage = toPlainText(error_message);
+
+    // Convert old_values and new_values to plain text JSON
     let oldValuesJson = null;
     let newValuesJson = null;
 
     if (old_values !== null && old_values !== undefined) {
-      oldValuesJson = typeof old_values === 'string' ? old_values : JSON.stringify(old_values);
+      const plainOldValues = convertToPlainTextObject(old_values);
+      oldValuesJson = JSON.stringify(plainOldValues, null, 2);
     }
 
     if (new_values !== null && new_values !== undefined) {
-      newValuesJson = typeof new_values === 'string' ? new_values : JSON.stringify(new_values);
+      const plainNewValues = convertToPlainTextObject(new_values);
+      newValuesJson = JSON.stringify(plainNewValues, null, 2);
     }
 
     const sql = `
@@ -81,20 +202,20 @@ async function createAuditLog(auditData) {
     `;
 
     const params = [
-      String(user_id).trim(),
-      user_email ? String(user_email).trim() : null,
-      user_name ? String(user_name).trim() : null,
-      user_position ? String(user_position).trim() : null,
-      String(action_type).trim().toUpperCase(),
-      String(entity_type).trim(),
-      entity_id ? String(entity_id).trim() : null,
-      description ? String(description).trim() : null,
-      ip_address ? String(ip_address).trim() : null,
-      user_agent ? String(user_agent).trim() : null,
+      plainUserId,
+      plainUserEmail,
+      plainUserName,
+      plainUserPosition,
+      plainActionType,
+      plainEntityType,
+      plainEntityId,
+      plainDescription,
+      plainIpAddress,
+      plainUserAgent,
       oldValuesJson,
       newValuesJson,
-      String(status).trim().toLowerCase(),
-      error_message ? String(error_message).trim() : null,
+      plainStatus,
+      plainErrorMessage,
       formattedDateCreated
     ];
 
@@ -299,19 +420,22 @@ async function getAllAuditLogs(options = {}) {
     // Execute query to get paginated results
     const [rows] = await query(sql, params);
 
-    // Parse JSON fields
+    // Parse JSON fields and convert any Buffer values to text
     const parsedRows = rows.map(row => {
+      // Convert any Buffer values to text first
+      const convertedRow = convertRowBuffersToText(row);
+      
       try {
-        if (row.old_values) {
-          row.old_values = typeof row.old_values === 'string' ? JSON.parse(row.old_values) : row.old_values;
+        if (convertedRow.old_values && typeof convertedRow.old_values === 'string') {
+          convertedRow.old_values = JSON.parse(convertedRow.old_values);
         }
-        if (row.new_values) {
-          row.new_values = typeof row.new_values === 'string' ? JSON.parse(row.new_values) : row.new_values;
+        if (convertedRow.new_values && typeof convertedRow.new_values === 'string') {
+          convertedRow.new_values = JSON.parse(convertedRow.new_values);
         }
       } catch (e) {
         console.warn('Error parsing JSON values for audit_id:', row.audit_id);
       }
-      return row;
+      return convertedRow;
     });
 
     // Calculate pagination metadata
@@ -363,13 +487,17 @@ async function getAuditLogById(auditId) {
     }
 
     const row = rows[0];
+    
+    // Convert any Buffer values to text first
+    const convertedRow = convertRowBuffersToText(row);
+    
     // Parse JSON fields
     try {
-      if (row.old_values) {
-        row.old_values = typeof row.old_values === 'string' ? JSON.parse(row.old_values) : row.old_values;
+      if (convertedRow.old_values && typeof convertedRow.old_values === 'string') {
+        convertedRow.old_values = JSON.parse(convertedRow.old_values);
       }
-      if (row.new_values) {
-        row.new_values = typeof row.new_values === 'string' ? JSON.parse(row.new_values) : row.new_values;
+      if (convertedRow.new_values && typeof convertedRow.new_values === 'string') {
+        convertedRow.new_values = JSON.parse(convertedRow.new_values);
       }
     } catch (e) {
       console.warn('Error parsing JSON values for audit_id:', auditId);
@@ -378,7 +506,7 @@ async function getAuditLogById(auditId) {
     return {
       success: true,
       message: 'Audit log retrieved successfully',
-      data: row
+      data: convertedRow
     };
   } catch (error) {
     console.error('Error fetching audit log:', error);

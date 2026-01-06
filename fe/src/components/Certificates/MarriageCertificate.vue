@@ -1,6 +1,6 @@
 <template>
   <div class="certificate-container">
-    <div class="certificate-wrapper" id="certificate-print">
+    <div class="certificate-wrapper" id="marriage-certificate-print">
       <!-- Ornate Gold Border -->
       <div class="certificate-border">
         <div class="border-corner top-left"></div>
@@ -86,6 +86,12 @@
               <div class="signature-underline"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Print Footer -->
+        <div class="print-footer">
+          <p class="print-date">Date Printed: {{ printDate }}</p>
+          <p class="print-by">Printed by: {{ printedBy }}</p>
         </div>
       </div>
     </div>
@@ -185,6 +191,42 @@ const churchLogo = ref('')
 const churchName = ref('BIBLE BAPTIST EKKLESIA OF')
 const churchNameLarge = ref('KAWIT')
 
+// Print footer data
+const printDate = ref('')
+const printedBy = ref('')
+
+// Get current user info for printed by
+const getCurrentUser = () => {
+  try {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user.username || user.email || 'Admin'
+    }
+    // Fallback to any stored name
+    const adminName = localStorage.getItem('adminName')
+    if (adminName) return adminName
+    return 'Admin'
+  } catch (e) {
+    return 'Admin'
+  }
+}
+
+// Set print footer data
+const setPrintFooterData = () => {
+  const now = new Date()
+  printDate.value = now.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  printedBy.value = getCurrentUser()
+}
+
 // Fetch header data from CMS
 const fetchHeaderData = async () => {
   try {
@@ -228,6 +270,9 @@ const fetchHeaderData = async () => {
 }
 
 const printCertificate = () => {
+  // Set print footer data before printing
+  setPrintFooterData()
+  
   // Force landscape orientation
   const style = document.createElement('style')
   style.innerHTML = `
@@ -238,11 +283,13 @@ const printCertificate = () => {
     }
   `
   document.head.appendChild(style)
-  window.print()
-  // Remove the style after printing
   setTimeout(() => {
-    document.head.removeChild(style)
-  }, 1000)
+    window.print()
+    // Remove the style after printing
+    setTimeout(() => {
+      document.head.removeChild(style)
+    }, 1000)
+  }, 100)
 }
 
 onMounted(async () => {

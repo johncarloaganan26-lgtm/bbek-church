@@ -23,6 +23,7 @@ import Messages from '../components/Admin/CommunicationRecords/Messages.vue'
 // Maintenance Pages
 import ContentManagement from '../components/Admin/Maintenance/ContentManagementPage.vue'
 import AuditTrail from '../components/Admin/Maintenance/AuditTrail.vue'
+import SystemLogs from '../components/Admin/Maintenance/SystemLogs.vue'
 import Archive from '../components/Admin/Maintenance/Archive.vue'
 import Settings from '../components/Admin/Maintenance/Settings.vue'
 
@@ -336,7 +337,7 @@ const routes = [
       {
         path: 'audit-trail',
         name: 'AuditTrail',
-        component: AuditTrail
+        component: SystemLogs
       },
       {
         path: 'archive',

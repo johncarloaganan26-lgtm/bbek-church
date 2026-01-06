@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+  import { defineStore } from 'pinia'
 import axios from '@/api/axios'
 
 export const useWaterBaptismStore = defineStore('waterBaptism', {
@@ -190,18 +190,26 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       this.loading = true
       this.error = null
       try {
-        // Only send the status field to preserve existing data
+        // Send all editable fields
         const updateData = {
-          status: baptismData.status
+          member_id: baptismData.member_id,
+          baptism_date: baptismData.baptism_date,
+          location: baptismData.location,
+          pastor_name: baptismData.pastor_name,
+          status: baptismData.status,
+          guardian_name: baptismData.guardian_name,
+          guardian_contact: baptismData.guardian_contact,
+          guardian_relationship: baptismData.guardian_relationship
         }
 
         const response = await axios.put(`/services/water-baptisms/updateWaterBaptism/${id}`, updateData)
         if (response.data.success) {
-          // Update the local baptisms array with the updated data
-          const index = this.baptisms.findIndex(baptism => baptism.id === id)
-          if (index !== -1) {
-            this.baptisms[index] = { ...this.baptisms[index], status: baptismData.status }
-          }
+          // Refresh the baptisms list to get updated data
+          await this.fetchBaptisms({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
           return { success: true, data: response.data.data }
         } else {
           this.error = response.data.message || 'Failed to update water baptism'

@@ -304,7 +304,11 @@ const sortByOptions = [
   'Department Name (Z-A)',
   'Date Created (Newest)',
   'Date Created (Oldest)',
-  'Status (A-Z)'
+  'Status (A-Z)',
+  'This Month',
+  'Last Month',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
 // Watch for filter changes
@@ -442,7 +446,20 @@ const handleExportExcel = async () => {
 }
 
 const handlePrint = () => {
+  ElMessage.info('Preparing print preview...')
   const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    ElMessage.error('Could not open print preview. Check browser pop-up settings.')
+    return
+  }
+  
+  // Get current user info for printed by
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const printedBy = userInfo?.member 
+    ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
+    : userInfo?.account?.email || 'Admin'
+  
+  ElMessage.success('Print preview opened. Please check your browser tabs.')
   const tableHeaders = ['Department Name', 'Department Lead', 'Joined Members', 'Status', 'Date Created']
   
   let tableRows = ''
@@ -458,6 +475,8 @@ const handlePrint = () => {
     `
   })
   
+  const currentDate = new Date().toLocaleString()
+  
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -471,9 +490,27 @@ const handlePrint = () => {
             font-family: Arial, sans-serif;
             margin: 20px;
           }
-          h1 {
-            text-align: center;
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+          }
+          .header img {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .header .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
           }
           table {
             width: 100%;
@@ -492,16 +529,28 @@ const handlePrint = () => {
           tr:nth-child(even) {
             background-color: #f9f9f9;
           }
-          .print-date {
-            text-align: right;
-            margin-bottom: 10px;
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             color: #666;
+          }
+          .footer-info {
+            text-align: right;
           }
         </style>
       </head>
       <body>
-        <h1>Departments</h1>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="header">
+          <img src="/logo.png" alt="Church Logo" />
+          <div>
+            <h1>Departments</h1>
+            <div class="subtitle">Biblical Bread Ministries</div>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -512,6 +561,13 @@ const handlePrint = () => {
             ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
           </tbody>
         </table>
+        <div class="footer">
+          <div>Total Records: ${departments.value.length}</div>
+          <div class="footer-info">
+            <div>Printed on: ${currentDate}</div>
+            <div>Printed by: ${printedBy}</div>
+          </div>
+        </div>
       </body>
     </html>
   `)

@@ -66,9 +66,19 @@
       <template #header>
         <div class="card-header">
           <span>Filters</span>
-          <el-button type="primary" text @click="resetFilters" :disabled="loading">
-            Reset Filters
-          </el-button>
+          <div class="header-actions">
+            <el-button type="success" @click="exportToCSV">
+              <el-icon><Download /></el-icon>
+              Export CSV
+            </el-button>
+            <el-button type="info" @click="printData">
+              <el-icon><Printer /></el-icon>
+              Print
+            </el-button>
+            <el-button type="primary" text @click="resetFilters" :disabled="loading">
+              Reset Filters
+            </el-button>
+          </div>
         </div>
       </template>
       <el-form :model="filters" :inline="true" class="filter-form">
@@ -363,6 +373,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useArchiveStore } from '@/stores/archiveStore'
 import { ElMessage } from 'element-plus'
 import { 
@@ -372,10 +383,14 @@ import {
   Search, 
   View, 
   Loading,
-  Refresh
+  Refresh,
+  Download,
+  Printer
 } from '@element-plus/icons-vue'
 
 const archiveStore = useArchiveStore()
+const route = useRoute()
+const router = useRouter()
 
 // Computed properties
 const archives = computed(() => archiveStore.archives)
@@ -540,13 +555,18 @@ const confirmRestore = async () => {
 
 const formatDateTime = (dateString) => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
+  // Handle MySQL DATETIME format "YYYY-MM-DD HH:mm:ss"
+  // Replace space with 'T' for proper ISO parsing
+  const formattedDate = String(dateString).replace(' ', 'T')
+  const date = new Date(formattedDate)
+  if (isNaN(date.getTime())) return dateString // Fallback to original string
   return date.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: true
   })
 }
 
@@ -560,8 +580,101 @@ const formatTableName = (tableName) => {
     .join(' ')
 }
 
+const exportToCSV = () => {
+  const headers = ['Archived Date', 'Original Table', 'Original ID', 'Archived By', 'Status', 'Restored Date']
+  const rows = archives.value.map(archive => [
+    formatDateTime(archive.archived_at),
+    formatTableName(archive.original_table),
+    archive.original_id,
+    archive.archived_by_name || archive.archived_by_email || archive.archived_by || 'System',
+    archive.restored ? 'Restored' : 'Archived',
+    archive.restored ? formatDateTime(archive.restored_at) : '-'
+  ])
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `archives_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success('Archives exported successfully')
+}
+
+const printData = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['Archived Date', 'Original Table', 'Original ID', 'Archived By', 'Status']
+  
+  const rows = archives.value.map(archive => `
+    <tr>
+      <td>${formatDateTime(archive.archived_at)}</td>
+      <td>${formatTableName(archive.original_table)}</td>
+      <td>${archive.original_id}</td>
+      <td>${archive.archived_by_name || archive.archived_by_email || archive.archived_by || 'System'}</td>
+      <td>${archive.restored ? 'Restored' : 'Archived'}</td>
+    </tr>
+  `).join('')
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Archives - Print</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1a365d; text-align: center; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #1a365d; color: white; }
+          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <h1>Archives</h1>
+        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="5" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
+}
+
 // Lifecycle
 onMounted(async () => {
+  // Check for query parameters from System Logs
+  const { table, search: searchParam, action } = route.query
+  
+  if (table) {
+    // Set table filter
+    archiveStore.setFilters({ original_table: table })
+  }
+  
+  if (searchParam) {
+    // Set search query
+    archiveStore.setSearchQuery(searchParam)
+  }
+  
+  if (action === 'restore') {
+    // Show restore hint
+    ElMessage.info('Click the restore button on any archived record to restore it')
+    // Clear the query param
+    router.replace({ query: { ...route.query, action: undefined } })
+  }
+  
   await Promise.all([
     fetchArchives(),
     fetchSummaryStats()
@@ -637,6 +750,7 @@ onMounted(async () => {
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .filter-form {

@@ -1,6 +1,6 @@
 <template>
   <div class="certificate-container">
-    <div class="certificate-wrapper" id="certificate-print">
+    <div class="certificate-wrapper" id="death-certificate-print">
       <!-- Ornate Gold Border -->
       <div class="certificate-border">
         <div class="border-corner top-left"></div>
@@ -21,105 +21,83 @@
             <div class="church-logo">
               <div class="logo-circle">
                 <img v-if="churchLogo" :src="churchLogo" alt="Church Logo" class="logo-image" />
-                <div v-else class="logo-building">KAWIT</div>
+                <div v-else class="logo-inner">
+                  <div class="bible-icon">📖</div>
+                  <div class="bible-reference">1 Cor 5:15</div>
+                  <div class="bible-version">KJV 1611</div>
+                </div>
+                <div v-if="!churchLogo" class="logo-ring-text">BAPTIST EKKLESIA OF KAWIT</div>
               </div>
-              <div class="sec-registered">S.E.C. REGISTERED</div>
             </div>
           </div>
           <div class="header-right">
             <h1 class="church-name">{{ churchName }}</h1>
-            <h2 v-if="churchNameSub" class="church-name-sub">{{ churchNameSub }}</h2>
-            <p class="church-address">{{ churchAddress }}</p>
-            <p class="church-contact">Contact no. {{ contactNumber }}</p>
+            <h1 v-if="churchNameLarge" class="church-name-large">{{ churchNameLarge }}</h1>
           </div>
         </div>
 
         <!-- Certificate Title -->
         <div class="certificate-title-section">
-          <h2 class="certificate-title">CERTIFICATE</h2>
-          <h3 class="certificate-subtitle">OF DEATH</h3>
+          <h2 class="certificate-title">Certificate <span class="title-small">of</span> Death</h2>
+          <p class="certificate-subtitle">THIS CERTIFICATE IS PRESENTED IN MEMORY OF</p>
         </div>
 
-        <!-- Introductory Statement -->
-        <div class="intro-section">
-          <p class="intro-text">
-            This certifies that the following individual, a beloved member of our congregation, has been called home to be with the Lord.
+        <!-- Deceased Name -->
+        <div class="deceased-name-section">
+          <div class="deceased-name">
+            {{ deceasedName || 'Deceased Name' }}
+          </div>
+        </div>
+
+        <!-- Death Details -->
+        <div class="death-details-section">
+          <p class="death-statement">WHO DEPARTED THIS LIFE</p>
+          <p class="death-date">
+            On this <span class="date-day">{{ formattedDeathDay }}</span> Day of <span class="date-month">{{ formattedDeathMonth }}</span> in the year <span class="date-year">{{ formattedDeathYear }}</span>
           </p>
-        </div>
-
-        <!-- Deceased Information -->
-        <div class="personal-info-section">
-          <div class="info-field">
-            <span class="field-label">Name of Deceased</span>
-            <span class="field-value">{{ deceasedName || '________________' }}</span>
-          </div>
-          <div class="info-field">
-            <span class="field-label">Born on</span>
-            <span class="field-value">{{ formattedBirthDate || '________________' }}</span>
-          </div>
-          <div class="info-field">
-            <span class="field-label">Date of Death</span>
-            <span class="field-value">{{ formattedDeathDate || '________________' }}</span>
-          </div>
-          <div class="info-field">
-            <span class="field-label">Age at Death</span>
-            <span class="field-value">{{ ageAtDeath || '________________' }}</span>
-          </div>
-          <div class="info-field">
-            <span class="field-label">Place of Death</span>
-            <span class="field-value">{{ placeOfDeath || '________________' }}</span>
-          </div>
-          <div class="info-field">
-            <span class="field-label">Address</span>
-            <span class="field-value">{{ address || '________________' }}</span>
-          </div>
-        </div>
-
-        <!-- Burial Information -->
-        <div class="burial-section">
-          <h4 class="burial-title">BURIAL INFORMATION</h4>
-          <div class="burial-grid">
-            <div class="burial-column">
-              <div class="info-field">
-                <span class="field-label">Burial Date</span>
-                <span class="field-value">{{ formattedBurialDate || '________________' }}</span>
-              </div>
-              <div class="info-field">
-                <span class="field-label">Burial Location</span>
-                <span class="field-value">{{ burialLocation || '________________' }}</span>
-              </div>
-            </div>
-            <div class="burial-column">
-              <div class="info-field">
-                <span class="field-label">Next of Kin</span>
-                <span class="field-value">{{ nextOfKin || '________________' }}</span>
-              </div>
-              <div class="info-field">
-                <span class="field-label">Relationship</span>
-                <span class="field-value">{{ relationship || '________________' }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Scripture Verse -->
-        <div class="verse-section">
-          <p class="verse-text">
-            "For I am persuaded, that neither death, nor life, nor angels, nor principalities, nor powers, nor things present, nor things to come, nor height, nor depth, nor any other creature, shall be able to separate us from the love of God, which is in Christ Jesus our Lord."
+          <p class="death-location">
+            at <span class="underline">{{ placeOfDeath || 'Place of Death' }}</span>
           </p>
-          <p class="verse-reference">— Romans 8:38-39 (KJV)</p>
+          <p class="birth-info">
+            Born on <span class="underline">{{ formattedBirthDate }}</span>, aged <span class="underline">{{ ageAtDeath || 'Age at Death' }}</span>
+          </p>
+          <p class="burial-info">
+            And was laid to rest on <span class="underline">{{ formattedBurialDate }}</span> at <span class="underline">{{ burialLocation || 'Burial Location' }}</span>
+          </p>
         </div>
 
         <!-- Signatures Section -->
         <div class="signatures-section">
-          <div class="signature-witness">
-            <p class="signature-label">Witnessed by:</p>
-            <span class="signature-value">{{ witnessName || '________________' }}</span>
+          <div class="signatures-left">
+            <p class="signature-label">Witness & Next of Kin</p>
+            <div class="signature-lines">
+              <div class="signature-columns">
+                <div class="signature-line-item">
+                  <span class="signature-name">{{ witnessName || 'Witness Name' }}</span>
+                  <div class="signature-underline"></div>
+                  <span class="signature-title">Witness</span>
+                </div>
+                <div class="signature-line-item">
+                  <span class="signature-name">{{ nextOfKin || 'Next of Kin Name' }}</span>
+                  <div class="signature-underline"></div>
+                  <span class="signature-title">{{ relationship || 'Relationship' }}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="signature-minister">
-            <p class="minister-name">{{ ministerName || 'Rev. Fresco Q. Sulapas' }}</p>
-            <p class="minister-title">Church Minister</p>
+          <div class="signatures-right">
+            <p class="signature-label">Minister/Pastor</p>
+            <div class="signature-line-item">
+              <span class="signature-name">{{ ministerName || 'Minister Name' }}</span>
+              <div class="signature-underline"></div>
+            </div>
           </div>
+        </div>
+
+        <!-- Print Footer -->
+        <div class="print-footer">
+          <p class="print-date">Date Printed: {{ printDate }}</p>
+          <p class="print-by">Printed by: {{ printedBy }}</p>
         </div>
       </div>
     </div>
@@ -184,7 +162,7 @@ const props = defineProps({
   },
   ministerName: {
     type: String,
-    default: 'Rev. Fresco Q. Sulapas'
+    default: ''
   },
   churchAddress: {
     type: String,
@@ -196,30 +174,88 @@ const props = defineProps({
   }
 })
 
+const formattedDeathDay = computed(() => {
+  if (!props.deathDate) return '15th'
+  const date = new Date(props.deathDate)
+  const day = date.getDate()
+  const suffix = getDaySuffix(day)
+  return `${day}${suffix}`
+})
+
+const formattedDeathMonth = computed(() => {
+  if (!props.deathDate) return 'December'
+  const date = new Date(props.deathDate)
+  return date.toLocaleDateString('en-US', { month: 'long' })
+})
+
+const formattedDeathYear = computed(() => {
+  if (!props.deathDate) return '2024'
+  const date = new Date(props.deathDate)
+  return date.getFullYear()
+})
+
 const formattedBirthDate = computed(() => {
-  if (!props.birthDate) return ''
+  if (!props.birthDate) return 'January 1, 1950'
   const date = new Date(props.birthDate)
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 })
 
-const formattedDeathDate = computed(() => {
-  if (!props.deathDate) return ''
-  const date = new Date(props.deathDate)
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-})
-
 const formattedBurialDate = computed(() => {
-  if (!props.burialDate) return ''
+  if (!props.burialDate) return 'December 20, 2024'
   const date = new Date(props.burialDate)
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 })
 
+const getDaySuffix = (day) => {
+  if (day > 3 && day < 21) return 'th'
+  switch (day % 10) {
+    case 1: return 'st'
+    case 2: return 'nd'
+    case 3: return 'rd'
+    default: return 'th'
+  }
+}
+
 // Dynamic header data
 const churchLogo = ref('')
-const churchName = ref('BIBLE BAPTIST EKKLESIA')
-const churchNameSub = ref('OF KAWIT')
-const churchAddress = ref(props.churchAddress || '0559 Villa Ramirez, Tabon 1, Kawit, Cavite')
-const contactNumber = ref(props.contactNumber || '09353166809')
+const churchName = ref('BIBLE BAPTIST EKKLESIA OF')
+const churchNameLarge = ref('KAWIT')
+
+// Print footer data
+const printDate = ref('')
+const printedBy = ref('')
+
+// Get current user info for printed by
+const getCurrentUser = () => {
+  try {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.username || user.email || 'Admin'
+    }
+    // Fallback to any stored name
+    const adminName = localStorage.getItem('adminName')
+    if (adminName) return adminName
+    return 'Admin'
+  } catch (e) {
+    return 'Admin'
+  }
+}
+
+// Set print footer data
+const setPrintFooterData = () => {
+  const now = new Date()
+  printDate.value = now.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  printedBy.value = getCurrentUser()
+}
 
 // Fetch header data from CMS
 const fetchHeaderData = async () => {
@@ -228,34 +264,31 @@ const fetchHeaderData = async () => {
     if (response.data.success && response.data.data) {
       const { page, images } = response.data.data
       const content = page?.content || {}
-      
+
       // Get logo from images (base64 data URL)
       if (images?.logo) {
         churchLogo.value = images.logo
       }
-      
+
       // Get church name from content and split if needed
       if (content.fullname) {
         const fullName = content.fullname.toUpperCase()
         // Try to split at "OF" if it exists
         const ofIndex = fullName.indexOf(' OF ')
         if (ofIndex > 0) {
-          churchName.value = fullName.substring(0, ofIndex)
-          churchNameSub.value = fullName.substring(ofIndex + 1)
+          churchName.value = fullName.substring(0, ofIndex + 3) // Include "OF"
+          churchNameLarge.value = fullName.substring(ofIndex + 4) // After "OF "
         } else {
-          churchName.value = fullName
-          churchNameSub.value = ''
+          // If no "OF", try to split at last space
+          const lastSpaceIndex = fullName.lastIndexOf(' ')
+          if (lastSpaceIndex > 0) {
+            churchName.value = fullName.substring(0, lastSpaceIndex)
+            churchNameLarge.value = fullName.substring(lastSpaceIndex + 1)
+          } else {
+            churchName.value = fullName
+            churchNameLarge.value = ''
+          }
         }
-      }
-      
-      // Get church address if available
-      if (content.address) {
-        churchAddress.value = content.address
-      }
-      
-      // Get contact number if available
-      if (content.contactNumber) {
-        contactNumber.value = content.contactNumber
       }
     }
   } catch (error) {
@@ -267,13 +300,32 @@ const fetchHeaderData = async () => {
 }
 
 const printCertificate = () => {
-  window.print()
+  // Set print footer data before printing
+  setPrintFooterData()
+
+  // Force landscape orientation
+  const style = document.createElement('style')
+  style.innerHTML = `
+    @media print {
+      @page {
+        size: landscape;
+      }
+    }
+  `
+  document.head.appendChild(style)
+  setTimeout(() => {
+    window.print()
+    // Remove the style after printing
+    setTimeout(() => {
+      document.head.removeChild(style)
+    }, 1000)
+  }, 100)
 }
 
 onMounted(async () => {
   // Fetch header data from CMS
   await fetchHeaderData()
-  
+
   // Auto-print when component is mounted (optional)
   // Uncomment the line below if you want auto-print on open
   // setTimeout(() => window.print(), 500)
@@ -293,13 +345,14 @@ onMounted(async () => {
 .certificate-wrapper {
   position: relative;
   width: 100%;
-  max-width: 8.5in;
-  min-height: 11in;
-  background: #faf8f3;
+  max-width: 11in;
+  min-height: 8.5in;
+  background: white;
   margin: 0 auto;
-  padding: 50px 60px;
+  padding: 40px 50px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   height: auto;
+  max-height: 8.5in;
 }
 
 /* Ornate Gold Border */
@@ -321,74 +374,78 @@ onMounted(async () => {
 }
 
 .border-corner.top-left {
-  top: 20px;
-  left: 20px;
+  top: 15px;
+  left: 15px;
   border-right: none;
   border-bottom: none;
-  border-top-left-radius: 15px;
+  border-top-left-radius: 12px;
 }
 
 .border-corner.top-right {
-  top: 20px;
-  right: 20px;
+  top: 15px;
+  right: 15px;
   border-left: none;
   border-bottom: none;
-  border-top-right-radius: 15px;
+  border-top-right-radius: 12px;
 }
 
 .border-corner.bottom-left {
-  bottom: 20px;
-  left: 20px;
+  bottom: 15px;
+  left: 15px;
   border-right: none;
   border-top: none;
-  border-bottom-left-radius: 15px;
+  border-bottom-left-radius: 12px;
 }
 
 .border-corner.bottom-right {
-  bottom: 20px;
-  right: 20px;
+  bottom: 15px;
+  right: 15px;
   border-left: none;
   border-top: none;
-  border-bottom-right-radius: 15px;
+  border-bottom-right-radius: 12px;
 }
 
 .border-top,
 .border-bottom {
   position: absolute;
-  left: 100px;
-  right: 100px;
+  left: 95px;
+  right: 95px;
   height: 3px;
   background: linear-gradient(to right, transparent, #d4af37 20%, #d4af37 80%, transparent);
 }
 
 .border-top {
-  top: 20px;
+  top: 15px;
 }
 
 .border-bottom {
-  bottom: 20px;
+  bottom: 15px;
 }
 
 .border-left,
 .border-right {
   position: absolute;
-  top: 100px;
-  bottom: 100px;
+  top: 95px;
+  bottom: 95px;
   width: 3px;
   background: linear-gradient(to bottom, transparent, #d4af37 20%, #d4af37 80%, transparent);
 }
 
 .border-left {
-  left: 20px;
+  left: 15px;
 }
 
 .border-right {
-  right: 20px;
+  right: 15px;
 }
 
 .certificate-content {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
 }
 
 /* Header Section */
@@ -396,7 +453,7 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   gap: 25px;
 }
 
@@ -411,22 +468,57 @@ onMounted(async () => {
 }
 
 .logo-circle {
+  position: relative;
   width: 100px;
   height: 100px;
-  border: 3px solid #1e40af;
+  border: 4px solid #1e40af;
   border-radius: 50%;
+  background: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
   margin-bottom: 8px;
 }
 
-.logo-building {
-  font-size: 12px;
+.logo-ring-text {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: bold;
+  color: white;
+  background: #1e40af;
+  padding: 2px 10px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  border-radius: 10px;
+}
+
+.logo-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+}
+
+.bible-icon {
+  font-size: 20px;
+  margin-bottom: 3px;
+}
+
+.bible-reference {
+  font-size: 7px;
   font-weight: bold;
   color: #1e40af;
-  text-align: center;
+  margin-bottom: 1px;
+}
+
+.bible-version {
+  font-size: 6px;
+  color: #1e40af;
 }
 
 .logo-image {
@@ -436,235 +528,217 @@ onMounted(async () => {
   border-radius: 50%;
 }
 
-.sec-registered {
-  font-size: 9px;
-  font-weight: 600;
-  color: #000;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .header-right {
   flex: 1;
-  text-align: left;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .church-name {
-  font-size: 24px;
-  font-weight: 900;
-  color: #000;
-  margin: 0 0 5px 0;
-  font-family: Arial, sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  line-height: 1.2;
-}
-
-.church-name-sub {
   font-size: 20px;
   font-weight: 900;
   color: #000;
-  margin: 0 0 8px 0;
+  margin: 0;
   font-family: Arial, sans-serif;
   text-transform: uppercase;
   letter-spacing: 1px;
   line-height: 1.2;
 }
 
-.church-address {
-  font-size: 13px;
+.church-name-large {
+  font-size: 28px;
+  font-weight: 900;
   color: #000;
-  margin: 0 0 4px 0;
+  margin: 3px 0 0 0;
   font-family: Arial, sans-serif;
-}
-
-.church-contact {
-  font-size: 13px;
-  color: #000;
-  margin: 0;
-  font-family: Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  line-height: 1;
 }
 
 /* Certificate Title Section */
 .certificate-title-section {
   text-align: center;
-  margin: 35px 0 25px 0;
+  margin: 25px 0 15px 0;
 }
 
 .certificate-title {
-  font-size: 42px;
-  font-weight: 900;
+  font-size: 56px;
+  font-weight: 400;
   color: #000;
-  margin: 0 0 8px 0;
-  font-family: Arial, sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  line-height: 1;
+  margin: 0 0 15px 0;
+  font-family: 'Brush Script MT', 'Lucida Handwriting', 'Edwardian Script ITC', cursive;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.title-small {
+  font-size: 32px;
 }
 
 .certificate-subtitle {
-  font-size: 36px;
-  font-weight: 900;
+  font-size: 12px;
   color: #000;
   margin: 0;
   font-family: Arial, sans-serif;
   text-transform: uppercase;
   letter-spacing: 2px;
-  line-height: 1;
-}
-
-/* Introductory Section */
-.intro-section {
-  margin: 25px 0;
-  text-align: center;
-}
-
-.intro-text {
-  font-size: 14px;
-  color: #000;
-  margin: 0;
-  font-family: 'Times New Roman', serif;
-  line-height: 1.6;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* Personal Information Section */
-.personal-info-section {
-  margin: 25px 0;
-}
-
-.info-field {
-  display: flex;
-  align-items: baseline;
-  margin-bottom: 12px;
-  font-family: 'Times New Roman', serif;
-}
-
-.field-label {
-  font-size: 14px;
-  color: #000;
   font-weight: 600;
-  min-width: 140px;
-  margin-right: 10px;
 }
 
-.field-value {
-  font-size: 14px;
-  color: #000;
-  flex: 1;
-  border-bottom: 1px solid #000;
-  padding-bottom: 2px;
-  min-height: 18px;
+/* Deceased Name Section */
+.deceased-name-section {
+  text-align: center;
+  margin: 20px 0;
 }
 
-/* Burial Section */
-.burial-section {
+.deceased-name {
+  font-size: 42px;
+  font-weight: 400;
+  color: #d4af37;
+  font-family: 'Brush Script MT', 'Lucida Handwriting', 'Edwardian Script ITC', cursive;
+  font-style: italic;
+  line-height: 1.3;
+}
+
+/* Death Details Section */
+.death-details-section {
+  text-align: center;
   margin: 25px 0;
 }
 
-.burial-title {
-  font-size: 16px;
-  font-weight: 900;
+.death-statement {
+  font-size: 14px;
   color: #000;
-  margin: 0 0 20px 0;
+  margin: 0 0 15px 0;
   font-family: Arial, sans-serif;
   text-transform: uppercase;
-  text-align: center;
   letter-spacing: 1px;
+  font-weight: 600;
 }
 
-.burial-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-}
-
-.burial-column {
-  display: flex;
-  flex-direction: column;
-}
-
-.burial-column .info-field {
-  margin-bottom: 12px;
-}
-
-/* Verse Section */
-.verse-section {
-  text-align: center;
-  margin: 30px 0;
-  padding: 20px 0;
-}
-
-.verse-text {
-  font-size: 13px;
+.death-date {
+  font-size: 16px;
   color: #000;
+  margin: 0 0 12px 0;
   font-family: 'Times New Roman', serif;
-  font-style: italic;
+  line-height: 1.5;
+}
+
+.date-day,
+.date-month,
+.date-year {
+  font-weight: 600;
+}
+
+.death-location,
+.birth-info,
+.burial-info {
+  font-size: 16px;
+  color: #000;
   margin: 0 0 8px 0;
-  line-height: 1.6;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+  font-family: 'Times New Roman', serif;
 }
 
-.verse-reference {
-  font-size: 12px;
-  color: #000;
+.burial-info {
   margin: 0;
-  font-family: 'Times New Roman', serif;
+}
+
+.underline {
+  text-decoration: underline;
 }
 
 /* Signatures Section */
 .signatures-section {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 30px;
-  padding-top: 20px;
+  margin-top: auto;
+  padding-top: 30px;
+  gap: 35px;
 }
 
-.signature-witness {
+.signatures-left,
+.signatures-right {
   flex: 1;
 }
 
 .signature-label {
   font-size: 13px;
   color: #000;
-  margin: 0 0 8px 0;
+  margin: 0 0 25px 0;
   font-family: 'Times New Roman', serif;
   font-weight: 600;
-}
-
-.signature-value {
-  font-size: 13px;
-  color: #000;
-  border-bottom: 1px solid #000;
-  padding-bottom: 2px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 4px;
   display: inline-block;
-  min-width: 200px;
-  font-family: 'Times New Roman', serif;
+  width: 100%;
 }
 
-.signature-minister {
-  text-align: center;
+.signature-lines {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.signature-columns {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.minister-name {
-  font-size: 15px;
-  font-weight: 900;
-  color: #000;
-  margin: 0 0 5px 0;
-  font-family: Arial, sans-serif;
+.signature-line-item {
+  display: flex;
+  flex-direction: column;
 }
 
-.minister-title {
+.signature-name {
   font-size: 13px;
   color: #000;
-  margin: 0;
+  margin-bottom: 6px;
+  font-family: 'Times New Roman', serif;
+  min-height: 18px;
+}
+
+.signature-title {
+  font-size: 11px;
+  color: #666;
+  font-family: 'Times New Roman', serif;
+  margin-top: 2px;
+}
+
+.signature-underline {
+  border-bottom: 1px solid #000;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.signatures-right .signature-label {
+  text-align: right;
+}
+
+.signatures-right .signature-underline {
+  width: 100%;
+}
+
+/* Print Footer */
+.print-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+  font-size: 10px;
+  color: #666;
   font-family: Arial, sans-serif;
+}
+
+.print-date,
+.print-by {
+  margin: 0;
 }
 
 /* Print Actions */
@@ -688,7 +762,7 @@ onMounted(async () => {
   background: #1e3a8a;
 }
 
-/* Print Styles */
+/* Print Styles - LANDSCAPE */
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
@@ -712,11 +786,11 @@ onMounted(async () => {
     padding: 12px 20px !important;
     page-break-after: avoid;
     page-break-inside: avoid;
-    height: 11in;
-    max-height: 11in;
+    height: 8.5in;
+    max-height: 8.5in;
     overflow: hidden;
-    width: 8.5in;
-    max-width: 8.5in;
+    width: 11in;
+    max-width: 11in;
   }
 
   .certificate-content {
@@ -724,157 +798,162 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    padding: 0 !important;
     transform: scale(0.97);
     transform-origin: top center;
   }
 
   /* Reduce spacing for print */
   .certificate-header {
-    margin-bottom: 5px !important;
-    gap: 12px !important;
+    margin-bottom: 8px !important;
+    gap: 15px !important;
   }
 
   .logo-circle {
-    width: 55px !important;
-    height: 55px !important;
-    margin-bottom: 3px !important;
+    width: 65px !important;
+    height: 65px !important;
+    margin-bottom: 5px !important;
   }
 
-  .logo-building {
-    font-size: 7px !important;
-  }
-
-  .sec-registered {
+  .logo-ring-text {
     font-size: 6px !important;
+    top: -8px !important;
+    padding: 1px 6px !important;
+  }
+
+  .logo-inner {
+    padding: 5px !important;
+  }
+
+  .bible-icon {
+    font-size: 16px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .bible-reference {
+    font-size: 6px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .bible-version {
+    font-size: 5px !important;
   }
 
   .church-name {
     font-size: 14px !important;
-    margin: 0 0 2px 0 !important;
     line-height: 1 !important;
+    margin: 0 !important;
   }
 
-  .church-name-sub {
-    font-size: 12px !important;
-    margin: 0 0 3px 0 !important;
+  .church-name-large {
+    font-size: 20px !important;
+    margin: 2px 0 0 0 !important;
     line-height: 1 !important;
-  }
-
-  .church-address,
-  .church-contact {
-    font-size: 9px !important;
-    margin: 0 0 1px 0 !important;
-    line-height: 1.1 !important;
   }
 
   .certificate-title-section {
-    margin: 8px 0 5px 0 !important;
+    margin: 10px 0 6px 0 !important;
   }
 
   .certificate-title {
-    font-size: 28px !important;
-    margin-bottom: 3px !important;
-    letter-spacing: 0.5px !important;
-    line-height: 1 !important;
+    font-size: 38px !important;
+    margin-bottom: 6px !important;
+    line-height: 0.95 !important;
+  }
+
+  .title-small {
+    font-size: 22px !important;
   }
 
   .certificate-subtitle {
-    font-size: 24px !important;
-    letter-spacing: 0.5px !important;
+    font-size: 10px !important;
+    letter-spacing: 1.2px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+
+  .deceased-name-section {
+    margin: 8px 0 !important;
+  }
+
+  .deceased-name {
+    font-size: 30px !important;
     line-height: 1 !important;
   }
 
-  .intro-section {
-    margin: 6px 0 !important;
+  .death-details-section {
+    margin: 10px 0 !important;
   }
 
-  .intro-text {
-    font-size: 10px !important;
-    line-height: 1.3 !important;
-    max-width: 500px !important;
-  }
-
-  .personal-info-section {
-    margin: 6px 0 !important;
-  }
-
-  .info-field {
-    margin-bottom: 6px !important;
-  }
-
-  .field-label {
-    font-size: 10px !important;
-    min-width: 100px !important;
-    margin-right: 6px !important;
-  }
-
-  .field-value {
-    font-size: 10px !important;
-    min-height: 12px !important;
-  }
-
-  .burial-section {
-    margin: 8px 0 !important;
-  }
-
-  .burial-title {
+  .death-statement {
     font-size: 11px !important;
     margin: 0 0 8px 0 !important;
-    letter-spacing: 0.3px !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0.5px !important;
   }
 
-  .burial-grid {
-    gap: 15px !important;
-  }
-
-  .burial-column .info-field {
-    margin-bottom: 6px !important;
-  }
-
-  .verse-section {
-    margin: 8px 0 !important;
-    padding: 6px 0 !important;
-  }
-
-  .verse-text {
-    font-size: 9px !important;
-    margin: 0 0 3px 0 !important;
+  .death-date,
+  .death-location,
+  .birth-info,
+  .burial-info {
+    font-size: 12px !important;
+    margin: 0 0 6px 0 !important;
     line-height: 1.3 !important;
-    max-width: 480px !important;
   }
 
-  .verse-reference {
-    font-size: 8px !important;
+  .burial-info {
+    margin: 0 !important;
   }
 
   .signatures-section {
-    margin-top: 10px !important;
-    padding-top: 6px !important;
+    padding-top: 12px !important;
+    gap: 25px !important;
+    margin-top: auto !important;
   }
 
   .signature-label {
-    font-size: 9px !important;
-    margin: 0 0 4px 0 !important;
-  }
-
-  .signature-value {
-    font-size: 9px !important;
-    min-width: 130px !important;
-  }
-
-  .minister-name {
     font-size: 10px !important;
-    margin: 0 0 2px 0 !important;
+    margin: 0 0 10px 0 !important;
+    padding-bottom: 2px !important;
+    border-bottom-width: 1.5px !important;
   }
 
-  .minister-title {
+  .signature-lines {
+    gap: 12px !important;
+    flex-direction: row !important;
+  }
+
+  .signature-columns {
+    flex: 1 !important;
+    gap: 10px !important;
+  }
+
+  .signature-name {
+    font-size: 10px !important;
+    margin-bottom: 4px !important;
+    min-height: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  .signature-title {
     font-size: 9px !important;
+    margin-top: 1px !important;
+  }
+
+  .signature-underline {
+    margin-top: 2px !important;
+  }
+
+  .print-footer {
+    font-size: 8px !important;
+    margin-top: 10px !important;
+    padding-top: 5px !important;
   }
 
   /* Adjust borders for print */
   .border-corner {
-    width: 50px !important;
-    height: 50px !important;
+    width: 45px !important;
+    height: 45px !important;
     border-width: 2px !important;
   }
 
@@ -900,8 +979,8 @@ onMounted(async () => {
 
   .border-top,
   .border-bottom {
-    left: 60px !important;
-    right: 60px !important;
+    left: 55px !important;
+    right: 55px !important;
     height: 2px !important;
     top: 10px !important;
   }
@@ -913,8 +992,8 @@ onMounted(async () => {
 
   .border-left,
   .border-right {
-    top: 60px !important;
-    bottom: 60px !important;
+    top: 55px !important;
+    bottom: 55px !important;
     width: 2px !important;
   }
 
@@ -935,36 +1014,28 @@ onMounted(async () => {
   }
 
   @page {
-    size: letter portrait;
+    size: letter landscape;
     margin: 0;
   }
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .certificate-wrapper {
-    padding: 40px 30px;
+    padding: 30px 40px;
   }
 
-  .certificate-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
+  .certificate-title {
+    font-size: 44px;
   }
 
-  .header-right {
-    text-align: center;
-  }
-
-  .burial-grid {
-    grid-template-columns: 1fr;
+  .deceased-name {
+    font-size: 36px;
   }
 
   .signatures-section {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
+    gap: 30px;
   }
 }
 </style>
-

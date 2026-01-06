@@ -5,65 +5,29 @@ const fs = require('fs');
 const { archiveBeforeDelete } = require('../archiveHelper');
 
 /**
- * Event Records CRUD Operations
- * Based on tbl_events schema:
- * - event_id (INT, PK, NN, AI) - auto-incrementing
- * - title (VARCHAR(45), NN)
- * - description (VARCHAR(500), NN)
- * - start_date (DATETIME, NN)
- * - end_date (DATETIME, NN)
- * - location (VARCHAR(45), NN)
- * - link (VARCHAR(150), nullable)
- * - type (VARCHAR(45), NN)
- * - status (VARCHAR(45), NN, default: 'pending')
- * - date_created (DATETIME, NN)
- * - image (LONGBLOB, nullable)
- * - joined_members (VARCHAR(2000), nullable) - JSON stringified array
- */
-
-/**
  * Helper function to convert image to blob
- * Supports: base64 string, Buffer, file path
- * @param {String|Buffer|Object} imageInput - Image as base64 string, Buffer, or file path
- * @returns {Buffer|null} - Image as Buffer (blob) or null
  */
 function convertImageToBlob(imageInput) {
   try {
-    // If null or undefined, return null
     if (!imageInput) {
       return null;
     }
-
-    // If already a Buffer, return it
     if (Buffer.isBuffer(imageInput)) {
       return imageInput;
     }
-
-    // If it's a file object from multer (has buffer property)
     if (imageInput.buffer && Buffer.isBuffer(imageInput.buffer)) {
       return imageInput.buffer;
     }
-
-    // If it's a file path (string starting with / or containing path separators)
     if (typeof imageInput === 'string' && (imageInput.startsWith('/') || imageInput.includes('\\') || imageInput.includes('/'))) {
-      // Check if file exists
       if (fs.existsSync(imageInput)) {
         return fs.readFileSync(imageInput);
       }
       return null;
     }
-
-    // If it's a base64 string
     if (typeof imageInput === 'string') {
-      // Remove data URL prefix if present (e.g., "data:image/png;base64,")
-      const base64Data = imageInput.includes(',') 
-        ? imageInput.split(',')[1] 
-        : imageInput;
-      
-      // Convert base64 to Buffer
+      const base64Data = imageInput.includes(',') ? imageInput.split(',')[1] : image64Input;
       return Buffer.from(base64Data, 'base64');
     }
-
     return null;
   } catch (error) {
     console.error('Error converting image to blob:', error);
@@ -71,21 +35,14 @@ function convertImageToBlob(imageInput) {
   }
 }
 
-/**
- * Helper function to convert blob to base64 string for JSON responses
- * @param {Buffer|null} blob - Image blob as Buffer
- * @returns {String|null} - Base64 string or null
- */
 function convertBlobToBase64(blob) {
   try {
     if (!blob) {
       return null;
     }
-    
     if (Buffer.isBuffer(blob)) {
       return blob.toString('base64');
     }
-    
     return null;
   } catch (error) {
     console.error('Error converting blob to base64:', error);
@@ -93,11 +50,6 @@ function convertBlobToBase64(blob) {
   }
 }
 
-/**
- * CREATE - Insert a new event record
- * @param {Object} eventData - Event data object
- * @returns {Promise<Object>} Result object
- */
 async function createEvent(eventData) {
   try {
     const {
@@ -114,87 +66,46 @@ async function createEvent(eventData) {
       joined_members = null
     } = eventData;
 
-    // Validate required fields
-    if (!title) {
-      throw new Error('Missing required field: title');
-    }
-    if (!description) {
-      throw new Error('Missing required field: description');
-    }
-    if (!start_date) {
-      throw new Error('Missing required field: start_date');
-    }
-    if (!end_date) {
-      throw new Error('Missing required field: end_date');
-    }
-    if (!location) {
-      throw new Error('Missing required field: location');
-    }
-    if (!type) {
-      throw new Error('Missing required field: type');
-    }
+    if (!title) throw new Error('Missing required field: title');
+    if (!description) throw new Error('Missing required field: description');
+    if (!start_date) throw new Error('Missing required field: start_date');
+    if (!end_date) throw new Error('Missing required field: end_date');
+    if (!location) throw new Error('Missing required field: location');
+    if (!type) throw new Error('Missing required field: type');
 
-    // Validate date range
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
-    
-    if (isNaN(startDate.getTime())) {
-      throw new Error('Invalid start_date format');
-    }
-    if (isNaN(endDate.getTime())) {
-      throw new Error('Invalid end_date format');
-    }
-    if (endDate < startDate) {
-      throw new Error('end_date must be after or equal to start_date');
-    }
+    if (isNaN(startDate.getTime())) throw new Error('Invalid start_date format');
+    if (isNaN(endDate.getTime())) throw new Error('Invalid end_date format');
+    if (endDate < startDate) throw new Error('end_date must be after or equal to start_date');
 
-    // Format dates
     const formattedStartDate = moment(start_date).format('YYYY-MM-DD HH:mm:ss');
     const formattedEndDate = moment(end_date).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
-    // Validate field lengths
-    if (title.trim().length > 45) {
-      throw new Error('Title exceeds maximum length of 45 characters');
-    }
-    if (description.trim().length > 500) {
-      throw new Error('Description exceeds maximum length of 500 characters');
-    }
-    if (location.trim().length > 45) {
-      throw new Error('Location exceeds maximum length of 45 characters');
-    }
-    if (link && link.trim().length > 45) {
-      throw new Error('Link exceeds maximum length of 45 characters');
-    }
-    if (type.trim().length > 45) {
-      throw new Error('Type exceeds maximum length of 45 characters');
-    }
-    if (status.trim().length > 45) {
-      throw new Error('Status exceeds maximum length of 45 characters');
-    }
+    if (title.trim().length > 45) throw new Error('Title exceeds maximum length of 45 characters');
+    if (description.trim().length > 500) throw new Error('Description exceeds maximum length of 500 characters');
+    if (location.trim().length > 45) throw new Error('Location exceeds maximum length of 45 characters');
+    if (link && link.trim().length > 45) throw new Error('Link exceeds maximum length of 45 characters');
+    if (type.trim().length > 45) throw new Error('Type exceeds maximum length of 45 characters');
+    if (status.trim().length > 45) throw new Error('Status exceeds maximum length of 45 characters');
 
-    // Convert image to blob
     const imageBlob = convertImageToBlob(image);
 
-    // Convert joined_members array to JSON string
     let joinedMembersJson = null;
     if (joined_members !== null && joined_members !== undefined) {
       if (Array.isArray(joined_members)) {
         joinedMembersJson = JSON.stringify(joined_members);
       } else if (typeof joined_members === 'string') {
-        // If it's already a string, try to parse and re-stringify to validate
         try {
           const parsed = JSON.parse(joined_members);
           joinedMembersJson = JSON.stringify(parsed);
         } catch (e) {
-          // If not valid JSON, treat as plain string and wrap in array
           joinedMembersJson = JSON.stringify([joined_members]);
         }
       } else {
         joinedMembersJson = JSON.stringify([joined_members]);
       }
-
-      // Validate joined_members JSON length (max 2000 characters)
       if (joinedMembersJson.length > 2000) {
         throw new Error('Joined members data exceeds maximum length of 2000 characters');
       }
@@ -221,8 +132,6 @@ async function createEvent(eventData) {
     ];
 
     const [result] = await query(sql, params);
-    
-    // Fetch the created event
     const createdEvent = await getEventById(result.insertId);
 
     return {
@@ -236,14 +145,8 @@ async function createEvent(eventData) {
   }
 }
 
-/**
- * READ ALL - Get all event records with pagination and filters
- * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, status, type, sortBy)
- * @returns {Promise<Object>} Object with paginated event records and metadata
- */
 async function getAllEvents(options = {}) {
   try {
-    // Extract and normalize parameters from options
     const search = options.search || options.q || null;
     const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
     const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
@@ -252,32 +155,28 @@ async function getAllEvents(options = {}) {
     const status = options.status || null;
     const type = options.type || null;
     const sortBy = options.sortBy || null;
+    const dateRangeStart = options.dateRangeStart || null;
+    const dateRangeEnd = options.dateRangeEnd || null;
 
-    // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_events';
     let countParams = [];
 
-    // Build query for fetching records
     let sql = 'SELECT * FROM tbl_events';
     const params = [];
 
-    // Build WHERE conditions array
     const whereConditions = [];
     let hasWhere = false;
 
-    // Add search functionality
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
       const searchCondition = `(title LIKE ? OR description LIKE ? OR location LIKE ? OR type LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
-
       whereConditions.push(searchCondition);
       countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
       params.push(searchPattern, searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 
-    // Add status filter
     if (status && status !== 'All Statuses') {
       whereConditions.push('status = ?');
       countParams.push(status);
@@ -285,7 +184,6 @@ async function getAllEvents(options = {}) {
       hasWhere = true;
     }
 
-    // Add type filter
     if (type && type !== 'All Types') {
       whereConditions.push('type = ?');
       countParams.push(type);
@@ -293,14 +191,55 @@ async function getAllEvents(options = {}) {
       hasWhere = true;
     }
 
-    // Apply WHERE clause if any conditions exist
+    if (dateRangeStart && dateRangeEnd) {
+      whereConditions.push('start_date >= ? AND start_date <= ?');
+      countParams.push(dateRangeStart, dateRangeEnd);
+      params.push(dateRangeStart, dateRangeEnd);
+      hasWhere = true;
+    } else if (dateRangeStart) {
+      whereConditions.push('start_date >= ?');
+      countParams.push(dateRangeStart);
+      params.push(dateRangeStart);
+      hasWhere = true;
+    } else if (dateRangeEnd) {
+      whereConditions.push('start_date <= ?');
+      countParams.push(dateRangeEnd);
+      params.push(dateRangeEnd);
+      hasWhere = true;
+    }
+
+    // Add month filter for month-based sorting (as WHERE clause to actually filter)
+    const monthMap = {
+      'January': 1, 'February': 2, 'March': 3, 'April': 4,
+      'May': 5, 'June': 6, 'July': 7, 'August': 8,
+      'September': 9, 'October': 10, 'November': 11, 'December': 12
+    };
+    
+    if (monthMap[sortBy] !== undefined) {
+      whereConditions.push('MONTH(start_date) = ?');
+      countParams.push(monthMap[sortBy]);
+      params.push(monthMap[sortBy]);
+      hasWhere = true;
+    } else if (sortBy === 'This Month') {
+      whereConditions.push('MONTH(start_date) = MONTH(CURDATE()) AND YEAR(start_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortBy === 'Last Month') {
+      whereConditions.push('MONTH(start_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(start_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    } else if (sortBy === 'This Year') {
+      whereConditions.push('YEAR(start_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortBy === 'Last Year') {
+      whereConditions.push('YEAR(start_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 YEAR))');
+      hasWhere = true;
+    }
+
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
       countSql += whereClause;
       sql += whereClause;
     }
 
-    // Add sorting
     let orderByClause = ' ORDER BY ';
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
@@ -334,14 +273,20 @@ async function getAllEvents(options = {}) {
       case 'Status (A-Z)':
         orderByClause += 'status ASC';
         break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE status 
+          WHEN 'pending' THEN 1 
+          WHEN 'ongoing' THEN 2 
+          WHEN 'completed' THEN 3 
+          ELSE 4 
+        END, date_created DESC`;
+        break;
       default:
-        orderByClause += 'date_created DESC'; // Default sorting
+        orderByClause += 'date_created DESC';
     }
     sql += orderByClause;
 
-    // Determine pagination values
     let finalLimit, finalOffset;
-
     if (page !== undefined && pageSize !== undefined) {
       const pageNum = parseInt(page) || 1;
       const size = parseInt(pageSize) || 10;
@@ -355,15 +300,12 @@ async function getAllEvents(options = {}) {
       finalOffset = null;
     }
 
-    // Get total count (before pagination)
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Add pagination to main query
     if (finalLimit !== null) {
       const limitValue = Math.max(1, parseInt(finalLimit) || 10);
       const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
-
       if (offsetValue > 0) {
         sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
       } else {
@@ -371,31 +313,24 @@ async function getAllEvents(options = {}) {
       }
     }
 
-    // Execute query to get paginated results
     const [rows] = await query(sql, params);
 
-    // Convert image blobs to base64 and create imageURL field, parse joined_members JSON for JSON response
     const processedRows = rows.map(event => {
       const processedEvent = { ...event };
-      
-      // Convert image blob to base64 and create imageURL field
       let imageUrl = null;
       if (event.image && Buffer.isBuffer(event.image)) {
         const base64String = convertBlobToBase64(event.image);
         if (base64String) {
-          // Create data URL format for frontend use
           imageUrl = `data:image/jpeg;base64,${base64String}`;
         }
       }
       processedEvent.imageUrl = imageUrl;
-      // Keep base64 image for backward compatibility, but prefer imageUrl
       if (event.image && Buffer.isBuffer(event.image)) {
         processedEvent.image = convertBlobToBase64(event.image);
       } else {
         processedEvent.image = null;
       }
       
-      // Parse joined_members JSON string back to array
       if (event.joined_members) {
         try {
           processedEvent.joined_members = JSON.parse(event.joined_members);
@@ -410,7 +345,6 @@ async function getAllEvents(options = {}) {
       return processedEvent;
     });
 
-    // Calculate pagination metadata
     const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null && finalLimit !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
     const currentPageSize = finalLimit || processedRows.length;
     const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
@@ -436,11 +370,6 @@ async function getAllEvents(options = {}) {
   }
 }
 
-/**
- * READ ONE - Get a single event by ID
- * @param {Number} eventId - Event ID
- * @returns {Promise<Object>} Event record
- */
 async function getEventById(eventId) {
   try {
     if (!eventId) {
@@ -458,32 +387,25 @@ async function getEventById(eventId) {
       };
     }
 
-    // Convert image blob to base64 and create imageURL field, parse joined_members JSON for JSON response
     const event = rows[0];
-    
-    // Convert image blob to base64 and create imageURL field
     let imageUrl = null;
     if (event.image && Buffer.isBuffer(event.image)) {
       const base64String = convertBlobToBase64(event.image);
       if (base64String) {
-        // Create data URL format for frontend use
         imageUrl = `data:image/jpeg;base64,${base64String}`;
       }
     }
     event.imageUrl = imageUrl;
-    // Keep base64 image for backward compatibility, but prefer imageUrl
     if (event.image && Buffer.isBuffer(event.image)) {
       event.image = convertBlobToBase64(event.image);
     } else {
       event.image = null;
     }
     
-    // Parse joined_members JSON string back to array
     if (event.joined_members) {
       try {
         event.joined_members = JSON.parse(event.joined_members);
       } catch (e) {
-        console.warn('Failed to parse joined_members JSON for event_id:', event.event_id);
         event.joined_members = [];
       }
     } else {
@@ -501,19 +423,12 @@ async function getEventById(eventId) {
   }
 }
 
-/**
- * UPDATE - Update an existing event record
- * @param {Number} eventId - Event ID
- * @param {Object} eventData - Updated event data
- * @returns {Promise<Object>} Result object
- */
 async function updateEvent(eventId, eventData) {
   try {
     if (!eventId) {
       throw new Error('Event ID is required');
     }
 
-    // Check if event exists
     const eventCheck = await getEventById(eventId);
     if (!eventCheck.success) {
       return {
@@ -537,7 +452,6 @@ async function updateEvent(eventId, eventData) {
       joined_members
     } = eventData;
 
-    // Build dynamic update query based on provided fields
     const fields = [];
     const params = [];
 
@@ -577,25 +491,10 @@ async function updateEvent(eventId, eventData) {
       params.push(formattedEndDate);
     }
 
-    // Validate date range if both dates are being updated
     if (start_date !== undefined && end_date !== undefined) {
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
       if (endDate < startDate) {
-        throw new Error('end_date must be after or equal to start_date');
-      }
-    } else if (start_date !== undefined) {
-      // If only start_date is updated, check against existing end_date
-      const existingEndDate = new Date(eventCheck.data.end_date);
-      const newStartDate = new Date(start_date);
-      if (existingEndDate < newStartDate) {
-        throw new Error('end_date must be after or equal to start_date');
-      }
-    } else if (end_date !== undefined) {
-      // If only end_date is updated, check against existing start_date
-      const existingStartDate = new Date(eventCheck.data.start_date);
-      const newEndDate = new Date(end_date);
-      if (newEndDate < existingStartDate) {
         throw new Error('end_date must be after or equal to start_date');
       }
     }
@@ -644,37 +543,30 @@ async function updateEvent(eventId, eventData) {
     }
 
     if (image !== undefined) {
-      // Convert image to blob
       const imageBlob = convertImageToBlob(image);
       fields.push('image = ?');
       params.push(imageBlob);
     }
 
     if (joined_members !== undefined) {
-      // Convert joined_members array to JSON string
       let joinedMembersJson = null;
       if (joined_members !== null) {
         if (Array.isArray(joined_members)) {
           joinedMembersJson = JSON.stringify(joined_members);
         } else if (typeof joined_members === 'string') {
-          // If it's already a string, try to parse and re-stringify to validate
           try {
             const parsed = JSON.parse(joined_members);
             joinedMembersJson = JSON.stringify(parsed);
           } catch (e) {
-            // If not valid JSON, treat as plain string and wrap in array
             joinedMembersJson = JSON.stringify([joined_members]);
           }
         } else {
           joinedMembersJson = JSON.stringify([joined_members]);
         }
-
-        // Validate joined_members JSON length (max 2000 characters)
         if (joinedMembersJson.length > 2000) {
           throw new Error('Joined members data exceeds maximum length of 2000 characters');
         }
       }
-      
       fields.push('joined_members = ?');
       params.push(joinedMembersJson);
     }
@@ -705,7 +597,6 @@ async function updateEvent(eventId, eventData) {
       };
     }
 
-    // Fetch updated event
     const updatedEvent = await getEventById(eventId);
 
     return {
@@ -719,19 +610,12 @@ async function updateEvent(eventId, eventData) {
   }
 }
 
-/**
- * DELETE - Delete an event record (archives it first)
- * @param {Number} eventId - Event ID
- * @param {String} archivedBy - User ID who is deleting/archiving the record (optional)
- * @returns {Promise<Object>} Result object
- */
 async function deleteEvent(eventId, archivedBy = null) {
   try {
     if (!eventId) {
       throw new Error('Event ID is required');
     }
 
-    // Check if event exists
     const eventCheck = await getEventById(eventId);
     if (!eventCheck.success) {
       return {
@@ -741,7 +625,6 @@ async function deleteEvent(eventId, archivedBy = null) {
       };
     }
 
-    // Archive the record before deleting
     await archiveBeforeDelete(
       'tbl_events',
       String(eventId),
@@ -749,7 +632,6 @@ async function deleteEvent(eventId, archivedBy = null) {
       archivedBy
     );
 
-    // Delete from original table
     const sql = 'DELETE FROM tbl_events WHERE event_id = ?';
     const [result] = await query(sql, [eventId]);
 
@@ -772,16 +654,9 @@ async function deleteEvent(eventId, archivedBy = null) {
   }
 }
 
-/**
- * EXPORT - Export event records to Excel
- * @param {Object} options - Optional query parameters (same as getAllEvents: search, status, type, sortBy)
- * @returns {Promise<Buffer>} Excel file buffer
- */
 async function exportEventsToExcel(options = {}) {
   try {
-    // Get all events matching the filters (without pagination for export)
     const exportOptions = { ...options };
-    // Remove pagination to get all records
     delete exportOptions.limit;
     delete exportOptions.offset;
     delete exportOptions.page;
@@ -795,7 +670,6 @@ async function exportEventsToExcel(options = {}) {
 
     const events = result.data;
 
-    // Prepare data for Excel export
     const excelData = events.map((event, index) => {
       return {
         'No.': index + 1,
@@ -813,33 +687,18 @@ async function exportEventsToExcel(options = {}) {
       };
     });
 
-    // Create a new workbook
     const workbook = XLSX.utils.book_new();
-
-    // Create worksheet from data
     const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    // Set column widths for better readability
     const columnWidths = [
-      { wch: 5 },   // No.
-      { wch: 12 },  // Event ID
-      { wch: 30 },  // Title
-      { wch: 40 },  // Description
-      { wch: 20 },  // Start Date
-      { wch: 20 },  // End Date
-      { wch: 25 },  // Location
-      { wch: 30 },  // Link
-      { wch: 20 },  // Type
-      { wch: 15 },  // Status
-      { wch: 20 },  // Date Created
-      { wch: 15 }   // Created Date
+      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 40 },
+      { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 30 },
+      { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }
     ];
     worksheet['!cols'] = columnWidths;
 
-    // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Events');
 
-    // Generate Excel file buffer
     const excelBuffer = XLSX.write(workbook, { 
       type: 'buffer', 
       bookType: 'xlsx',
@@ -853,19 +712,12 @@ async function exportEventsToExcel(options = {}) {
   }
 }
 
-/**
- * READ ALL BY MEMBER - Get all events where a specific member has joined
- * @param {Number} memberId - Member ID
- * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, status, type, sortBy)
- * @returns {Promise<Object>} Object with paginated event records and metadata
- */
 async function getEventsByMemberId(memberId, options = {}) {
   try {
     if (!memberId) {
       throw new Error('Member ID is required');
     }
 
-    // Extract and normalize parameters from options
     const search = options.search || options.q || null;
     const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
     const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
@@ -875,50 +727,40 @@ async function getEventsByMemberId(memberId, options = {}) {
     const type = options.type || null;
     const sortBy = options.sortBy || null;
 
-    // Convert memberId to number for comparison
     const memberIdNum = parseInt(memberId);
 
-    // First, get all events and filter by member_id in joined_members array
-    // Build base query to fetch all events
     let sql = 'SELECT * FROM tbl_events';
     const params = [];
 
-    // Build WHERE conditions array for other filters (not member_id)
     const whereConditions = [];
     let hasWhere = false;
 
-    // Add search functionality
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
       const searchCondition = `(title LIKE ? OR description LIKE ? OR location LIKE ? OR type LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
-
       whereConditions.push(searchCondition);
       params.push(searchPattern, searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 
-    // Add status filter
     if (status && status !== 'All Statuses') {
       whereConditions.push('status = ?');
       params.push(status);
       hasWhere = true;
     }
 
-    // Add type filter
     if (type && type !== 'All Types') {
       whereConditions.push('type = ?');
       params.push(type);
       hasWhere = true;
     }
 
-    // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
       sql += whereClause;
     }
 
-    // Add sorting
     let orderByClause = ' ORDER BY ';
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
@@ -952,30 +794,29 @@ async function getEventsByMemberId(memberId, options = {}) {
       case 'Status (A-Z)':
         orderByClause += 'status ASC';
         break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE status 
+          WHEN 'pending' THEN 1 
+          WHEN 'ongoing' THEN 2 
+          WHEN 'completed' THEN 3 
+          ELSE 4 
+        END, date_created DESC`;
+        break;
       default:
-        orderByClause += 'date_created DESC'; // Default sorting
+        orderByClause += 'date_created DESC';
     }
     sql += orderByClause;
 
-    // Execute query to get all events (before filtering by member_id)
     const [allRows] = await query(sql, params);
 
-    // Filter events where member_id exists in joined_members array
-    // joined_members is stored as VARCHAR string containing JSON array like "[1, 2, 3]"
     const filteredRows = allRows.filter(event => {
-      // Check if joined_members exists and is not empty
       if (!event.joined_members || event.joined_members.trim() === '') {
         return false;
       }
 
       try {
-        // Parse the JSON string to array
         const joinedMembersArray = JSON.parse(event.joined_members);
-        
-        // Check if it's an array and contains the member_id
         if (Array.isArray(joinedMembersArray)) {
-          // Compare as numbers to handle zero-padded strings (e.g., "000000004" should match 4)
-          // Convert both the array element and memberId to numbers for comparison
           return joinedMembersArray.some(id => {
             const idNum = parseInt(id);
             return !isNaN(idNum) && idNum === memberIdNum;
@@ -983,15 +824,11 @@ async function getEventsByMemberId(memberId, options = {}) {
         }
         return false;
       } catch (e) {
-        // If parsing fails, skip this event
-        console.warn('Failed to parse joined_members JSON for event_id:', event.event_id, e);
         return false;
       }
     });
 
-    // Determine pagination values
     let finalLimit, finalOffset;
-
     if (page !== undefined && pageSize !== undefined) {
       const pageNum = parseInt(page) || 1;
       const size = parseInt(pageSize) || 10;
@@ -1005,7 +842,6 @@ async function getEventsByMemberId(memberId, options = {}) {
       finalOffset = null;
     }
 
-    // Apply pagination to filtered results
     let rows;
     if (finalLimit !== null) {
       const limitValue = Math.max(1, parseInt(finalLimit) || 10);
@@ -1015,33 +851,26 @@ async function getEventsByMemberId(memberId, options = {}) {
       rows = filteredRows;
     }
 
-    // Convert image blobs to base64 and create imageURL field, parse joined_members JSON for JSON response
     const processedRows = rows.map(event => {
       const processedEvent = { ...event };
-      
-      // Convert image blob to base64 and create imageURL field
       let imageUrl = null;
       if (event.image && Buffer.isBuffer(event.image)) {
         const base64String = convertBlobToBase64(event.image);
         if (base64String) {
-          // Create data URL format for frontend use
           imageUrl = `data:image/jpeg;base64,${base64String}`;
         }
       }
       processedEvent.imageUrl = imageUrl;
-      // Keep base64 image for backward compatibility, but prefer imageUrl
       if (event.image && Buffer.isBuffer(event.image)) {
         processedEvent.image = convertBlobToBase64(event.image);
       } else {
         processedEvent.image = null;
       }
       
-      // Parse joined_members JSON string back to array
       if (event.joined_members) {
         try {
           processedEvent.joined_members = JSON.parse(event.joined_members);
         } catch (e) {
-          console.warn('Failed to parse joined_members JSON for event_id:', event.event_id);
           processedEvent.joined_members = [];
         }
       } else {
@@ -1051,10 +880,8 @@ async function getEventsByMemberId(memberId, options = {}) {
       return processedEvent;
     });
 
-    // Calculate pagination metadata
     const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null && finalLimit !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
     const currentPageSize = finalLimit || processedRows.length;
-    // Calculate total pages based on filtered results
     const totalFilteredCount = filteredRows.length;
     const totalPages = finalLimit ? Math.ceil(totalFilteredCount / finalLimit) : 1;
     const hasMore = currentPage < totalPages;
@@ -1078,55 +905,42 @@ async function getEventsByMemberId(memberId, options = {}) {
   }
 }
 
-/**
- * READ ALL SERMON EVENTS - Get all sermon events that are not pending
- * Prioritizes ongoing status, then sorts by latest date
- * @returns {Promise<Object>} Object with sermon event records
- */
 async function getSermonEvents() {
   try {
-    // Build query to get events where status != 'pending' AND type = 'sermon'
-    // Sort: ongoing status first, then by start_date DESC (latest first)
     const sql = `
       SELECT * FROM tbl_events
-      WHERE status != ? AND type = ?
-      ORDER BY
-        CASE WHEN status = 'ongoing' THEN 0 ELSE 1 END,
-        start_date DESC
+      WHERE status = ?
+        AND link IS NOT NULL
+        AND link != ''
+        AND start_date <= NOW()
+        AND end_date >= NOW()
+      ORDER BY start_date DESC
     `;
 
-    const params = ['pending', 'sermon'];
+    const params = ['ongoing'];
 
-    // Execute query
     const [rows] = await query(sql, params);
 
-    // Convert image blobs to base64 and create imageURL field, parse joined_members JSON for JSON response
     const processedRows = rows.map(event => {
       const processedEvent = { ...event };
-
-      // Convert image blob to base64 and create imageURL field
       let imageUrl = null;
       if (event.image && Buffer.isBuffer(event.image)) {
         const base64String = convertBlobToBase64(event.image);
         if (base64String) {
-          // Create data URL format for frontend use
           imageUrl = `data:image/jpeg;base64,${base64String}`;
         }
       }
       processedEvent.imageUrl = imageUrl;
-      // Keep base64 image for backward compatibility, but prefer imageUrl
       if (event.image && Buffer.isBuffer(event.image)) {
         processedEvent.image = convertBlobToBase64(event.image);
       } else {
         processedEvent.image = null;
       }
 
-      // Parse joined_members JSON string back to array
       if (event.joined_members) {
         try {
           processedEvent.joined_members = JSON.parse(event.joined_members);
         } catch (e) {
-          console.warn('Failed to parse joined_members JSON for event_id:', event.event_id);
           processedEvent.joined_members = [];
         }
       } else {
@@ -1158,4 +972,3 @@ module.exports = {
   getEventsByMemberId,
   getSermonEvents
 };
-

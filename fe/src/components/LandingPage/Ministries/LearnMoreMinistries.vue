@@ -51,42 +51,31 @@
             <!-- Left Side - Description and Info -->
             <v-col cols="12" lg="6">
               <div class="space-y-6">
-                <div>
-                  <h2 class="text-3xl md:text-4xl font-weight-bold text-white mb-4" style="font-family: 'Georgia', serif;">
-                    {{ learnMoreMinistryData.aboutTitle || 'About This Ministry' }}
-                  </h2>
-                  <p class="text-lg text-black leading-relaxed font-normal">
-                    {{ model?.description || learnMoreMinistryData.defaultDescription || "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives." }}
-                  </p>
+                <p class="text-lg text-black leading-relaxed font-normal">
+                  {{ model?.description || learnMoreMinistryData.defaultDescription || "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives." }}
+                </p>
+
+                <div class="d-flex align-start gap-3">
+                  <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
+                  <div>
+                    <p class="font-weight-bold text-black">Schedule</p>
+                    <p class="text-black font-normal">{{ formatDate(model?.schedule) || 'Weekly meetings' }}</p>
+                  </div>
                 </div>
 
-                <div class="space-y-4">
-                  <h3 class="text-xl font-weight-bold text-white mb-4" style="font-family: 'Georgia', serif;">
-                    {{ learnMoreMinistryData.detailsTitle || 'Ministry Details' }}
-                  </h3>
-                  
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
-                    <div>
-                      <p class="font-weight-bold text-black">Schedule</p>
-                      <p class="text-black font-normal">{{ formatDate(model?.schedule) || 'Weekly meetings' }}</p>
-                    </div>
+                <div class="d-flex align-start gap-3">
+                  <v-icon color="black" size="24" class="mt-1">mdi-clock-outline</v-icon>
+                  <div>
+                    <p class="font-weight-bold text-black">Time</p>
+                    <p class="text-black font-normal">{{ formatTime(model?.schedule) }}</p>
                   </div>
+                </div>
 
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="black" size="24" class="mt-1">mdi-clock-outline</v-icon>
-                    <div>
-                      <p class="font-weight-bold text-black">Time</p>
-                      <p class="text-black font-normal">{{ formatTime(model?.schedule) }}</p>
-                    </div>
-                  </div>
-
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="black" size="24" class="mt-1">mdi-account</v-icon>
-                    <div>
-                      <p class="font-weight-bold text-black">Leader</p>
-                      <p class="text-black font-normal">{{ model?.leader || 'Ministry Leader' }}</p>
-                    </div>
+                <div class="d-flex align-start gap-3">
+                  <v-icon color="black" size="24" class="mt-1">mdi-account</v-icon>
+                  <div>
+                    <p class="font-weight-bold text-black">Leader</p>
+                    <p class="text-black font-normal">{{ model?.leader || 'Ministry Leader' }}</p>
                   </div>
                 </div>
 
@@ -97,10 +86,8 @@
                   :class="hasAlreadyJoined ? 'disabled-btn' : 'join-btn'"
                   :style="hasAlreadyJoined 
                     ? { '--btn-bg': '#9ca3af', '--btn-color': 'white', '--btn-border': '#9ca3af' }
-                    : { '--btn-bg': learnMoreMinistryData.buttonColor || '#14b8a6', '--btn-color': 'black', '--btn-border': learnMoreMinistryData.buttonColor || '#14b8a6' }"
+                    : { '--btn-bg': learnMoreMinistryData.buttonColor || '#ffffff', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#ffffff' }"
                   :disabled="hasAlreadyJoined"
-                  @mouseenter="onButtonHover"
-                  @mouseleave="onButtonLeave"
                   @click="handleJoinMinistry"
                 >
                   {{ hasAlreadyJoined ? (learnMoreMinistryData.alreadyJoinedText || 'Already Joined') : (learnMoreMinistryData.joinButtonText || 'Join Us') }}
@@ -109,9 +96,7 @@
                   v-else
                   size="large"
                   class="join-btn"
-                  :style="{ '--btn-bg': learnMoreMinistryData.buttonColor || '#14b8a6', '--btn-color': 'black', '--btn-border': learnMoreMinistryData.buttonColor || '#14b8a6' }"
-                  @mouseenter="onButtonHover"
-                  @mouseleave="onButtonLeave"
+                  :style="{ '--btn-bg': learnMoreMinistryData.buttonColor || '#ffffff', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#ffffff' }"
                   @click="handleJoinAsGuest"
                 >
                   {{ learnMoreMinistryData.joinButtonText || 'Join Us' }}
@@ -314,26 +299,6 @@ const checkIfAlreadyJoined = async () => {
   }
 }
 
-const onButtonHover = (event) => {
-  if (!hasAlreadyJoined.value) {
-    const buttonColor = learnMoreMinistryData.value.buttonColor || '#14b8a6'
-    // Darken the color slightly on hover
-    const hoverColor = buttonColor === '#14b8a6' ? '#0fa08f' : buttonColor
-    event.target.style.setProperty('background-color', hoverColor, 'important')
-    event.target.style.setProperty('color', 'black', 'important')
-    event.target.style.setProperty('border-color', hoverColor, 'important')
-  }
-}
-
-const onButtonLeave = (event) => {
-  if (!hasAlreadyJoined.value) {
-    const buttonColor = learnMoreMinistryData.value.buttonColor || '#14b8a6'
-    event.target.style.setProperty('background-color', buttonColor, 'important')
-    event.target.style.setProperty('color', 'black', 'important')
-    event.target.style.setProperty('border-color', buttonColor, 'important')
-  }
-}
-
 watch(() => route.params.id, () => {
   if (!ministryModelFromState.value && route.params.id) {
     fetchMinistryData()
@@ -349,7 +314,7 @@ watch(() => model.value, (newModel) => {
 
 const learnMoreMinistryData = ref({
   backgroundColor: '#ffffff',
-  buttonColor: '#14b8a6',
+  buttonColor: '#16a34a',
   aboutTitle: 'About This Ministry',
   defaultDescription: "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives.",
   detailsTitle: 'Ministry Details',
@@ -467,14 +432,16 @@ onMounted(async () => {
   margin-top: 1.5rem;
 }
 
-.space-y-4 > * + * {
-  margin-top: 1rem;
-}
-
 .join-btn {
+  transition: all 0.3s ease;
   background-color: var(--btn-bg) !important;
   color: var(--btn-color) !important;
   border: 1px solid var(--btn-border) !important;
+}
+
+.join-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
 .disabled-btn {

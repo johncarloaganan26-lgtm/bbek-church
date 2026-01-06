@@ -359,9 +359,19 @@ const handleSubmitPassword = async () => {
 
   try {
    
-     if(formData.value.newPassword === formData.value.confirmPassword){
-      const response =await accountsStore.updateAccount(mockResponse.value.acc_id, {password: formData.value.newPassword , email: mockResponse.value.email , position: mockResponse.value.position , status: mockResponse.value.status})
-      ElMessage.success(response.message)
+    if(formData.value.newPassword === formData.value.confirmPassword){
+      const response = await accountsStore.updateAccount(mockResponse.value.acc_id, { password: formData.value.newPassword, email: mockResponse.value.email, position: mockResponse.value.position, status: mockResponse.value.status })
+      if (response && response.success) {
+        const msg = response.message || 'Password changed successfully.'
+        ElMessage.success(msg)
+        successMessage.value = msg
+        passwordChanged.value = true
+      } else {
+        const err = response?.error || 'Failed to change password.'
+        ElMessage.error(err)
+        errorMessage.value = err
+        return
+      }
     }else{
       errorMessage.value = 'Passwords do not match.'
       return

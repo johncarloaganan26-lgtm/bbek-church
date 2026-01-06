@@ -134,34 +134,47 @@ function convertValueForMySQL(value, columnType) {
 
   // Handle datetime/timestamp fields
   if (columnType.includes('DATETIME') || columnType.includes('TIMESTAMP')) {
-    if (value instanceof Date) {
-      // Convert Date object to MySQL format
+    if (typeof value === 'string') {
+      // Remove extra quotes if present (e.g., '"2026-01-05T12:10:34.000Z"' -> '2026-01-05T12:10:34.000Z')
+      let cleanedValue = value.trim();
+      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) || 
+          (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
+        cleanedValue = cleanedValue.slice(1, -1);
+      }
+      
       const moment = require('moment');
-      return moment(value).format('YYYY-MM-DD HH:mm:ss');
-    } else if (typeof value === 'string') {
-      // Convert ISO string or other formats to MySQL format
-      const moment = require('moment');
-      const date = moment(value);
+      const date = moment(cleanedValue);
       if (date.isValid()) {
         return date.format('YYYY-MM-DD HH:mm:ss');
       }
       // If it's already in MySQL format, return as is
-      return value;
+      return cleanedValue;
+    } else if (value instanceof Date) {
+      // Convert Date object to MySQL format
+      const moment = require('moment');
+      return moment(value).format('YYYY-MM-DD HH:mm:ss');
     }
   }
 
   // Handle date fields
   if (columnType.includes('DATE') && !columnType.includes('DATETIME') && !columnType.includes('TIMESTAMP')) {
-    if (value instanceof Date) {
+    if (typeof value === 'string') {
+      // Remove extra quotes if present
+      let cleanedValue = value.trim();
+      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) || 
+          (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
+        cleanedValue = cleanedValue.slice(1, -1);
+      }
+      
       const moment = require('moment');
-      return moment(value).format('YYYY-MM-DD');
-    } else if (typeof value === 'string') {
-      const moment = require('moment');
-      const date = moment(value);
+      const date = moment(cleanedValue);
       if (date.isValid()) {
         return date.format('YYYY-MM-DD');
       }
-      return value;
+      return cleanedValue;
+    } else if (value instanceof Date) {
+      const moment = require('moment');
+      return moment(value).format('YYYY-MM-DD');
     }
   }
 

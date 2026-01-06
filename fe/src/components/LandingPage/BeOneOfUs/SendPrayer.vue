@@ -1,7 +1,7 @@
 <template>
   <div class="send-prayer-page">
     <!-- Hero Section -->
-    <section class="hero-section py-20 bg-purple-darken-2 text-white position-relative">
+    <section class="hero-section py-20 bg-teal-darken-2 text-white position-relative">
       <v-container>
         <div class="text-center">
           <h1 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold mb-6 fade-in-up">
@@ -39,8 +39,8 @@
         <v-row>
           <v-col cols="12" md="4">
             <v-card class="text-center pa-6 prayer-card prayer-card-1" elevation="2">
-              <v-avatar size="64" color="purple-lighten-5" class="mb-4">
-                <v-icon size="32" color="purple">mdi-lock</v-icon>
+              <v-avatar size="64" color="teal-lighten-5" class="mb-4">
+                <v-icon size="32" color="teal">mdi-lock</v-icon>
               </v-avatar>
               <h3 class="text-h6 font-weight-bold mb-2">Confidential</h3>
               <p class="text-body-2">
@@ -51,8 +51,8 @@
           </v-col>
           <v-col cols="12" md="4">
             <v-card class="text-center pa-6 prayer-card prayer-card-2" elevation="2">
-              <v-avatar size="64" color="purple-lighten-5" class="mb-4">
-                <v-icon size="32" color="purple">mdi-heart</v-icon>
+              <v-avatar size="64" color="teal-lighten-5" class="mb-4">
+                <v-icon size="32" color="teal">mdi-heart</v-icon>
               </v-avatar>
               <h3 class="text-h6 font-weight-bold mb-2">Compassionate</h3>
               <p class="text-body-2">
@@ -62,8 +62,8 @@
           </v-col>
           <v-col cols="12" md="4">
             <v-card class="text-center pa-6 prayer-card prayer-card-3" elevation="2">
-              <v-avatar size="64" color="purple-lighten-5" class="mb-4">
-                <v-icon size="32" color="purple">mdi-clock-outline</v-icon>
+              <v-avatar size="64" color="teal-lighten-5" class="mb-4">
+                <v-icon size="32" color="teal">mdi-clock-outline</v-icon>
               </v-avatar>
               <h3 class="text-h6 font-weight-bold mb-2">24/7 Available</h3>
               <p class="text-body-2">
@@ -120,27 +120,45 @@
                 ></v-checkbox>
                 <v-btn
                   type="submit"
-                  color="purple"
+                  color="teal"
                   size="large"
                   block
-                  class="text-white"
+                  class="text-white mt-4"
                   :loading="submitting"
                 >
                   Submit Prayer Request
                 </v-btn>
               </v-form>
+
+              <!-- Success Message Popup -->
+              <v-dialog v-model="successDialog.show" max-width="500" persistent>
+                <v-card class="text-center pa-6">
+                  <v-avatar color="success" size="80" class="mb-4">
+                    <v-icon size="48" color="white">mdi-check</v-icon>
+                  </v-avatar>
+                  <v-card-title class="text-h5 font-weight-bold">
+                    {{ successDialog.title }}
+                  </v-card-title>
+                  <v-card-text class="text-body-1">
+                    {{ successDialog.message }}
+                  </v-card-text>
+                  <v-card-actions class="justify-center">
+                    <v-btn color="teal" variant="flat" @click="closeSuccessDialog">
+                      OK
+                    </v-btn>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
             </v-card>
           </v-col>
         </v-row>
       </v-container>
     </section>
-    
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useFormsStore } from '@/stores/formsStore'
 
 const formsStore = useFormsStore()
@@ -148,6 +166,27 @@ const formsStore = useFormsStore()
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')) || null)
 const submitting = ref(false)
 const formRef = ref(null)
+
+// Success dialog state
+const successDialog = ref({
+  show: false,
+  title: '',
+  message: ''
+})
+
+// Show success dialog
+const showSuccessDialog = (title, message) => {
+  successDialog.value = {
+    show: true,
+    title,
+    message
+  }
+}
+
+// Close success dialog
+const closeSuccessDialog = () => {
+  successDialog.value.show = false
+}
 
 const formData = ref({
   name: '',
@@ -186,18 +225,18 @@ const handleSubmit = async () => {
 
   // Basic validation
   if (!formData.value.request || formData.value.request.trim() === '') {
-    ElMessage.error('Please enter your prayer request')
+    showSuccessDialog('Validation Error', 'Please enter your prayer request')
     return
   }
 
   // For non-anonymous requests, validate name and email
   if (!formData.value.anonymous) {
     if (!formData.value.name || formData.value.name.trim() === '') {
-      ElMessage.error('Please enter your name')
+      showSuccessDialog('Validation Error', 'Please enter your name')
       return
     }
     if (!formData.value.email || formData.value.email.trim() === '') {
-      ElMessage.error('Please enter your email')
+      showSuccessDialog('Validation Error', 'Please enter your email')
       return
     }
   }
@@ -233,11 +272,11 @@ const handleSubmit = async () => {
       payload.email = formData.value.email.trim()
     }
 
-    await formsStore.createForm(payload)
-    ElMessage.success('Prayer request submitted successfully! We will pray for you.')
-    
-  // Reset form (but keep user info if not anonymous)
-  if (formData.value.anonymous) {
+    const result = await formsStore.createForm(payload)
+    showSuccessDialog('Success!', result?.message || 'Prayer request submitted successfully! We will pray for you.')
+
+    // Reset form (but keep user info if not anonymous)
+    if (formData.value.anonymous) {
     formData.value = {
       name: '',
       email: '',
@@ -268,6 +307,7 @@ const handleSubmit = async () => {
   } catch (error) {
     // Error message is already shown by the store/axios interceptor
     console.error('Error submitting prayer request:', error)
+    showSuccessDialog('Error', 'Failed to submit prayer request. Please try again.')
   } finally {
     submitting.value = false
   }

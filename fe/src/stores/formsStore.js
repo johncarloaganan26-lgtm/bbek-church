@@ -182,7 +182,7 @@ export const useFormsStore = defineStore('forms', {
           if (userInfo?.account?.acc_id || userInfo?.acc_id) {
             await this.fetchMyForms(formData.form_type)
           }
-          return { success: true, data: response.data.data }
+          return { success: true, data: response.data.data, message: response.data.message }
         } else {
           throw new Error(response.data.message || 'Failed to create form')
         }

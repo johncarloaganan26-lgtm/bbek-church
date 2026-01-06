@@ -370,11 +370,13 @@ const isBrideDisabled = computed(() => {
   return isMemberUser.value && currentUserMember.value?.gender === 'F'
 })
 
-// Status options
+// Status options - standardized: pending, approved, disapproved, completed, cancelled
 const statusOptions = [
   { label: 'Pending', value: 'pending' },
-  { label: 'Ongoing', value: 'ongoing' },
-  { label: 'Completed', value: 'completed' }
+  { label: 'Approved', value: 'approved' },
+  { label: 'Disapproved', value: 'disapproved' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Cancelled', value: 'cancelled' }
 ]
 
 // Fetch options on mount
@@ -539,7 +541,18 @@ const rules = {
     }
   ],
   status: [
-    { required: true, message: 'Status is required', trigger: 'change' }
+    { required: true, message: 'Status is required', trigger: 'change' },
+    {
+      validator: (rule, value, callback) => {
+        // Atomic validation: approved/completed requires marriage_date
+        if ((value === 'approved' || value === 'completed') && (!formData.marriage_date || formData.marriage_date === '')) {
+          callback(new Error('Marriage date is required for approved/completed status'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
   ]
 }
 

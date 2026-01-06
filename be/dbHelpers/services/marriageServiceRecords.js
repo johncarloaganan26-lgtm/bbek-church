@@ -458,6 +458,25 @@ async function getAllMarriageServices(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(ms.marriage_date) = ? AND YEAR(ms.marriage_date) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(ms.marriage_date) = MONTH(CURDATE()) AND YEAR(ms.marriage_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(ms.marriage_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(ms.marriage_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -467,7 +486,6 @@ async function getAllMarriageServices(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Marriage ID (A-Z)':
         orderByClause += 'ms.marriage_id ASC';
@@ -495,6 +513,16 @@ async function getAllMarriageServices(options = {}) {
         break;
       case 'Status (A-Z)':
         orderByClause += 'ms.status ASC';
+        break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE ms.status 
+          WHEN 'Pending' THEN 1 
+          WHEN 'Approved' THEN 2 
+          WHEN 'Disapproved' THEN 3 
+          WHEN 'Completed' THEN 4 
+          WHEN 'Cancelled' THEN 5 
+          ELSE 6 
+        END, ms.date_created DESC`;
         break;
       default:
         orderByClause += 'ms.date_created DESC'; // Default sorting

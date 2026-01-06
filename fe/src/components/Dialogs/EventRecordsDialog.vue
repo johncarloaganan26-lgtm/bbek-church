@@ -271,11 +271,12 @@ const typeOptions = [
   { label: 'Other', value: 'other' }
 ]
 
-// Status options (reuse pattern from services)
+// Status options - standardized: pending, approved, completed, cancelled
 const statusOptions = [
   { label: 'Pending', value: 'pending' },
-  { label: 'Ongoing', value: 'ongoing' },
-  { label: 'Completed', value: 'completed' }
+  { label: 'Approved', value: 'approved' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Cancelled', value: 'cancelled' }
 ]
 
 // Form data

@@ -4,45 +4,46 @@ const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
 
 /**
- * Tithes Records CRUD Operations
- * Based on tbl_tithes schema:
- * - tithes_id (INT, PK, NN, AI) - auto-incrementing
- * - member_id (VARCHAR(45), NN, UQ)
- * - amount (DOUBLE, NN)
- * - type (VARCHAR(45), NN)
- * - payment_method (VARCHAR(45), NN)
- * - notes (VARCHAR(2000), nullable)
- * - status (VARCHAR(45), NN, default: 'pending')
- * - date_created (DATETIME, NN)
+ * Safely convert Buffer or any value to string
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} String representation
  */
+function safeToString(value, defaultValue = '') {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  return String(value);
+}
 
 /**
- * Check if a tithe with the same member_id already exists
- * @param {String} memberId - Member ID to check
- * @param {Number} excludeTithesId - Optional tithes_id to exclude from check (for updates)
- * @returns {Promise<Object>} Object with isDuplicate flag
+ * Tithes Records CRUD Operations
+ * Based on tbl_tithes schema (no status field - simple CRUD record):
+ * - tithes_id (INT, PK, NN, AI) - auto-incrementing
+ * - member_id (VARCHAR(45), nullable)
+ * - member_name (VARCHAR(100), nullable) - for non-member donors
+ * - is_anonymous (TINYINT, default: 0)
+ * - donation_type (ENUM: 'money', 'inkind', default: 'money')
+ * - amount (DOUBLE, nullable for in-kind)
+ * - type (VARCHAR(45), NN)
+ * - payment_method (VARCHAR(45), nullable for in-kind)
+ * - donation_items (TEXT, nullable) - description of in-kind items
+ * - notes (VARCHAR(2000), nullable)
+ * - date_created (DATETIME, NN)
  */
-async function checkDuplicateTithe(memberId, excludeTithesId = null) {
-  try {
-    let sql = 'SELECT tithes_id, member_id FROM tbl_tithes WHERE member_id = ?';
-    const params = [memberId];
-
-    if (excludeTithesId) {
-      sql += ' AND tithes_id != ?';
-      params.push(excludeTithesId);
-    }
-
-    const [rows] = await query(sql, params);
-
-    return {
-      isDuplicate: rows.length > 0,
-      tithe: rows.length > 0 ? rows[0] : null
-    };
-  } catch (error) {
-    console.error('Error checking for duplicate tithe:', error);
-    throw error;
-  }
-}
 
 /**
  * CREATE - Insert a new tithe record
@@ -52,63 +53,62 @@ async function checkDuplicateTithe(memberId, excludeTithesId = null) {
 async function createTithe(titheData) {
   try {
     const {
-      member_id,
-      amount,
-      type,
-      payment_method,
+      member_id = null,
+      member_name = null,
+      is_anonymous = false,
+      donation_type = 'money',
+      amount = 0,
+      type = '',
+      payment_method = null,
+      donation_items = null,
       notes = null,
-      status = 'pending',
       date_created = new Date()
     } = titheData;
-
-    // Validate required fields
-    if (!member_id) {
-      throw new Error('Missing required field: member_id');
-    }
-    if (amount === undefined || amount === null) {
-      throw new Error('Missing required field: amount');
-    }
-    if (!type) {
-      throw new Error('Missing required field: type');
-    }
-    if (!payment_method) {
-      throw new Error('Missing required field: payment_method');
-    }
-
-    // Validate amount is a number
-    const amountValue = parseFloat(amount);
-    if (isNaN(amountValue) || amountValue < 0) {
-      throw new Error('Amount must be a valid positive number');
-    }
-
-    // Check for duplicate member_id
-    const duplicateCheck = await checkDuplicateTithe(member_id);
-    if (duplicateCheck.isDuplicate) {
-      return {
-        success: false,
-        message: 'A tithe record with this member ID already exists',
-        error: 'Duplicate member_id'
-      };
-    }
 
     // Format date
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
-    const sql = `
-      INSERT INTO tbl_tithes 
-        (member_id, amount, type, payment_method, notes, status, date_created)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const params = [
-      member_id.trim(),
-      amountValue,
-      type.trim(),
-      payment_method.trim(),
-      notes ? notes.trim() : null,
-      status,
-      formattedDateCreated
-    ];
+    // Build insert query based on donation type
+    let sql, params;
+    
+    if (donation_type === 'money') {
+      sql = `
+        INSERT INTO tbl_tithes 
+          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, notes, status, date_created)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      params = [
+        member_id ? String(member_id).trim() : null,
+        donation_type,
+        member_name || null,
+        is_anonymous ? 1 : 0,
+        parseFloat(amount) || 0,
+        String(type).trim() || 'donation',
+        payment_method ? String(payment_method).trim() : null,
+        notes ? String(notes).trim() : null,
+        'pending',
+        formattedDateCreated
+      ];
+    } else {
+      sql = `
+        INSERT INTO tbl_tithes 
+          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, donation_items, notes, status, date_created)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      params = [
+        member_id ? String(member_id).trim() : null,
+        donation_type,
+        member_name || null,
+        is_anonymous ? 1 : 0,
+        0,  // amount is 0 for in-kind donations
+        String(type).trim() || 'other',
+        null,  // payment_method is null for in-kind donations
+        safeToString(donation_items, ''),
+        notes ? String(notes).trim() : null,
+        'pending',
+        formattedDateCreated
+      ];
+    }
 
     const [result] = await query(sql, params);
     
@@ -117,18 +117,18 @@ async function createTithe(titheData) {
 
     return {
       success: true,
-      message: 'Tithe created successfully',
+      message: 'Donation created successfully',
       data: createdTithe.data
     };
   } catch (error) {
-    console.error('Error creating tithe:', error);
+    console.error('Error creating donation:', error);
     throw error;
   }
 }
 
 /**
  * READ ALL - Get all tithe records with pagination and filters
- * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, type, status, sortBy)
+ * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, type, donationType, sortBy)
  * @returns {Promise<Object>} Object with paginated tithe records and metadata
  */
 async function getAllTithes(options = {}) {
@@ -140,49 +140,56 @@ async function getAllTithes(options = {}) {
     const page = options.page !== undefined ? parseInt(options.page) : undefined;
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const type = options.type || null;
-    const status = options.status || null;
+    const donationType = options.donationType || null;
     const sortBy = options.sortBy || null;
 
-    // Build base query for counting total records (with JOIN for accurate count)
-    let countSql = 'SELECT COUNT(*) as total FROM tbl_tithes t INNER JOIN tbl_members m ON t.member_id = m.member_id';
+    // Build base query for counting total records
+    let countSql = 'SELECT COUNT(*) as total FROM tbl_tithes t LEFT JOIN tbl_members m ON t.member_id = m.member_id';
     let countParams = [];
 
     // Build query for fetching records with member data
     let sql = `SELECT 
       t.tithes_id,
       t.member_id,
+      t.donation_type,
+      t.member_name,
+      t.is_anonymous,
       t.amount,
       t.type,
       t.payment_method,
+      t.donation_items,
       t.notes,
       t.status,
       t.date_created,
       m.firstname,
       m.lastname,
       m.middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
+      COALESCE(
+        t.member_name,
+        CONCAT(
+          m.firstname,
+          IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
+          ' ',
+          m.lastname
+        )
       ) as fullname
     FROM tbl_tithes t
-    INNER JOIN tbl_members m ON t.member_id = m.member_id`;
+    LEFT JOIN tbl_members m ON t.member_id = m.member_id`;
     const params = [];
 
     // Build WHERE conditions array
     const whereConditions = [];
     let hasWhere = false;
 
-    // Add search functionality (search by member_id, member name, type, or payment_method)
+    // Add search functionality
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
-      const searchCondition = `(t.member_id LIKE ? OR t.type LIKE ? OR t.payment_method LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?)`;
+      const searchCondition = `(t.member_id LIKE ? OR t.member_name LIKE ? OR t.type LIKE ? OR t.payment_method LIKE ? OR t.donation_items LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
 
       whereConditions.push(searchCondition);
-      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 
@@ -194,11 +201,30 @@ async function getAllTithes(options = {}) {
       hasWhere = true;
     }
 
-    // Add status filter
-    if (status && status !== 'All Statuses') {
-      whereConditions.push('t.status = ?');
-      countParams.push(status);
-      params.push(status);
+    // Add donation_type filter
+    if (donationType && donationType !== 'all') {
+      whereConditions.push('t.donation_type = ?');
+      countParams.push(donationType);
+      params.push(donationType);
+      hasWhere = true;
+    }
+
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(t.date_created) = ? AND YEAR(t.date_created) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(t.date_created) = MONTH(CURDATE()) AND YEAR(t.date_created) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(t.date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(t.date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
       hasWhere = true;
     }
 
@@ -211,7 +237,6 @@ async function getAllTithes(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Tithes ID (Low to High)':
         orderByClause += 't.tithes_id ASC';
@@ -234,9 +259,6 @@ async function getAllTithes(options = {}) {
       case 'Type (A-Z)':
         orderByClause += 't.type ASC';
         break;
-      case 'Status (A-Z)':
-        orderByClause += 't.status ASC';
-        break;
       case 'Name (A-Z)':
         orderByClause += 'fullname ASC';
         break;
@@ -244,7 +266,7 @@ async function getAllTithes(options = {}) {
         orderByClause += 'fullname DESC';
         break;
       default:
-        orderByClause += 't.date_created DESC'; // Default sorting
+        orderByClause += 't.date_created DESC';
     }
     sql += orderByClause;
 
@@ -268,15 +290,15 @@ async function getAllTithes(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Get summary statistics from ALL records (ignoring filters for summary cards)
-    // Only count completed donations for totals
+    // Get summary statistics from ALL money donations
     const [summaryStatsResult] = await query(`
       SELECT 
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) as totalDonations,
-        COALESCE(SUM(CASE WHEN type = 'tithe' AND status = 'completed' THEN amount ELSE 0 END), 0) as totalTithes,
-        COALESCE(SUM(CASE WHEN type = 'offering' AND status = 'completed' THEN amount ELSE 0 END), 0) as totalOfferings,
-        COALESCE(SUM(CASE WHEN type IN ('missions', 'love_gift', 'building_fund', 'donation', 'other') AND status = 'completed' THEN amount ELSE 0 END), 0) as totalSpecialOfferings
+        COALESCE(SUM(amount), 0) as totalDonations,
+        COALESCE(SUM(CASE WHEN type = 'tithe' THEN amount ELSE 0 END), 0) as totalTithes,
+        COALESCE(SUM(CASE WHEN type = 'offering' THEN amount ELSE 0 END), 0) as totalOfferings,
+        COALESCE(SUM(CASE WHEN type IN ('missions', 'love_gift', 'building_fund', 'donation', 'other') THEN amount ELSE 0 END), 0) as totalSpecialOfferings
       FROM tbl_tithes
+      WHERE donation_type = 'money'
     `);
     
     const summaryStats = {
@@ -308,7 +330,7 @@ async function getAllTithes(options = {}) {
 
     return {
       success: true,
-      message: 'Tithes retrieved successfully',
+      message: 'Donations retrieved successfully',
       data: rows,
       count: rows.length,
       totalCount: totalCount,
@@ -323,7 +345,7 @@ async function getAllTithes(options = {}) {
       }
     };
   } catch (error) {
-    console.error('Error fetching tithes:', error);
+    console.error('Error fetching donations:', error);
     throw error;
   }
 }
@@ -345,59 +367,26 @@ async function getTitheById(tithesId) {
     if (rows.length === 0) {
       return {
         success: false,
-        message: 'Tithe not found',
+        message: 'Donation not found',
         data: null
       };
     }
 
     return {
       success: true,
-      message: 'Tithe retrieved successfully',
+      message: 'Donation retrieved successfully',
       data: rows[0]
     };
   } catch (error) {
-    console.error('Error fetching tithe:', error);
+    console.error('Error fetching donation:', error);
     throw error;
   }
 }
 
 /**
- * READ ONE - Get a single tithe by member_id
- * @param {String} memberId - Member ID
- * @returns {Promise<Object>} Tithe record
- */
-async function getTitheByMemberId(memberId) {
-  try {
-    if (!memberId) {
-      throw new Error('Member ID is required');
-    }
-
-    const sql = 'SELECT * FROM tbl_tithes WHERE member_id = ?';
-    const [rows] = await query(sql, [memberId]);
-
-    if (rows.length === 0) {
-      return {
-        success: false,
-        message: 'Tithe not found',
-        data: null
-      };
-    }
-
-    return {
-      success: true,
-      message: 'Tithe retrieved successfully',
-      data: rows[0]
-    };
-  } catch (error) {
-    console.error('Error fetching tithe by member ID:', error);
-    throw error;
-  }
-}
-
-/**
- * UPDATE - Update an existing tithe record
+ * UPDATE - Update an existing donation record
  * @param {Number} tithesId - Tithes ID
- * @param {Object} titheData - Updated tithe data
+ * @param {Object} titheData - Updated donation data
  * @returns {Promise<Object>} Result object
  */
 async function updateTithe(tithesId, titheData) {
@@ -406,23 +395,26 @@ async function updateTithe(tithesId, titheData) {
       throw new Error('Tithes ID is required');
     }
 
-    // Check if tithe exists
+    // Check if donation exists
     const titheCheck = await getTitheById(tithesId);
     if (!titheCheck.success) {
       return {
         success: false,
-        message: 'Tithe not found',
+        message: 'Donation not found',
         data: null
       };
     }
 
     const {
       member_id,
+      member_name,
+      is_anonymous,
+      donation_type,
       amount,
       type,
       payment_method,
+      donation_items,
       notes,
-      status,
       date_created
     } = titheData;
 
@@ -431,33 +423,29 @@ async function updateTithe(tithesId, titheData) {
     const params = [];
 
     if (member_id !== undefined) {
-      // Check for duplicate member_id (excluding current tithe)
-      const duplicateCheck = await checkDuplicateTithe(member_id.trim(), tithesId);
-      if (duplicateCheck.isDuplicate) {
-        return {
-          success: false,
-          message: 'A tithe record with this member ID already exists',
-          error: 'Duplicate member_id'
-        };
-      }
-
       fields.push('member_id = ?');
-      params.push(member_id.trim());
+      params.push(member_id ? member_id.trim() : null);
+    }
+
+    if (member_name !== undefined) {
+      fields.push('member_name = ?');
+      params.push(member_name || null);
+    }
+
+    if (is_anonymous !== undefined) {
+      fields.push('is_anonymous = ?');
+      params.push(is_anonymous ? 1 : 0);
+    }
+
+    if (donation_type !== undefined) {
+      fields.push('donation_type = ?');
+      params.push(donation_type);
     }
 
     if (amount !== undefined) {
-      // Validate amount is a number
       const amountValue = parseFloat(amount);
-      if (isNaN(amountValue) || amountValue < 0) {
-        return {
-          success: false,
-          message: 'Amount must be a valid positive number',
-          error: 'Invalid amount'
-        };
-      }
-
       fields.push('amount = ?');
-      params.push(amountValue);
+      params.push(isNaN(amountValue) ? 0 : amountValue);
     }
 
     if (type !== undefined) {
@@ -467,17 +455,17 @@ async function updateTithe(tithesId, titheData) {
 
     if (payment_method !== undefined) {
       fields.push('payment_method = ?');
-      params.push(payment_method.trim());
+      params.push(payment_method ? payment_method.trim() : null);
+    }
+
+    if (donation_items !== undefined) {
+      fields.push('donation_items = ?');
+      params.push(donation_items ? donation_items.trim() : null);
     }
 
     if (notes !== undefined) {
       fields.push('notes = ?');
       params.push(notes ? notes.trim() : null);
-    }
-
-    if (status !== undefined) {
-      fields.push('status = ?');
-      params.push(status);
     }
 
     if (date_created !== undefined) {
@@ -507,27 +495,27 @@ async function updateTithe(tithesId, titheData) {
     if (result.affectedRows === 0) {
       return {
         success: false,
-        message: 'Tithe not found or no changes made',
+        message: 'Donation not found or no changes made',
         data: null
       };
     }
 
-    // Fetch updated tithe
+    // Fetch updated donation
     const updatedTithe = await getTitheById(tithesId);
 
     return {
       success: true,
-      message: 'Tithe updated successfully',
+      message: 'Donation updated successfully',
       data: updatedTithe.data
     };
   } catch (error) {
-    console.error('Error updating tithe:', error);
+    console.error('Error updating donation:', error);
     throw error;
   }
 }
 
 /**
- * DELETE - Delete a tithe record (archives it first)
+ * DELETE - Delete a donation record (archives it first)
  * @param {Number} tithesId - Tithes ID
  * @param {String} archivedBy - User ID who is deleting/archiving the record (optional)
  * @returns {Promise<Object>} Result object
@@ -538,12 +526,12 @@ async function deleteTithe(tithesId, archivedBy = null) {
       throw new Error('Tithes ID is required');
     }
 
-    // Check if tithe exists
+    // Check if donation exists
     const titheCheck = await getTitheById(tithesId);
     if (!titheCheck.success) {
       return {
         success: false,
-        message: 'Tithe not found',
+        message: 'Donation not found',
         data: null
       };
     }
@@ -563,32 +551,30 @@ async function deleteTithe(tithesId, archivedBy = null) {
     if (result.affectedRows === 0) {
       return {
         success: false,
-        message: 'Tithe not found',
+        message: 'Donation not found',
         data: null
       };
     }
 
     return {
       success: true,
-      message: 'Tithe archived and deleted successfully',
+      message: 'Donation archived and deleted successfully',
       data: { tithes_id: tithesId }
     };
   } catch (error) {
-    console.error('Error deleting tithe:', error);
+    console.error('Error deleting donation:', error);
     throw error;
   }
 }
 
 /**
- * EXPORT - Export tithe records to Excel
- * @param {Object} options - Optional query parameters (same as getAllTithes: search, type, status, sortBy)
+ * EXPORT - Export donation records to Excel
+ * @param {Object} options - Optional query parameters
  * @returns {Promise<Buffer>} Excel file buffer
  */
 async function exportTithesToExcel(options = {}) {
   try {
-    // Get all tithes matching the filters (without pagination for export)
     const exportOptions = { ...options };
-    // Remove pagination to get all records
     delete exportOptions.limit;
     delete exportOptions.offset;
     delete exportOptions.page;
@@ -597,7 +583,7 @@ async function exportTithesToExcel(options = {}) {
     const result = await getAllTithes(exportOptions);
     
     if (!result.success || !result.data || result.data.length === 0) {
-      throw new Error('No tithes found to export');
+      throw new Error('No donations found to export');
     }
 
     const tithes = result.data;
@@ -608,14 +594,17 @@ async function exportTithesToExcel(options = {}) {
         'No.': index + 1,
         'Tithes ID': tithe.tithes_id || '',
         'Member ID': tithe.member_id || '',
+        'Member Name': tithe.member_name || '',
+        'Anonymous': tithe.is_anonymous ? 'Yes' : 'No',
+        'Donation Type': tithe.donation_type || 'money',
         'Full Name': tithe.fullname || '',
         'First Name': tithe.firstname || '',
         'Last Name': tithe.lastname || '',
         'Middle Name': tithe.middle_name || '',
         'Amount': tithe.amount || 0,
-        'Type': tithe.type || '',
+        'Type/Category': tithe.type || '',
         'Payment Method': tithe.payment_method || '',
-        'Status': tithe.status || '',
+        'Donation Items': tithe.donation_items || '',
         'Notes': tithe.notes || '',
         'Date Created': tithe.date_created ? moment(tithe.date_created).format('YYYY-MM-DD HH:mm:ss') : '',
         'Created Date': tithe.date_created ? moment(tithe.date_created).format('YYYY-MM-DD') : ''
@@ -633,14 +622,17 @@ async function exportTithesToExcel(options = {}) {
       { wch: 5 },   // No.
       { wch: 12 },  // Tithes ID
       { wch: 15 },  // Member ID
+      { wch: 25 },  // Member Name
+      { wch: 10 },  // Anonymous
+      { wch: 12 },  // Donation Type
       { wch: 25 },  // Full Name
       { wch: 20 },  // First Name
       { wch: 20 },  // Last Name
       { wch: 15 },  // Middle Name
       { wch: 15 },  // Amount
-      { wch: 15 },  // Type
+      { wch: 15 },  // Type/Category
       { wch: 18 },  // Payment Method
-      { wch: 12 },  // Status
+      { wch: 30 },  // Donation Items
       { wch: 30 },  // Notes
       { wch: 20 },  // Date Created
       { wch: 15 }   // Created Date
@@ -659,7 +651,7 @@ async function exportTithesToExcel(options = {}) {
 
     return excelBuffer;
   } catch (error) {
-    console.error('Error exporting tithes to Excel:', error);
+    console.error('Error exporting donations to Excel:', error);
     throw error;
   }
 }
@@ -668,10 +660,7 @@ module.exports = {
   createTithe,
   getAllTithes,
   getTitheById,
-  getTitheByMemberId,
   updateTithe,
   deleteTithe,
-  checkDuplicateTithe,
   exportTithesToExcel
 };
-

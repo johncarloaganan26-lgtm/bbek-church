@@ -55,7 +55,7 @@
                 <el-dropdown-menu>
                   <template v-for="child in menu.children" :key="child.value || child.label">
                     <el-dropdown-item
-                      v-if="child && ((child.to !== '/events/my-events') || user)"
+                      v-if="child"
                       @click="redirectToChildrenPage(child)"
                       class="menu-dropdown-item"
                       :style="{ '--hover-color': headerData.hoverColor || '#14b8a6' }"
@@ -114,6 +114,14 @@
                 <el-dropdown-item @click="navigateTo('/landpage/transactions')" class="menu-item">
                   <el-icon><Clock /></el-icon>
                   <span>View Transactions</span>
+                </el-dropdown-item>
+                <el-dropdown-item @click="navigateTo('/events/my-events')" class="menu-item">
+                  <el-icon><Calendar /></el-icon>
+                  <span>Joined Events</span>
+                </el-dropdown-item>
+                <el-dropdown-item @click="navigateTo('/ministries/my-ministry')" class="menu-item">
+                  <el-icon><Guide /></el-icon>
+                  <span>Joined Ministries</span>
                 </el-dropdown-item>
                 <el-dropdown-item @click="navigateTo('/schedule-change')" class="menu-item">
                   <el-icon><Calendar /></el-icon>
@@ -177,7 +185,7 @@
               <div v-show="openSubmenus[menu?.value]" class="mobile-submenu">
                 <template v-for="child in menu.children" :key="child?.value || child?.label || Math.random()">
                 <div
-                    v-if="child && (child.to !== '/events/my-events' || user)"
+                    v-if="child"
                   class="mobile-submenu-item"
                   @click="handleMobileMenuClick(child)"
                 >
@@ -222,6 +230,14 @@
                 <el-icon><Clock /></el-icon>
                 <span>View Transactions</span>
               </div>
+              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/events/my-events' })">
+                <el-icon><Calendar /></el-icon>
+                <span>Joined Events</span>
+              </div>
+              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/ministries/my-ministry' })">
+                <el-icon><Guide /></el-icon>
+                <span>Joined Ministries</span>
+              </div>
               <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/schedule-change' })">
                 <el-icon><Calendar /></el-icon>
                 <span>Request Schedule Change</span>
@@ -261,7 +277,8 @@ import {
   Calendar,
   SwitchButton,
   Close,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Guide
 } from '@element-plus/icons-vue'
 import axios from '@/api/axios'
 
@@ -322,7 +339,6 @@ const defaultHeaderData = {
     ]},
     {label: 'Give', value: 'give',to:'/give'},
     {label: 'Events', value: 'events',to:'/events',children:[
-        { label:'My Events', value: 'my-events',to:'/events/my-events'},
         { label:'All Events', value: 'all-events',to:'/events/all-events'},
     ]},
     {label: 'Ministry', value: 'ministry',to:'/ministries', children:[
@@ -450,13 +466,7 @@ onMounted(async() => {
         isMinistry: true,
         to: `/ministries/ministry-data?ministryData=${encodeURIComponent(JSON.stringify(ministry))}`
       }))
-      if(user.value){
-        ministryChildren.unshift({
-          label: 'My Ministry',
-          value: 'my-ministry',
-          to: '/ministries/my-ministry'
-        })
-      }
+      // Removed "My Ministry" from menu - joined ministries will reflect in "My Services"
       
       return {
         ...menu,

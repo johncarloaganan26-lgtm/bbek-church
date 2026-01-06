@@ -613,7 +613,10 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
         ${getInfoBox('Request Details', [
           { label: 'Request ID', value: approvalDetails.approvalId || 'N/A' },
           { label: 'Type', value: typeLabel },
-          { label: 'Name', value: approvalDetails.requestTitle || 'N/A' }
+          { label: 'Name', value: approvalDetails.requestTitle || 'N/A' },
+          ...(status === 'approved' && approvalDetails.approvalDate ? [
+            { label: 'Approval Date', value: new Date(approvalDetails.approvalDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }
+          ] : [])
         ])}
         ${status === 'approved' ? getNextSteps([
           'You are now registered for this activity',

@@ -123,7 +123,7 @@
               @update:model-value="handlePageSizeChange"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="4" class="d-flex align-center gap-2">
+          <v-col cols="12" md="5" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
@@ -177,12 +177,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!loading && services.length === 0">
+          <tr v-if="!loading && sortedServices.length === 0">
             <td colspan="10" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
-          <tr v-for="service in services" :key="service.burial_id">
+          <tr v-for="service in sortedServices" :key="service.burial_id">
             <!-- <td>{{ service.burial_id }}</td> -->
             <td>{{ service.fullname || service.member_id }}</td>
             <td>{{ service.deceased_name }}</td>
@@ -264,6 +264,33 @@ const burialServiceStore = useBurialServiceStore()
 
 // Computed properties from store
 const services = computed(() => burialServiceStore.services)
+
+// Sort services with Pending status first, followed by other statuses in specified order
+const sortedServices = computed(() => {
+  const statusOrder = {
+    'pending': 1,
+    'approved': 2,
+    'disapproved': 3,
+    'completed': 4,
+    'cancelled': 5
+  }
+  
+  return [...services.value].sort((a, b) => {
+    const aOrder = statusOrder[a.status] || 999
+    const bOrder = statusOrder[b.status] || 999
+    
+    // First sort by status order
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder
+    }
+    
+    // If same status, sort by date created (newest first)
+    const aDate = new Date(a.date_created || 0)
+    const bDate = new Date(b.date_created || 0)
+    return bDate - aDate
+  })
+})
+
 const loading = computed(() => burialServiceStore.loading)
 const currentPage = computed({
   get: () => burialServiceStore.currentPage,
@@ -290,16 +317,21 @@ const filters = computed({
 })
 
 const sortByOptions = [
+  'Status (Pending First)',
   'Service Date (Newest)',
   'Service Date (Oldest)',
   'Burial ID (A-Z)',
   'Burial ID (Z-A)',
   'Date Created (Newest)',
   'Date Created (Oldest)',
-  'Status (A-Z)'
+  'Status (A-Z)',
+  'This Month',
+  'Last Month',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-const statusOptions = ['All Statuses', 'pending', 'ongoing', 'completed', 'scheduled']
+const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
 
 // Dialog state
 const burialServiceDialog = ref(false)
@@ -378,10 +410,13 @@ const handleSubmit = async (data) => {
 }
 
 const handleSearchChange = (value) => {
+  ElMessage.info('Searching records...')
   burialServiceStore.setSearchQuery(value)
 }
 
 const handleFilterChange = () => {
+  const statusText = filters.value.status || 'All Statuses'
+  ElMessage.info(`Filtering by: ${statusText}`)
   burialServiceStore.setFilters(filters.value)
 }
 
@@ -390,6 +425,7 @@ const handlePageChange = (page) => {
 }
 
 const handlePageSizeChange = (pageSize) => {
+  ElMessage.info(`Showing ${pageSize} items per page`)
   burialServiceStore.setPageSize(pageSize)
 }
 
@@ -408,13 +444,13 @@ const handleExportExcel = async () => {
 }
 
 const getStartIndex = () => {
-  if (services.value.length === 0) return 0
+  if (sortedServices.value.length === 0) return 0
   return (currentPage.value - 1) * itemsPerPage.value + 1
 }
 
 const getEndIndex = () => {
   const end = currentPage.value * itemsPerPage.value
-  return Math.min(end, totalCount.value)
+  return Math.min(end, sortedServices.value.length)
 }
 
 const formatDateTime = (dateString) => {
@@ -429,21 +465,14 @@ const formatDateTime = (dateString) => {
   })
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
-
 const formatStatus = (status) => {
   const statusMap = {
     'pending': 'Pending',
-    'ongoing': 'Ongoing',
+    'approved': 'Approved',
+    'disapproved': 'Disapproved',
     'completed': 'Completed',
+    'cancelled': 'Cancelled',
+    'ongoing': 'Ongoing',
     'scheduled': 'Scheduled'
   }
   return statusMap[status] || status
@@ -451,20 +480,36 @@ const formatStatus = (status) => {
 
 const getStatusColor = (status) => {
   const colors = {
+    'approved': 'info',
+    'disapproved': 'error',
     'scheduled': 'info',
     'completed': 'success',
     'pending': 'warning',
-    'ongoing': 'warning'
+    'ongoing': 'warning',
+    'cancelled': 'error'
   }
   return colors[status] || 'default'
 }
 
 const handlePrint = () => {
+  ElMessage.info('Preparing print preview...')
   const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    ElMessage.error('Could not open print preview. Check browser pop-up settings.')
+    return
+  }
+  
+  // Get current user info for printed by
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const printedBy = userInfo?.member 
+    ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
+    : userInfo?.account?.email || 'Admin'
+  
+  ElMessage.success('Print preview opened. Please check your browser tabs.')
   const tableHeaders = ['Member', 'Deceased Name', 'Birthdate', 'Date of Death', 'Relationship', 'Location', 'Pastor ID', 'Service Date', 'Status', 'Date Created']
   
   let tableRows = ''
-  services.value.forEach((service) => {
+  sortedServices.value.forEach((service) => {
     tableRows += `
       <tr>
         <td>${service.fullname || service.member_id || 'N/A'}</td>
@@ -481,6 +526,8 @@ const handlePrint = () => {
     `
   })
   
+  const currentDate = new Date().toLocaleString()
+  
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -494,9 +541,27 @@ const handlePrint = () => {
             font-family: Arial, sans-serif;
             margin: 20px;
           }
-          h1 {
-            text-align: center;
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+          }
+          .header img {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .header .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
           }
           table {
             width: 100%;
@@ -515,16 +580,28 @@ const handlePrint = () => {
           tr:nth-child(even) {
             background-color: #f9f9f9;
           }
-          .print-date {
-            text-align: right;
-            margin-bottom: 10px;
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             color: #666;
+          }
+          .footer-info {
+            text-align: right;
           }
         </style>
       </head>
       <body>
-        <h1>Burial Services</h1>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="header">
+          <img src="/logo.png" alt="Church Logo" />
+          <div>
+            <h1>Burial Services</h1>
+            <div class="subtitle">Biblical Bread Ministries</div>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -535,6 +612,13 @@ const handlePrint = () => {
             ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
           </tbody>
         </table>
+        <div class="footer">
+          <div>Total Records: ${sortedServices.value.length}</div>
+          <div class="footer-info">
+            <div>Printed on: ${currentDate}</div>
+            <div>Printed by: ${printedBy}</div>
+          </div>
+        </div>
       </body>
     </html>
   `)

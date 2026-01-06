@@ -98,13 +98,6 @@
             :active="$route.name === 'Approvals'"
             @click="closeDrawerOnMobile"
           ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-cash-multiple" 
-            title="Transactions"
-            :to="{ name: 'Transactions' }"
-            :active="$route.name === 'Transactions'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
         </v-list-group>
 
         <!-- Services -->
@@ -168,9 +161,9 @@
             :active="$route.name === 'Archive'"
             @click="closeDrawerOnMobile"
           ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-cog" 
-            title="Settings" 
+          <v-list-item
+            prepend-icon="mdi-cog"
+            title="Settings"
             :to="{ name: 'Settings' }"
             :active="$route.name === 'Settings'"
             @click="closeDrawerOnMobile"

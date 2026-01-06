@@ -31,7 +31,7 @@
               @update:model-value="fetchForms"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="2">
             <v-select
               v-model="formTypeFilter"
               :items="formTypeOptions"
@@ -43,15 +43,50 @@
               @update:model-value="fetchForms"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2" class="d-flex justify-end">
-            <v-btn
-              color="primary"
-              prepend-icon="mdi-refresh"
-              @click="fetchForms"
-              :loading="loading"
-            >
-              Refresh
-            </v-btn>
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="sortBy"
+              :items="sortByOptions"
+              label="Sort By"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              @update:model-value="fetchForms"
+            ></v-select>
+          </v-col>
+          <v-col cols="12" md="2" class="d-flex align-center gap-2">
+            <v-tooltip text="Export CSV" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn 
+                  icon="mdi-file-export"
+                  variant="outlined"
+                  v-bind="props"
+                  @click="exportToCSV"
+                ></v-btn>
+              </template>
+            </v-tooltip>
+            <v-tooltip text="Print" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn 
+                  icon="mdi-printer"
+                  variant="outlined"
+                  v-bind="props"
+                  @click="printData"
+                ></v-btn>
+              </template>
+            </v-tooltip>
+            <v-tooltip text="Refresh" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn 
+                  icon="mdi-refresh"
+                  variant="outlined"
+                  v-bind="props"
+                  :loading="loading"
+                  @click="fetchForms"
+                ></v-btn>
+              </template>
+            </v-tooltip>
           </v-col>
         </v-row>
       </v-card-text>
@@ -260,6 +295,21 @@ const approvingId = ref(null)
 const rejectingId = ref(null)
 const showViewDialog = ref(false)
 const selectedForm = computed(() => formsStore.selectedForm)
+const sortBy = ref(null)
+
+const sortByOptions = [
+  'Date (Newest)',
+  'Date (Oldest)',
+  'Date Created (Newest)',
+  'Date Created (Oldest)',
+  'Status (A-Z)',
+  'Type (A-Z)',
+  'Name (A-Z)',
+  'This Month',
+  'Last Month',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
 
 const statusOptions = [
   { title: 'Pending', value: 'pending' },
@@ -292,7 +342,8 @@ const fetchForms = async () => {
       page: currentPage.value,
       pageSize: pageSize.value,
       status: statusFilter.value,
-      form_type: formTypeFilter.value
+      form_type: formTypeFilter.value,
+      sortBy: sortBy.value
     })
   } catch (error) {
     // Error is already handled in the store
@@ -364,7 +415,7 @@ const rejectForm = async (formId) => {
 }
 
 // Watch for filter changes and refetch
-watch([statusFilter, formTypeFilter], () => {
+watch([statusFilter, formTypeFilter, sortBy], () => {
   fetchForms()
 })
 
@@ -416,6 +467,80 @@ const formatDate = (dateString) => {
 const truncateText = (text, length) => {
   if (!text) return '-'
   return text.length > length ? text.substring(0, length) + '...' : text
+}
+
+const exportToCSV = () => {
+  const headers = ['Name', 'Email', 'Type', 'Subject/Details', 'Date', 'Status']
+  const rows = forms.value.map(form => [
+    form.name || form.submitted_by_name || 'Anonymous',
+    form.email || form.submitted_by_email || '-',
+    getFormTypeLabel(form.form_type),
+    form.form_data?.request || form.form_data?.serviceType || '-',
+    formatDate(form.created_at),
+    formatStatus(form.status)
+  ])
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `messages_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success('Messages exported successfully')
+}
+
+const printData = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['Name', 'Email', 'Type', 'Subject/Details', 'Date', 'Status']
+  
+  const rows = forms.value.map(form => `
+    <tr>
+      <td>${form.name || form.submitted_by_name || 'Anonymous'}</td>
+      <td>${form.email || form.submitted_by_email || '-'}</td>
+      <td>${getFormTypeLabel(form.form_type)}</td>
+      <td>${form.form_data?.request || form.form_data?.serviceType || '-'}</td>
+      <td>${formatDate(form.created_at)}</td>
+      <td>${formatStatus(form.status)}</td>
+    </tr>
+  `).join('')
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Messages & Prayer Requests - Print</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1a365d; text-align: center; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #1a365d; color: white; }
+          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <h1>Messages & Prayer Requests</h1>
+        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="6" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
 }
 
 // Watch for page changes

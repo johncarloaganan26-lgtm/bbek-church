@@ -66,9 +66,19 @@
       <template #header>
         <div class="card-header">
           <span>Filters</span>
-          <el-button type="primary" text @click="resetFilters" :disabled="loading">
-            Reset Filters
-          </el-button>
+          <div class="header-actions">
+            <el-button type="success" @click="exportToCSV">
+              <el-icon><Download /></el-icon>
+              Export CSV
+            </el-button>
+            <el-button type="info" @click="printData">
+              <el-icon><Printer /></el-icon>
+              Print
+            </el-button>
+            <el-button type="primary" text @click="resetFilters" :disabled="loading">
+              Reset Filters
+            </el-button>
+          </div>
         </div>
       </template>
       <el-form :model="filters" :inline="true" class="filter-form">
@@ -387,7 +397,9 @@ import {
   Refresh,
   View,
   Edit,
-  Delete
+  Delete,
+  Download,
+  Printer
 } from '@element-plus/icons-vue'
 import AnnouncementDialog from '@/components/Dialogs/AnnouncementDialog.vue'
 
@@ -524,6 +536,81 @@ const getPriorityColor = (priority) => {
     low: ''
   }
   return colorMap[priority] || 'info'
+}
+
+const exportToCSV = () => {
+  const headers = ['Title', 'Type', 'Priority', 'Audience', 'Status', 'Created Date', 'Created By']
+  const rows = announcements.value.map(announcement => [
+    announcement.title,
+    announcement.type,
+    announcement.priority,
+    formatAudience(announcement.target_audience),
+    announcement.is_active ? 'Active' : 'Inactive',
+    formatDateTime(announcement.created_at),
+    announcement.created_by_name || announcement.created_by_email || 'System'
+  ])
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `announcements_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success('Announcements exported successfully')
+}
+
+const printData = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['Title', 'Type', 'Priority', 'Audience', 'Status', 'Created Date']
+  
+  const rows = announcements.value.map(announcement => `
+    <tr>
+      <td>${announcement.title}</td>
+      <td>${announcement.type}</td>
+      <td>${announcement.priority}</td>
+      <td>${formatAudience(announcement.target_audience)}</td>
+      <td>${announcement.is_active ? 'Active' : 'Inactive'}</td>
+      <td>${formatDateTime(announcement.created_at)}</td>
+    </tr>
+  `).join('')
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Announcements - Print</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1a365d; text-align: center; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #1a365d; color: white; }
+          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <h1>Announcements</h1>
+        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="6" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
 }
 
 // Lifecycle

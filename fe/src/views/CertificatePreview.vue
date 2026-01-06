@@ -24,18 +24,46 @@
       </button>
     </div>
 
+    <!-- Child Dedication Certificate -->
     <ChildDedicationCertificate
       v-if="currentCertificate === 'child'"
-      :childName="childDedicationData.childName"
-      :birthLocation="childDedicationData.birthLocation"
-      :birthDate="childDedicationData.birthDate"
-      :fatherName="childDedicationData.fatherName"
-      :motherName="childDedicationData.motherName"
-      :dedicationDate="childDedicationData.dedicationDate"
-      :sponsors="childDedicationData.sponsors"
-      :ministerName="childDedicationData.ministerName"
-      :churchName="childDedicationData.churchName"
-      :churchAddress="childDedicationData.churchAddress"
+      :child-id="childDedicationData.child_id || childDedicationData.childId || ''"
+      :requested-by="childDedicationData.requested_by || childDedicationData.requestedBy || ''"
+      :requester-fullname="childDedicationData.requester_fullname || childDedicationData.requesterFullname || ''"
+      :requester-firstname="childDedicationData.requester_firstname || ''"
+      :requester-lastname="childDedicationData.requester_lastname || ''"
+      :requester-middle-name="childDedicationData.requester_middle_name || ''"
+      :child-first-name="childDedicationData.child_firstname || childDedicationData.childFirstname || ''"
+      :child-middle-name="childDedicationData.child_middle_name || childDedicationData.childMiddlename || ''"
+      :child-last-name="childDedicationData.child_lastname || childDedicationData.childLastname || ''"
+      :date-of-birth="childDedicationData.date_of_birth || childDedicationData.dateOfBirth || ''"
+      :place-of-birth="childDedicationData.place_of_birth || childDedicationData.placeOfBirth || ''"
+      :gender="childDedicationData.gender || ''"
+      :preferred-dedication-date="childDedicationData.preferred_dedication_date || childDedicationData.preferredDedicationDate || childDedicationData.dedicationDate || ''"
+      :contact-phone-number="childDedicationData.contact_phone_number || childDedicationData.contactPhoneNumber || ''"
+      :contact-email="childDedicationData.contact_email || childDedicationData.contactEmail || ''"
+      :contact-address="childDedicationData.contact_address || childDedicationData.contactAddress || ''"
+      :father-first-name="childDedicationData.father_firstname || childDedicationData.fatherFirstname || ''"
+      :father-last-name="childDedicationData.father_lastname || childDedicationData.fatherLastname || ''"
+      :father-middle-name="childDedicationData.father_middle_name || ''"
+      :father-phone-number="childDedicationData.father_phone_number || ''"
+      :father-email="childDedicationData.father_email || ''"
+      :father-address="childDedicationData.father_address || ''"
+      :mother-first-name="childDedicationData.mother_firstname || childDedicationData.motherFirstname || ''"
+      :mother-last-name="childDedicationData.mother_lastname || childDedicationData.motherLastname || ''"
+      :mother-middle-name="childDedicationData.mother_middle_name || ''"
+      :mother-phone-number="childDedicationData.mother_phone_number || ''"
+      :mother-email="childDedicationData.mother_email || ''"
+      :mother-address="childDedicationData.mother_address || ''"
+      :sponsors="childDedicationData.sponsors || []"
+      :pastor="childDedicationData.pastor || childDedicationData.ministerName || ''"
+      :location="childDedicationData.location || childDedicationData.churchAddress || ''"
+      :status="childDedicationData.status || ''"
+      :date-created="childDedicationData.date_created || childDedicationData.dateCreated || ''"
+      :child-fullname="childDedicationData.child_fullname || childDedicationData.childName || ''"
+      :father-fullname="childDedicationData.father_fullname || childDedicationData.fatherName || ''"
+      :mother-fullname="childDedicationData.mother_fullname || childDedicationData.motherName || ''"
+      :certificate-number="childDedicationData.child_id || childDedicationData.childId || ''"
     />
 
     <MarriageCertificate
@@ -50,26 +78,30 @@
       :churchAddress="marriageData.churchAddress"
     />
 
+    <!-- Water Baptism Certificate -->
     <WaterBaptismCertificate
       v-else-if="currentCertificate === 'baptism'"
-      :name="baptismData.name"
-      :birth-date="baptismData.birthDate"
-      :address="baptismData.address"
-      :baptism-date="baptismData.baptismDate"
-      :baptism-location="baptismData.baptismLocation"
-      :year="baptismData.year"
-      :member-id="baptismData.memberId"
-      :saved-date="baptismData.savedDate"
-      :fited-date="baptismData.fitedDate"
-      :civil-status="baptismData.civilStatus"
-      :desire-ministry="baptismData.desireMinistry"
-      :if-married="baptismData.ifMarried"
-      :spouse-name="baptismData.spouseName"
-      :marriage-date="baptismData.marriageDate"
-      :witness-name="baptismData.witnessName"
-      :minister-name="baptismData.ministerName"
-      :church-address="baptismData.churchAddress"
-      :contact-number="baptismData.contactNumber"
+      :baptism-id="baptismData.baptism_id || baptismData.baptismId || ''"
+      :member-id="baptismData.member_id || baptismData.memberId || ''"
+      :baptism-date="baptismData.baptism_date || baptismData.baptismDate || ''"
+      :location="baptismData.location || baptismData.baptismLocation || ''"
+      :pastor-name="baptismData.pastor_name || baptismData.pastorName || baptismData.ministerName || ''"
+      :status="baptismData.status || ''"
+      :guardian-name="baptismData.guardian_name || ''"
+      :guardian-contact="baptismData.guardian_contact || ''"
+      :guardian-relationship="baptismData.guardian_relationship || ''"
+      :date-created="baptismData.date_created || baptismData.dateCreated || ''"
+      :first-name="baptismData.firstname || baptismData.firstName || ''"
+      :last-name="baptismData.lastname || baptismData.lastName || ''"
+      :middle-name="baptismData.middle_name || baptismData.middleName || ''"
+      :fullname="baptismData.fullname || baptismData.name || baptismData.member_fullname || ''"
+      :birthdate="baptismData.birthdate || baptismData.birthDate || baptismData.member_birthdate || ''"
+      :age="baptismData.age || ''"
+      :gender="baptismData.gender || ''"
+      :address="baptismData.address || baptismData.member_address || ''"
+      :email="baptismData.email || ''"
+      :phone-number="baptismData.phone_number || baptismData.contactNumber || ''"
+      :certificate-number="baptismData.baptism_id || baptismData.baptismId || ''"
     />
 
     <DeathCertificate
@@ -146,28 +178,46 @@ const goBack = () => {
   router.back()
 }
 
-const childDedicationData = ref({
-  childName: 'John Michael Smith',
-  birthLocation: 'Manila, Philippines',
-  birthDate: '2020-05-15',
-  fatherName: 'John Smith',
-  motherName: 'Jane Smith',
-  dedicationDate: '2021-06-20',
-  sponsors: [
-    'Michael Johnson',
-    'Sarah Johnson',
-    'David Williams',
-    'Emily Williams',
-    'Robert Brown',
-    'Lisa Brown',
-    'James Davis',
-    'Maria Davis',
-    'William Miller',
-    'Anna Miller'
-  ],
-  ministerName: 'Rev. Fresco Q. Sulapas',
-  churchName: 'BIBLE BAPTIST EKKLESIA OF KAWIT',
-  churchAddress: '485 Acacia St. Villa Ramirez, Tabon 1, Kawit Cavite'
+// Computed property for child dedication data - use route data if available, otherwise use default
+const childDedicationData = computed(() => {
+  if (routeCertificateData.value && currentCertificate.value === 'child') {
+    let data = routeCertificateData.value
+    if (data.service) {
+      data = data.service
+    }
+    return data
+  }
+  
+  // Default data for preview
+  return {
+    child_id: '0000000001',
+    requested_by: '1',
+    requester_fullname: 'John Member',
+    child_firstname: 'John Michael',
+    child_middle_name: 'Santos',
+    child_lastname: 'Smith',
+    date_of_birth: '2020-05-15',
+    place_of_birth: 'Manila, Philippines',
+    gender: 'M',
+    preferred_dedication_date: '2021-06-20',
+    contact_phone_number: '09123456789',
+    contact_email: 'parent@email.com',
+    contact_address: '123 Main St, Kawit Cavite',
+    father_firstname: 'John',
+    father_lastname: 'Smith',
+    father_middle_name: 'Robert',
+    mother_firstname: 'Jane',
+    mother_lastname: 'Smith',
+    mother_middle_name: 'Doe',
+    sponsors: [
+      { firstname: 'Michael', lastname: 'Johnson' },
+      { firstname: 'Sarah', lastname: 'Johnson' }
+    ],
+    pastor: 'Rev. Fresco Q. Sulapas',
+    location: 'Bible Baptist Ekklesia of Kawit',
+    status: 'completed',
+    child_fullname: 'John Michael Santos Smith'
+  }
 })
 
 const marriageData = ref({
@@ -188,56 +238,34 @@ const marriageData = ref({
 // Computed property for baptism data - use route data if available, otherwise use default
 const baptismData = computed(() => {
   if (routeCertificateData.value && currentCertificate.value === 'baptism') {
-    // Handle both transaction data structure and direct service data
     let data = routeCertificateData.value
     if (data.service) {
       data = data.service
     }
-    
-    const baptismDate = data.baptism_date || data.baptismDate || ''
-    
-    return {
-      name: data.member_fullname || data.name || '',
-      birthDate: data.member_birthdate || data.birthdate || data.birthDate || '',
-      address: data.member_address || data.address || '',
-      baptismDate: baptismDate,
-      baptismLocation: data.baptism_location || data.baptismLocation || '',
-      year: baptismDate ? new Date(baptismDate).getFullYear().toString() : (data.year || ''),
-      memberId: data.member_id || data.memberId || '',
-      savedDate: data.member_date_created || data.savedDate || '',
-      fitedDate: data.fited_date || data.fitted_date || data.date_fited || data.fitedDate || baptismDate,
-      civilStatus: data.civil_status || data.member_civil_status || data.civilStatus || '',
-      desireMinistry: data.desire_ministry || data.desireMinistry || '',
-      ifMarried: data.if_married || data.ifMarried || '',
-      spouseName: data.spouse_name || data.spouseName || '',
-      marriageDate: data.marriage_date || data.marriageDate || '',
-      witnessName: data.witness_fullname || data.witness_name || data.witnessName || '',
-      ministerName: data.pastor_fullname || data.minister_fullname || data.ministerName || 'Rev. Fresco Q. Sulapas',
-      churchAddress: data.churchAddress || '0559 Villa Ramirez, Tabon 1, Kawit, Cavite',
-      contactNumber: data.contactNumber || '09353166809'
-    }
+    return data
   }
   
   // Default data for preview
   return {
-    name: 'John Michael Smith',
-    birthDate: '1990-05-15',
+    baptism_id: '0000000001',
+    member_id: '1',
+    firstname: 'John Michael',
+    lastname: 'Smith',
+    middle_name: 'Santos',
+    fullname: 'John Michael Santos Smith',
+    birthdate: '1990-05-15',
+    age: '34',
+    gender: 'M',
     address: '123 Main Street, Kawit, Cavite',
-    baptismDate: '2024-06-20',
-    baptismLocation: 'Bible Baptist Ekklesia of Kawit',
-    year: '2024',
-    memberId: 'BBEK-2024-001',
-    savedDate: '2024-05-10',
-    fitedDate: '2024-06-15',
-    civilStatus: 'Single',
-    desireMinistry: 'Music Ministry',
-    ifMarried: 'No',
-    spouseName: '',
-    marriageDate: '',
-    witnessName: 'Michael Johnson',
-    ministerName: 'Rev. Fresco Q. Sulapas',
-    churchAddress: '0559 Villa Ramirez, Tabon 1, Kawit, Cavite',
-    contactNumber: '09353166809'
+    email: 'member@email.com',
+    phone_number: '09123456789',
+    baptism_date: '2024-06-20',
+    location: 'Bible Baptist Ekklesia of Kawit',
+    pastor_name: 'Rev. Fresco Q. Sulapas',
+    status: 'completed',
+    guardian_name: '',
+    guardian_contact: '',
+    guardian_relationship: ''
   }
 })
 

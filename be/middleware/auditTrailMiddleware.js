@@ -1,3 +1,68 @@
+/**
+ * Safely convert Buffer or any value to plain text string
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string representation
+ */
+function safeToString(value, defaultValue = null) {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  return String(value);
+}
+
+/**
+ * Convert any value to plain text (no IDs, no Buffers, just text)
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string
+ */
+function toPlainText(value, defaultValue = '') {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  // Handle Buffer - convert to UTF-8 string
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8').trim();
+  }
+  
+  // Handle objects - convert to readable text
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  // Handle numbers - convert to string
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  
+  // Handle booleans - convert to string
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  
+  // Handle strings - trim and return
+  return String(value).trim();
+}
+
 const { createAuditLog } = require('../dbHelpers/auditTrailRecords');
 const { query } = require('../database/db');
 
@@ -15,20 +80,12 @@ async function getUserInfo(userId) {
   try {
     if (!userId) return null;
 
-    // Get account info and join with members table to get fullname
-    // tbl_accounts doesn't have firstname/lastname, so we join with tbl_members
+    // Get account info - only email needed
     const sql = `
       SELECT 
         a.acc_id,
-        a.email,
-        a.position,
-        CONCAT(
-          COALESCE(m.firstname, ''),
-          IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-          IF(m.lastname IS NOT NULL AND m.lastname != '', CONCAT(' ', m.lastname), '')
-        ) as fullname
+        a.email
       FROM tbl_accounts a
-      LEFT JOIN tbl_members m ON a.email = m.email
       WHERE a.acc_id = ?
     `;
     const [rows] = await query(sql, [userId]);
@@ -36,9 +93,7 @@ async function getUserInfo(userId) {
     if (rows.length > 0) {
       return {
         user_id: rows[0].acc_id,
-        user_email: rows[0].email || null,
-        user_name: rows[0].fullname || rows[0].email || null, // Fallback to email if no fullname
-        user_position: rows[0].position || null
+        user_email: rows[0].email || null
       };
     }
     return null;
@@ -50,9 +105,10 @@ async function getUserInfo(userId) {
 
 /**
  * Extract entity type and ID from request path
+ * Returns plain text descriptions instead of IDs
  * @param {String} path - Request path
  * @param {String} method - HTTP method
- * @returns {Object} Entity type and ID
+ * @returns {Object} Entity type and description (text, not IDs)
  */
 function extractEntityInfo(path, method) {
   // Map API paths to entity types based on actual routes in index.js
@@ -82,13 +138,15 @@ function extractEntityInfo(path, method) {
   };
 
   let entityType = 'unknown';
-  let entityId = null;
+  let entityDescription = 'Unknown entity';
 
   // Find matching path prefix (check longest matches first)
   const sortedPrefixes = Object.entries(pathMappings).sort((a, b) => b[0].length - a[0].length);
   for (const [prefix, type] of sortedPrefixes) {
     if (path.startsWith(prefix)) {
       entityType = type;
+      // Create a readable description from the path
+      entityDescription = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       break;
     }
   }
@@ -101,7 +159,7 @@ function extractEntityInfo(path, method) {
     // e.g., /api/something/action -> 'something'
     if (pathSegments.length >= 2 && pathSegments[0] === 'api') {
       const potentialEntity = pathSegments[1];
-      // Convert kebab-case or snake_case to snake_case
+      // Convert kebab-case or snake_case to readable text
       const normalizedEntity = potentialEntity
         .replace(/-/g, '_')
         .toLowerCase();
@@ -109,37 +167,189 @@ function extractEntityInfo(path, method) {
       // Only use if it looks like a valid entity name (alphanumeric and underscores)
       if (/^[a-z][a-z0-9_]*$/.test(normalizedEntity)) {
         entityType = normalizedEntity;
+        entityDescription = normalizedEntity.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       }
     }
   }
 
-  // Extract ID from path patterns:
-  // - /getXById/:id
-  // - /updateX/:id
-  // - /deleteX/:id
-  // - /getXByY/:y (where Y is a field like memberId)
-  // - /:id (direct ID in path)
-  const idPatterns = [
-    /\/get\w+ById\/(\d+)/i,           // getMemberById/123
-    /\/update\w+\/(\d+)/i,              // updateMember/123
-    /\/delete\w+\/(\d+)/i,             // deleteMember/123
-    /\/get\w+By\w+\/(\d+)/i,           // getTitheByMemberId/123
-    /\/update\w+Status\/(\d+)/i,        // updateApprovalStatus/123
-    /\/(\d+)(?:\?|$)/                  // /123 or /123?param=value
-  ];
+  return { entityType, entityDescription };
+}
 
-  for (const pattern of idPatterns) {
-    const match = path.match(pattern);
-    if (match) {
-      entityId = match[1];
-      break;
+/**
+ * Convert request data to plain text description
+ * No IDs, no Buffers - just readable text of what the data is
+ * @param {Object} req - Express request object
+ * @param {String} entityType - Type of entity
+ * @returns {Object} Plain text data description
+ */
+function getDataAsText(req, entityType) {
+  const result = {
+    action_description: '',
+    data_summary: '',
+    data_details: []
+  };
+
+  // Build action description
+  const method = req.method.toUpperCase();
+  const path = req.path;
+  result.action_description = `${method} ${path}`;
+
+  // If there's a body, summarize it as plain text
+  if (req.body && Object.keys(req.body).length > 0) {
+    const textParts = [];
+    
+    for (const [key, value] of Object.entries(req.body)) {
+      // Skip sensitive fields
+      if (['password', 'token', 'secret', 'key'].includes(key.toLowerCase())) {
+        textParts.push(`${key}: [REDACTED]`);
+      } else {
+        const textValue = toPlainText(value, 'null');
+        textParts.push(`${key}: ${textValue}`);
+      }
     }
+    
+    result.data_summary = textParts.join(', ');
+    result.data_details = textParts;
   }
 
-  // If no ID found in path, try to extract from request body (for POST/PUT)
-  // This will be handled in logAuditAction function
+  return result;
+}
 
-  return { entityType, entityId };
+/**
+ * Create audit log entry with plain text data (no IDs, no Buffers)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {String} actionType - Action type override (optional)
+ * @param {String} entityType - Entity type override (optional)
+ * @param {String} description - Description override (optional)
+ * @param {Object} oldValues - Old values for UPDATE actions (optional) - will be converted to text
+ * @param {Object} newValues - New values for CREATE/UPDATE actions (optional) - will be converted to text
+ * @param {String} status - Status (success, failed, error) - default: 'success'
+ * @param {String} errorMessage - Error message if status is not success (optional)
+ */
+async function logAuditAction(req, res, options = {}) {
+  try {
+    // Don't log audit trail routes themselves to avoid recursion
+    if (req.path.startsWith('/api/audit-trail')) {
+      return;
+    }
+    
+    // Don't log if user is not authenticated (unless it's a login action)
+    if (!req.user && !req.path.includes('/login')) {
+      return;
+    }
+
+    const {
+      actionType: overrideActionType,
+      entityType: overrideEntityType,
+      description: overrideDescription,
+      oldValues,
+      newValues,
+      status: overrideStatus = 'success',
+      errorMessage
+    } = options;
+
+    // Get user info - only store email (user_id and user_email only)
+    let userInfo = {
+      user_id: toPlainText(req.user?.acc_id || req.user?.user_id || 'anonymous'),
+      user_email: toPlainText(req.user?.email || null)
+    };
+
+    // Fetch full user info if we have user_id
+    if (userInfo.user_id && userInfo.user_id !== 'anonymous') {
+      const fullUserInfo = await getUserInfo(userInfo.user_id);
+      if (fullUserInfo) {
+        userInfo = {
+          user_id: toPlainText(fullUserInfo.user_id),
+          user_email: toPlainText(fullUserInfo.user_email)
+        };
+      }
+    }
+
+    // Extract entity info - get plain text description instead of ID
+    const { entityType: extractedEntityType, entityDescription } = extractEntityInfo(req.path, req.method);
+    const finalEntityType = overrideEntityType || extractedEntityType;
+    
+    // Log warning if entity type is still unknown (for debugging)
+    if (finalEntityType === 'unknown' && !overrideEntityType) {
+      console.warn(`[Audit Trail] Unknown entity type for path: ${req.method} ${req.path}`);
+    }
+
+    // Don't log VIEW actions - only log CREATE, UPDATE, DELETE, LOGIN, LOGOUT, EXPORT, VIEW_LIST
+    const finalActionType = overrideActionType || getActionType(req.method, req.path);
+    if (!finalActionType) {
+      return; // Skip logging VIEW actions (single record views)
+    }
+
+    // Get the route that was accessed as plain text
+    const routeAccessed = toPlainText(req.originalUrl || req.path);
+    
+    // Use route as description (or override if provided)
+    const description = overrideDescription || routeAccessed;
+
+    // Get IP address and user agent as plain text
+    const ipAddress = toPlainText(req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']);
+    const userAgent = toPlainText(req.headers['user-agent']);
+
+    // Process values to plain text - no Buffers, no IDs, just text
+    let processedOldValues = null;
+    let processedNewValues = null;
+
+    if (oldValues) {
+      processedOldValues = convertToPlainTextObject(oldValues);
+    }
+
+    if (newValues) {
+      processedNewValues = convertToPlainTextObject(newValues);
+    } else if (req.method !== 'GET' && req.body) {
+      processedNewValues = convertToPlainTextObject(req.body);
+    }
+
+    // Prepare audit data with plain text only
+    const auditData = {
+      ...userInfo,
+      action_type: toPlainText(finalActionType),
+      entity_type: toPlainText(finalEntityType),
+      entity_id: toPlainText(entityDescription), // Store description instead of ID
+      description: toPlainText(description),
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      old_values: processedOldValues,
+      new_values: processedNewValues,
+      status: toPlainText(overrideStatus),
+      error_message: toPlainText(errorMessage)
+    };
+
+    // Create audit log (non-blocking - don't fail the request if logging fails)
+    createAuditLog(auditData).catch(error => {
+      console.error('Error creating audit log (non-blocking):', error);
+    });
+  } catch (error) {
+    // Don't throw error - audit logging should never break the main request
+    console.error('Error in audit trail middleware:', error);
+  }
+}
+
+/**
+ * Convert an object to plain text values (no Buffers, no IDs)
+ * @param {Object} obj - Object to convert
+ * @returns {Object} Object with plain text values
+ */
+function convertToPlainTextObject(obj) {
+  if (!obj || typeof obj !== 'object') {
+    return toPlainText(obj);
+  }
+
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip sensitive fields
+    if (['password', 'token', 'secret', 'key', 'acc_password'].includes(key.toLowerCase())) {
+      result[key] = '[REDACTED]';
+    } else {
+      result[key] = toPlainText(value);
+    }
+  }
+  return result;
 }
 
 /**
@@ -176,24 +386,9 @@ function getActionType(method, path) {
   if (lowerPath.includes('/update')) return 'UPDATE';
   if (lowerPath.includes('/delete')) return 'DELETE';
   
-  // GET requests - determine if viewing single record or list
+  // GET requests - don't log VIEW actions for single records
+  // Only log VIEW_LIST for list views
   if (upperMethod === 'GET') {
-    // Patterns that indicate viewing a single record:
-    // - /getXById/:id
-    // - /getXByY/:y (e.g., getTitheByMemberId/:memberId)
-    // - /getX/:id (direct ID)
-    // - /getCertificateData/:id
-    // - /me (get current user)
-    if (lowerPath.includes('/getbyid') || 
-        lowerPath.includes('/getby') || 
-        lowerPath.includes('/getcertificatedata') ||
-        lowerPath.endsWith('/me') ||
-        /\/get\w+byid\/\d+/i.test(path) ||
-        /\/get\w+by\w+\/\d+/i.test(path) ||
-        /\/(\d+)(?:\?|$)/.test(path)) {
-      return 'VIEW';
-    }
-    
     // Patterns that indicate viewing a list:
     // - /getAllX
     // - /getAllXForSelect
@@ -204,8 +399,8 @@ function getActionType(method, path) {
       return 'VIEW_LIST';
     }
     
-    // Default for GET is VIEW_LIST
-    return 'VIEW_LIST';
+    // Don't log VIEW actions for single records - return null to skip
+    return null;
   }
   
   // Map HTTP methods to action types (fallback)
@@ -219,153 +414,6 @@ function getActionType(method, path) {
       return 'DELETE';
     default:
       return 'UNKNOWN';
-  }
-}
-
-/**
- * Create audit log entry
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {String} actionType - Action type override (optional)
- * @param {String} entityType - Entity type override (optional)
- * @param {String} entityId - Entity ID override (optional)
- * @param {String} description - Description override (optional)
- * @param {Object} oldValues - Old values for UPDATE actions (optional)
- * @param {Object} newValues - New values for CREATE/UPDATE actions (optional)
- * @param {String} status - Status (success, failed, error) - default: 'success'
- * @param {String} errorMessage - Error message if status is not success (optional)
- */
-async function logAuditAction(req, res, options = {}) {
-  try {
-    // Don't log audit trail routes themselves to avoid recursion
-    if (req.path.startsWith('/api/audit-trail')) {
-      return;
-    }
-    
-    // Don't log if user is not authenticated (unless it's a login action)
-    if (!req.user && !req.path.includes('/login')) {
-      return;
-    }
-
-    const {
-      actionType: overrideActionType,
-      entityType: overrideEntityType,
-      entityId: overrideEntityId,
-      description: overrideDescription,
-      oldValues,
-      newValues,
-      status: overrideStatus = 'success',
-      errorMessage
-    } = options;
-
-    // Get user info
-    let userInfo = {
-      user_id: req.user?.acc_id || req.user?.user_id || 'anonymous',
-      user_email: req.user?.email || null,
-      user_name: null,
-      user_position: req.user?.position || null
-    };
-
-    // Fetch full user info if we have user_id
-    if (userInfo.user_id && userInfo.user_id !== 'anonymous') {
-      const fullUserInfo = await getUserInfo(userInfo.user_id);
-      if (fullUserInfo) {
-        userInfo = { ...userInfo, ...fullUserInfo };
-      }
-    }
-
-    // Extract entity info
-    const { entityType: extractedEntityType, entityId: extractedEntityId } = extractEntityInfo(req.path, req.method);
-    const finalEntityType = overrideEntityType || extractedEntityType;
-    
-    // Log warning if entity type is still unknown (for debugging)
-    if (finalEntityType === 'unknown' && !overrideEntityType) {
-      console.warn(`[Audit Trail] Unknown entity type for path: ${req.method} ${req.path}`);
-    }
-    
-    // Try to extract entity ID from various sources (in order of priority):
-    // 1. Override parameter
-    // 2. Extracted from path
-    // 3. Request body fields (common ID field names)
-    // 4. Request params (for routes like /:id)
-    const possibleEntityIds = [
-      overrideEntityId,
-      extractedEntityId,
-      req.params?.id,
-      req.params?.memberId,
-      req.body?.id,
-      req.body?.member_id,
-      req.body?.acc_id,
-      req.body?.transaction_id,
-      req.body?.event_id,
-      req.body?.ministry_id,
-      req.body?.department_id,
-      req.body?.approval_id,
-      req.body?.baptism_id,
-      req.body?.marriage_id,
-      req.body?.burial_id,
-      req.body?.child_dedication_id,
-      req.body?.child_id,
-      req.body?.tithe_id,
-      req.body?.church_leader_id,
-      req.body?.department_officer_id
-    ].filter(id => id !== null && id !== undefined);
-    
-    // Always provide a value for entity_id - use a generated value if none found
-    let finalEntityId = possibleEntityIds.length > 0 ? String(possibleEntityIds[0]) : null;
-    
-    // If still no ID found, generate one based on entity type and timestamp or use path
-    if (!finalEntityId) {
-      // Try to use a meaningful identifier from the path or body
-      const pathSegments = req.path.split('/').filter(seg => seg && !seg.includes('?'));
-      const lastSegment = pathSegments[pathSegments.length - 1];
-      
-      // If last segment looks like an ID (numeric or alphanumeric), use it
-      if (lastSegment && /^[a-zA-Z0-9_-]+$/.test(lastSegment) && lastSegment !== finalEntityType) {
-        finalEntityId = lastSegment;
-      } else {
-        // Generate a unique identifier based on entity type, timestamp, and user
-        const timestamp = Date.now();
-        const userId = userInfo.user_id || 'unknown';
-        finalEntityId = `${finalEntityType}_${userId}_${timestamp}`;
-      }
-    }
-
-    // Determine action type
-    const finalActionType = overrideActionType || getActionType(req.method, req.path);
-
-    // Get the route that was accessed (include method and full path)
-    const routeAccessed = `${req.method} ${req.originalUrl || req.path}`;
-    
-    // Use route as description (or override if provided)
-    const description = overrideDescription || routeAccessed;
-
-    // Get IP address and user agent
-    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null;
-    const userAgent = req.headers['user-agent'] || null;
-
-    // Prepare audit data
-    const auditData = {
-      ...userInfo,
-      action_type: finalActionType,
-      entity_type: finalEntityType,
-      entity_id: finalEntityId,
-      description,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      old_values: oldValues,
-      new_values: newValues || (req.method !== 'GET' ? req.body : null),
-      status: overrideStatus,
-      error_message: errorMessage
-    };
-
-    // Create audit log (non-blocking - don't fail the request if logging fails)
-    createAuditLog(auditData).catch(error => {
-      console.error('Error creating audit log (non-blocking):', error);
-    });
-  } catch (error) {
-    // Don't throw error - audit logging should never break the main request
-    console.error('Error in audit trail middleware:', error);
   }
 }
 

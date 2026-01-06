@@ -40,6 +40,9 @@
 
       <!-- Deceased Name -->
       <el-form-item label="Deceased Name" prop="deceased_name">
+        <template #label>
+          <span>Deceased Name <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.deceased_name"
           placeholder="Enter deceased full name"
@@ -51,6 +54,9 @@
 
       <!-- Deceased Birthdate -->
       <el-form-item label="Deceased Birthdate" prop="deceased_birthdate">
+        <template #label>
+          <span>Deceased Birthdate <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-date-picker
           v-model="formData.deceased_birthdate"
           type="date"
@@ -65,6 +71,9 @@
 
       <!-- Date of Death -->
       <el-form-item label="Date of Death" prop="date_death">
+        <template #label>
+          <span>Date of Death <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-date-picker
           v-model="formData.date_death"
           type="datetime"
@@ -79,6 +88,9 @@
 
       <!-- Relationship -->
       <el-form-item label="Relationship" prop="relationship">
+        <template #label>
+          <span>Relationship <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-select
           v-model="formData.relationship"
           placeholder="Select relationship"
@@ -98,6 +110,9 @@
 
       <!-- Location -->
       <el-form-item label="Location" prop="location" >
+        <template #label>
+          <span>Location <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.location"
           placeholder="Enter service location"
@@ -109,6 +124,9 @@
 
       <!-- Pastor -->
       <el-form-item label="Pastor" prop="pastor_name" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+        <template #label>
+          <span>Pastor <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-select
           v-model="formData.pastor_name"
           placeholder="Select pastor"
@@ -128,6 +146,9 @@
 
       <!-- Service Date & Time -->
       <el-form-item label="Service Date & Time" prop="service_date" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+        <template #label>
+          <span>Service Date & Time <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-date-picker
           v-model="formData.service_date"
           type="datetime"
@@ -143,6 +164,9 @@
 
       <!-- Status -->
       <el-form-item label="Status" prop="status" v-if="userInfo.account.position === 'admin' || userInfo.account.position === 'staff'">
+        <template #label>
+          <span>Status <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-select
           v-model="formData.status"
           placeholder="Status"
@@ -270,7 +294,7 @@ const formData = reactive({
   status: 'pending'
 })
 
-// Status options
+// Status options - standardized: pending, approved, disapproved, completed, cancelled
 const statusOptions = [
   { label: 'Pending', value: 'pending' },
   { label: 'Approved', value: 'approved' },
@@ -317,12 +341,11 @@ const updateStatusFromServiceDate = () => {
     return
   }
 
+  // If service date is in the future, set to 'approved' (scheduled)
   if (serviceDate.getTime() > now.getTime()) {
-    formData.status = 'scheduled'
-  } else if (Math.abs(serviceDate.getTime() - now.getTime()) < 2 * 60 * 60 * 1000) {
-    // Within 2 hours window considered ongoing
-    formData.status = 'ongoing'
+    formData.status = 'approved'
   } else {
+    // Past date - service should be completed
     formData.status = 'completed'
   }
 }
@@ -508,6 +531,17 @@ defineExpose({
 .burial-service-dialog :deep(.el-form-item__label) {
   font-weight: 500;
   color: #424242;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.required-text {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 4px;
 }
 
 .burial-service-dialog :deep(.el-input__wrapper) {

@@ -81,13 +81,32 @@
         </el-link>
       </div>
     </el-form>
+
+    <!-- Success Message Popup -->
+    <el-dialog
+      v-model="successDialog.show"
+      width="450px"
+      center
+      :show-close="false"
+      class="success-dialog"
+    >
+      <div class="text-center">
+        <div class="success-icon-container mb-4">
+          <el-icon size="48" color="#67c23a"><CircleCheckFilled /></el-icon>
+        </div>
+        <h3 class="text-h6 font-weight-bold mb-2">{{ successDialog.title }}</h3>
+        <p class="text-body-2">{{ successDialog.message }}</p>
+      </div>
+      <template #footer>
+        <el-button type="success" @click="closeSuccessDialog">OK</el-button>
+      </template>
+    </el-dialog>
   </el-dialog>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { Close, Message, ArrowLeft } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { Close, Message, ArrowLeft, CircleCheckFilled } from '@element-plus/icons-vue'
 import { useAccountsStore } from '@/stores/ChurchRecords/accountsStore'
 
 const accountsStore = useAccountsStore()
@@ -108,6 +127,27 @@ const forgotPasswordFormRef = ref(null)
 
 // Loading state
 const loading = ref(false)
+
+// Success dialog state
+const successDialog = ref({
+  show: false,
+  title: '',
+  message: ''
+})
+
+// Show success dialog
+const showSuccessDialog = (title, message) => {
+  successDialog.value = {
+    show: true,
+    title,
+    message
+  }
+}
+
+// Close success dialog
+const closeSuccessDialog = () => {
+  successDialog.value.show = false
+}
 
 // Form data
 const forgotPasswordForm = reactive({
@@ -132,31 +172,43 @@ const closeDialog = () => {
 }
 
 const handleForgotPassword = async () => {
-  if (!forgotPasswordFormRef.value) return
+  if (!forgotPasswordFormRef.value) {
+    console.error('Form ref is not available')
+    return
+  }
 
   // Validate form
-  await forgotPasswordFormRef.value.validate(async (valid) => {
-    if (!valid) {
-      return false
-    }
-
-    loading.value = true
-
-    try {
-      const result = await accountsStore.forgotPassword(forgotPasswordForm.email)
-      if (result) {
-        ElMessage.success('Password reset link has been sent to your email address')
-        closeDialog()
-      } else {
-        ElMessage.error(accountsStore.error || 'Failed to send reset link. Please try again.')
-      }
-    } catch (error) {
-      console.error('Forgot password error:', error)
-      ElMessage.error('An error occurred. Please try again.')
-    } finally {
-      loading.value = false
-    }
+  const valid = await forgotPasswordFormRef.value.validate().catch(err => {
+    console.error('Validation error:', err)
+    return false
   })
+  
+  if (!valid) {
+    return
+  }
+
+  loading.value = true
+
+  try {
+    console.log('Calling forgotPassword API for:', forgotPasswordForm.email)
+    const result = await accountsStore.forgotPassword(forgotPasswordForm.email)
+    console.log('Forgot password result:', result)
+    
+    if (result) {
+      showSuccessDialog('Success!', 'Password reset link has been sent to your email address')
+      // Reset form but keep dialog open to show the success message
+      forgotPasswordFormRef.value?.resetFields()
+      forgotPasswordForm.email = ''
+      loading.value = false
+    } else {
+      showSuccessDialog('Error', accountsStore.error || 'Failed to send reset link. Please try again.')
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error)
+    showSuccessDialog('Error', 'An error occurred. Please try again.')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleBackToLogin = () => {
@@ -275,6 +327,31 @@ const handleBackToLogin = () => {
   align-items: center;
   gap: 4px;
   font-size: 14px;
+}
+
+/* Success Dialog styles */
+.success-dialog :deep(.el-dialog) {
+  border-radius: 12px;
+}
+
+.success-dialog :deep(.el-dialog__header) {
+  padding: 20px 20px 0 20px;
+  margin-bottom: 0;
+}
+
+.success-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.success-icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #f0f9eb;
+  margin: 0 auto;
 }
 </style>
 

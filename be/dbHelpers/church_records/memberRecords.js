@@ -674,22 +674,31 @@ async function getAllMembers(options = {}) {
       }
   
       // Add join month filter
-      // Handle joinMonth parameter (e.g., "January", "February", etc., or "All Months")
+      // Handle joinMonth parameter (e.g., "January", "February", etc., or "All Months", "This Month", "Last Month")
       if (joinMonth && joinMonth !== 'All Months' && joinMonth.trim() !== '') {
-        // Get month number (1-12) from month name
-        const monthMap = {
-          'January': 1, 'February': 2, 'March': 3, 'April': 4,
-          'May': 5, 'June': 6, 'July': 7, 'August': 8,
-          'September': 9, 'October': 10, 'November': 11, 'December': 12
-        };
         const monthName = joinMonth.trim();
-        const monthNum = monthMap[monthName];
         
-        if (monthNum) {
-          whereConditions.push('MONTH(date_created) = ?');
-          countParams.push(monthNum);
-          params.push(monthNum);
+        if (monthName === 'This Month') {
+          whereConditions.push('MONTH(date_created) = MONTH(CURDATE()) AND YEAR(date_created) = YEAR(CURDATE())');
           hasWhere = true;
+        } else if (monthName === 'Last Month') {
+          whereConditions.push('MONTH(date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+          hasWhere = true;
+        } else {
+          // Get month number (1-12) from month name
+          const monthMap = {
+            'January': 1, 'February': 2, 'March': 3, 'April': 4,
+            'May': 5, 'June': 6, 'July': 7, 'August': 8,
+            'September': 9, 'October': 10, 'November': 11, 'December': 12
+          };
+          const monthNum = monthMap[monthName];
+          
+          if (monthNum) {
+            whereConditions.push('MONTH(date_created) = ? AND YEAR(date_created) = YEAR(CURDATE())');
+            countParams.push(monthNum);
+            params.push(monthNum);
+            hasWhere = true;
+          }
         }
       }
   

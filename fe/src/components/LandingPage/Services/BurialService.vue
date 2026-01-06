@@ -429,6 +429,26 @@
       :burial-service-data="null"
       @submit="handleBurialDialogSubmit"
     />
+
+    <!-- Success Message Popup -->
+    <v-dialog v-model="successDialog.show" max-width="500" persistent>
+      <v-card class="text-center pa-6">
+        <v-avatar color="success" size="80" class="mb-4">
+          <v-icon size="48" color="white">mdi-check</v-icon>
+        </v-avatar>
+        <v-card-title class="text-h5 font-weight-bold">
+          {{ successDialog.title }}
+        </v-card-title>
+        <v-card-text class="text-body-1">
+          {{ successDialog.message }}
+        </v-card-text>
+        <v-card-actions class="justify-center">
+          <v-btn color="teal" variant="flat" @click="closeSuccessDialog">
+            OK
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -493,6 +513,27 @@ const submitError = ref('')
 const isSubmitting = ref(false)
 const showBurialDialog = ref(false)
 const burialDialogRef = ref(null)
+
+// Success dialog state
+const successDialog = ref({
+  show: false,
+  title: '',
+  message: ''
+})
+
+// Show success dialog
+const showSuccessDialog = (title, message) => {
+  successDialog.value = {
+    show: true,
+    title,
+    message
+  }
+}
+
+// Close success dialog
+const closeSuccessDialog = () => {
+  successDialog.value.show = false
+}
 
 // Initialize form with user info if logged in
 onMounted(async () => {
@@ -630,8 +671,7 @@ const handleSubmit = async (e) => {
     const result = await memberRegistrationStore.registerMemberFromBurialService(payload)
     
     if (result.success) {
-      submitMessage.value = result.message || 'Thank you for your burial service request! Your information has been received successfully. Our team will review your request and contact you within 24 hours with further details about the service date and arrangements.'
-      ElMessage.success(submitMessage.value)
+      showSuccessDialog('Success!', result.message || 'Burial service request submitted successfully! Our pastoral team will support you during this time.')
       
       // Clear form after successful submission
       resetForm()
@@ -679,7 +719,7 @@ const handleBurialDialogSubmit = async (payload) => {
   try {
     const { success, error } = await burialServiceStore.createService(payload)
     if (success) {
-      ElMessage.success('Burial service request submitted successfully.')
+      showSuccessDialog('Success!', 'Burial service request submitted successfully! Our pastoral team will support you during this time.')
       showBurialDialog.value = false
     } else {
       ElMessage.error(error || 'Failed to submit burial service request.')

@@ -15,48 +15,37 @@
       <!-- Content Section -->
       <section class="content-section relative w-full py-20 pt-32">
         <v-container>
-          <!-- Event Title -->
-          <h1 class="text-4xl md:text-5xl lg:text-6xl font-weight-bold text-black mb-6 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic; text-transform: uppercase;">
-            {{ eventModel?.eventName || 'Event Details' }}
-          </h1>
-
           <v-row>
-            <!-- Left Side - Description and Info -->
+            <!-- Left Side - Title and Description and Info -->
             <v-col cols="12" lg="6">
+              <!-- Event Title -->
+              <h1 class="text-4xl md:text-5xl lg:text-6xl font-weight-bold text-black mb-6" style="font-family: 'Georgia', serif; font-style: italic; text-transform: uppercase;">
+                {{ eventModel?.eventName || 'Event Details' }}
+              </h1>
+              
               <div class="space-y-6">
-                <div class="fade-in-up-delay">
-                  <h2 class="text-3xl md:text-4xl font-weight-bold text-black mb-4" style="font-family: 'Georgia', serif;">
-                    {{ learnMoreEventsData.aboutTitle || 'About This Event' }}
-                  </h2>
-                  <p class="text-lg text-black leading-relaxed font-normal">
-                    {{ eventModel?.description || learnMoreEventsData.noDescriptionText || "No description available" }}
-                  </p>
+                <p class="text-lg text-black leading-relaxed font-normal">
+                  {{ eventModel?.description || learnMoreEventsData.noDescriptionText || "No description available" }}
+                </p>
+
+                <div class="d-flex align-start gap-3">
+                  <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
+                  <div>
+                    <p class="font-weight-bold text-black">Date & Time</p>
+                    <p class="text-black font-normal">
+                      <strong>Start Date:</strong> {{ formatDate(eventModel?.start_date)  || 'TBA' }} 
+                    </p>
+                    <p class="text-black font-normal">
+                      <strong>End Date:</strong> {{ formatDate(eventModel?.end_date) || 'TBA' }}
+                    </p>
+                  </div>
                 </div>
 
-                <div class="space-y-4 fade-in-up-delay-2">
-                  <h3 class="text-xl font-weight-bold text-black mb-4" style="font-family: 'Georgia', serif;">
-                    {{ learnMoreEventsData.detailsTitle || 'Event Details' }}
-                  </h3>
-                  
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="black" size="24" class="mt-1">mdi-calendar</v-icon>
-                    <div>
-                      <p class="font-weight-bold text-black">Date & Time</p>
-                      <p class="text-black font-normal">
-                        <strong>Start Date:</strong> {{ formatDate(eventModel?.start_date)  || 'TBA' }} 
-                      </p>
-                      <p class="text-black font-normal">
-                        <strong>End Date:</strong> {{ formatDate(eventModel?.end_date) || 'TBA' }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="d-flex align-start gap-3">
-                    <v-icon color="black" size="24" class="mt-1">mdi-map-marker</v-icon>
-                    <div>
-                      <p class="font-weight-bold text-black">Location</p>
-                      <p class="text-black font-normal">{{ eventModel?.location || 'TBA' }}</p>
-                    </div>
+                <div class="d-flex align-start gap-3">
+                  <v-icon color="black" size="24" class="mt-1">mdi-map-marker</v-icon>
+                  <div>
+                    <p class="font-weight-bold text-black">Location</p>
+                    <p class="text-black font-normal">{{ eventModel?.location || 'TBA' }}</p>
                   </div>
                 </div>
 
@@ -64,7 +53,7 @@
                   v-if="userInfo?.member?.member_id"
                   :loading="loading"
                   size="large"
-                  :class="hasAlreadyJoined ? 'disabled-btn fade-in-up-delay-2' : 'join-btn fade-in-up-delay-2'"
+                  :class="hasAlreadyJoined ? 'disabled-btn' : 'join-btn'"
                   :style="hasAlreadyJoined 
                     ? { '--btn-bg': '#9ca3af', '--btn-color': 'white', '--btn-border': '#9ca3af' }
                     : { '--btn-bg': learnMoreEventsData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#16a34a' }"
@@ -76,7 +65,7 @@
                 <v-btn
                   v-else
                   size="large"
-                  class="join-btn fade-in-up-delay-2"
+                  class="join-btn"
                   :style="{ '--btn-bg': learnMoreEventsData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#16a34a' }"
                   @click="handleJoinAsGuest"
                 >
@@ -87,7 +76,7 @@
 
             <!-- Right Side - Image -->
             <v-col cols="12" lg="6">
-              <div class="relative overflow-hidden event-image-container fade-in-up-delay" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+              <div class="relative overflow-hidden" style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
                 <v-img
                   :src="`${eventModel?.imageUrl}`"
                   :alt="eventModel?.eventName || 'Event'"
@@ -360,22 +349,6 @@ onMounted(async () => {
   margin-top: 1.5rem;
 }
 
-.space-y-4 > * + * {
-  margin-top: 1rem;
-}
-
-.fade-in-up {
-  animation: fadeInUp 0.8s ease-out;
-}
-
-.fade-in-up-delay {
-  animation: fadeInUp 0.8s ease-out 0.2s both;
-}
-
-.fade-in-up-delay-2 {
-  animation: fadeInUp 0.8s ease-out 0.4s both;
-}
-
 .join-btn {
   transition: all 0.3s ease;
   background-color: var(--btn-bg) !important;
@@ -394,24 +367,4 @@ onMounted(async () => {
   border: 1px solid var(--btn-border) !important;
   cursor: not-allowed !important;
 }
-
-.event-image-container :deep(.v-img) {
-  transition: transform 0.5s ease;
-}
-
-.event-image-container:hover :deep(.v-img) {
-  transform: scale(1.05);
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 </style>
-

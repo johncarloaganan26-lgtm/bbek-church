@@ -475,7 +475,8 @@ async function updateApprovalStatus(id, status) {
       type: type,
       requestTitle: requestTitle,
       recipientName: memberName,
-      approvalId: approvalId
+      approvalId: approvalId,
+      approvalDate: updated.data?.date_created
     });
   } catch (emailError) {
     // Log email error but don't fail the status update

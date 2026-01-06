@@ -10,7 +10,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
     filters: {
       sortBy: 'Date Created (Newest)',
       type: 'All Types',
-      status: 'All Statuses'
+      donationType: 'all'
     },
     currentPage: 1,
     totalPages: 1,
@@ -54,7 +54,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const search = options.search !== undefined ? options.search : this.searchQuery
         const type = options.type !== undefined ? options.type : this.filters.type
-        const status = options.status !== undefined ? options.status : this.filters.status
+        const donationType = options.donationType !== undefined ? options.donationType : this.filters.donationType
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
 
         // Calculate offset from page and pageSize
@@ -71,8 +71,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         if (type && type !== 'All Types') {
           params.append('type', type)
         }
-        if (status && status !== 'All Statuses') {
-          params.append('status', status)
+        if (donationType && donationType !== 'all') {
+          params.append('donationType', donationType)
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
@@ -118,8 +118,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
           if (options.type !== undefined) {
             this.filters.type = type
           }
-          if (options.status !== undefined) {
-            this.filters.status = status
+          if (options.donationType !== undefined) {
+            this.filters.donationType = donationType
           }
           if (options.sortBy !== undefined) {
             this.filters.sortBy = sortBy
@@ -305,7 +305,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
       try {
         const search = options.search !== undefined ? options.search : this.searchQuery
         const type = options.type !== undefined ? options.type : this.filters.type
-        const status = options.status !== undefined ? options.status : this.filters.status
+        const donationType = options.donationType !== undefined ? options.donationType : this.filters.donationType
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
 
         const params = new URLSearchParams()
@@ -313,8 +313,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         if (type && type !== 'All Types') {
           params.append('type', type)
         }
-        if (status && status !== 'All Statuses') {
-          params.append('status', status)
+        if (donationType && donationType !== 'all') {
+          params.append('donationType', donationType)
         }
         if (sortBy) {
           params.append('sortBy', sortBy)

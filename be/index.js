@@ -53,6 +53,7 @@ const transactionRouter = require('./routes/transactionRoutes');
 const memberRegistrationRouter = require('./routes/memberRegistrationRoute');
 const auditTrailRouter = require('./routes/auditTrailRoutes');
 const archiveRouter = require('./routes/archiveRoutes');
+const systemLogsRouter = require('./routes/systemLogsRoutes');
 const announcementRouter = require('./routes/announcementRoutes');
 const formRouter = require('./routes/formRoutes');
 const cmsRouter = require('./routes/cmsRoutes');
@@ -217,6 +218,10 @@ app.use(authenticateToken);
 const { auditTrailMiddleware } = require('./middleware/auditTrailMiddleware');
 app.use(auditTrailMiddleware);
 
+// Apply system logs middleware (v2 - raw data only)
+const systemLogsMiddleware = require('./middleware/systemLogsMiddleware');
+app.use(systemLogsMiddleware);
+
 
 // Church records routes
 app.use('/api/church-records/members', memberRouter);
@@ -239,6 +244,9 @@ app.use('/api/member-registration', memberRegistrationRouter);
 
 // Audit trail routes
 app.use('/api/audit-trail', auditTrailRouter);
+
+// System logs routes (v2 - raw data only)
+app.use('/api/system-logs', systemLogsRouter);
 
 // Archive routes
 app.use('/api/archives', archiveRouter);

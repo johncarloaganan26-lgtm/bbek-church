@@ -1,5 +1,10 @@
 <template>
   <div class="child-dedication">
+    <CertificateDialog
+      v-model="certificateDialog"
+      :certificate-type="certificateType"
+      :certificate-data="certificateData"
+    />
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Child Dedication Records</h1>
       <v-btn 
@@ -110,7 +115,7 @@
               @update:model-value="handlePageSizeChange"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="4" class="d-flex align-center gap-2">
+          <v-col cols="12" md="5" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
@@ -163,12 +168,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!loading && dedications.length === 0">
+          <tr v-if="!loading && sortedDedications.length === 0">
             <td colspan="10" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
-          <tr v-for="dedication in dedications" :key="dedication.child_id">
+          <tr v-for="dedication in sortedDedications" :key="dedication.child_id">
             <!-- <td>{{ dedication.child_id }}</td> -->
             <td>{{ dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() }}</td>
             <td>{{ dedication.requester_fullname || dedication.requested_by }}</td>
@@ -184,6 +189,19 @@
             </td>
             <td>{{ formatDateTime(dedication.date_created) }}</td>
             <td>
+              <v-tooltip v-if="dedication.status === 'completed'" text="Print Certificate" location="top">
+                <template v-slot:activator="{ props }">
+                  <v-btn 
+                    icon="mdi-certificate" 
+                    variant="text" 
+                    size="small" 
+                    color="success"
+                    class="mr-2"
+                    v-bind="props"
+                    @click="printCertificate(dedication)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip text="Edit Child Dedication" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
@@ -244,11 +262,39 @@ import { ref, computed, onMounted } from 'vue'
 import { useChildDedicationStore } from '@/stores/ServicesRecords/childDedicationStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
+import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
 
 const childDedicationStore = useChildDedicationStore()
 
 // Computed properties from store
 const dedications = computed(() => childDedicationStore.dedications)
+
+// Sort dedications with Pending status first, followed by other statuses in specified order
+const sortedDedications = computed(() => {
+  const statusOrder = {
+    'pending': 1,
+    'approved': 2,
+    'disapproved': 3,
+    'completed': 4,
+    'cancelled': 5
+  }
+  
+  return [...dedications.value].sort((a, b) => {
+    const aOrder = statusOrder[a.status] || 999
+    const bOrder = statusOrder[b.status] || 999
+    
+    // First sort by status order
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder
+    }
+    
+    // If same status, sort by date created (newest first)
+    const aDate = new Date(a.date_created || 0)
+    const bDate = new Date(b.date_created || 0)
+    return bDate - aDate
+  })
+})
+
 const loading = computed(() => childDedicationStore.loading)
 const currentPage = computed({
   get: () => childDedicationStore.currentPage,
@@ -274,20 +320,28 @@ const filters = computed({
 })
 
 const sortByOptions = [
+  'Status (Pending First)',
   'Dedication Date (Newest)',
   'Dedication Date (Oldest)',
   'Child ID (A-Z)',
   'Child ID (Z-A)',
   'Date Created (Newest)',
   'Date Created (Oldest)',
-  'Status (A-Z)'
+  'Status (A-Z)',
+  'This Month',
+  'Last Month',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-const statusOptions = ['All Statuses', 'pending', 'ongoing', 'completed']
+const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
 
 // Dialog state
 const childDedicationDialog = ref(false)
 const dedicationData = ref(null)
+const certificateDialog = ref(false)
+const certificateType = ref('')
+const certificateData = ref(null)
 
 // Handlers
 const handleDedicationDialog = () => {
@@ -409,13 +463,13 @@ const handleExportExcel = async () => {
 }
 
 const getStartIndex = () => {
-  if (dedications.value.length === 0) return 0
+  if (sortedDedications.value.length === 0) return 0
   return (currentPage.value - 1) * itemsPerPage.value + 1
 }
 
 const getEndIndex = () => {
   const end = currentPage.value * itemsPerPage.value
-  return Math.min(end, totalCount.value)
+  return Math.min(end, sortedDedications.value.length)
 }
 
 const formatDateTime = (dateString) => {
@@ -499,8 +553,14 @@ const handlePrint = () => {
   const printWindow = window.open('', '_blank')
   const tableHeaders = ['Child Name', 'Requester', 'Preferred Date', 'Pastor', 'Location', 'Father', 'Mother', 'Status', 'Date Created']
 
+  // Get current user info for printed by
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const printedBy = userInfo?.member 
+    ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
+    : userInfo?.account?.email || 'Admin'
+
   let tableRows = ''
-  dedications.value.forEach((dedication) => {
+  sortedDedications.value.forEach((dedication) => {
     const childName = dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() || 'N/A'
     const requesterName = dedication.requester_fullname || dedication.requested_by || 'N/A'
     const pastorName = dedication.pastor || 'N/A'
@@ -520,6 +580,8 @@ const handlePrint = () => {
     `
   })
   
+  const currentDate = new Date().toLocaleString()
+  
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -533,9 +595,27 @@ const handlePrint = () => {
             font-family: Arial, sans-serif;
             margin: 20px;
           }
-          h1 {
-            text-align: center;
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+          }
+          .header img {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .header .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
           }
           table {
             width: 100%;
@@ -554,16 +634,28 @@ const handlePrint = () => {
           tr:nth-child(even) {
             background-color: #f9f9f9;
           }
-          .print-date {
-            text-align: right;
-            margin-bottom: 10px;
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             color: #666;
+          }
+          .footer-info {
+            text-align: right;
           }
         </style>
       </head>
       <body>
-        <h1>Child Dedication Records</h1>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="header">
+          <img src="/logo.png" alt="Church Logo" />
+          <div>
+            <h1>Child Dedication Records</h1>
+            <div class="subtitle">Biblical Bread Ministries</div>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -574,6 +666,13 @@ const handlePrint = () => {
             ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
           </tbody>
         </table>
+        <div class="footer">
+          <div>Total Records: ${sortedDedications.value.length}</div>
+          <div class="footer-info">
+            <div>Printed on: ${currentDate}</div>
+            <div>Printed by: ${printedBy}</div>
+          </div>
+        </div>
       </body>
     </html>
   `)
@@ -584,6 +683,16 @@ const handlePrint = () => {
     printWindow.print()
     printWindow.close()
   }, 250)
+}
+
+const printCertificate = (dedication) => {
+  certificateType.value = 'child_dedication'
+  certificateData.value = {
+    service: {
+      ...dedication
+    }
+  }
+  certificateDialog.value = true
 }
 
 // Initialize on mount

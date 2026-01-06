@@ -1,478 +1,264 @@
 <template>
-  <div class="audit-trail-page">
+  <div class="audit-trail-container">
+    <!-- Header -->
     <div class="page-header">
-      <h1>Audit Trail</h1>
-      <p class="page-subtitle">Track all user actions and system activities</p>
+      <div class="header-content">
+        <h1 class="page-title">
+          <el-icon><Document /></el-icon>
+          Audit Trail
+        </h1>
+        <p class="page-subtitle">Track all user actions and system activities (v2 - Raw Data)</p>
+      </div>
+      <div class="header-actions">
+        <el-button type="success" @click="exportToCSV">
+          <el-icon><Download /></el-icon>
+          Export CSV
+        </el-button>
+        <el-button type="info" @click="printData">
+          <el-icon><Printer /></el-icon>
+          Print
+        </el-button>
+        <el-button type="primary" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          Refresh
+        </el-button>
+      </div>
     </div>
-
-    <!-- Summary Cards -->
-    <el-row :gutter="20" class="summary-cards">
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="summary-card">
-          <div class="card-content">
-            <el-icon :size="40" color="#409EFF" class="card-icon">
-              <Document />
-            </el-icon>
-            <div class="card-info">
-              <div class="card-label">Total Actions</div>
-              <div class="card-value">{{ summaryStats?.total_count || 0 }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="summary-card">
-          <div class="card-content">
-            <el-icon :size="40" color="#67C23A" class="card-icon">
-              <Clock />
-            </el-icon>
-            <div class="card-info">
-              <div class="card-label">Last 24 Hours</div>
-              <div class="card-value">{{ summaryStats?.recent_activity_24h || 0 }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="summary-card">
-          <div class="card-content">
-            <el-icon :size="40" color="#409EFF" class="card-icon">
-              <CircleCheck />
-            </el-icon>
-            <div class="card-info">
-              <div class="card-label">Successful</div>
-              <div class="card-value">{{ getStatusCount('success') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="summary-card">
-          <div class="card-content">
-            <el-icon :size="40" color="#F56C6C" class="card-icon">
-              <Warning />
-            </el-icon>
-            <div class="card-info">
-              <div class="card-label">Failed/Errors</div>
-              <div class="card-value">{{ getStatusCount('failed') + getStatusCount('error') }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
 
     <!-- Filters -->
     <el-card class="filter-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span>Filters</span>
-          <el-button type="primary" text @click="resetFilters" :disabled="loading">
-            Reset Filters
-          </el-button>
-        </div>
-      </template>
-      <el-form :model="filters" :inline="true" class="filter-form">
-        <el-form-item label="Search">
-          <el-input
-            v-model="searchQuery"
-            placeholder="Search by user, route, entity..."
-            clearable
-            @input="handleSearch"
-            @clear="handleSearch"
-            :disabled="loading"
-            style="width: 300px"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item label="User ID">
-          <el-input
-            v-model="filters.user_id"
-            placeholder="Enter user ID"
-            clearable
-            @change="handleFilterChange"
-            :disabled="loading"
-            style="width: 150px"
-          />
-        </el-form-item>
-        <el-form-item label="Action Type">
-          <el-select
-            v-model="filters.action_type"
-            placeholder="Select action"
-            @change="handleFilterChange"
-            :disabled="loading"
-            clearable
-            style="width: 180px"
-          >
-            <el-option label="All Actions" value="All Actions" />
-            <el-option label="CREATE" value="CREATE" />
-            <el-option label="UPDATE" value="UPDATE" />
-            <el-option label="DELETE" value="DELETE" />
-            <el-option label="VIEW" value="VIEW" />
-            <el-option label="VIEW_LIST" value="VIEW_LIST" />
-            <el-option label="LOGIN" value="LOGIN" />
-            <el-option label="LOGOUT" value="LOGOUT" />
-            <el-option label="EXPORT" value="EXPORT" />
-            <el-option label="VIEW_CERTIFICATE" value="VIEW_CERTIFICATE" />
-          </el-select>
-        </el-form-item>
-        <!-- <el-form-item label="Entity Type">
-          <el-select
-            v-model="filters.entity_type"
-            placeholder="Select entity"
-            @change="handleFilterChange"
-            :disabled="loading"
-            clearable
-            style="width: 180px"
-          >
-            <el-option label="All Entities" value="All Entities" />
-            <el-option label="member" value="member" />
-            <el-option label="account" value="account" />
-            <el-option label="department" value="department" />
-            <el-option label="ministry" value="ministry" />
-            <el-option label="event" value="event" />
-            <el-option label="approval" value="approval" />
-            <el-option label="tithe" value="tithe" />
-            <el-option label="church_leader" value="church_leader" />
-            <el-option label="department_officer" value="department_officer" />
-            <el-option label="marriage_service" value="marriage_service" />
-            <el-option label="water_baptism" value="water_baptism" />
-            <el-option label="burial_service" value="burial_service" />
-            <el-option label="child_dedication" value="child_dedication" />
-            <el-option label="transaction" value="transaction" />
-          </el-select>
-        </el-form-item> -->
-        <el-form-item label="Status">
-          <el-select
-            v-model="filters.status"
-            placeholder="Select status"
-            @change="handleFilterChange"
-            :disabled="loading"
-            clearable
-            style="width: 150px"
-          >
-            <el-option label="All Statuses" value="All Statuses" />
-            <el-option label="success" value="success" />
-            <el-option label="failed" value="failed" />
-            <el-option label="error" value="error" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="Date Range">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="To"
-            start-placeholder="Start date"
-            end-placeholder="End date"
-            @change="handleDateRangeChange"
-            :disabled="loading"
-            style="width: 300px"
-          />
-        </el-form-item>
-        <el-form-item label="Sort By">
-          <el-select
-            v-model="sortBy"
-            placeholder="Select sort"
-            @change="handleFilterChange"
-            :disabled="loading"
-            style="width: 180px"
-          >
-            <el-option label="Date (Newest)" value="Date (Newest)" />
-            <el-option label="Date (Oldest)" value="Date (Oldest)" />
-            <el-option label="User Name (A-Z)" value="User Name (A-Z)" />
-            <el-option label="Action Type (A-Z)" value="Action Type (A-Z)" />
-            <!-- <el-option label="Entity Type (A-Z)" value="Entity Type (A-Z)" /> -->
-          </el-select>
-        </el-form-item>
-      </el-form>
+      <div class="filter-row">
+        <el-input
+          v-model="filters.search"
+          placeholder="Search descriptions, entity names, emails..."
+          clearable
+          class="search-input"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+
+        <el-select v-model="filters.action_type" placeholder="Action Type" clearable @change="fetchData">
+          <el-option label="CREATE" value="CREATE" />
+          <el-option label="UPDATE" value="UPDATE" />
+          <el-option label="DELETE" value="DELETE" />
+          <el-option label="LOGIN" value="LOGIN" />
+          <el-option label="LOGOUT" value="LOGOUT" />
+          <el-option label="EXPORT" value="EXPORT" />
+          <el-option label="VIEW_LIST" value="VIEW_LIST" />
+        </el-select>
+
+        <el-select v-model="filters.entity_type" placeholder="Entity Type" clearable @change="fetchData">
+          <el-option label="Member" value="Member" />
+          <el-option label="Account" value="Account" />
+          <el-option label="Department" value="Department" />
+          <el-option label="Ministry" value="Ministry" />
+          <el-option label="Event" value="Event" />
+          <el-option label="Water Baptism" value="Water Baptism" />
+          <el-option label="Burial Service" value="Burial Service" />
+          <el-option label="Marriage Service" value="Marriage Service" />
+          <el-option label="Child Dedication" value="Child Dedication" />
+          <el-option label="Transaction" value="Transaction" />
+          <el-option label="System" value="System" />
+        </el-select>
+
+        <el-select v-model="filters.status" placeholder="Status" clearable @change="fetchData">
+          <el-option label="Success" value="success" />
+          <el-option label="Failed" value="failed" />
+          <el-option label="Error" value="error" />
+        </el-select>
+
+        <el-date-picker
+          v-model="filters.dateRange"
+          type="daterange"
+          range-separator="to"
+          start-placeholder="Start Date"
+          end-placeholder="End Date"
+          @change="handleDateChange"
+        />
+
+        <el-button @click="resetFilters" :disabled="loading">
+          <el-icon><RefreshRight /></el-icon>
+          Reset
+        </el-button>
+      </div>
     </el-card>
 
-    <!-- Audit Logs Table -->
-    <el-card class="table-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span>Audit Logs</span>
-          <div class="header-actions">
-            <el-select
-              v-model="itemsPerPage"
-              @change="handlePageSizeChange"
-              :disabled="loading"
-              style="width: 120px; margin-right: 10px"
-            >
-              <el-option
-                v-for="size in pageSizeOptions"
-                :key="size"
-                :label="`${size} / page`"
-                :value="size"
-              />
-            </el-select>
-            <el-button
-              :icon="Refresh"
-              circle
-              @click="fetchAuditLogs"
-              :loading="loading"
-              :disabled="loading"
-            />
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <el-card class="stat-card" shadow="hover">
+        <div class="stat-content">
+          <el-icon class="stat-icon total"><Document /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.total_count || 0 }}</div>
+            <div class="stat-label">Total Logs</div>
           </div>
         </div>
-      </template>
+      </el-card>
 
-      <!-- Table -->
+      <el-card class="stat-card" shadow="hover">
+        <div class="stat-content">
+          <el-icon class="stat-icon success"><CircleCheck /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ getStatusCount('success') }}</div>
+            <div class="stat-label">Success</div>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="stat-card" shadow="hover">
+        <div class="stat-content">
+          <el-icon class="stat-icon failed"><CircleClose /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ getStatusCount('failed') + getStatusCount('error') }}</div>
+            <div class="stat-label">Failed/Error</div>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="stat-card" shadow="hover">
+        <div class="stat-content">
+          <el-icon class="stat-icon today"><Calendar /></el-icon>
+          <div class="stat-info">
+            <div class="stat-value">{{ stats.today_count || 0 }}</div>
+            <div class="stat-label">Today's Logs</div>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- Data Table -->
+    <el-card class="data-card" shadow="hover">
       <el-table
-        v-loading="loading"
         :data="auditLogs"
+        v-loading="loading"
         stripe
         style="width: 100%"
-        empty-text="No audit logs found"
+        :default-sort="{ prop: 'date_created', order: 'descending' }"
       >
-        <el-table-column prop="date_created" label="Date & Time" width="180">
+        <el-table-column prop="date_created" label="Date & Time" width="180" sortable>
           <template #default="{ row }">
-            {{ formatDateTime(row.date_created) }}
+            {{ formatDate(row.date_created) }}
           </template>
         </el-table-column>
-        <el-table-column prop="user_name" label="User" width="200">
+
+        <el-table-column prop="user_email" label="User Email" width="200" sortable>
           <template #default="{ row }">
-            <div class="user-cell">
-              <div class="user-name">{{ row.user_name || row.user_email || 'N/A' }}</div>
-              <div class="user-position" v-if="row.user_position">
-                {{ row.user_position }}
-              </div>
-            </div>
+            <el-tag type="info" size="small">{{ row.user_email || 'System' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="action_type" label="Action" width="140">
+
+        <el-table-column prop="action_type" label="Action" width="120" sortable>
           <template #default="{ row }">
             <el-tag :type="getActionTypeColor(row.action_type)" size="small">
               {{ row.action_type }}
             </el-tag>
           </template>
         </el-table-column>
-        <!-- <el-table-column prop="entity_type" label="Entity Type" width="150">
+
+        <el-table-column prop="entity_type" label="Entity" width="150" sortable>
           <template #default="{ row }">
-            <el-tag type="info" size="small">
-              {{ formatEntityType(row.entity_type) }}
-            </el-tag>
-          </template>
-        </el-table-column> -->
-        <el-table-column prop="entity_id" label="Entity ID" width="120">
-          <template #default="{ row }">
-            {{ row.entity_id || 'N/A' }}
+            <el-tag type="primary" size="small">{{ row.entity_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="Route" min-width="300" show-overflow-tooltip>
+
+        <el-table-column prop="entity_name" label="Entity Name" width="180">
           <template #default="{ row }">
-            <code class="route-code">{{ row.description || 'N/A' }}</code>
+            {{ row.entity_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="Status" width="100" align="center">
+
+        <el-table-column prop="description" label="Description" min-width="300">
+          <template #default="{ row }">
+            <code class="description-text">{{ row.description }}</code>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="ip_address" label="IP Address" width="140">
+          <template #default="{ row }">
+            {{ row.ip_address || '-' }}
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="status" label="Status" width="100" sortable>
           <template #default="{ row }">
             <el-tag :type="getStatusColor(row.status)" size="small">
-              {{ row.status.toUpperCase() }}
+              {{ row.status }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="Actions" width="80" align="center" fixed="right">
+
+        <el-table-column prop="error_message" label="Error" width="200">
           <template #default="{ row }">
-            <el-button
-              :icon="View"
-              circle
-              size="small"
-              @click="viewDetails(row)"
-              type="primary"
-              text
-            />
+            <el-tag v-if="row.error_message" type="danger" size="small">
+              {{ row.error_message }}
+            </el-tag>
+            <span v-else>-</span>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- Pagination -->
-      <div class="pagination-container" v-if="totalPages > 1">
-        <div class="pagination-info">
-          Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to
-          {{ Math.min(currentPage * itemsPerPage, totalCount) }} of {{ totalCount }} entries
-        </div>
+      <div class="pagination-container">
         <el-pagination
-          v-model:current-page="currentPage"
-          :page-size="itemsPerPage"
-          :total="totalCount"
-          :page-sizes="pageSizeOptions"
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 25, 50, 100]"
+          :total="pagination.totalCount"
           layout="total, sizes, prev, pager, next, jumper"
-          @current-change="handlePageChange"
-          @size-change="handlePageSizeChange"
-          :disabled="loading"
+          @size-change="fetchData"
+          @current-change="fetchData"
         />
       </div>
     </el-card>
-
-    <!-- Details Dialog -->
-    <el-dialog
-      v-model="detailsDialog"
-      title="Audit Log Details"
-      width="800px"
-      :close-on-click-modal="false"
-    >
-      <div v-if="selectedLog" class="detail-content">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="User">
-            <div>
-              <div>{{ selectedLog.user_name || selectedLog.user_email || 'N/A' }}</div>
-              <div class="text-caption" v-if="selectedLog.user_position">
-                {{ selectedLog.user_position }}
-              </div>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="Date & Time">
-            {{ formatDateTime(selectedLog.date_created) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Action Type">
-            <el-tag :type="getActionTypeColor(selectedLog.action_type)" size="small">
-              {{ selectedLog.action_type }}
-            </el-tag>
-          </el-descriptions-item>
-          <!-- <el-descriptions-item label="Entity Type">
-            {{ formatEntityType(selectedLog.entity_type) }}
-          </el-descriptions-item> -->
-          <el-descriptions-item label="Entity ID" v-if="selectedLog.entity_id">
-            {{ selectedLog.entity_id }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Status">
-            <el-tag :type="getStatusColor(selectedLog.status)" size="small">
-              {{ selectedLog.status.toUpperCase() }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="Route Accessed" :span="2">
-            <code>{{ selectedLog.description || 'N/A' }}</code>
-          </el-descriptions-item>
-          <el-descriptions-item label="IP Address" v-if="selectedLog.ip_address">
-            {{ selectedLog.ip_address }}
-          </el-descriptions-item>
-          <el-descriptions-item label="User Agent" v-if="selectedLog.user_agent">
-            {{ selectedLog.user_agent }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Error Message" :span="2" v-if="selectedLog.error_message">
-            <span class="error-text">{{ selectedLog.error_message }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="Old Values" :span="2" v-if="selectedLog.old_values">
-            <pre class="json-preview">{{ JSON.stringify(selectedLog.old_values, null, 2) }}</pre>
-          </el-descriptions-item>
-          <el-descriptions-item label="New Values" :span="2" v-if="selectedLog.new_values">
-            <pre class="json-preview">{{ JSON.stringify(selectedLog.new_values, null, 2) }}</pre>
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="detailsDialog = false">Close</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useAuditTrailStore } from '@/stores/auditTrailStore'
-import {
-  Document,
-  Clock,
-  CircleCheck,
-  Warning,
-  Search,
-  View,
-  Refresh,
-  RefreshRight
-} from '@element-plus/icons-vue'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { Document, Refresh, Search, CircleCheck, CircleClose, Calendar, RefreshRight, Download, Printer } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { useAuditTrailStore } from '@/stores/Admin/auditTrailStore'
 
 const auditTrailStore = useAuditTrailStore()
 
-// Computed properties
-const auditLogs = computed(() => auditTrailStore.auditLogs)
-const loading = computed(() => auditTrailStore.loading)
-const searchQuery = computed({
-  get: () => auditTrailStore.searchQuery,
-  set: (value) => auditTrailStore.setSearchQuery(value)
+// State
+const loading = ref(false)
+const auditLogs = ref([])
+const stats = reactive({
+  total_count: 0,
+  by_status: [],
+  today_count: 0
 })
-const filters = computed(() => auditTrailStore.filters)
-const currentPage = computed({
-  get: () => auditTrailStore.currentPage,
-  set: (value) => auditTrailStore.setCurrentPage(value)
-})
-const totalPages = computed(() => auditTrailStore.totalPages)
-const totalCount = computed(() => auditTrailStore.totalCount)
-const itemsPerPage = computed({
-  get: () => auditTrailStore.itemsPerPage,
-  set: (value) => auditTrailStore.setPageSize(value)
-})
-const pageSizeOptions = computed(() => auditTrailStore.pageSizeOptions)
-const summaryStats = computed(() => auditTrailStore.summaryStats)
 
-// Local state
-const detailsDialog = ref(false)
-const selectedLog = ref(null)
-const dateRange = ref([])
-const sortBy = computed({
-  get: () => auditTrailStore.filters.sortBy || 'Date (Newest)',
-  set: (value) => auditTrailStore.setFilters({ sortBy: value })
+// Filters
+const filters = reactive({
+  search: '',
+  action_type: '',
+  entity_type: '',
+  status: '',
+  dateRange: null
 })
+
+// Pagination
+const pagination = reactive({
+  page: 1,
+  pageSize: 25,
+  totalCount: 0
+})
+
+// Computed
+const getStatusCount = (status) => {
+  const found = stats.by_status.find(s => s.status === status)
+  return found ? found.count : 0
+}
 
 // Methods
-const fetchAuditLogs = async () => {
-  await auditTrailStore.fetchAuditLogs()
-}
-
-const fetchSummaryStats = async () => {
-  await auditTrailStore.fetchSummaryStats()
-}
-
-const handleSearch = () => {
-  fetchAuditLogs()
-}
-
-const handleFilterChange = () => {
-  fetchAuditLogs()
-}
-
-const handleDateRangeChange = () => {
-  if (dateRange.value && dateRange.value.length === 2) {
-    auditTrailStore.setFilters({
-      date_from: dateRange.value[0],
-      date_to: dateRange.value[1]
-    })
-  } else {
-    auditTrailStore.setFilters({
-      date_from: null,
-      date_to: null
-    })
-  }
-  fetchAuditLogs()
-}
-
-const handlePageChange = (page) => {
-  auditTrailStore.setCurrentPage(page)
-  fetchAuditLogs()
-}
-
-const handlePageSizeChange = () => {
-  fetchAuditLogs()
-}
-
-const resetFilters = () => {
-  auditTrailStore.resetFilters()
-  // Reset to default date range (last 30 days / 1 month)
-  initializeDefaultDateRange()
-  fetchAuditLogs()
-}
-
-const viewDetails = (item) => {
-  selectedLog.value = item
-  detailsDialog.value = true
-}
-
-const formatDateTime = (dateString) => {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
   return date.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -482,227 +268,315 @@ const formatDateTime = (dateString) => {
   })
 }
 
-const formatEntityType = (entityType) => {
-  return entityType
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
-
-const getActionTypeColor = (actionType) => {
-  const colorMap = {
+const getActionTypeColor = (action) => {
+  const colors = {
     CREATE: 'success',
-    UPDATE: 'info',
+    UPDATE: 'warning',
     DELETE: 'danger',
-    VIEW: 'primary',
-    VIEW_LIST: 'primary',
-    LOGIN: 'success',
-    LOGOUT: 'warning',
-    EXPORT: 'info',
-    VIEW_CERTIFICATE: ''
+    LOGIN: 'info',
+    LOGOUT: 'info',
+    EXPORT: 'primary',
+    VIEW_LIST: ''
   }
-  return colorMap[actionType] || 'info'
+  return colors[action] || ''
 }
 
 const getStatusColor = (status) => {
-  const colorMap = {
+  const colors = {
     success: 'success',
-    failed: 'warning',
+    failed: 'danger',
     error: 'danger'
   }
-  return colorMap[status] || 'info'
+  return colors[status] || 'info'
 }
 
-const getStatusCount = (status) => {
-  if (!summaryStats.value?.by_status) return 0
-  const statusItem = summaryStats.value.by_status.find(item => item.status === status)
-  return statusItem?.count || 0
+const handleSearch = () => {
+  // Debounce search
+  clearTimeout(window.searchTimeout)
+  window.searchTimeout = setTimeout(() => {
+    pagination.page = 1
+    fetchData()
+  }, 300)
 }
 
-// Initialize default date range (last 30 days / 1 month)
-const initializeDefaultDateRange = () => {
-  const today = new Date()
-  const oneMonthAgo = new Date()
-  oneMonthAgo.setMonth(today.getMonth() - 1)
+const handleDateChange = () => {
+  pagination.page = 1
+  fetchData()
+}
+
+const resetFilters = () => {
+  filters.search = ''
+  filters.action_type = ''
+  filters.entity_type = ''
+  filters.status = ''
+  filters.dateRange = null
+  pagination.page = 1
+  fetchData()
+}
+
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      search: filters.search || undefined,
+      action_type: filters.action_type || undefined,
+      entity_type: filters.entity_type || undefined,
+      status: filters.status || undefined,
+      date_from: filters.dateRange ? filters.dateRange[0] : undefined,
+      date_to: filters.dateRange ? filters.dateRange[1] : undefined
+    }
+
+    const result = await auditTrailStore.fetchAuditLogs(params)
+    
+    if (result && result.success) {
+      auditLogs.value = result.data || []
+      pagination.totalCount = result.totalCount || 0
+    }
+
+    // Fetch stats
+    await fetchStats()
+  } catch (error) {
+    console.error('Error fetching audit logs:', error)
+    ElMessage.error('Failed to fetch audit logs')
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchStats = async () => {
+  try {
+    const result = await auditTrailStore.getAuditStats()
+    if (result && result.success) {
+      stats.total_count = result.data?.total_count || 0
+      stats.by_status = result.data?.by_status || []
+    }
+  } catch (error) {
+    console.error('Error fetching stats:', error)
+  }
+}
+
+const refreshData = () => {
+  pagination.page = 1
+  fetchData()
+}
+
+const exportToCSV = () => {
+  const headers = ['Date & Time', 'User Email', 'Action', 'Entity', 'Entity Name', 'Description', 'IP Address', 'Status', 'Error']
+  const rows = auditLogs.value.map(log => [
+    formatDate(log.date_created),
+    log.user_email || 'System',
+    log.action_type,
+    log.entity_type,
+    log.entity_name || '-',
+    log.description,
+    log.ip_address || '-',
+    log.status,
+    log.error_message || '-'
+  ])
   
-  dateRange.value = [oneMonthAgo, today]
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
   
-  // Set filters with default date range
-  auditTrailStore.setFilters({
-    date_from: oneMonthAgo.toISOString().split('T')[0],
-    date_to: today.toISOString().split('T')[0]
-  })
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `audit_trail_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success('Audit trail exported successfully')
+}
+
+const printData = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['Date & Time', 'User Email', 'Action', 'Entity', 'Entity Name', 'Description', 'IP Address', 'Status']
+  
+  const rows = auditLogs.value.map(log => `
+    <tr>
+      <td>${formatDate(log.date_created)}</td>
+      <td>${log.user_email || 'System'}</td>
+      <td>${log.action_type}</td>
+      <td>${log.entity_type}</td>
+      <td>${log.entity_name || '-'}</td>
+      <td>${log.description}</td>
+      <td>${log.ip_address || '-'}</td>
+      <td>${log.status}</td>
+    </tr>
+  `).join('')
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Audit Trail - Print</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1a365d; text-align: center; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 10px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+          th { background-color: #1a365d; color: white; }
+          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <h1>Audit Trail</h1>
+        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="8" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
 }
 
 // Lifecycle
-onMounted(async () => {
-  // Initialize default date range before fetching
-  initializeDefaultDateRange()
-  
-  await Promise.all([
-    fetchAuditLogs(),
-    fetchSummaryStats()
-  ])
+onMounted(() => {
+  fetchData()
 })
 </script>
 
 <style scoped>
-.audit-trail-page {
+.audit-trail-container {
   padding: 24px;
+  background-color: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 24px;
 }
 
-.page-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-  color: #303133;
+.header-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .page-subtitle {
-  color: #909399;
   font-size: 14px;
-  margin: 0;
-}
-
-.summary-cards {
-  margin-bottom: 24px;
-}
-
-.summary-card {
-  height: 100%;
-}
-
-.card-content {
-  display: flex;
-  align-items: center;
-}
-
-.card-icon {
-  margin-right: 16px;
-}
-
-.card-info {
-  flex: 1;
-}
-
-.card-label {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-
-.card-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+  color: #6b7280;
+  margin: 8px 0 0 0;
 }
 
 .filter-card {
   margin-bottom: 24px;
+  border-radius: 12px;
 }
 
-.card-header {
+.filter-row {
   display: flex;
-  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
+.search-input {
+  width: 300px;
 }
 
-.filter-form {
-  margin-top: 0;
-}
-
-.table-card {
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.user-cell {
-  min-width: 150px;
+.stat-card {
+  border-radius: 12px;
 }
 
-.user-name {
-  font-weight: 500;
-  margin-bottom: 4px;
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.user-position {
+.stat-icon {
+  font-size: 32px;
+}
+
+.stat-icon.total { color: #409eff; }
+.stat-icon.success { color: #67c23a; }
+.stat-icon.failed { color: #f56c6c; }
+.stat-icon.today { color: #e6a23c; }
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.data-card {
+  border-radius: 12px;
+}
+
+.description-text {
   font-size: 12px;
-  color: #909399;
-}
-
-.route-code {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: #409EFF;
-  background-color: #F5F7FA;
-  padding: 2px 6px;
-  border-radius: 3px;
+  color: #606266;
+  background-color: #f4f4f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pagination-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #EBEEF5;
-  flex-wrap: wrap;
-  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 
-.pagination-info {
-  font-size: 14px;
-  color: #909399;
-}
-
-.detail-content {
-  padding: 0;
-}
-
-.json-preview {
-  background: #F5F7FA;
-  padding: 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  max-height: 400px;
-  overflow: auto;
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.text-caption {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.error-text {
-  color: #F56C6C;
+@media (max-width: 1200px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .pagination-container {
-    flex-direction: column;
-    align-items: stretch;
+  .stats-row {
+    grid-template: 1fr;
   }
-
-  .filter-form {
-    display: flex;
+  
+  .filter-row {
     flex-direction: column;
   }
-
-  .filter-form :deep(.el-form-item) {
-    margin-right: 0;
-    margin-bottom: 16px;
+  
+  .search-input {
+    width: 100%;
   }
 }
 </style>

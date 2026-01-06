@@ -206,6 +206,17 @@ async function getAllWaterBaptisms(options = {}) {
       m.firstname,
       m.lastname,
       m.middle_name,
+      m.birthdate,
+      m.age,
+      m.gender,
+      m.address,
+      m.email,
+      m.phone_number,
+      m.civil_status,
+      m.position,
+      m.guardian_name as member_guardian_name,
+      m.guardian_contact as member_guardian_contact,
+      m.guardian_relationship as member_guardian_relationship,
       CONCAT(
         m.firstname,
         IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
@@ -240,6 +251,25 @@ async function getAllWaterBaptisms(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(wb.baptism_date) = ? AND YEAR(wb.baptism_date) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(wb.baptism_date) = MONTH(CURDATE()) AND YEAR(wb.baptism_date) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(wb.baptism_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(wb.baptism_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -249,7 +279,6 @@ async function getAllWaterBaptisms(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Baptism ID (A-Z)':
         orderByClause += 'wb.baptism_id ASC';
@@ -271,6 +300,16 @@ async function getAllWaterBaptisms(options = {}) {
         break;
       case 'Status (A-Z)':
         orderByClause += 'wb.status ASC';
+        break;
+      case 'Status (Pending First)':
+        orderByClause += `CASE wb.status 
+          WHEN 'Pending' THEN 1 
+          WHEN 'Approved' THEN 2 
+          WHEN 'Disapproved' THEN 3 
+          WHEN 'Completed' THEN 4 
+          WHEN 'Cancelled' THEN 5 
+          ELSE 6 
+        END, wb.date_created DESC`;
         break;
       default:
         orderByClause += 'wb.date_created DESC'; // Default sorting
@@ -391,14 +430,18 @@ async function getWaterBaptismByMemberId(memberId) {
       B.member_id as member_member_id,
       B.firstname, 
       B.lastname, 
-      B.middle_name, 
+      B.middle_name,
       B.birthdate,
       B.age,
       B.gender,
       B.address,
       B.email,
       B.phone_number,
+      B.civil_status,
       B.position,
+      B.guardian_name as member_guardian_name,
+      B.guardian_contact as member_guardian_contact,
+      B.guardian_relationship as member_guardian_relationship,
       B.date_created as member_date_created,
       CONCAT(B.firstname, " ", IFNULL(B.middle_name, ""), " ", B.lastname) as fullname 
     FROM tbl_waterbaptism A 
@@ -693,6 +736,17 @@ async function exportWaterBaptismsToExcel(options = {}) {
         'No.': index + 1,
         'Baptism ID': baptism.baptism_id || '',
         'Member ID': baptism.member_id || '',
+        'First Name': baptism.firstname || '',
+        'Middle Name': baptism.middle_name || '',
+        'Last Name': baptism.lastname || '',
+        'Birthdate': baptism.birthdate || '',
+        'Age': baptism.age || '',
+        'Gender': baptism.gender || '',
+        'Address': baptism.address || '',
+        'Email': baptism.email || '',
+        'Phone Number': baptism.phone_number || '',
+        'Civil Status': baptism.civil_status || '',
+        'Position': baptism.position || '',
         'Location': baptism.location || '',
         'Pastor Name': baptism.pastor_name || '',
         'Baptism Date': baptism.baptism_date ? moment(baptism.baptism_date).format('YYYY-MM-DD HH:mm:ss') : '',
@@ -711,7 +765,18 @@ async function exportWaterBaptismsToExcel(options = {}) {
       { wch: 5 },   // No.
       { wch: 15 },  // Baptism ID
       { wch: 15 },  // Member ID
-      { wch: 20 },  // Location
+      { wch: 15 },  // First Name
+      { wch: 15 },  // Middle Name
+      { wch: 15 },  // Last Name
+      { wch: 15 },  // Birthdate
+      { wch: 8 },   // Age
+      { wch: 10 },  // Gender
+      { wch: 40 },  // Address
+      { wch: 25 },  // Email
+      { wch: 15 },  // Phone Number
+      { wch: 15 },  // Civil Status
+      { wch: 20 },  // Position
+      { wch: 25 },  // Location
       { wch: 20 },  // Pastor Name
       { wch: 20 },  // Baptism Date
       { wch: 15 },  // Status

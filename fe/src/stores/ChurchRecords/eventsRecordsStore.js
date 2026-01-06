@@ -59,6 +59,8 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
         const status = options.status !== undefined ? options.status : this.filters.status
         const type = options.type !== undefined ? options.type : this.filters.type
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRangeStart = (options.dateRangeStart !== undefined && options.dateRangeStart !== null) ? options.dateRangeStart : this.filters.dateRangeStart
+        const dateRangeEnd = (options.dateRangeEnd !== undefined && options.dateRangeEnd !== null) ? options.dateRangeEnd : this.filters.dateRangeEnd
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -72,6 +74,12 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRangeStart) {
+          params.append('dateRangeStart', dateRangeStart)
+        }
+        if (dateRangeEnd) {
+          params.append('dateRangeEnd', dateRangeEnd)
         }
 
         const response = await axios.get(`/church-records/events/getAllEvents?${params}`)

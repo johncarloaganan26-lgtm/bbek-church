@@ -2,6 +2,120 @@ const { query } = require('../database/db');
 const moment = require('moment');
 
 /**
+ * Safely convert Buffer or any value to plain text string
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string representation
+ */
+function safeToString(value, defaultValue = '') {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8');
+  }
+  
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  return String(value);
+}
+
+/**
+ * Convert any value to plain text (handles Buffer conversion)
+ * @param {*} value - Value to convert
+ * @param {String} defaultValue - Default value if conversion fails
+ * @returns {String} Plain text string
+ */
+function toPlainText(value, defaultValue = '') {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  
+  // Handle Buffer - convert to UTF-8 string
+  if (Buffer.isBuffer(value)) {
+    return value.toString('utf8').trim();
+  }
+  
+  // Handle objects - convert to readable text
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+  
+  // Handle numbers - convert to string
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  
+  // Handle booleans - convert to string
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  
+  // Handle strings - trim and return
+  return String(value).trim();
+}
+
+/**
+ * Convert all Buffer fields in a row to text (for reading data)
+ * Preserves date fields for proper formatting in frontend
+ * @param {Object} row - Database row
+ * @returns {Object} Row with all Buffers converted to text, date fields preserved
+ */
+function convertRowBuffersToText(row) {
+  if (!row || typeof row !== 'object') {
+    return row;
+  }
+  
+  const converted = {};
+  for (const [key, value] of Object.entries(row)) {
+    // Preserve date fields as-is for frontend formatting
+    if (['archived_at', 'restored_at', 'date_created'].includes(key)) {
+      converted[key] = value;
+    } else if (key === 'restored') {
+      // Keep restored as number (0 or 1) so frontend can properly check it
+      // The string "0" is truthy in JavaScript, causing display bugs
+      converted[key] = value === 1 || value === true || value === '1' ? 1 : 0;
+    } else {
+      converted[key] = toPlainText(value);
+    }
+  }
+  return converted;
+}
+
+/**
+ * Convert an object to plain text values (no Buffers, no IDs)
+ * @param {Object} obj - Object to convert
+ * @returns {String} Plain text string representation
+ */
+function convertToPlainTextObject(obj) {
+  if (!obj || typeof obj !== 'object') {
+    return toPlainText(obj);
+  }
+
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip sensitive fields
+    if (['password', 'token', 'secret', 'key', 'acc_password'].includes(key.toLowerCase())) {
+      result[key] = '[REDACTED]';
+    } else {
+      result[key] = toPlainText(value);
+    }
+  }
+  return JSON.stringify(result, null, 2);
+}
+
+/**
  * Archive Records CRUD Operations
  * Based on tbl_archives schema:
  * - archive_id (INT, PK, AI, NN) - Auto-incrementing
@@ -18,6 +132,7 @@ const moment = require('moment');
 
 /**
  * ARCHIVE - Archive a record from any table
+ * Stores archived_data as plain text instead of JSON
  * @param {String} originalTable - Name of the original table
  * @param {String} originalId - ID of the record in the original table
  * @param {Object} recordData - Complete data of the record to archive
@@ -36,10 +151,16 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
       throw new Error('Record data is required');
     }
 
-    // Convert record data to JSON string
-    const archivedDataJson = typeof recordData === 'string' 
-      ? recordData 
-      : JSON.stringify(recordData);
+    // Convert record data to plain text string (not JSON)
+    let archivedDataText = '';
+    if (typeof recordData === 'string') {
+      archivedDataText = recordData;
+    } else if (typeof recordData === 'object') {
+      // Convert object to readable plain text
+      archivedDataText = convertToPlainTextObject(recordData);
+    } else {
+      archivedDataText = String(recordData);
+    }
 
     const sql = `
       INSERT INTO tbl_archives 
@@ -50,10 +171,10 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
     const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
 
     const params = [
-      String(originalTable).trim(),
-      String(originalId).trim(),
-      archivedDataJson,
-      archivedBy ? String(archivedBy).trim() : null,
+      toPlainText(originalTable),
+      toPlainText(originalId),
+      archivedDataText,
+      toPlainText(archivedBy),
       formattedDate
     ];
 
@@ -233,9 +354,8 @@ async function getAllArchives(options = {}) {
     // Execute query to get paginated results
     const [rows] = await query(sql, params);
 
-    // No need to parse JSON fields - archived_data is excluded from this query
-    // archived_data is only loaded when viewing a single record via getArchiveById
-    const parsedRows = rows;
+    // Convert any Buffer values to text in all rows
+    const parsedRows = rows.map(row => convertRowBuffersToText(row));
 
     // Calculate pagination metadata
     const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
@@ -301,21 +421,31 @@ async function getArchiveById(archiveId) {
     }
 
     const row = rows[0];
-    // Parse JSON fields
-    try {
-      if (row.archived_data) {
-        row.archived_data = typeof row.archived_data === 'string' 
-          ? JSON.parse(row.archived_data) 
-          : row.archived_data;
+    
+    // Convert any Buffer values to text first
+    const convertedRow = convertRowBuffersToText(row);
+    
+    // archived_data is now stored as plain text, no need to parse JSON
+    // If it's a string representation of an object, try to parse it for restoration
+    let archivedData = convertedRow.archived_data;
+    if (typeof archivedData === 'string') {
+      // Try to parse as JSON first, if it fails, keep as plain text
+      try {
+        const parsed = JSON.parse(archivedData);
+        // Check if parsed result is an object (not just a number or string)
+        if (typeof parsed === 'object' && parsed !== null) {
+          archivedData = parsed;
+        }
+      } catch (e) {
+        // Not valid JSON, keep as plain text
       }
-    } catch (e) {
-      console.warn('Error parsing JSON data for archive_id:', archiveId);
     }
+    convertedRow.archived_data = archivedData;
 
     return {
       success: true,
       message: 'Archive record retrieved successfully',
-      data: row
+      data: convertedRow
     };
   } catch (error) {
     console.error('Error fetching archive record:', error);
@@ -359,11 +489,38 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
     }
 
     // Get the archived data
-    const archivedData = archive.archived_data;
+    let archivedData = archive.archived_data;
     if (!archivedData) {
       return {
         success: false,
         message: 'Archived data is missing',
+        data: null
+      };
+    }
+
+    // If archived_data is a string (plain text), try to parse it as JSON for restoration
+    if (typeof archivedData === 'string') {
+      try {
+        const parsed = JSON.parse(archivedData);
+        // Check if parsed result is an object (not just a number or string)
+        if (typeof parsed === 'object' && parsed !== null) {
+          archivedData = parsed;
+        }
+      } catch (e) {
+        // Not valid JSON, keep as plain text - cannot restore
+        return {
+          success: false,
+          message: 'Archived data is in plain text format and cannot be restored. Please restore manually.',
+          data: null
+        };
+      }
+    }
+
+    // Ensure archivedData is an object for restoration
+    if (typeof archivedData !== 'object' || archivedData === null) {
+      return {
+        success: false,
+        message: 'Archived data is not in a valid format for restoration',
         data: null
       };
     }
@@ -539,6 +696,151 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
 }
 
 /**
+ * Get archives within a specific date range
+ * @param {String} dateFrom - Start date (YYYY-MM-DD)
+ * @param {String} dateTo - End date (YYYY-MM-DD)
+ * @param {Object} options - Optional query parameters (limit, offset, page, pageSize, original_table, restored)
+ * @returns {Promise<Object>} Object with paginated archive records and metadata
+ */
+async function getArchivesByDateRange(dateFrom, dateTo, options = {}) {
+  try {
+    const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
+    const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
+    const page = options.page !== undefined ? parseInt(options.page) : undefined;
+    const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
+    const original_table = options.original_table || null;
+    const restored = options.restored !== undefined ? options.restored : null;
+    const sortBy = options.sortBy || null;
+
+    // Format dates
+    const formattedDateFrom = moment(dateFrom).format('YYYY-MM-DD 00:00:00');
+    const formattedDateTo = moment(dateTo).format('YYYY-MM-DD 23:59:59');
+
+    // Build base query for counting total records
+    let countSql = 'SELECT COUNT(*) as total FROM tbl_archives a';
+    let countParams = [formattedDateFrom, formattedDateTo];
+
+    // Build query for fetching records
+    let sql = `
+      SELECT 
+        a.archive_id,
+        a.original_table,
+        a.original_id,
+        a.archived_by,
+        a.archived_at,
+        a.restored,
+        a.restored_at,
+        a.restored_by,
+        a.restore_notes,
+        acc.email as archived_by_email
+      FROM tbl_archives a
+      LEFT JOIN tbl_accounts acc ON a.archived_by = acc.acc_id
+      WHERE a.archived_at >= ? AND a.archived_at <= ?
+    `;
+    const params = [formattedDateFrom, formattedDateTo];
+
+    // Add original_table filter
+    if (original_table && original_table !== 'All Tables') {
+      sql += ' AND a.original_table = ?';
+      countSql += ' AND a.original_table = ?';
+      countParams.push(original_table);
+      params.push(original_table);
+    }
+
+    // Add restored filter
+    if (restored !== null && restored !== undefined) {
+      const restoredValue = restored === true || restored === 'true' || restored === 1 || restored === '1' ? 1 : 0;
+      sql += ' AND a.restored = ?';
+      countSql += ' AND a.restored = ?';
+      countParams.push(restoredValue);
+      params.push(restoredValue);
+    }
+
+    // Add sorting
+    let orderByClause = ' ORDER BY ';
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+    switch (sortByValue) {
+      case 'Date (Newest)':
+        orderByClause += 'a.archived_at DESC';
+        break;
+      case 'Date (Oldest)':
+        orderByClause += 'a.archived_at ASC';
+        break;
+      case 'Table (A-Z)':
+        orderByClause += 'a.original_table ASC';
+        break;
+      default:
+        orderByClause += 'a.archived_at DESC';
+    }
+    sql += orderByClause;
+
+    // Determine pagination values
+    let finalLimit, finalOffset;
+
+    if (page !== undefined && pageSize !== undefined) {
+      const pageNum = parseInt(page) || 1;
+      const size = Math.min(parseInt(pageSize) || 25, 50);
+      finalLimit = size;
+      finalOffset = (pageNum - 1) * size;
+    } else if (limit !== undefined) {
+      finalLimit = Math.min(parseInt(limit) || 25, 50);
+      finalOffset = offset !== undefined ? parseInt(offset) : 0;
+    } else {
+      finalLimit = 25;
+      finalOffset = 0;
+    }
+
+    // Get total count
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+
+    // Add pagination
+    const limitValue = Math.max(1, Math.min(parseInt(finalLimit) || 25, 50));
+    const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
+
+    if (offsetValue > 0) {
+      sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
+    } else {
+      sql += ` LIMIT ${limitValue}`;
+    }
+
+    // Execute query
+    const [rows] = await query(sql, params);
+
+    // Convert Buffer values to text
+    const parsedRows = rows.map(row => convertRowBuffersToText(row));
+
+    // Calculate pagination metadata
+    const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
+    const currentPageSize = finalLimit || parsedRows.length;
+    const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
+
+    return {
+      success: true,
+      message: 'Archives retrieved successfully',
+      data: parsedRows,
+      count: parsedRows.length,
+      totalCount: totalCount,
+      dateRange: {
+        from: formattedDateFrom,
+        to: formattedDateTo
+      },
+      pagination: {
+        page: currentPage,
+        pageSize: currentPageSize,
+        totalPages: totalPages,
+        totalCount: totalCount,
+        hasNextPage: currentPage < totalPages,
+        hasPreviousPage: currentPage > 1
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching archives by date range:', error);
+    throw error;
+  }
+}
+
+/**
  * Get summary statistics for archives
  * @returns {Promise<Object>} Summary statistics
  */
@@ -590,6 +892,7 @@ module.exports = {
   getAllArchives,
   getArchiveById,
   restoreArchive,
-  getArchiveSummary
+  getArchiveSummary,
+  getArchivesByDateRange
 };
 

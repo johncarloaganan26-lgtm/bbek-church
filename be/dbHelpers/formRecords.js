@@ -250,6 +250,25 @@ async function getAllForms(options = {}) {
       hasWhere = true;
     }
 
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+
+    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    if (sortByValue && monthNames.includes(sortByValue)) {
+      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      whereConditions.push('MONTH(f.created_at) = ? AND YEAR(f.created_at) = YEAR(CURDATE())');
+      countParams.push(monthIndex);
+      params.push(monthIndex);
+      hasWhere = true;
+    } else if (sortByValue === 'This Month') {
+      whereConditions.push('MONTH(f.created_at) = MONTH(CURDATE()) AND YEAR(f.created_at) = YEAR(CURDATE())');
+      hasWhere = true;
+    } else if (sortByValue === 'Last Month') {
+      whereConditions.push('MONTH(f.created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(f.created_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+      hasWhere = true;
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -259,7 +278,6 @@ async function getAllForms(options = {}) {
 
     // Add sorting
     let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Date (Newest)':
         orderByClause += 'f.created_at DESC';
@@ -267,8 +285,20 @@ async function getAllForms(options = {}) {
       case 'Date (Oldest)':
         orderByClause += 'f.created_at ASC';
         break;
-      case 'Status':
+      case 'Date Created (Newest)':
+        orderByClause += 'f.created_at DESC';
+        break;
+      case 'Date Created (Oldest)':
+        orderByClause += 'f.created_at ASC';
+        break;
+      case 'Status (A-Z)':
         orderByClause += 'f.status ASC';
+        break;
+      case 'Type (A-Z)':
+        orderByClause += 'f.form_type ASC';
+        break;
+      case 'Name (A-Z)':
+        orderByClause += 'f.name ASC';
         break;
       default:
         orderByClause += 'f.created_at DESC'; // Default sorting

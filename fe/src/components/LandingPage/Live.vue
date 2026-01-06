@@ -452,14 +452,6 @@ const formatDate = (dateString) => {
   });
 };
 
-// Check if date is today
-const isToday = (dateString) => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  const today = new Date();
-  return date.toDateString() === today.toDateString();
-};
-
 // Convert video URL to embed URL
 const convertToEmbedUrl = (url) => {
   if (!url) return null;
@@ -649,22 +641,16 @@ const fetchSermonEvents = async () => {
     if (response.data.success && response.data.data) {
       const events = response.data.data;
 
-      // Find ongoing event with today's date and has a link
-      const todayOngoingEvent = events.find(
-        (event) =>
-          event.status === "ongoing" && isToday(event.start_date) && event.link
-      );
-
-      if (todayOngoingEvent) {
-        ongoingEvent.value = todayOngoingEvent;
+      // First ongoing event (with link and within date range) becomes the ongoing event
+      if (events.length > 0) {
+        ongoingEvent.value = events[0];
         // Convert link to embed URL
-        embedUrl.value = convertToEmbedUrl(todayOngoingEvent.link);
+        embedUrl.value = convertToEmbedUrl(events[0].link);
       }
 
-      // Set sermons (excluding the ongoing one if it exists)
-      sermons.value = events
-        .filter((event) => event !== todayOngoingEvent)
-        .slice(0, 6);
+      // Set sermons (all events from the API, excluding the first one if it's the ongoing event)
+      // The API already filters for ongoing events with links, so we just take up to 6
+      sermons.value = events.slice(0, 6);
     }
   } catch (error) {
     console.error("Error fetching sermon events:", error);

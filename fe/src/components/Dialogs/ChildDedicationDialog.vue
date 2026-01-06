@@ -20,7 +20,10 @@
       :label-position="labelPosition"
     >
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
-      <el-form-item v-if="!isMemberUser" label="Requested By (Member)" prop="requested_by">
+      <el-form-item v-if="!isMemberUser" prop="requested_by">
+        <template #label>
+          <span>Requested By (Member) <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-select
           v-model="formData.requested_by"
           placeholder="Select member"
@@ -52,7 +55,10 @@
       <el-divider content-position="left">Child's Information</el-divider>
 
       <!-- Child First Name -->
-      <el-form-item label="Child's First Name" prop="child_firstname">
+      <el-form-item prop="child_firstname">
+        <template #label>
+          <span>Child's First Name <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.child_firstname"
           placeholder="Enter child's first name"
@@ -63,7 +69,10 @@
       </el-form-item>
 
       <!-- Child Last Name -->
-      <el-form-item label="Child's Last Name" prop="child_lastname">
+      <el-form-item prop="child_lastname">
+        <template #label>
+          <span>Child's Last Name <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.child_lastname"
           placeholder="Enter child's last name"
@@ -85,7 +94,10 @@
       </el-form-item>
 
       <!-- Date of Birth -->
-      <el-form-item label="Date of Birth" prop="date_of_birth">
+      <el-form-item prop="date_of_birth">
+        <template #label>
+          <span>Date of Birth <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-date-picker
           v-model="formData.date_of_birth"
           type="date"
@@ -100,7 +112,10 @@
       </el-form-item>
 
       <!-- Place of Birth -->
-      <el-form-item label="Place of Birth" prop="place_of_birth">
+      <el-form-item prop="place_of_birth">
+        <template #label>
+          <span>Place of Birth <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.place_of_birth"
           placeholder="Enter place of birth"
@@ -111,7 +126,10 @@
       </el-form-item>
 
       <!-- Gender -->
-      <el-form-item label="Gender" prop="gender">
+      <el-form-item prop="gender">
+        <template #label>
+          <span>Gender <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-radio-group v-model="formData.gender" size="large" :disabled="loading">
           <el-radio label="M">Male</el-radio>
           <el-radio label="F">Female</el-radio>
@@ -119,7 +137,10 @@
       </el-form-item>
 
       <!-- Preferred Dedication Date -->
-      <el-form-item label="Preferred Dedication Date" prop="preferred_dedication_date">
+      <el-form-item prop="preferred_dedication_date">
+        <template #label>
+          <span>Preferred Dedication Date <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-date-picker
           v-model="formData.preferred_dedication_date"
           type="date"
@@ -400,7 +421,10 @@
       <el-divider content-position="left">Contact Details</el-divider>
 
       <!-- Contact Phone Number -->
-      <el-form-item label="Contact Phone Number" prop="contact_phone_number">
+      <el-form-item prop="contact_phone_number">
+        <template #label>
+          <span>Contact Phone Number <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.contact_phone_number"
           placeholder="Enter contact phone number"
@@ -423,7 +447,10 @@
       </el-form-item>
 
       <!-- Contact Address -->
-      <el-form-item label="Contact Address" prop="contact_address">
+      <el-form-item prop="contact_address">
+        <template #label>
+          <span>Contact Address <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.contact_address"
           type="textarea"
@@ -436,7 +463,10 @@
       </el-form-item>
 
       <!-- Pastor (Admin/Staff only) -->
-      <el-form-item v-if="!isMemberUser" label="Pastor" prop="pastor" required>
+      <el-form-item v-if="!isMemberUser" prop="pastor">
+        <template #label>
+          <span>Pastor <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-select
           v-model="formData.pastor"
           placeholder="Select pastor"
@@ -457,7 +487,10 @@
       </el-form-item>
 
       <!-- Location (Admin/Staff only) -->
-      <el-form-item v-if="!isMemberUser" label="Location" prop="location" required>
+      <el-form-item v-if="!isMemberUser" prop="location">
+        <template #label>
+          <span>Location <span class="required">*</span> <span class="required-text">Required</span></span>
+        </template>
         <el-input
           v-model="formData.location"
           placeholder="Enter dedication location"
@@ -1139,6 +1172,17 @@ defineExpose({
 .child-dedication-dialog :deep(.el-form-item__label) {
   font-weight: 500;
   color: #424242;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.required-text {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 4px;
 }
 
 .child-dedication-dialog :deep(.el-input__wrapper) {

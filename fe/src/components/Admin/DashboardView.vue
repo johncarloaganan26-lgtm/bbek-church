@@ -231,13 +231,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuditTrailStore } from '@/stores/auditTrailStore'
+import { useSystemLogsStore } from '@/stores/Admin/systemLogsStore'
 import axios from '@/api/axios'
 import MemberRecordDialog from '@/components/Dialogs/MemberDialog.vue'
 import TithesOfferingsDialog from '@/components/Dialogs/TithesOfferingsDialog.vue'
 
 const router = useRouter()
-const auditTrailStore = useAuditTrailStore()
+const systemLogsStore = useSystemLogsStore()
 
 // Dashboard statistics
 const totalMembers = ref(0)
@@ -372,7 +372,7 @@ const getStatusColor = (status) => {
 const fetchRecentActivities = async () => {
   try {
     // Fetch recent activities (limit to 3 most recent) with timeout
-    await withTimeout(auditTrailStore.fetchAuditLogs({
+    await withTimeout(systemLogsStore.fetchLogs({
       page: 1,
       pageSize: 3,
       sortBy: 'Date (Newest)'
@@ -386,7 +386,7 @@ const fetchRecentActivities = async () => {
  * Transform audit logs to activity format for display
  */
 const recentActivities = computed(() => {
-  return auditTrailStore.auditLogs
+  return systemLogsStore.logs
     .slice(0, 3) // Limit to 3 most recent
     .map(log => ({
       id: log.audit_id || log.id,

@@ -1,0 +1,17 @@
+const { query } = require('./database/db');
+
+async function checkArchives() {
+  try {
+    console.log('Checking archives...');
+    const [rows] = await query('SELECT archive_id, original_table, original_id, restored FROM tbl_archives ORDER BY archive_id DESC LIMIT 5');
+    console.log('Archives:', JSON.stringify(rows, null, 2));
+    
+    const [countResult] = await query('SELECT COUNT(*) as total FROM tbl_archives');
+    console.log('Total:', countResult[0]);
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+  process.exit(0);
+}
+
+checkArchives();
