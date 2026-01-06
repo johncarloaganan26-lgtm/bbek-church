@@ -25,9 +25,9 @@
       <div class="logo-container">
         <el-avatar :size="64" class="logo-avatar">
           <el-image
-            src="/img/logobbek.png"
+            src="/logo.png"
             alt="BBEK Logo"
-            fit="cover"
+            fit="contain"
           />
         </el-avatar>
       </div>
