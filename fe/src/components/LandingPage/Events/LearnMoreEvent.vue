@@ -1,6 +1,6 @@
 <template>
   <div class="learn-more-event-page">
-    <section class="event-section" style="position: relative;">
+    <section class="event-section" :style="{ position: 'relative', backgroundColor: learnMoreEventsData.backgroundColor || '#ffffff' }">
       <!-- Loading overlay -->
       <v-overlay :model-value="loading" contained class="align-center justify-center" style="z-index: 10;">
         <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
@@ -120,12 +120,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AcceptJesusChristDialog from '../Dialog/AcceptJesusChristDialog.vue'
+import { useCms } from '@/composables/useCms'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,7 +223,7 @@ const checkIfAlreadyJoined = async () => {
   }
 }
 
-const learnMoreEventsData = ref({
+const learnMoreEventsData = reactive({
   backgroundColor: '#ffffff',
   buttonColor: '#14b8a6',
   aboutTitle: 'About This Event',
@@ -233,16 +234,19 @@ const learnMoreEventsData = ref({
   approvedText: 'You Already Join'
 })
 
+// Load CMS data
+const { loading: cmsLoading, loadPageData } = useCms('learnmoreevents')
+
 // Computed properties for button states
 const getButtonText = computed(() => {
   if (approvalStatus.value === 'pending') {
-    return learnMoreEventsData.value.pendingText || 'Pending Request'
+    return learnMoreEventsData.pendingText || 'Pending Request'
   } else if (approvalStatus.value === 'approved') {
-    return learnMoreEventsData.value.approvedText || 'You Already Join'
+    return learnMoreEventsData.approvedText || 'You Already Join'
   } else if (approvalStatus.value === 'rejected') {
     return 'Request Rejected'
   }
-  return learnMoreEventsData.value.joinButtonText || 'Join Us'
+  return learnMoreEventsData.joinButtonText || 'Join Us'
 })
 
 const getButtonClass = computed(() => {
@@ -260,7 +264,7 @@ const getButtonColor = computed(() => {
   } else if (approvalStatus.value === 'rejected') {
     return '#ef4444'
   }
-  return learnMoreEventsData.value.buttonColor || '#14b8a6'
+  return learnMoreEventsData.buttonColor || '#14b8a6'
 })
 
 const getButtonDisabled = computed(() => {
@@ -271,6 +275,16 @@ onMounted(async () => {
   const eventId = eventModel.value?.event_id || eventModel.value?.id
   if (userInfo.value?.member?.member_id && eventId) {
     checkIfAlreadyJoined()
+  }
+  
+  // Load CMS data
+  const cmsData = await loadPageData()
+  if (cmsData) {
+    console.log('CMS data loaded:', cmsData)
+    Object.assign(learnMoreEventsData, cmsData)
+    console.log('Updated learnMoreEventsData:', learnMoreEventsData)
+  } else {
+    console.log('No CMS data found, using defaults')
   }
 })
 </script>

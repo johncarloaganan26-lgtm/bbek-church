@@ -166,12 +166,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AcceptJesusChristDialog from '../Dialog/AcceptJesusChristDialog.vue'
 import dayjs from 'dayjs'
+import { useCms } from '@/composables/useCms'
 
 const route = useRoute()
 const router = useRouter()
@@ -321,7 +322,7 @@ watch(() => model.value, (newModel) => {
   }
 })
 
-const learnMoreMinistryData = ref({
+const learnMoreMinistryData = reactive({
   backgroundColor: '#ffffff',
   buttonColor: '#16a34a',
   aboutTitle: 'About This Ministry',
@@ -338,16 +339,19 @@ const learnMoreMinistryData = ref({
   joinButtonColor: '#14b8a6'
 })
 
+// Load CMS data
+const { loading: cmsLoading, loadPageData } = useCms('learnmoreministry')
+
 // Computed properties for button states
 const getButtonText = computed(() => {
   if (approvalStatus.value === 'pending') {
-    return learnMoreMinistryData.value.pendingText || 'Pending Request'
+    return learnMoreMinistryData.pendingText || 'Pending Request'
   } else if (approvalStatus.value === 'approved') {
-    return learnMoreMinistryData.value.approvedText || 'You Already Join'
+    return learnMoreMinistryData.approvedText || 'You Already Join'
   } else if (approvalStatus.value === 'rejected') {
-    return learnMoreMinistryData.value.rejectedText || 'Request Rejected'
+    return learnMoreMinistryData.rejectedText || 'Request Rejected'
   }
-  return learnMoreMinistryData.value.joinButtonText || 'Join Us'
+  return learnMoreMinistryData.joinButtonText || 'Join Us'
 })
 
 const getButtonClass = computed(() => {
@@ -365,7 +369,7 @@ const getButtonColor = computed(() => {
   } else if (approvalStatus.value === 'rejected') {
     return '#ef4444'
   }
-  return learnMoreMinistryData.value.buttonColor || '#16a34a'
+  return learnMoreMinistryData.buttonColor || '#16a34a'
 })
 
 const getButtonDisabled = computed(() => {
@@ -380,7 +384,7 @@ onMounted(async () => {
     model.value = ministryModelFromState.value
     loading.value = false
   } else if (route.params.id) {
-    fetchMinistryData()
+    await fetchMinistryData()
   } else {
     loading.value = false
     model.value = null
@@ -389,6 +393,16 @@ onMounted(async () => {
   // Check if member has already joined after model is loaded
   if (model.value && userInfo.value?.member?.member_id) {
     checkIfAlreadyJoined()
+  }
+  
+  // Load CMS data
+  const cmsData = await loadPageData()
+  if (cmsData) {
+    console.log('CMS data loaded:', cmsData)
+    Object.assign(learnMoreMinistryData, cmsData)
+    console.log('Updated learnMoreMinistryData:', learnMoreMinistryData)
+  } else {
+    console.log('No CMS data found, using defaults')
   }
 })
 </script>

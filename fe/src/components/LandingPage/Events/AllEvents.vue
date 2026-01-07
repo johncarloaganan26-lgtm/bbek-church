@@ -85,9 +85,10 @@
                 <p class="event-date">{{ event.start_date }} - {{ event.end_date }}</p>
                 <p class="event-location">{{ event.location }}</p>
                 <v-btn
-                  color="white"
+                  size="small"
                   variant="outlined"
-                  class="mt-4"
+                  class="mt-4 learn-more-btn"
+                  :style="{ color: eventsData.learnMoreButtonColor || '#ffffff', borderColor: eventsData.learnMoreButtonColor || '#ffffff' }"
                   @click="goToLearnMore(event)"
                 >
                   Learn More
@@ -164,6 +165,7 @@ const eventsData = ref({
   sectionTitle: 'Upcoming Events',
   sectionSubtitle: 'Join us for exciting upcoming events that bring our community together in faith and fellowship.',
   sectionBackgroundColor: '#ffffff',
+  learnMoreButtonColor: '#ffffff',
   joinCommunityTitle: 'Join Our Community',
   joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.',
   joinButtonText: 'Become a Member',
@@ -188,6 +190,10 @@ const fetchEventsData = async () => {
       if (content.sectionBackgroundColor) {
         eventsData.value.sectionBackgroundColor = content.sectionBackgroundColor
         console.log('Section background color from CMS:', content.sectionBackgroundColor)
+      }
+      if (content.learnMoreButtonColor) {
+        eventsData.value.learnMoreButtonColor = content.learnMoreButtonColor
+        console.log('Learn More button color from CMS:', content.learnMoreButtonColor)
       }
       if (content.joinCommunityTitle) eventsData.value.joinCommunityTitle = content.joinCommunityTitle
       if (content.joinCommunityText) eventsData.value.joinCommunityText = content.joinCommunityText

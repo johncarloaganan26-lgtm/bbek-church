@@ -72,9 +72,10 @@
               <div class="ministry-content">
                 <h3 class="ministry-title">{{ ministry.ministry_name }}</h3>
                 <v-btn
-                  color="white"
+                  size="small"
                   variant="outlined"
-                  class="mt-4"
+                  class="mt-4 learn-more-btn"
+                  :style="{ color: ministriesData.learnMoreButtonColor || '#ffffff', borderColor: ministriesData.learnMoreButtonColor || '#ffffff' }"
                   @click="goToLearnMore(ministry)"
                 >
                   Learn More
@@ -154,6 +155,7 @@ const ministriesData = ref({
   heroImage: null,
   sectionTitle: 'Our Ministries',
   sectionSubtitle: 'Discover our various ministries designed to help you grow in faith and serve our community.',
+  learnMoreButtonColor: '#ffffff',
   joinCommunityTitle: 'Join Our Faith Community',
   joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.',
   joinButtonText: 'Become a Member',
@@ -174,6 +176,7 @@ const fetchMinistriesData = async () => {
       if (content.heroSubtitle) ministriesData.value.heroSubtitle = content.heroSubtitle
       if (content.sectionTitle) ministriesData.value.sectionTitle = content.sectionTitle
       if (content.sectionSubtitle) ministriesData.value.sectionSubtitle = content.sectionSubtitle
+      if (content.learnMoreButtonColor) ministriesData.value.learnMoreButtonColor = content.learnMoreButtonColor
       if (content.joinCommunityTitle) ministriesData.value.joinCommunityTitle = content.joinCommunityTitle
       if (content.joinCommunityText) ministriesData.value.joinCommunityText = content.joinCommunityText
       if (content.joinButtonText) ministriesData.value.joinButtonText = content.joinButtonText
