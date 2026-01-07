@@ -5,7 +5,7 @@
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -15,6 +15,34 @@ body {
   min-height: 100vh;
 }
 
+/* Custom v-alert error styling - force red with highest specificity */
+div.v-alert.v-alert--error {
+  background-color: #ffebee !important;
+  border: 1px solid #d32f2f !important;
+  color: #c62828 !important;
+}
+
+div.v-alert.v-alert--error .v-alert__title,
+div.v-alert.v-alert--error .v-alert__text,
+div.v-alert.v-alert--error .v-alert__icon {
+  color: #c62828 !important;
+}
+
+/* Force Element Plus error messages to be red */
+.el-message--error {
+  background-color: #ffebee !important;
+  border: 1px solid #d32f2f !important;
+}
+
+.el-message--error .el-message__content {
+  color: #c62828 !important;
+  font-weight: 600 !important;
+}
+
+.el-message--error .el-message-icon.el-icon {
+  color: #c62828 !important;
+}
+
 /* Mobile responsive improvements */
 @media (max-width: 640px) {
   body {
@@ -22,7 +50,11 @@ body {
   }
 
   /* Ensure proper touch targets */
-  button, a, input, select, textarea {
+  button,
+  a,
+  input,
+  select,
+  textarea {
     min-height: 44px;
     min-width: 44px;
   }
@@ -32,4 +64,3 @@ body {
     max-width: 100%;
   }
 }
-

@@ -75,6 +75,7 @@
               <v-alert
                 v-if="errorMessage"
                 type="error"
+                variant="outlined"
                 class="mb-4"
                 closable
                 @click:close="errorMessage = ''"

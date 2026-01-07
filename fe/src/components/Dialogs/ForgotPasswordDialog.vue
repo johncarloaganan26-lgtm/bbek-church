@@ -82,23 +82,24 @@
       </div>
     </el-form>
 
-    <!-- Success Message Popup -->
+    <!-- Success/Error Message Popup -->
     <el-dialog
       v-model="successDialog.show"
       width="450px"
       center
       :show-close="false"
-      class="success-dialog"
+      :class="['success-dialog', successDialog.isError ? 'error-dialog' : '']"
     >
       <div class="text-center">
-        <div class="success-icon-container mb-4">
-          <el-icon size="48" color="#67c23a"><CircleCheckFilled /></el-icon>
+        <div :class="['success-icon-container', 'mb-4', successDialog.isError ? 'error-icon-container' : '']">
+          <el-icon v-if="successDialog.isError" size="48" color="#f56c6c"><CircleCloseFilled /></el-icon>
+          <el-icon v-else size="48" color="#67c23a"><CircleCheckFilled /></el-icon>
         </div>
         <h3 class="text-h6 font-weight-bold mb-2">{{ successDialog.title }}</h3>
         <p class="text-body-2">{{ successDialog.message }}</p>
       </div>
       <template #footer>
-        <el-button type="success" @click="closeSuccessDialog">OK</el-button>
+        <el-button :type="successDialog.isError ? 'danger' : 'success'" @click="closeSuccessDialog">OK</el-button>
       </template>
     </el-dialog>
   </el-dialog>
@@ -106,7 +107,7 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { Close, Message, ArrowLeft, CircleCheckFilled } from '@element-plus/icons-vue'
+import { Close, Message, ArrowLeft, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import { useAccountsStore } from '@/stores/ChurchRecords/accountsStore'
 
 const accountsStore = useAccountsStore()
@@ -132,15 +133,17 @@ const loading = ref(false)
 const successDialog = ref({
   show: false,
   title: '',
-  message: ''
+  message: '',
+  isError: false
 })
 
 // Show success dialog
-const showSuccessDialog = (title, message) => {
+const showSuccessDialog = (title, message, isError = false) => {
   successDialog.value = {
     show: true,
     title,
-    message
+    message,
+    isError
   }
 }
 
@@ -201,11 +204,11 @@ const handleForgotPassword = async () => {
       forgotPasswordForm.email = ''
       loading.value = false
     } else {
-      showSuccessDialog('Error', accountsStore.error || 'Failed to send reset link. Please try again.')
+      showSuccessDialog('Error', accountsStore.error || 'Failed to send reset link. Please try again.', true)
     }
   } catch (error) {
     console.error('Forgot password error:', error)
-    showSuccessDialog('Error', 'An error occurred. Please try again.')
+    showSuccessDialog('Error', 'An error occurred. Please try again.', true)
   } finally {
     loading.value = false
   }
@@ -352,6 +355,14 @@ const handleBackToLogin = () => {
   border-radius: 50%;
   background-color: #f0f9eb;
   margin: 0 auto;
+}
+
+.error-icon-container {
+  background-color: #fef0f0 !important;
+}
+
+.error-dialog :deep(.el-dialog) {
+  border-radius: 12px;
 }
 </style>
 
