@@ -34,7 +34,8 @@ export const useMinistriesStore = defineStore('ministries', {
     searchQuery: '',
     filters: {
       sortBy: 'Date Created (Newest)',
-      status: 'All Statuses'
+      status: 'All Statuses',
+      departmentNamePattern: ''
     },
     currentPage: 1,
     totalPages: 1,
@@ -91,6 +92,9 @@ export const useMinistriesStore = defineStore('ministries', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const departmentNamePattern = options.departmentNamePattern !== undefined 
+          ? options.departmentNamePattern 
+          : this.filters.departmentNamePattern
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -101,6 +105,9 @@ export const useMinistriesStore = defineStore('ministries', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (departmentNamePattern) {
+          params.append('department_name_pattern', departmentNamePattern)
         }
 
         const response = await axios.get(`/church-records/ministries/getAllMinistries?${params}`)

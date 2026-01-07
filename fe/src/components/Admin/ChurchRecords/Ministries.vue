@@ -97,6 +97,18 @@
               @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="selectedCategory"
+              :items="categoryOptions"
+              label="Category"
+              variant="outlined"
+              density="compact"
+              :disabled="loading"
+              hide-details
+              @update:model-value="handleCategoryChange"
+            ></v-select>
+          </v-col>
           <v-col cols="12" md="3" class="d-flex align-center">
             <v-select
               v-model="itemsPerPage"
@@ -142,6 +154,7 @@
             <th class="text-left font-weight-bold">Schedule</th>
             <th class="text-left font-weight-bold">Leader</th>
             <th class="text-left font-weight-bold">Department</th>
+            <th class="text-left font-weight-bold">Category</th>
             <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Members</th>
             <th class="text-left font-weight-bold">Date Created</th>
@@ -159,6 +172,15 @@
             <td>{{ formatDateTime(ministry.schedule) }}</td>
             <td>{{ ministry.leader_fullname || ministry.leader_id || 'N/A' }}</td>
             <td>{{ ministry.department_name || ministry.department_id || 'N/A' }}</td>
+            <td>
+              <v-chip 
+                :color="getCategoryColor(ministry.department_name)" 
+                size="small"
+                variant="flat"
+              >
+                {{ getCategoryLabel(ministry.department_name) }}
+              </v-chip>
+            </td>
             <td>
               <v-chip 
                 :color="ministry.status === 'active' ? 'success' : 'default'" 
@@ -284,6 +306,17 @@ const sortByOptions = [
 
 const statusOptions = ['All Statuses', 'active', 'not_active']
 
+// Category options for filtering
+const categoryOptions = [
+  { title: 'All Categories', value: '' },
+  { title: 'Adult', value: 'Adult' },
+  { title: 'Ladies', value: 'Ladies' },
+  { title: 'Youth', value: 'Youth' }
+]
+
+// Category filter state
+const selectedCategory = ref('')
+
 // Dialog state
 const ministryDialog = ref(false)
 const ministryData = ref(null)
@@ -364,6 +397,18 @@ const handleSearchChange = (value) => {
 }
 
 const handleFilterChange = () => {
+  ministriesStore.setFilters(filters.value)
+}
+
+// Handle category filter change
+const handleCategoryChange = () => {
+  // Convert category to department_name_pattern
+  const pattern = selectedCategory.value 
+    ? `%${selectedCategory.value}%` 
+    : ''
+  
+  // Update filters and refetch
+  filters.value.departmentNamePattern = pattern
   ministriesStore.setFilters(filters.value)
 }
 
@@ -534,6 +579,26 @@ onMounted(async () => {
   await ministriesStore.fetchDepartmentOptions()
   await ministriesStore.fetchMemberOptions()
 })
+
+// Get category color based on department name
+const getCategoryColor = (departmentName) => {
+  if (!departmentName) return 'grey'
+  const name = departmentName.toLowerCase()
+  if (name.includes('adult')) return 'blue'
+  if (name.includes('ladies')) return 'pink'
+  if (name.includes('youth')) return 'orange'
+  return 'grey'
+}
+
+// Get category label based on department name
+const getCategoryLabel = (departmentName) => {
+  if (!departmentName) return 'Other'
+  const name = departmentName.toLowerCase()
+  if (name.includes('adult')) return 'Adult'
+  if (name.includes('ladies')) return 'Ladies'
+  if (name.includes('youth')) return 'Youth'
+  return 'Other'
+}
 </script>
 
 <style scoped>

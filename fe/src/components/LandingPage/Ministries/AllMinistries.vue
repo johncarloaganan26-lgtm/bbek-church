@@ -46,6 +46,22 @@
             {{ ministriesData.sectionSubtitle || 'Discover our various ministries designed to help you grow in faith and serve our community.' }}
           </p>
 
+          <!-- Category Filter -->
+          <div class="category-filter mb-8">
+            <v-btn
+              v-for="category in categories"
+              :key="category.value"
+              :color="selectedCategory === category.value ? 'teal' : 'grey-lighten-2'"
+              :variant="selectedCategory === category.value ? 'flat' : 'outlined'"
+              class="mx-2 category-btn"
+              :class="{ 'text-white': selectedCategory === category.value }"
+              @click="selectCategory(category.value)"
+            >
+              <v-icon start>{{ category.icon }}</v-icon>
+              {{ category.label }}
+            </v-btn>
+          </div>
+
           <!-- Loading State -->
           <div v-if="loading" class="text-center py-16 flex flex-col items-center justify-center">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
@@ -70,6 +86,14 @@
               ></div>
               <div class="ministry-overlay"></div>
               <div class="ministry-content">
+                <v-chip
+                  v-if="getMinistryCategory(ministry.department_name)"
+                  :color="getCategoryColor(ministry.department_name)"
+                  size="small"
+                  class="mb-2"
+                >
+                  {{ getMinistryCategory(ministry.department_name) }}
+                </v-chip>
                 <h3 class="ministry-title">{{ ministry.ministry_name }}</h3>
                 <v-btn
                   size="small"
@@ -213,6 +237,15 @@ const departmentList = ref([])
 const departmentId = computed(() => route.params.departmentId)
 const loading = ref(false)
 
+// Category filter
+const categories = [
+  { value: 'all', label: 'All', icon: 'mdi-view-grid' },
+  { value: 'adult', label: 'Adult', icon: 'mdi-account-group' },
+  { value: 'ladies', label: 'Ladies', icon: 'mdi-account-heart' },
+  { value: 'youth', label: 'Youth', icon: 'mdi-account-star' }
+]
+const selectedCategory = ref('all')
+
 const departmentName = computed(() => {
   if (!departmentId.value) return null
   const dept = departmentList.value.find((d) => d.department_id === Number(departmentId.value))
@@ -263,6 +296,12 @@ const getAllMinistryList = async () => {
       params.append('department_id', departmentId.value)
     }
     
+    // Add category filter based on department name
+    const categoryFilter = getCategoryDepartmentFilter()
+    if (categoryFilter.departmentNamePattern) {
+      params.append('department_name_pattern', categoryFilter.departmentNamePattern)
+    }
+    
     params.append('sortBy', 'Date Created (Newest)')
     
     const response = await axios.get(`/church-records/ministries/getAllMinistries?${params}`)
@@ -304,6 +343,47 @@ const goToLearnMore = (ministry) => {
   })
 }
 
+// Select category and fetch ministries
+const selectCategory = (category) => {
+  selectedCategory.value = category
+  pageNumber.value = 1
+  refresh.value = true
+}
+
+// Map category to department names (for filtering)
+const getCategoryDepartmentFilter = () => {
+  switch (selectedCategory.value) {
+    case 'adult':
+      return { departmentNamePattern: '%Adult%' }
+    case 'ladies':
+      return { departmentNamePattern: '%Ladies%' }
+    case 'youth':
+      return { departmentNamePattern: '%Youth%' }
+    default:
+      return {}
+  }
+}
+
+// Get category label based on department name
+const getMinistryCategory = (departmentName) => {
+  if (!departmentName) return null
+  const name = departmentName.toLowerCase()
+  if (name.includes('adult')) return 'Adult'
+  if (name.includes('ladies')) return 'Ladies'
+  if (name.includes('youth')) return 'Youth'
+  return null // Don't show anything if no category match
+}
+
+// Get category color based on department name
+const getCategoryColor = (departmentName) => {
+  if (!departmentName) return 'grey'
+  const name = departmentName.toLowerCase()
+  if (name.includes('adult')) return 'blue'
+  if (name.includes('ladies')) return 'pink'
+  if (name.includes('youth')) return 'orange'
+  return 'grey'
+}
+
 const previousPage = () => {
   if (pageNumber.value > 1) {
     pageNumber.value--
@@ -318,7 +398,7 @@ const nextPage = () => {
   }
 }
 
-watch([refresh, pageNumber, departmentId], () => {
+watch([refresh, pageNumber, departmentId, selectedCategory], () => {
   if (refresh.value) {
     getAllMinistryList()
     refresh.value = false
@@ -538,6 +618,20 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Category Filter Styles */
+.category-filter {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-btn {
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 @media (max-width: 960px) {

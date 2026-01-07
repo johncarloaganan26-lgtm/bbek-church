@@ -263,6 +263,7 @@ async function getAllMinistries(options = {}) {
     const status = options.status || null;
     const sortBy = options.sortBy || null;
     const department_id = options.department_id || options.departmentId || null;
+    const department_name_pattern = options.department_name_pattern || null;
 
     // Build base query for counting total records (with JOINs for accurate count)
     let countSql = `SELECT COUNT(*) as total 
@@ -334,6 +335,14 @@ async function getAllMinistries(options = {}) {
         params.push(departmentIdInt);
         hasWhere = true;
       }
+    }
+
+    // Add department_name_pattern filter (for category filtering like Adult, Ladies, Youth)
+    if (department_name_pattern) {
+      whereConditions.push('d.department_name LIKE ?');
+      countParams.push(department_name_pattern);
+      params.push(department_name_pattern);
+      hasWhere = true;
     }
 
     // Apply WHERE clause if any conditions exist
