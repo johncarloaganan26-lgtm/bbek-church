@@ -1,34 +1,76 @@
 <template>
   <div class="certificate-container">
     <div class="certificate-wrapper" id="water-baptism-certificate-print">
-      <!-- Outer Border -->
+      <!-- Outer Gold Border -->
       <div class="outer-border">
+        <!-- Inner Cream Background -->
         <div class="inner-border">
-          <!-- Header Section -->
-          <div class="header-section">
-            <div class="church-header">
-              <div class="church-logo-area">
-                <div class="logo-emblem">
-                  <img v-if="churchLogo" :src="churchLogo" alt="Church Logo" class="logo-image" />
-                  <div v-else class="emblem-cross">
-                    <div class="cross-v"></div>
-                    <div class="cross-h"></div>
-                  </div>
+          <!-- Watermark Logo Background -->
+          <div class="watermark-logo">
+            <img :src="effectiveLogo" alt="Church Logo Watermark" class="watermark-image" />
+          </div>
+
+          <!-- Corner Ornaments - Elaborate Design -->
+          <div class="corner-design top-left">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              <path d="M5 5 L25 5 L25 15 L15 15 L15 25 L5 25 Z" fill="none" stroke="#8b7355" stroke-width="2"/>
+              <circle cx="8" cy="8" r="2" fill="#8b7355"/>
+              <circle cx="17" cy="8" r="1.5" fill="#8b7355"/>
+              <circle cx="8" cy="17" r="1.5" fill="#8b7355"/>
+            </svg>
+          </div>
+          <div class="corner-design top-right">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              <path d="M45 5 L25 5 L25 15 L35 15 L35 25 L45 25 Z" fill="none" stroke="#8b7355" stroke-width="2"/>
+              <circle cx="42" cy="8" r="2" fill="#8b7355"/>
+              <circle cx="33" cy="8" r="1.5" fill="#8b7355"/>
+              <circle cx="42" cy="17" r="1.5" fill="#8b7355"/>
+            </svg>
+          </div>
+          <div class="corner-design bottom-left">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              <path d="M5 45 L25 45 L25 35 L15 35 L15 25 L5 25 Z" fill="none" stroke="#8b7355" stroke-width="2"/>
+              <circle cx="8" cy="42" r="2" fill="#8b7355"/>
+              <circle cx="17" cy="42" r="1.5" fill="#8b7355"/>
+              <circle cx="8" cy="33" r="1.5" fill="#8b7355"/>
+            </svg>
+          </div>
+          <div class="corner-design bottom-right">
+            <svg width="50" height="50" viewBox="0 0 50 50">
+              <path d="M45 45 L25 45 L25 35 L35 35 L35 25 L45 25 Z" fill="none" stroke="#8b7355" stroke-width="2"/>
+              <circle cx="42" cy="42" r="2" fill="#8b7355"/>
+              <circle cx="33" cy="42" r="1.5" fill="#8b7355"/>
+              <circle cx="42" cy="33" r="1.5" fill="#8b7355"/>
+            </svg>
+          </div>
+
+          <!-- Church Header -->
+          <div class="church-header">
+            <div class="church-logo-area">
+              <div class="logo-emblem">
+                <img v-if="churchLogo || effectiveLogo" :src="churchLogo || effectiveLogo" alt="Church Logo" class="logo-image" />
+                <div v-else class="emblem-cross">
+                  <div class="cross-v"></div>
+                  <div class="cross-h"></div>
                 </div>
-                <div class="sec-text">S.E.C. REGISTERED</div>
               </div>
-              <div class="church-info">
-                <h1 class="church-name">BIBLE BAPTIST EKKLESIA</h1>
-                <h2 class="church-subtitle">OF KAWIT</h2>
-                <p class="church-address">485 Acacia St. Villa Ramirez, Tabon 1, Kawit Cavite</p>
-              </div>
+              <div class="sec-text">S.E.C. REGISTERED</div>
+            </div>
+            <div class="church-info">
+              <h1 class="church-name">BIBLE BAPTIST EKKLESIA</h1>
+              <h2 class="church-subtitle">OF KAWIT</h2>
+              <p class="church-address">485 Acacia St. Villa Ramirez, Tabon 1, Kawit Cavite</p>
             </div>
           </div>
 
           <!-- Certificate Title -->
           <div class="title-section">
-            <h2 class="main-title">CERTIFICATE</h2>
-            <h3 class="subtitle">OF BAPTISM</h3>
+            <div class="title-decoration left"></div>
+            <div class="title-content">
+              <h2 class="main-title">CERTIFICATE</h2>
+              <h3 class="subtitle">OF BAPTISM</h3>
+            </div>
+            <div class="title-decoration right"></div>
           </div>
 
           <p class="baptism-statement">This is to certify that</p>
@@ -38,94 +80,68 @@
             <span class="member-name">{{ fullName }}</span>
           </div>
 
-          <p class="baptism-detail">Has been baptized in the name of the Father, and of the Son, and of the Holy Ghost</p>
+          <p class="baptism-detail">has been baptized in the name of the Father, and of the Son, and of the Holy Ghost</p>
 
-          <!-- Personal Information -->
+          <!-- Personal Information - Two Column Layout -->
           <div class="personal-info-section">
-            <div class="info-row">
-              <div class="info-field">
-                <span class="label">Age:</span>
-                <span class="value">{{ age || '_________________' }}</span>
+            <div class="info-column left-column">
+              <div class="info-field-row">
+                <span class="label">Date of Baptism:</span>
+                <span class="value">{{ formattedBaptismDate }}</span>
               </div>
-              <div class="info-field">
+              <div class="info-field-row">
+                <span class="label">Baptism Location:</span>
+                <span class="value">{{ location || '_________' }}</span>
+              </div>
+              <div class="info-field-row">
+                <span class="label">Civil Status:</span>
+                <span class="value">{{ civilStatus || '_______' }}</span>
+              </div>
+              <div class="info-field-row">
+                <span class="label">Address:</span>
+                <span class="value">{{ address || '________________________________' }}</span>
+              </div>
+              <div class="info-field-row">
+                <span class="label">Phone:</span>
+                <span class="value">{{ phoneNumber || '____________' }}</span>
+              </div>
+            </div>
+            <div class="info-column right-column">
+              <div class="info-field-row">
+                <span class="label">Age:</span>
+                <span class="value">{{ age || '__' }}</span>
+              </div>
+              <div class="info-field-row">
                 <span class="label">Gender:</span>
                 <span class="value">{{ formattedGender }}</span>
               </div>
-            </div>
-            <div class="info-row">
-              <div class="info-field">
+              <div class="info-field-row">
                 <span class="label">Birthdate:</span>
                 <span class="value">{{ formattedBirthdate }}</span>
               </div>
-              <div class="info-field">
-                <span class="label">Civil Status:</span>
-                <span class="value">{{ civilStatus || '_________________' }}</span>
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-field info-full">
-                <span class="label">Address:</span>
-                <span class="value">{{ address || '_________________' }}</span>
-              </div>
-            </div>
-            <div class="info-row">
-              <div class="info-field">
+           
+              <div class="info-field-row">
                 <span class="label">Email:</span>
-                <span class="value">{{ email || '_________________' }}</span>
+                <span class="value">{{ email || '________________________' }}</span>
               </div>
-              <div class="info-field">
-                <span class="label">Phone:</span>
-                <span class="value">{{ phoneNumber || '_________________' }}</span>
-              </div>
-            </div>
-            <div class="info-row" v-if="position">
-              <div class="info-field info-full">
-                <span class="label">Position:</span>
-                <span class="value">{{ position }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Baptism Details -->
-          <div class="baptism-details-section">
-            <div class="baptism-row">
-              <div class="field-group">
-                <span class="field-label">Date of Baptism:</span>
-                <span class="field-value">{{ formattedBaptismDate }}</span>
-              </div>
-            </div>
-            <div class="baptism-row">
-              <div class="field-group">
-                <span class="field-label">Baptism Location:</span>
-                <span class="field-value">{{ location || '_________________' }}</span>
-              </div>
-            </div>
-            <div class="baptism-row">
-              <div class="field-group">
-                <span class="field-label">Minister:</span>
-                <span class="field-value">{{ pastorName || '_________________' }}</span>
-              </div>
+              
             </div>
           </div>
 
           <!-- Guardian Information (if applicable) -->
           <div class="guardian-section" v-if="displayGuardianName">
             <div class="section-title">GUARDIAN INFORMATION</div>
-            <div class="guardian-row">
-              <div class="field-group">
-                <span class="field-label">Guardian's Name:</span>
-                <span class="field-value">{{ displayGuardianName }}</span>
-              </div>
+            <div class="info-field-row">
+              <span class="label">Guardian's Name:</span>
+              <span class="value">{{ displayGuardianName }}</span>
             </div>
-            <div class="guardian-row">
-              <div class="field-group">
-                <span class="field-label">Contact Number:</span>
-                <span class="field-value">{{ displayGuardianContact || '_________________' }}</span>
-              </div>
-              <div class="field-group">
-                <span class="field-label">Relationship:</span>
-                <span class="field-value">{{ formattedGuardianRelationship }}</span>
-              </div>
+            <div class="info-field-row">
+              <span class="label">Contact Number:</span>
+              <span class="value">{{ displayGuardianContact || '_________________' }}</span>
+            </div>
+            <div class="info-field-row">
+              <span class="label">Relationship:</span>
+              <span class="value">{{ formattedGuardianRelationship }}</span>
             </div>
           </div>
 
@@ -140,8 +156,12 @@
 
           <!-- Footer -->
           <div class="footer-section">
-            <p class="cert-number">Certificate No.: {{ baptismId || certificateNumber }}</p>
-            <p class="issue-date">Issued on: {{ formattedIssueDate }}</p>
+            <div class="footer-left">
+              <p class="cert-number">Certificate No.: {{ baptismId || certificateNumber }}</p>
+            </div>
+            <div class="footer-right">
+              <p class="issue-date">Issued on: {{ formattedIssueDate }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -178,7 +198,7 @@ const props = defineProps({
   address: { type: String, default: '' },
   email: { type: String, default: '' },
   phoneNumber: { type: String, default: '' },
-  civilStatus: { type: String, default: '' }, // civil_status from API mapped to camelCase
+  civilStatus: { type: String, default: '' },
   position: { type: String, default: '' },
   
   // Member guardian fields (from tbl_members)
@@ -193,6 +213,11 @@ const props = defineProps({
 
 const churchLogo = ref(props.churchLogo)
 
+// Get effective logo (use public logo if CMS logo not available)
+const effectiveLogo = computed(() => {
+  return churchLogo.value || '/logobbek-watermark.jpg'
+})
+
 // Computed full name from API or individual fields
 const fullName = computed(() => {
   if (props.fullname) return props.fullname
@@ -205,7 +230,7 @@ const fullName = computed(() => {
 
 // Format gender for display
 const formattedGender = computed(() => {
-  if (!props.gender) return '_________________'
+  if (!props.gender) return '_________'
   const genderMap = {
     'M': 'Male',
     'm': 'Male',
@@ -219,25 +244,25 @@ const formattedGender = computed(() => {
 
 // Format birthdate for display
 const formattedBirthdate = computed(() => {
-  if (!props.birthdate) return '_________________'
+  if (!props.birthdate) return '_________'
   try {
     const date = new Date(props.birthdate)
-    if (isNaN(date.getTime())) return '_________________'
+    if (isNaN(date.getTime())) return '_________'
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch {
-    return '_________________'
+    return '_________'
   }
 })
 
 // Format baptism date for display
 const formattedBaptismDate = computed(() => {
-  if (!props.baptismDate) return '_________________'
+  if (!props.baptismDate) return '_________'
   try {
     const date = new Date(props.baptismDate)
-    if (isNaN(date.getTime())) return '_________________'
+    if (isNaN(date.getTime())) return '_________'
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch {
-    return '_________________'
+    return '_________'
   }
 })
 
@@ -263,7 +288,7 @@ const displayGuardianRelationship = computed(() => {
 // Format guardian relationship for display
 const formattedGuardianRelationship = computed(() => {
   const relationship = displayGuardianRelationship.value
-  if (!relationship) return '_________________'
+  if (!relationship) return '_________'
   const relationships = {
     'parent': 'Parent',
     'grandparent': 'Grandparent',
@@ -297,48 +322,117 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Times+New+Roman:wght@400;600;700&display=swap');
+
 .certificate-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
-  background: #f5f5f5;
+  justify-content: center;
   min-height: 100vh;
+  background: #e8e0d0;
+  padding: 20px;
 }
 
 .certificate-wrapper {
   width: 100%;
-  max-width: 8.5in;
-  background: #fff;
-  margin: 0 auto;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 450px;
 }
 
+/* Outer Gold Border - Removed */
 .outer-border {
-  border: 8px solid #1a365d;
-  padding: 8px;
-  margin: 8px;
+  border: 3px solid #8b7355;
+  padding: 3px;
+  background: #d4c4a8;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.15),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 0 20px rgba(139, 119, 87, 0.1);
 }
 
+/* Inner Paper Background - Aged Paper Look */
 .inner-border {
-  border: 3px solid #d4af37;
-  padding: 25px 35px;
-  background: #fffef8;
+  background-color: #f3e6c4;
+  background-image: 
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(139, 115, 85, 0.02) 1px, rgba(139, 115, 85, 0.02) 2px),
+    repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(139, 115, 85, 0.01) 1px, rgba(139, 115, 85, 0.01) 2px);
+  padding: 20px 18px;
+  border: 1px solid #8b7355;
+  position: relative;
+  box-shadow: 
+    inset 0 0 30px rgba(139, 115, 85, 0.08),
+    inset 0 0 60px rgba(139, 115, 85, 0.05);
+}
+
+/* Watermark Logo - Centered and Fitted */
+.watermark-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  height: 85%;
+  opacity: 0.08;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.watermark-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Corner Ornaments - Elaborate Design */
+.corner-design {
+  position: absolute;
+  z-index: 2;
+  opacity: 0.8;
+}
+
+.corner-design.top-left {
+  top: 5px;
+  left: 5px;
+}
+
+.corner-design.top-right {
+  top: 5px;
+  right: 5px;
+}
+
+.corner-design.bottom-left {
+  bottom: 5px;
+  left: 5px;
+}
+
+.corner-design.bottom-right {
+  bottom: 5px;
+  right: 5px;
+}
+
+/* Remove old corner-ornament styles */
+.corner-ornament {
+  display: none;
+}
+
+/* Decorative Stars */
+.decor-star {
+  display: none;
 }
 
 /* Header Section */
-.header-section {
-  text-align: center;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #d4af37;
-  padding-bottom: 15px;
-}
-
 .church-header {
+  text-align: center;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #8b7355;
+  padding-bottom: 10px;
+  position: relative;
+  z-index: 3;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 25px;
+  gap: 8px;
 }
 
 .church-logo-area {
@@ -348,15 +442,16 @@ onMounted(async () => {
 }
 
 .logo-emblem {
-  width: 70px;
-  height: 70px;
-  background: #fff;
-  border: 3px solid #1a365d;
+  width: 50px;
+  height: 50px;
+  background: #fffef8;
+  border: 2px solid #8b7355;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(139, 115, 85, 0.1);
 }
 
 .logo-image {
@@ -367,14 +462,14 @@ onMounted(async () => {
 
 .emblem-cross {
   position: relative;
-  width: 35px;
-  height: 35px;
+  width: 25px;
+  height: 25px;
 }
 
 .cross-v {
   position: absolute;
-  width: 6px;
-  height: 32px;
+  width: 4px;
+  height: 22px;
   background: #1a365d;
   left: 50%;
   transform: translateX(-50%);
@@ -383,231 +478,268 @@ onMounted(async () => {
 
 .cross-h {
   position: absolute;
-  width: 28px;
-  height: 6px;
+  width: 18px;
+  height: 4px;
   background: #1a365d;
   top: 50%;
   transform: translateY(-50%);
-  left: 3.5px;
+  left: 3px;
   border-radius: 2px;
 }
 
 .sec-text {
-  font-size: 8px;
-  font-weight: 600;
-  color: #1a365d;
-  margin-top: 4px;
+  font-size: 7px;
+  font-weight: 700;
+  color: #8b7355;
+  margin-top: 3px;
   letter-spacing: 1px;
+  font-family: 'Times New Roman', serif;
 }
 
 .church-info {
-  text-align: left;
+  text-align: center;
 }
 
 .church-name {
-  font-size: 18px;
-  font-weight: 800;
-  color: #1a365d;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c1810;
   margin: 0;
   letter-spacing: 2px;
-  font-family: 'Georgia', serif;
+  font-family: 'Cinzel', serif;
 }
 
 .church-subtitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a365d;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c1810;
   margin: 0;
   letter-spacing: 4px;
-  font-family: 'Georgia', serif;
+  font-family: 'Cinzel', serif;
 }
 
 .church-address {
-  font-size: 11px;
-  color: #333;
-  margin: 6px 0 0 0;
-  font-family: 'Arial', sans-serif;
+  font-size: 9px;
+  color: #4a3728;
+  margin: 4px 0 0 0;
+  font-family: 'Times New Roman', serif;
 }
 
 /* Title Section */
 .title-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 3;
+}
+
+.title-content {
   text-align: center;
-  margin-bottom: 5px;
+  padding: 0 15px;
+}
+
+.title-decoration {
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #8b7355);
+  position: relative;
+}
+
+.title-decoration.left {
+  background: linear-gradient(to right, transparent, #8b7355);
+}
+
+.title-decoration.right {
+  background: linear-gradient(to left, transparent, #8b7355);
+}
+
+.title-decoration::after {
+  content: '❖';
+  position: absolute;
+  top: -8px;
+  font-size: 12px;
+  color: #8b7355;
+}
+
+.title-decoration.left::after {
+  right: 0;
+}
+
+.title-decoration.right::after {
+  left: 0;
 }
 
 .main-title {
-  font-size: 32px;
-  font-weight: 800;
-  color: #1a365d;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2c1810;
   margin: 0;
-  letter-spacing: 6px;
-  font-family: 'Georgia', serif;
+  letter-spacing: 4px;
+  font-family: 'Cinzel', serif;
 }
 
 .subtitle {
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 600;
-  color: #1a365d;
+  color: #2c1810;
   margin: 0;
-  letter-spacing: 4px;
-  font-family: 'Georgia', serif;
+  letter-spacing: 3px;
+  font-family: 'Cinzel', serif;
 }
 
 .baptism-statement {
   text-align: center;
-  font-size: 13px;
-  color: #333;
-  margin: 0 0 10px 0;
+  font-size: 11px;
+  color: #4a3728;
+  margin: 10px 0 5px 0;
   font-family: 'Times New Roman', serif;
+  position: relative;
+  z-index: 3;
 }
 
 /* Member Name */
 .member-name-section {
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+  position: relative;
+  z-index: 3;
 }
 
 .member-name {
-  font-size: 28px;
+  font-size: 18px;
   font-weight: 700;
-  color: #1a365d;
-  font-family: 'Georgia', serif;
+  color: #2c1810;
+  font-family: 'Times New Roman', serif;
   display: inline-block;
-  padding: 5px 20px;
-  border-bottom: 2px solid #d4af37;
+  padding: 4px 20px;
+  border-bottom: 2px solid #8b7355;
 }
 
 .baptism-detail {
   text-align: center;
-  font-size: 13px;
-  color: #333;
-  margin: 0 0 15px 0;
+  font-size: 11px;
+  color: #4a3728;
+  margin: 0 0 12px 0;
   font-family: 'Times New Roman', serif;
+  position: relative;
+  z-index: 3;
 }
 
-/* Personal Information */
+/* Personal Information - Two Column Layout */
 .personal-info-section {
-  margin-bottom: 15px;
-  padding: 12px;
-  background: #f8f8f8;
-  border-radius: 4px;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 20px;
 }
 
-.info-row {
+.info-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-column {
+  flex: 0 0 180px;
+}
+
+.right-column {
+  flex: 1;
+}
+
+.info-column .info-field-row {
   display: flex;
   justify-content: space-between;
-  gap: 30px;
+  align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
 }
 
-.info-row:last-child {
+.info-column .info-field-row:last-child {
   margin-bottom: 0;
 }
 
-.info-field {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.info-field.info-full {
-  flex: 1;
-  width: 100%;
-}
-
-.info-field.info-full .value {
-  flex: 1;
-  min-width: 200px;
-}
-
-.info-field .label {
-  font-size: 12px;
-  color: #333;
+.info-column .info-field-row .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c1810;
   font-family: 'Times New Roman', serif;
   white-space: nowrap;
 }
 
-.info-field .value {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1a365d;
-  font-family: 'Arial', sans-serif;
+.info-column .info-field-row .value {
+  font-size: 11px;
+  font-weight: 400;
+  color: #2c1810;
+  font-family: 'Times New Roman', serif;
+  text-align: left;
+  flex: 1;
+  border-bottom: 1px dotted #8b7355;
   min-width: 80px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 2px;
-}
-
-/* Baptism Details */
-.baptism-details-section {
-  margin-bottom: 15px;
-  padding: 12px;
-  background: #f0f4f8;
-  border-radius: 4px;
-}
-
-.baptism-row {
-  margin-bottom: 10px;
-}
-
-.baptism-row:last-child {
-  margin-bottom: 0;
-}
-
-.field-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.field-label {
-  font-size: 12px;
-  color: #333;
-  font-family: 'Times New Roman', serif;
-  white-space: nowrap;
-}
-
-.field-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1a365d;
-  font-family: 'Arial', sans-serif;
-  flex: 1;
-  border-bottom: 1px solid #333;
-  padding-bottom: 2px;
 }
 
 /* Guardian Section */
 .guardian-section {
-  margin-bottom: 15px;
-  padding: 12px;
-  background: #f8f8f8;
-  border-radius: 4px;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 3;
+}
+
+.guardian-section .info-field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.guardian-section .info-field-row:last-child {
+  margin-bottom: 0;
+}
+
+.guardian-section .info-field-row .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c1810;
+  font-family: 'Times New Roman', serif;
+  white-space: nowrap;
+}
+
+.guardian-section .info-field-row .value {
+  font-size: 11px;
+  font-weight: 400;
+  color: #2c1810;
+  font-family: 'Times New Roman', serif;
+  text-align: left;
+  flex: 1;
+  border-bottom: 1px dotted #8b7355;
+  min-width: 80px;
 }
 
 .section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #1a365d;
+  color: #2c1810;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 10px;
-  font-family: 'Arial', sans-serif;
-}
-
-.guardian-row {
+  letter-spacing: 1px;
   margin-bottom: 8px;
-}
-
-.guardian-row:last-child {
-  margin-bottom: 0;
+  font-family: 'Times New Roman', serif;
+  border-bottom: 1px solid #8b7355;
+  padding-bottom: 4px;
+  text-align: center;
 }
 
 /* Minister Section */
 .minister-section {
-  text-align: right;
-  margin-top: 25px;
-  padding-top: 15px;
-  border-top: 1px solid #ddd;
+  text-align: center;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #8b7355;
+  position: relative;
+  z-index: 3;
 }
 
 .minister-info {
@@ -616,25 +748,25 @@ onMounted(async () => {
 }
 
 .minister-name {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
-  color: #1a365d;
-  margin: 0 0 8px 0;
-  font-family: 'Georgia', serif;
+  color: #2c1810;
+  margin: 0 0 5px 0;
+  font-family: 'Times New Roman', serif;
 }
 
 .signature-line {
-  width: 180px;
-  height: 2px;
-  background: #333;
-  margin: 0 auto 5px auto;
+  width: 140px;
+  height: 1px;
+  background: #4a3728;
+  margin: 0 auto 3px auto;
 }
 
 .signature-label {
-  font-size: 11px;
-  color: #333;
+  font-size: 10px;
+  color: #4a3728;
   margin: 0;
-  font-family: 'Arial', sans-serif;
+  font-family: 'Times New Roman', serif;
   text-transform: uppercase;
 }
 
@@ -642,41 +774,30 @@ onMounted(async () => {
 .footer-section {
   display: flex;
   justify-content: space-between;
-  margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid #d4af37;
+  margin-top: 12px;
+  padding-top: 8px;
+  position: relative;
+  z-index: 3;
+}
+
+.footer-left,
+.footer-right {
+  flex: 1;
+}
+
+.footer-right {
+  text-align: right;
 }
 
 .cert-number,
 .issue-date {
-  font-size: 10px;
-  color: #666;
+  font-size: 9px;
+  color: #4a3728;
   margin: 0;
-  font-family: 'Arial', sans-serif;
+  font-family: 'Times New Roman', serif;
 }
 
-/* Print Button */
-.certificate-actions {
-  margin-top: 20px;
-}
-
-.print-btn {
-  padding: 12px 24px;
-  background: #1a365d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.print-btn:hover {
-  background: #1e4a7a;
-}
-
-/* Print Styles */
+/* Print Styles - Full Page */
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
@@ -686,28 +807,215 @@ onMounted(async () => {
   body {
     margin: 0;
     padding: 0;
+    background: white !important;
   }
 
   .certificate-container {
-    padding: 0;
-    background: white;
-    min-height: auto;
+    width: 8.5in;
+    min-height: 11in;
+    padding: 0.25in;
+    background: #e8e0d0 !important;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
   }
 
   .certificate-wrapper {
     box-shadow: none;
     margin: 0;
+    width: 100%;
+    flex: 1;
   }
 
   .outer-border {
-    border-width: 4px !important;
+    border: 4px solid #8b7355 !important;
     padding: 4px !important;
-    margin: 0 !important;
+    background: #d4c4a8 !important;
+    height: calc(100% - 8px);
+    box-sizing: border-box;
   }
 
   .inner-border {
-    padding: 15px 20px !important;
-    border-width: 2px !important;
+    padding: 0.25in 0.35in !important;
+    background-color: #f3e6c4 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    border: 2px solid #8b7355 !important;
+    height: calc(100% - 0.5in - 4px);
+    box-sizing: border-box;
+  }
+
+  .watermark-logo {
+    opacity: 0.08 !important;
+    width: 70% !important;
+    height: 70% !important;
+  }
+
+  .corner-design {
+    opacity: 0.9 !important;
+  }
+
+  .corner-design svg {
+    stroke: #8b7355 !important;
+    width: 60px !important;
+    height: 60px !important;
+  }
+
+  .corner-design svg circle {
+    fill: #8b7355 !important;
+  }
+
+  .corner-design.top-left,
+  .corner-design.top-right {
+    top: 8px !important;
+  }
+
+  .corner-design.bottom-left,
+  .corner-design.bottom-right {
+    bottom: 8px !important;
+  }
+
+  .title-decoration {
+    background: linear-gradient(to right, transparent, #8b7355) !important;
+    width: 80px !important;
+    height: 3px !important;
+  }
+
+  .title-decoration::after {
+    color: #8b7355 !important;
+    font-size: 18px !important;
+    top: -14px !important;
+  }
+
+  .church-header {
+    margin-bottom: 0.15in !important;
+    border-bottom-width: 3px !important;
+    padding-bottom: 0.1in !important;
+    gap: 0.08in !important;
+  }
+
+  .logo-emblem {
+    width: 80px !important;
+    height: 80px !important;
+    border-width: 3px !important;
+  }
+
+  .sec-text {
+    font-size: 12px !important;
+    margin-top: 4px !important;
+  }
+
+  .church-name {
+    font-size: 28px !important;
+    letter-spacing: 3px !important;
+  }
+
+  .church-subtitle {
+    font-size: 18px !important;
+    letter-spacing: 6px !important;
+  }
+
+  .church-address {
+    font-size: 12px !important;
+    margin-top: 6px !important;
+  }
+
+  .main-title {
+    font-size: 36px !important;
+    letter-spacing: 6px !important;
+  }
+
+  .subtitle {
+    font-size: 22px !important;
+    letter-spacing: 5px !important;
+  }
+
+  .title-content {
+    padding: 0 0.3in !important;
+  }
+
+  .baptism-statement {
+    font-size: 16px !important;
+    margin: 0.1in 0 0.05in 0 !important;
+  }
+
+  .member-name {
+    font-size: 32px !important;
+    border-bottom-width: 3px !important;
+    padding: 0.05in 0.3in !important;
+  }
+
+  .baptism-detail {
+    font-size: 14px !important;
+    margin: 0 0 0.15in 0 !important;
+  }
+
+  .personal-info-section {
+    margin-bottom: 0.15in !important;
+    gap: 0.3in !important;
+  }
+
+  .left-column {
+    flex: 0 0 280px !important;
+  }
+
+  .info-field-row {
+    margin-bottom: 0.08in !important;
+    gap: 10px !important;
+  }
+
+  .info-field-row .label {
+    font-size: 14px !important;
+  }
+
+  .info-field-row .value {
+    font-size: 14px !important;
+    min-width: 80px !important;
+    border-bottom-width: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  .guardian-section {
+    margin-bottom: 0.15in !important;
+  }
+
+  .section-title {
+    font-size: 14px !important;
+    margin-bottom: 0.08in !important;
+    padding-bottom: 4px !important;
+    border-bottom-width: 2px !important;
+  }
+
+  .minister-section {
+    margin-top: 0.25in !important;
+    padding-top: 0.15in !important;
+    border-top-width: 2px !important;
+  }
+
+  .minister-name {
+    font-size: 18px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .signature-line {
+    width: 200px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .signature-label {
+    font-size: 12px !important;
+  }
+
+  .footer-section {
+    margin-top: 0.2in !important;
+    padding-top: 0.1in !important;
+  }
+
+  .cert-number,
+  .issue-date {
+    font-size: 11px !important;
   }
 
   .no-print,
@@ -722,23 +1030,46 @@ onMounted(async () => {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .church-header {
-    flex-direction: column;
-    gap: 15px;
+@media (max-width: 480px) {
+  .member-name {
+    font-size: 16px;
   }
 
-  .church-info {
-    text-align: center;
+  .main-title {
+    font-size: 18px;
   }
 
-  .info-row {
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .personal-info-section {
     flex-direction: column;
     gap: 10px;
   }
 
-  .member-name {
-    font-size: 22px;
+  .info-column {
+    width: 100%;
+  }
+
+  .left-column,
+  .right-column {
+    flex: 1;
+  }
+
+  .info-column .info-field-row {
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
+
+  .outer-border {
+    border-width: 2px !important;
+    padding: 2px !important;
+  }
+
+  .inner-border {
+    padding: 15px !important;
   }
 }
 </style>

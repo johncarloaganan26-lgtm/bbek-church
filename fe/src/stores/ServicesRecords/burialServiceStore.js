@@ -166,8 +166,14 @@ export const useBurialServiceStore = defineStore('burialService', {
     async updateService(id, serviceData) {
       this.loading = true
       this.error = null
+      const accessToken = localStorage.getItem('accessToken')
       try {
-        const response = await axios.put(`/church-records/burial-services/updateBurialService/${id}`, serviceData)
+        const response = await axios.put(`/church-records/burial-services/updateBurialService/${id}`, serviceData, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
         if (response.data.success) {
           await this.fetchServices({
             page: this.currentPage,

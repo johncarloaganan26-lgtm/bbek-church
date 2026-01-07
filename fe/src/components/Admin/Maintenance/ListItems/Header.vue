@@ -276,8 +276,8 @@ const defaultHeaderData = {
     {label: "I'm New", value: 'im-new',to:'/new'},
     {label: 'About', value: 'about',to:'/about' , children:[
         {label: 'Our Story', value: 'our-story',to:'/about/aboutus'},
-        {label: 'Department Officers', value: 'department-officers',to:'/about/departmentofficer'},
         {label: 'Church Leadership', value: 'leadership',to:'/about/churchleaders'},
+        {label: 'Department Officers', value: 'department-officers',to:'/about/departmentofficer'},
         {label: 'Beliefs', value: 'beliefs',to:'/about/beliefs'},
     ]},
     {label: 'Give', value: 'give',to:'/give'},

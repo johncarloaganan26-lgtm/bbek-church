@@ -61,11 +61,26 @@ const dbConfig = {
   // SSL configuration (many cloud databases require SSL)
   ssl: process.env.DB_SSL === 'true' ? {} : false,
   
-  // Ensure binary data (BLOB) is handled correctly
+  // Ensure binary data (BLOB) is handled correctly and text fields are converted to strings
+  // This fixes issues where VARCHAR/TEXT fields are returned as Buffer objects
   typeCast: function (field, next) {
     if (field.type === 'BLOB' || field.type === 'LONGBLOB') {
       return field.buffer();
     }
+    
+    // Check if the field is a string type but was returned as Buffer
+    if (field.type === 'VAR_STRING' || field.type === 'STRING' || 
+        field.type === 'VARCHAR' || field.type === 'TEXT' || 
+        field.type === 'LONGTEXT' || field.type === 'MEDIUMTEXT' || 
+        field.type === 'TINYTEXT') {
+      const buffer = field.buffer();
+      // If it's a Buffer, convert it to string
+      if (Buffer.isBuffer(buffer)) {
+        return buffer.toString('utf8');
+      }
+      return buffer;
+    }
+    
     return next();
   }
 };

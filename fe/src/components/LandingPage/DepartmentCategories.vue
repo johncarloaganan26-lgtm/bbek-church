@@ -111,9 +111,12 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from '@/api/axios'
+import { useCms } from '@/composables/useCms'
 
 const router = useRouter()
+
+// Use CMS composable for proper caching and cross-tab sync
+const { loadPageData } = useCms('departmentcategories')
 
 // CMS Data
 const cmsData = ref({
@@ -172,52 +175,37 @@ const youthBgImage = computed(() => {
   return null
 })
 
-// Fetch CMS data
+// Fetch CMS data using useCms composable for proper caching
 const fetchCmsData = async () => {
   try {
-    const response = await axios.get('/cms/departmentcategories/full')
-    if (response.data.success && response.data.data) {
-      const { page, images: cmsImages } = response.data.data
-      const content = page?.content || {}
+    const cmsContent = await loadPageData()
+    
+    if (cmsContent) {
+      console.log('CMS Data loaded for Department Categories:', cmsContent)
       
-      console.log('CMS Response - Department Categories:', { content, cmsImages })
-      
-      if (content.sectionTitle) cmsData.value.sectionTitle = content.sectionTitle
-      if (content.sectionSubtitle) cmsData.value.sectionSubtitle = content.sectionSubtitle
-      if (content.adultTitle) cmsData.value.adultTitle = content.adultTitle
-      if (content.adultDescription) cmsData.value.adultDescription = content.adultDescription
-      if (content.adultLinkText) cmsData.value.adultLinkText = content.adultLinkText
-      if (content.ladiesTitle) cmsData.value.ladiesTitle = content.ladiesTitle
-      if (content.ladiesDescription) cmsData.value.ladiesDescription = content.ladiesDescription
-      if (content.ladiesLinkText) cmsData.value.ladiesLinkText = content.ladiesLinkText
-      if (content.youthTitle) cmsData.value.youthTitle = content.youthTitle
-      if (content.youthDescription) cmsData.value.youthDescription = content.youthDescription
-      if (content.youthLinkText) cmsData.value.youthLinkText = content.youthLinkText
-      if (content.buttonColor) cmsData.value.buttonColor = content.buttonColor
-      
-      // Handle background images
-      if (cmsImages && typeof cmsImages === 'object') {
-        if (cmsImages.adultBackgroundImage && cmsImages.adultBackgroundImage.startsWith('data:image/')) {
-          cmsData.value.adultBackgroundImage = cmsImages.adultBackgroundImage
-        }
-        if (cmsImages.ladiesBackgroundImage && cmsImages.ladiesBackgroundImage.startsWith('data:image/')) {
-          cmsData.value.ladiesBackgroundImage = cmsImages.ladiesBackgroundImage
-        }
-        if (cmsImages.youthBackgroundImage && cmsImages.youthBackgroundImage.startsWith('data:image/')) {
-          cmsData.value.youthBackgroundImage = cmsImages.youthBackgroundImage
-        }
-      }
+      // Update cmsData with loaded content
+      if (cmsContent.sectionTitle) cmsData.value.sectionTitle = cmsContent.sectionTitle
+      if (cmsContent.sectionSubtitle) cmsData.value.sectionSubtitle = cmsContent.sectionSubtitle
+      if (cmsContent.adultTitle) cmsData.value.adultTitle = cmsContent.adultTitle
+      if (cmsContent.adultDescription) cmsData.value.adultDescription = cmsContent.adultDescription
+      if (cmsContent.adultLinkText) cmsData.value.adultLinkText = cmsContent.adultLinkText
+      if (cmsContent.ladiesTitle) cmsData.value.ladiesTitle = cmsContent.ladiesTitle
+      if (cmsContent.ladiesDescription) cmsData.value.ladiesDescription = cmsContent.ladiesDescription
+      if (cmsContent.ladiesLinkText) cmsData.value.ladiesLinkText = cmsContent.ladiesLinkText
+      if (cmsContent.youthTitle) cmsData.value.youthTitle = cmsContent.youthTitle
+      if (cmsContent.youthDescription) cmsData.value.youthDescription = cmsContent.youthDescription
+      if (cmsContent.youthLinkText) cmsData.value.youthLinkText = cmsContent.youthLinkText
+      if (cmsContent.buttonColor) cmsData.value.buttonColor = cmsContent.buttonColor
+      if (cmsContent.adultBackgroundImage) cmsData.value.adultBackgroundImage = cmsContent.adultBackgroundImage
+      if (cmsContent.ladiesBackgroundImage) cmsData.value.ladiesBackgroundImage = cmsContent.ladiesBackgroundImage
+      if (cmsContent.youthBackgroundImage) cmsData.value.youthBackgroundImage = cmsContent.youthBackgroundImage
       
       console.log('✅ Department Categories CMS data loaded successfully')
     } else {
       console.log('⚠️ No CMS data found for Department Categories, using defaults')
     }
   } catch (error) {
-    if (error.response?.status !== 404) {
-      console.error('Error fetching department categories CMS data:', error)
-    } else {
-      console.log('CMS page not found (404), using default values')
-    }
+    console.error('Error fetching department categories CMS data:', error)
   }
 }
 

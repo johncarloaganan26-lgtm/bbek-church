@@ -27,8 +27,8 @@
    <ImNew v-if="activeSection === 'imNew'" :activeSection="activeSection" />
    <About v-if="activeSection === 'about'" :activeSection="activeSection" />
    <OurStory v-if="activeSection === 'ourStory'" :activeSection="activeSection" />
-   <DepartmentOfficer v-if="activeSection === 'departmentOfficer'" :activeSection="activeSection" />
    <ChurchLeader v-if="activeSection === 'churchLeaders'" :activeSection="activeSection" />
+   <DepartmentOfficer v-if="activeSection === 'departmentOfficer'" :activeSection="activeSection" />
    <Belief v-if="activeSection === 'beliefs'" :activeSection="activeSection" />
    <Give v-if="activeSection === 'give'" :activeSection="activeSection" />
    <Events v-if="activeSection === 'events'" :activeSection="activeSection" />
@@ -59,8 +59,8 @@ import Home from './ListItems/Home.vue'
 import ImNew from './ListItems/ImNew.vue'
 import About from './ListItems/About.vue'
 import OurStory from './ListItems/OurStory.vue'
-import DepartmentOfficer from './ListItems/DepartmentOfficer.vue'
 import ChurchLeader from './ListItems/ChurchLeader.vue'
+import DepartmentOfficer from './ListItems/DepartmentOfficer.vue'
 import Belief from './ListItems/Belief.vue'
 import Give from './ListItems/Give.vue'
 import Events from './ListItems/Events.vue'
@@ -127,17 +127,17 @@ const contentSections = ref([
     }
   },
   {
-    id: 'departmentOfficer',
-    label: 'Department Officer',
-    action: () => {
-      activeSection.value = 'departmentOfficer'
-    }
-  },
-  {
     id: 'churchLeaders',
     label: 'Church Leaders',
     action: () => {
       activeSection.value = 'churchLeaders'
+    }
+  },
+    {
+    id: 'departmentOfficer',
+    label: 'Department Officer',
+    action: () => {
+      activeSection.value = 'departmentOfficer'
     }
   },
   {

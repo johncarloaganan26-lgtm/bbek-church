@@ -34,7 +34,7 @@
 
         <!-- Desktop Menu -->
         <div class="desktop-menu">
-          <template v-for="menu in headerData.menus" :key="menu.value">
+          <template v-for="menu in sortedMenus" :key="menu.value">
             <!-- Menu with children (dropdown) -->
             <el-dropdown
               v-if="menu.children && Array.isArray(menu.children) && menu.children.length > 0"
@@ -77,10 +77,10 @@
               {{ menu.label }}
             </el-button>
           </template>
-         
+          
           <!-- Login Button -->
           <el-button
-            v-if="(user?.account?.position === 'admin' || user?.account?.position === 'staff' || user?.account?.position !== 'member') || !user"
+            v-if="showLoginButton"
             :type="'primary'"
             :style="{ backgroundColor: headerData.buttonColor || '#14b8a6', borderColor: headerData.buttonColor || '#14b8a6' }"
             class="login-button"
@@ -100,8 +100,8 @@
                 <el-icon><User /></el-icon>
               </el-avatar>
               <div class="user-info">
-                <div class="user-name">{{ user?.member ? `${user.member.firstname || ''} ${user.member.lastname || ''}`.trim() : 'User' }}</div>
-                <div class="user-position">{{ user?.account?.position ? user.account.position.charAt(0).toUpperCase() + user.account.position.slice(1) : 'Member' }}</div>
+                <div class="user-name">{{ userDisplayName }}</div>
+                <div class="user-position">{{ userDisplayPosition }}</div>
               </div>
               <el-icon class="chevron-icon"><ArrowDown /></el-icon>
             </div>
@@ -175,7 +175,7 @@
         </div>
 
         <div class="mobile-menu-items">
-          <template v-for="menu in headerData.menus" :key="menu?.value || menu?.label || Math.random()">
+          <template v-for="menu in sortedMenus" :key="menu?.value || menu?.label || Math.random()">
             <!-- Menu with children -->
             <div v-if="menu && menu.children && Array.isArray(menu.children) && menu.children.length > 0" class="mobile-menu-group">
               <div class="mobile-menu-item" @click="toggleMobileSubmenu(menu?.value)">
@@ -184,13 +184,13 @@
               </div>
               <div v-show="openSubmenus[menu?.value]" class="mobile-submenu">
                 <template v-for="child in menu.children" :key="child?.value || child?.label || Math.random()">
-                <div
+                  <div
                     v-if="child"
-                  class="mobile-submenu-item"
-                  @click="handleMobileMenuClick(child)"
-                >
+                    class="mobile-submenu-item"
+                    @click="handleMobileMenuClick(child)"
+                  >
                     {{ child?.label || '' }}
-                </div>
+                  </div>
                 </template>
               </div>
             </div>
@@ -203,7 +203,7 @@
           <!-- Login/User Section -->
           <div class="mobile-menu-divider"></div>
           <el-button
-            v-if="(user?.account?.position === 'admin' || user?.account?.position === 'staff' || user?.account?.position !== 'member') || !user"
+            v-if="showLoginButton"
             :type="'primary'"
             :style="{ backgroundColor: headerData.buttonColor || '#14b8a6', borderColor: headerData.buttonColor || '#14b8a6', width: '100%' }"
             class="mobile-login-button"
@@ -217,8 +217,8 @@
                 <el-icon><User /></el-icon>
               </el-avatar>
               <div class="user-info">
-                <div class="user-name">{{ user?.member ? `${user.member.firstname || ''} ${user.member.lastname || ''}`.trim() : 'User' }}</div>
-                <div class="user-position">{{ user?.account?.position ? user.account.position.charAt(0).toUpperCase() + user.account.position.slice(1) : 'Member' }}</div>
+                <div class="user-name">{{ userDisplayName }}</div>
+                <div class="user-position">{{ userDisplayPosition }}</div>
               </div>
             </div>
             <div class="mobile-user-menu">
@@ -289,17 +289,121 @@ const cmsStore = useCmsStore()
 // Loading state for CMS data
 const isLoadingHeader = computed(() => cmsStore.isPageLoading('header'))
 
+// Computed property to determine if login button should be shown
+const showLoginButton = computed(() => {
+  // Show login button if no user OR user is admin/staff
+  if (!user.value) {
+    return true
+  }
+  const position = user.value?.account?.position
+  if (position === 'admin' || position === 'staff') {
+    return true
+  }
+  // Don't show login button for members - show user dropdown instead
+  return false
+})
+
+// Computed property for user display name
+const userDisplayName = computed(() => {
+  if (user.value?.member) {
+    return `${user.value.member.firstname || ''} ${user.value.member.lastname || ''}`.trim()
+  }
+  return 'User'
+})
+
+// Computed property for user position display
+const userDisplayPosition = computed(() => {
+  if (user.value?.account?.position) {
+    return user.value.account.position.charAt(0).toUpperCase() + user.value.account.position.slice(1)
+  }
+  return 'Member'
+})
+
 const scrolled = ref(false)
 const mobileMenuOpen = ref(false)
 const openSubmenus = ref({})
 const departmentList = ref([])
 
 const loginDialog = ref(false)
-const user = ref(JSON.parse(localStorage.getItem('userInfo')) || null)
+const user = ref(null)
+
+// Function to get user from localStorage safely
+const getUserFromStorage = () => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo && userInfo !== '{}') {
+      return JSON.parse(userInfo)
+    }
+    return null
+  } catch (e) {
+    console.error('Error parsing userInfo from localStorage:', e)
+    return null
+  }
+}
+
+// Initialize user from localStorage on mount
+onMounted(async () => {
+  window.addEventListener('scroll', handleScroll)
+  
+  // Set initial user value from localStorage
+  user.value = getUserFromStorage()
+  
+  // Debug log
+  console.log('Navigation mounted, user from storage:', JSON.stringify(user.value))
+  console.log('User position:', user.value?.account?.position)
+  
+  // Listen for storage changes (e.g., login/logout in other tabs)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'userInfo') {
+      user.value = getUserFromStorage()
+      console.log('Storage event triggered, user updated:', JSON.stringify(user.value))
+    }
+  })
+  
+  // Fetch header data from CMS API
+  await fetchHeaderData()
+  
+  console.log('Header data loaded:', headerData.value)
+  console.log('User initialized:', user.value)
+})
+
+// Desired order for About submenu children
+const ABOUT_SUBMENU_ORDER = [
+  'Our Story',
+  'Church Leadership',
+  'Department Officers'
+]
+
+// Computed property to ensure menus are always sorted correctly
+const sortedMenus = computed(() => {
+  const menus = headerData.value.menus || []
+  
+  return menus.map(menu => {
+    if (!menu.children || !Array.isArray(menu.children)) {
+      return menu
+    }
+    
+    // Sort children
+    const sortedChildren = [...menu.children].sort((a, b) => {
+      const aIndex = ABOUT_SUBMENU_ORDER.indexOf(a.label)
+      const bIndex = ABOUT_SUBMENU_ORDER.indexOf(b.label)
+      
+      // Items in the order list come first
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+      if (aIndex !== -1) return -1
+      if (bIndex !== -1) return 1
+      
+      // Other items sorted alphabetically
+      return a.label?.localeCompare(b.label)
+    })
+    
+    return { ...menu, children: sortedChildren }
+  })
+})
 
 const toggleMobileSubmenu = (menuValue) => {
   if (menuValue !== undefined && menuValue !== null) {
-  openSubmenus.value[menuValue] = !openSubmenus.value[menuValue]
+    openSubmenus.value[menuValue] = !openSubmenus.value[menuValue]
   }
 }
 
@@ -335,7 +439,6 @@ const defaultHeaderData = {
         {label: 'Our Story', value: 'our-story',to:'/about/aboutus'},
         {label: 'Church Leadership', value: 'church-leadership',to:'/about/churchleaders'},
         {label: 'Department Officers', value: 'department-officers',to:'/about/departmentofficer'},
-     
     ]},
     {label: 'Give', value: 'give',to:'/give'},
     {label: 'Events', value: 'events',to:'/events/all-events'},
@@ -438,6 +541,7 @@ const fetchHeaderData = async () => {
     // Keep default data on error
   }
 } 
+
 const navigateTo = (path) => {
   if (path) {
     router.push(path)
@@ -448,14 +552,8 @@ const handleScroll = () => {
   scrolled.value = window.scrollY > 50
 }
 
-onMounted(async() => {
-  window.addEventListener('scroll', handleScroll)
-  
-  // Fetch header data from CMS API
-  await fetchHeaderData()
-  
-  console.log('Header data loaded:', headerData.value)
-})
+
+
 const redirectToChildrenPage = (child) => {
   console.log('Redirecting to child page:', child)
   
@@ -477,6 +575,7 @@ const redirectToChildrenPage = (child) => {
     console.warn('Child menu item has no route:', child)
   }
 }
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
@@ -485,8 +584,8 @@ const openLoginDialog = () => {
   console.log(user.value , 'user.value')
   if(user.value){
     if(user.value?.account?.position === 'admin' || user.value?.account?.position === 'staff'){
-    router.push('/admin')
-  }
+      router.push('/admin')
+    }
   }else{
     loginDialog.value = true
   }
@@ -617,16 +716,10 @@ const handleLogout = async () => {
 
 /* Desktop Menu */
 .desktop-menu {
-  display: none;
+  display: flex;
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
-}
-
-@media (min-width: 1024px) {
-  .desktop-menu {
-    display: flex;
-  }
 }
 
 .menu-button {

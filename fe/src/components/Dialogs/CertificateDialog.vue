@@ -193,325 +193,480 @@ const handleClose = () => {
 }
 
 const printCertificate = () => {
-  // Find the certificate wrapper within the dialog content
-  const certificateElement = document.querySelector('.certificate-dialog-content .certificate-wrapper')
+  const certificateElement = document.querySelector('.certificate-wrapper')
   if (certificateElement) {
-    // Get the outer HTML including the wrapper
-    const content = certificateElement.outerHTML
+    // Clone the element
+    const clonedElement = certificateElement.cloneNode(true)
     
-    // Get all computed styles from the certificate element
-    const computedStyles = getComputedStyle(certificateElement)
+    // Get the inner HTML of the certificate
+    const content = clonedElement.innerHTML
     
-    // Create a temporary print window with the certificate content and all styles
+    // Create print window
     const printWindow = window.open('', '_blank')
+    
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Print Certificate</title>
+          <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Times+New+Roman:wght@400;600;700&display=swap" rel="stylesheet">
           <style>
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            body {
-              margin: 0;
-              padding: 20px;
-              background: white;
-            }
+            
             @page {
               size: letter portrait;
               margin: 0;
             }
+            
+            body {
+              margin: 0;
+              padding: 0;
+              background: white;
+              font-family: 'Times New Roman', serif;
+            }
+            
             .certificate-container {
+              width: 8.5in;
+              min-height: 11in;
+              background: #e8e0d0;
+              display: flex;
+              justify-content: center;
+              padding: 0.25in;
+              box-sizing: border-box;
+            }
+            
+            .certificate-wrapper {
+              width: 8.5in;
+            }
+            
+            .outer-border {
+              border: 4px solid #8b7355;
+              padding: 4px;
+              background: #d4c4a8;
+            }
+            
+            .inner-border {
+              background-color: #f3e6c4;
+              padding: 0.25in 0.35in;
+              border: 2px solid #8b7355;
+              position: relative;
+            }
+            
+            .watermark-logo {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 70%;
+              height: 70%;
+              opacity: 0.08;
+              z-index: 0;
+              pointer-events: none;
+            }
+            
+            .watermark-image {
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+            }
+            
+            .corner-design {
+              position: absolute;
+              z-index: 2;
+            }
+            
+            .corner-design svg {
+              width: 60px;
+              height: 60px;
+            }
+            
+            .corner-design.top-left { top: 8px; left: 8px; }
+            .corner-design.top-right { top: 8px; right: 8px; }
+            .corner-design.bottom-left { bottom: 8px; left: 8px; }
+            .corner-design.bottom-right { bottom: 8px; right: 8px; }
+            
+            .corner-design svg * {
+              stroke: #8b7355 !important;
+              fill: #8b7355 !important;
+            }
+            
+            .church-header {
+              text-align: center;
+              margin-bottom: 0.15in;
+              border-bottom: 3px solid #8b7355;
+              padding-bottom: 0.1in;
+              position: relative;
+              z-index: 3;
               display: flex;
               flex-direction: column;
               align-items: center;
-              padding: 20px;
-              background: #f5f5f5;
-              min-height: 100vh;
+              gap: 0.08in;
             }
-            .certificate-wrapper {
-              width: 100%;
-              max-width: 8.5in;
-              background: #fff;
-              margin: 0 auto;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .outer-border {
-              border: 8px solid #1a365d;
-              padding: 8px;
-              margin: 8px;
-            }
-            .inner-border {
-              border: 3px solid #d4af37;
-              padding: 25px 35px;
-              background: #fffef8;
-            }
-            .header-section {
-              text-align: center;
-              margin-bottom: 20px;
-              border-bottom: 2px solid #d4af37;
-              padding-bottom: 15px;
-            }
-            .church-header {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 25px;
-            }
+            
             .church-logo-area {
               display: flex;
               flex-direction: column;
               align-items: center;
             }
+            
             .logo-emblem {
-              width: 70px;
-              height: 70px;
-              background: #fff;
-              border: 3px solid #1a365d;
+              width: 80px;
+              height: 80px;
+              background: #fffef8;
+              border: 3px solid #8b7355;
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
               overflow: hidden;
             }
+            
             .logo-image {
               width: 100%;
               height: 100%;
               object-fit: contain;
             }
-            .emblem-cross {
-              position: relative;
-              width: 35px;
-              height: 35px;
-            }
-            .cross-v {
-              position: absolute;
-              width: 6px;
-              height: 32px;
-              background: #1a365d;
-              left: 50%;
-              transform: translateX(-50%);
-              border-radius: 2px;
-            }
-            .cross-h {
-              position: absolute;
-              width: 28px;
-              height: 6px;
-              background: #1a365d;
-              top: 50%;
-              transform: translateY(-50%);
-              left: 3.5px;
-              border-radius: 2px;
-            }
+            
             .sec-text {
-              font-size: 8px;
-              font-weight: 600;
-              color: #1a365d;
-              margin-top: 4px;
-              letter-spacing: 1px;
-            }
-            .church-info {
-              text-align: left;
-            }
-            .church-name {
-              font-size: 18px;
-              font-weight: 800;
-              color: #1a365d;
-              margin: 0;
-              letter-spacing: 2px;
-              font-family: 'Georgia', serif;
-            }
-            .church-subtitle {
-              font-size: 14px;
+              font-size: 12px;
               font-weight: 700;
-              color: #1a365d;
-              margin: 0;
-              letter-spacing: 4px;
-              font-family: 'Georgia', serif;
-            }
-            .church-address {
-              font-size: 11px;
-              color: #333;
-              margin: 6px 0 0 0;
-              font-family: 'Arial', sans-serif;
-            }
-            .title-section {
-              text-align: center;
-              margin-bottom: 5px;
-            }
-            .main-title {
-              font-size: 32px;
-              font-weight: 800;
-              color: #1a365d;
-              margin: 0;
-              letter-spacing: 6px;
-              font-family: 'Georgia', serif;
-            }
-            .subtitle {
-              font-size: 20px;
-              font-weight: 600;
-              color: #1a365d;
-              margin: 0;
-              letter-spacing: 4px;
-              font-family: 'Georgia', serif;
-            }
-            .dedication-statement,
-            .baptism-statement {
-              text-align: center;
-              font-size: 13px;
-              color: #333;
-              margin: 0 0 15px 0;
+              color: #8b7355;
+              margin-top: 4px;
+              letter-spacing: 2px;
               font-family: 'Times New Roman', serif;
             }
-            .member-name-section {
+            
+            .church-info {
               text-align: center;
-              margin-bottom: 10px;
             }
-            .member-name {
+            
+            .church-name {
               font-size: 28px;
               font-weight: 700;
-              color: #1a365d;
-              font-family: 'Georgia', serif;
-              display: inline-block;
-              padding: 5px 20px;
-              border-bottom: 2px solid #d4af37;
+              color: #2c1810;
+              margin: 0;
+              letter-spacing: 3px;
+              font-family: 'Cinzel', serif;
             }
-            .personal-info-section {
-              margin-bottom: 15px;
-              padding: 12px;
-              background: #f8f8f8;
-              border-radius: 4px;
+            
+            .church-subtitle {
+              font-size: 18px;
+              font-weight: 600;
+              color: #2c1810;
+              margin: 0;
+              letter-spacing: 6px;
+              font-family: 'Cinzel', serif;
             }
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              gap: 30px;
-              margin-bottom: 8px;
+            
+            .church-address {
+              font-size: 12px;
+              color: #4a3728;
+              margin: 6px 0 0 0;
+              font-family: 'Times New Roman', serif;
             }
-            .info-row:last-child {
-              margin-bottom: 0;
-            }
-            .info-field {
+            
+            .title-section {
               display: flex;
               align-items: center;
+              justify-content: center;
+              margin-bottom: 0.15in;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .title-content {
+              text-align: center;
+              padding: 0 0.3in;
+            }
+            
+            .title-decoration {
+              width: 80px;
+              height: 3px;
+              background: linear-gradient(to right, transparent, #8b7355);
+              position: relative;
+            }
+            
+            .title-decoration::after {
+              content: '❖';
+              position: absolute;
+              top: -14px;
+              font-size: 18px;
+              color: #8b7355;
+            }
+            
+            .title-decoration.left::after { right: 0; }
+            .title-decoration.right::after { left: 0; }
+            
+            .main-title {
+              font-size: 36px;
+              font-weight: 700;
+              color: #2c1810;
+              margin: 0;
+              letter-spacing: 6px;
+              font-family: 'Cinzel', serif;
+            }
+            
+            .subtitle {
+              font-size: 22px;
+              font-weight: 600;
+              color: #2c1810;
+              margin: 0;
+              letter-spacing: 5px;
+              font-family: 'Cinzel', serif;
+            }
+            
+            .baptism-statement,
+            .dedication-statement {
+              text-align: center;
+              font-size: 16px;
+              color: #4a3728;
+              margin: 0.1in 0 0.05in 0;
+              font-family: 'Times New Roman', serif;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .member-name-section {
+              text-align: center;
+              margin-bottom: 0.08in;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .member-name {
+              font-size: 32px;
+              font-weight: 700;
+              color: #2c1810;
+              font-family: 'Times New Roman', serif;
+              display: inline-block;
+              padding: 0.05in 0.3in;
+              border-bottom: 3px solid #8b7355;
+            }
+            
+            .baptism-detail {
+              text-align: center;
+              font-size: 14px;
+              color: #4a3728;
+              margin: 0 0 0.15in 0;
+              font-family: 'Times New Roman', serif;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .personal-info-section,
+            .child-section,
+            .parent-section,
+            .sponsors-section,
+            .contact-section,
+            .admin-section {
+              margin-bottom: 0.15in;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .personal-info-section {
+              display: flex;
+              gap: 0.3in;
+            }
+            
+            .info-column {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+            }
+            
+            .left-column {
+              flex: 0 0 280px;
+            }
+            
+            .info-field-row,
+            .child-row,
+            .parent-row,
+            .contact-row,
+            .admin-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 0.08in;
               gap: 10px;
             }
-            .info-field .label {
-              font-size: 12px;
-              color: #333;
-              font-family: 'Times New Roman', serif;
-              white-space: nowrap;
-            }
-            .info-field .value {
-              font-size: 12px;
-              font-weight: 600;
-              color: #1a365d;
-              font-family: 'Arial', sans-serif;
-              min-width: 80px;
-              border-bottom: 1px solid #333;
-              padding-bottom: 2px;
-            }
-            .baptism-details-section,
-            .guardian-section {
-              margin-bottom: 15px;
-              padding: 12px;
-              background: #f0f4f8;
-              border-radius: 4px;
-            }
-            .section-title {
-              font-size: 11px;
-              font-weight: 700;
-              color: #1a365d;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-              margin-bottom: 10px;
-              font-family: 'Arial', sans-serif;
-            }
-            .baptism-row {
-              margin-bottom: 10px;
-            }
-            .baptism-row:last-child {
+            
+            .info-field-row:last-child,
+            .child-row:last-child,
+            .parent-row:last-child,
+            .contact-row:last-child,
+            .admin-row:last-child {
               margin-bottom: 0;
             }
+            
             .field-group {
               display: flex;
               align-items: center;
-              gap: 10px;
+              gap: 8px;
             }
-            .field-label {
-              font-size: 12px;
-              color: #333;
+            
+            .field-label,
+            .label {
+              font-size: 14px;
+              font-weight: 700;
+              color: #2c1810;
               font-family: 'Times New Roman', serif;
               white-space: nowrap;
             }
-            .field-value {
-              font-size: 12px;
-              font-weight: 600;
-              color: #1a365d;
-              font-family: 'Arial', sans-serif;
+            
+            .field-value,
+            .value {
+              font-size: 14px;
+              font-weight: 400;
+              color: #2c1810;
+              font-family: 'Times New Roman', serif;
+              text-align: left;
               flex: 1;
-              border-bottom: 1px solid #333;
+              border-bottom: 2px dotted #8b7355;
+              min-width: 80px;
               padding-bottom: 2px;
             }
-            .minister-section {
-              text-align: right;
-              margin-top: 25px;
-              padding-top: 15px;
-              border-top: 1px solid #ddd;
+            
+            .section-title {
+              font-size: 14px;
+              font-weight: 700;
+              color: #2c1810;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+              margin-bottom: 0.08in;
+              font-family: 'Times New Roman', serif;
+              border-bottom: 2px solid #8b7355;
+              padding-bottom: 4px;
+              text-align: center;
             }
+            
+            .requested-section {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 0.15in;
+              padding-bottom: 0.1in;
+              border-bottom: 2px solid #8b7355;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .requested-section .label {
+              font-size: 14px;
+            }
+            
+            .requested-section .value {
+              font-size: 16px;
+              border-bottom: 2px dotted #8b7355;
+              padding-bottom: 2px;
+            }
+            
+            .sponsors-grid {
+              display: flex;
+              justify-content: flex-start;
+              gap: 1in;
+            }
+            
+            .sponsor-column {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+            
+            .sponsor-name {
+              font-size: 14px;
+              color: #2c1810;
+              font-family: 'Times New Roman', serif;
+            }
+            
+            .minister-section {
+              text-align: center;
+              margin-top: 0.25in;
+              padding-top: 0.15in;
+              border-top: 2px solid #8b7355;
+              position: relative;
+              z-index: 3;
+            }
+            
             .minister-info {
               display: inline-block;
               text-align: center;
             }
+            
             .minister-name {
-              font-size: 14px;
+              font-size: 18px;
               font-weight: 700;
-              color: #1a365d;
+              color: #2c1810;
               margin: 0 0 8px 0;
-              font-family: 'Georgia', serif;
+              font-family: 'Times New Roman', serif;
             }
+            
             .signature-line {
-              width: 180px;
+              width: 200px;
               height: 2px;
-              background: #333;
-              margin: 0 auto 5px auto;
+              background: #4a3728;
+              margin: 0 auto 6px auto;
             }
+            
             .signature-label {
-              font-size: 11px;
-              color: #333;
+              font-size: 12px;
+              color: #4a3728;
               margin: 0;
-              font-family: 'Arial', sans-serif;
+              font-family: 'Times New Roman', serif;
               text-transform: uppercase;
             }
+            
             .footer-section {
               display: flex;
               justify-content: space-between;
-              margin-top: 20px;
-              padding-top: 12px;
-              border-top: 1px solid #d4af37;
+              margin-top: 0.2in;
+              padding-top: 0.1in;
+              position: relative;
+              z-index: 3;
             }
+            
+            .footer-left,
+            .footer-right {
+              flex: 1;
+            }
+            
+            .footer-right {
+              text-align: right;
+            }
+            
             .cert-number,
             .issue-date {
-              font-size: 10px;
-              color: #666;
+              font-size: 11px;
+              color: #4a3728;
               margin: 0;
-              font-family: 'Arial', sans-serif;
+              font-family: 'Times New Roman', serif;
             }
           </style>
         </head>
         <body>
-          ${content}
+          <div class="certificate-container">
+            <div class="certificate-wrapper">
+              <div class="outer-border">
+                <div class="inner-border">
+                  ${content}
+                </div>
+              </div>
+            </div>
+          </div>
         </body>
       </html>
     `)
+    
     printWindow.document.close()
     printWindow.focus()
+    
     setTimeout(() => {
       printWindow.print()
       printWindow.close()
-    }, 250)
+    }, 500)
   } else {
     ElMessage.error('Certificate content not found')
   }
@@ -544,13 +699,5 @@ const printCertificate = () => {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 0;
-}
-
-@media print {
-  .certificate-dialog :deep(.el-dialog__footer),
-  .certificate-dialog :deep(.el-dialog__header),
-  .dialog-footer {
-    display: none !important;
-  }
 }
 </style>

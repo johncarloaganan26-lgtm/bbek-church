@@ -348,8 +348,8 @@ const saveChanges = async () => {
     const success = await savePageData(contentToSave, imagesToSave)
     
     if (success) {
-      // Reload data
-      const loadedData = await loadPageData()
+      // Force reload data with fresh fetch (bypass cache)
+      const loadedData = await loadPageData(true) // forceRefresh = true
       if (loadedData) {
         Object.keys(loadedData).forEach(key => {
           if (categoriesData[key] !== undefined) {
