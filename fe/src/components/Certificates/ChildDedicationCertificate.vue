@@ -1027,6 +1027,110 @@ onMounted(async () => {
   .no-print, .certificate-actions { display: none !important; }
 }
 
+/* Mobile Print - Force Grayscale */
+@media print and (max-width: 768px) {
+  .certificate-container {
+    background: white !important;
+    padding: 10px !important;
+  }
+
+  .outer-border {
+    background: white !important;
+    border: 2px solid black !important;
+  }
+
+  .inner-border {
+    background-color: white !important;
+    background-image: none !important;
+    border: 1px solid black !important;
+  }
+
+  .watermark-logo {
+    display: none !important;
+  }
+
+  .corner-design svg {
+    stroke: black !important;
+  }
+
+  .corner-design svg circle {
+    fill: black !important;
+  }
+
+  .title-decoration {
+    background: linear-gradient(to right, transparent, black) !important;
+  }
+
+  .title-decoration::after {
+    color: black !important;
+  }
+
+  .church-header {
+    border-bottom-color: black !important;
+  }
+
+  .logo-emblem {
+    border-color: black !important;
+    background: white !important;
+  }
+
+  .sec-text {
+    color: black !important;
+  }
+
+  .church-name, .church-subtitle, .church-address {
+    color: black !important;
+  }
+
+  .main-title, .subtitle {
+    color: black !important;
+  }
+
+  .dedication-statement {
+    color: black !important;
+  }
+
+  .child-fullname {
+    color: black !important;
+    border-bottom-color: black !important;
+    background: none !important;
+  }
+
+  .field-label, .field-value {
+    color: black !important;
+    border-bottom-color: black !important;
+  }
+
+  .section-title {
+    color: black !important;
+    border-bottom-color: black !important;
+  }
+
+  .sponsor-name {
+    color: black !important;
+  }
+
+  .minister-section {
+    border-top-color: black !important;
+  }
+
+  .minister-name {
+    color: black !important;
+  }
+
+  .signature-line {
+    background: black !important;
+  }
+
+  .signature-label {
+    color: black !important;
+  }
+
+  .cert-number, .issue-date {
+    color: black !important;
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .certificate-container {
