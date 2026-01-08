@@ -260,9 +260,9 @@ const printCertificate = () => {
               top: 50%;
               left: 50%;
               transform: translate(-50%, -50%);
-              width: 70%;
-              height: 70%;
-              opacity: 0.08;
+              width: 50%;
+              height: 50%;
+              opacity: 0.15;
               z-index: 0;
               pointer-events: none;
             }
@@ -444,6 +444,24 @@ const printCertificate = () => {
               display: inline-block;
               padding: 0.05in 0.3in;
               border-bottom: 3px solid #8b7355;
+            }
+            
+            .child-name-section {
+              text-align: center;
+              margin-bottom: 0.08in;
+              position: relative;
+              z-index: 3;
+            }
+            
+            .child-fullname {
+              font-size: 32px;
+              font-weight: 700;
+              color: #2c1810;
+              font-family: 'Times New Roman', serif;
+              display: inline-block;
+              padding: 0.05in 0.3in;
+              border-bottom: 3px solid #8b7355;
+              background: linear-gradient(to bottom, rgba(139, 115, 85, 0.05), transparent);
             }
             
             .baptism-detail {

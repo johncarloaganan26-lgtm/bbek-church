@@ -420,8 +420,8 @@ onMounted(async () => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 85%;
-  height: 85%;
+  width: 60%;
+  height: 60%;
   opacity: 0.15;
   z-index: 0;
   pointer-events: none;
@@ -910,8 +910,8 @@ onMounted(async () => {
 
   .watermark-logo {
     opacity: 0.15 !important;
-    width: 70% !important;
-    height: 70% !important;
+    width: 50% !important;
+    height: 50% !important;
   }
 
   .corner-design { opacity: 0.9 !important; }
@@ -1103,8 +1103,8 @@ onMounted(async () => {
   }
 
   .watermark-logo {
-    width: 90% !important;
-    height: 90% !important;
+    width: 70% !important;
+    height: 70% !important;
   }
 
   .corner-design {
