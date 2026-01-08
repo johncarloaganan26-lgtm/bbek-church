@@ -42,9 +42,9 @@
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption grey--text mb-1">Monthly Donations</div>
-              <div class="text-h4 font-weight-bold">{{ monthlyDonations }}</div>
-              <div class="text-caption success--text">{{ donationChange }}</div>
+              <div class="text-caption grey--text mb-1">Total Donations</div>
+              <div class="text-h4 font-weight-bold">{{ totalDonations }}</div>
+              <div class="text-caption success--text">All-time total</div>
             </div>
             <v-avatar size="56" color="purple lighten-5" class="d-flex align-center justify-center">
               <span style="color: white !important;" class="mdi mdi-gift icon-custom" aria-hidden="true"></span>
@@ -246,8 +246,8 @@ const totalMen = ref(0)
 const totalWomen = ref(0)
 const activeEvents = ref(0)
 const upcomingEvents = ref(0)
-const monthlyDonations = ref('₱0')
-const donationChange = ref('+0% from last month')
+const totalDonations = ref('₱0')
+const donationChange = ref('All-time total')
 const totalMessages = ref(0)
 const unreadMessages = ref(0)
 const waterBaptismCount = ref(0)
@@ -349,13 +349,44 @@ const formatRelativeTime = (dateString) => {
 }
 
 /**
- * Format action type for display (action only, no entity)
+ * Format action type for display with descriptive message
  */
 const formatAction = (log) => {
   const action = log.action_type?.toUpperCase() || ''
+  const entity = log.entity_type?.toLowerCase() || ''
   
-  // Return just the action type
-  return action || 'UNKNOWN'
+  // Create descriptive action message
+  let actionMessage = ''
+  switch (action) {
+    case 'CREATE':
+      actionMessage = 'Created'
+      break
+    case 'UPDATE':
+      actionMessage = 'Updated'
+      break
+    case 'DELETE':
+      actionMessage = 'Deleted'
+      break
+    case 'VIEW':
+      actionMessage = 'Viewed'
+      break
+    case 'LOGIN':
+      actionMessage = 'Logged in'
+      break
+    case 'LOGOUT':
+      actionMessage = 'Logged out'
+      break
+    case 'APPROVE':
+      actionMessage = 'Approved'
+      break
+    case 'REJECT':
+      actionMessage = 'Rejected'
+      break
+    default:
+      actionMessage = action || 'Performed action'
+  }
+  
+  return actionMessage
 }
 
 /**
@@ -431,10 +462,23 @@ const fetchDashboardStats = async () => {
       activeEvents.value = stats.events?.active || 0
       upcomingEvents.value = stats.events?.upcoming || 0
       
-      // Set donations stats
-      const currentMonthTotal = stats.donations?.currentMonth || 0
-      monthlyDonations.value = `₱${currentMonthTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      donationChange.value = stats.donations?.changeText || 'No change from last month'
+      // Set donations stats - use total all-time donations from tithes
+      const totalAllDonations = stats.donations?.totalAll || 0
+      totalDonations.value = `₱${totalAllDonations.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      
+      // Also fetch from tithes endpoint to get accurate total
+      try {
+        const tithesResponse = await axios.get('/church-records/tithes/getAllTithes', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` },
+          params: { limit: 1, pageSize: 1 }
+        })
+        if (tithesResponse.data.success && tithesResponse.data.summaryStats) {
+          const tithesTotal = tithesResponse.data.summaryStats.totalDonations || 0
+          totalDonations.value = `₱${tithesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        }
+      } catch (tithesError) {
+        console.error('Error fetching tithes:', tithesError)
+      }
       
       // Set messages stats
       totalMessages.value = stats.messages?.total || 0
@@ -454,8 +498,7 @@ const fetchDashboardStats = async () => {
     totalWomen.value = 0
     activeEvents.value = 0
     upcomingEvents.value = 0
-    monthlyDonations.value = '₱0.00'
-    donationChange.value = 'No data available'
+    totalDonations.value = '₱0.00'
     totalMessages.value = 0
     unreadMessages.value = 0
     waterBaptismCount.value = 0
@@ -603,4 +646,3 @@ const handleMessagesDialog = ( data ) => {
   }
 }
 </style>
-

@@ -11,7 +11,6 @@ export const useAccountsStore = defineStore('accounts', {
     filters: {
       status: 'All Statuses',
       position: 'All Positions',
-      createdMonth: 'All Months',
       sortBy: 'Date Created (Newest)'
     },
     currentPage: 1,

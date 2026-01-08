@@ -9,6 +9,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
     searchQuery: '',
     filters: {
       ageRange: 'All Ages',
+      gender: 'All Genders',
       joinMonth: 'All Months',
       sortBy: 'Name (A-Z)'
     },
@@ -45,16 +46,24 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         })
       }
 
-      // Month filter
-      if (state.filters.joinMonth !== 'All Months') {
+      // Gender filter
+      if (state.filters.gender !== 'All Genders') {
         filtered = filtered.filter(member => {
-          const date = new Date(member.joinDate)
-          const monthName = date.toLocaleString('default', { month: 'long' })
-          return monthName === state.filters.joinMonth
+          return member.gender === state.filters.gender
         })
       }
 
-      // Sort
+      // Join month filter
+      if (state.filters.joinMonth !== 'All Months') {
+        filtered = filtered.filter(member => {
+          if (!member.date_created) return false
+          const memberDate = new Date(member.date_created)
+          const memberMonth = memberDate.toLocaleString('en-US', { month: 'long' })
+          return memberMonth === state.filters.joinMonth
+        })
+      }
+
+      // Sort by join date (using date_created field)
       filtered.sort((a, b) => {
         switch (state.filters.sortBy) {
           case 'Name (A-Z)':
@@ -62,13 +71,21 @@ export const useMemberRecordStore = defineStore('memberRecord', {
           case 'Name (Z-A)':
             return (b.name || '').localeCompare(a.name || '')
           case 'Join Date (Newest)':
-            return new Date(b.joinDate) - new Date(a.joinDate)
+            return new Date(b.date_created || 0) - new Date(a.date_created || 0)
           case 'Join Date (Oldest)':
-            return new Date(a.joinDate) - new Date(b.joinDate)
+            return new Date(a.date_created || 0) - new Date(b.date_created || 0)
           case 'Age (Low to High)':
             return (a.age || 0) - (b.age || 0)
           case 'Age (High to Low)':
             return (b.age || 0) - (a.age || 0)
+          case 'Gender (Male First)':
+            // Sort by gender: Male first
+            const genderOrder = { 'Male': 1, 'Female': 2 }
+            return (genderOrder[a.gender] || 3) - (genderOrder[b.gender] || 3)
+          case 'Gender (Female First)':
+            // Sort by gender: Female first
+            const genderOrder2 = { 'Female': 1, 'Male': 2 }
+            return (genderOrder2[a.gender] || 3) - (genderOrder2[b.gender] || 3)
           default:
             return 0
         }
@@ -95,6 +112,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const search = options.search !== undefined ? options.search : this.searchQuery
         const ageRange = options.ageRange !== undefined ? options.ageRange : this.filters.ageRange
+        const gender = options.gender !== undefined ? options.gender : this.filters.gender
         const joinMonth = options.joinMonth !== undefined ? options.joinMonth : this.filters.joinMonth
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
 
@@ -111,6 +129,9 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         // Add filter parameters (only if not default values)
         if (ageRange && ageRange !== 'All Ages') {
           params.append('ageRange', ageRange)
+        }
+        if (gender && gender !== 'All Genders') {
+          params.append('gender', gender)
         }
         if (joinMonth && joinMonth !== 'All Months') {
           params.append('joinMonth', joinMonth)
@@ -150,6 +171,9 @@ export const useMemberRecordStore = defineStore('memberRecord', {
           }
           if (options.ageRange !== undefined) {
             this.filters.ageRange = ageRange
+          }
+          if (options.gender !== undefined) {
+            this.filters.gender = gender
           }
           if (options.joinMonth !== undefined) {
             this.filters.joinMonth = joinMonth
@@ -357,6 +381,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         // Use current filters if not provided
         const search = options.search !== undefined ? options.search : this.searchQuery
         const ageRange = options.ageRange !== undefined ? options.ageRange : this.filters.ageRange
+        const gender = options.gender !== undefined ? options.gender : this.filters.gender
         const joinMonth = options.joinMonth !== undefined ? options.joinMonth : this.filters.joinMonth
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
 
@@ -365,6 +390,9 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         if (search) params.append('search', search)
         if (ageRange && ageRange !== 'All Ages') {
           params.append('ageRange', ageRange)
+        }
+        if (gender && gender !== 'All Genders') {
+          params.append('gender', gender)
         }
         if (joinMonth && joinMonth !== 'All Months') {
           params.append('joinMonth', joinMonth)

@@ -1,4 +1,4 @@
-a<template>
+  a<template>
   <div class="member-record">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Church Members</h1>
@@ -32,6 +32,17 @@ a<template>
               density="compact"
               hide-details
               @update:model-value="handleFilterChange('ageRange', $event)"
+            ></v-select>
+          </v-col>
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="memberStore.filters.gender"
+              :items="genderOptions"
+              label="Gender"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="handleFilterChange('gender', $event)"
             ></v-select>
           </v-col>
           <v-col cols="12" md="2">
@@ -188,6 +199,7 @@ a<template>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
 import MemberDialog from '../../Dialogs/MemberDialog.vue'
+import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 // Pinia Store
@@ -199,6 +211,8 @@ const memberData = ref(null)
 
 // Filter options
 const ageRangeOptions = ['All Ages', '0-18', '19-30', '31-50', '51+']
+const genderOptions = ['All Genders', 'Male', 'Female']
+const joinMonthOptions = ['All Months', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const sortByOptions = [
   'Name (A-Z)',
   'Name (Z-A)',
@@ -206,10 +220,8 @@ const sortByOptions = [
   'Join Date (Oldest)',
   'Age (Low to High)',
   'Age (High to Low)',
-  'This Month',
-  'Last Month',
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'Gender (Male First)',
+  'Gender (Female First)'
 ]
 
 // Computed properties for two-way binding with store
@@ -285,6 +297,7 @@ const handleMemberSuccess = () => {
     pageSize: memberStore.itemsPerPage,
     search: memberStore.searchQuery,
     ageRange: memberStore.filters.ageRange,
+    gender: memberStore.filters.gender,
     joinMonth: memberStore.filters.joinMonth,
     sortBy: memberStore.filters.sortBy
   })
@@ -345,6 +358,7 @@ const handleExportExcel = async () => {
     const result = await memberStore.exportMembersToExcel({
       search: memberStore.searchQuery,
       ageRange: memberStore.filters.ageRange,
+      gender: memberStore.filters.gender,
       joinMonth: memberStore.filters.joinMonth,
       sortBy: memberStore.filters.sortBy
     })
@@ -360,137 +374,234 @@ const handleExportExcel = async () => {
   }
 }
 
-const handlePrint = () => {
-  const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Name', 'Age', 'Address', 'Email', 'Phone', 'Join Date', 'Position']
-  
-  // Get current user info for printed by
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-  const printedBy = userInfo?.member 
-    ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
-    : userInfo?.account?.email || 'Admin'
-  
-  let tableRows = ''
-  memberStore.members.forEach((member) => {
-    const name = getMemberName(member)
-    const joinDate = formatDate(member.date_created)
+const handlePrint = async () => {
+  try {
+    // Show loading state
+    memberStore.loading = true
+    console.log('Print: Starting to fetch all data...')
     
-    tableRows += `
-      <tr>
-        <td>${name}</td>
-        <td>${member.age || 'N/A'}</td>
-        <td>${member.address || 'N/A'}</td>
-        <td>${member.email || 'N/A'}</td>
-        <td>${member.phone_number || 'N/A'}</td>
-        <td>${joinDate}</td>
-        <td>${member.position || 'N/A'}</td>
-      </tr>
-    `
-  })
-  
-  const currentDate = new Date().toLocaleString()
-  
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Church Members - Print</title>
-        <style>
-          @media print {
-            @page { margin: 1cm; }
-          }
-          body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-          }
-          .header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #333;
-          }
-          .header img {
-            width: 60px;
-            height: 60px;
-            margin-right: 15px;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .header .subtitle {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-          }
-          th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-          }
-          th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-          }
-          tr:nth-child(even) {
-            background-color: #f9f9f9;
-          }
-          .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #666;
-          }
-          .footer-info {
-            text-align: right;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="/logo.png" alt="Church Logo" />
-          <div>
-            <h1>Church Members</h1>
-            <div class="subtitle">Biblical Bread Ministries</div>
+    // Fetch all members (use a large page size to get all data)
+    const accessToken = localStorage.getItem('accessToken')
+    if (!accessToken) {
+      throw new Error('No access token found')
+    }
+    
+    const params = new URLSearchParams()
+    params.append('limit', '10000') // Large limit to get all data
+    params.append('offset', '0')
+    
+    // Add current filters to get the filtered data
+    if (memberStore.searchQuery) {
+      params.append('search', memberStore.searchQuery)
+    }
+    if (memberStore.filters.ageRange && memberStore.filters.ageRange !== 'All Ages') {
+      params.append('ageRange', memberStore.filters.ageRange)
+    }
+    if (memberStore.filters.gender && memberStore.filters.gender !== 'All Genders') {
+      params.append('gender', memberStore.filters.gender)
+    }
+    if (memberStore.filters.joinMonth && memberStore.filters.joinMonth !== 'All Months') {
+      params.append('joinMonth', memberStore.filters.joinMonth)
+    }
+    if (memberStore.filters.sortBy) {
+      params.append('sortBy', memberStore.filters.sortBy)
+    }
+    
+    console.log('Print: Fetching with params:', params.toString())
+    
+    const response = await axios.get(`/church-records/members/getAllMembers?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    console.log('Print: Response received:', response.data)
+    
+    if (!response.data || !response.data.success) {
+      throw new Error(response.data?.message || 'Failed to fetch members')
+    }
+    
+    const allMembers = response.data?.data || []
+    console.log('Print: Total members fetched:', allMembers.length)
+    
+    // Sort the members locally to match the selected sort option
+    allMembers.sort((a, b) => {
+      switch (memberStore.filters.sortBy) {
+        case 'Name (A-Z)':
+          return (getMemberName(a) || '').localeCompare(getMemberName(b) || '')
+        case 'Name (Z-A)':
+          return (getMemberName(b) || '').localeCompare(getMemberName(a) || '')
+        case 'Join Date (Newest)':
+          return new Date(b.date_created || 0) - new Date(a.date_created || 0)
+        case 'Join Date (Oldest)':
+          return new Date(a.date_created || 0) - new Date(b.date_created || 0)
+        case 'Age (Low to High)':
+          return (a.age || 0) - (b.age || 0)
+        case 'Age (High to Low)':
+          return (b.age || 0) - (a.age || 0)
+        case 'Gender (Male First)':
+          const genderOrder = { 'Male': 1, 'Female': 2 }
+          return (genderOrder[a.gender] || 3) - (genderOrder[b.gender] || 3)
+        case 'Gender (Female First)':
+          const genderOrder2 = { 'Female': 1, 'Male': 2 }
+          return (genderOrder2[a.gender] || 3) - (genderOrder2[b.gender] || 3)
+        default:
+          return 0
+      }
+    })
+    
+    console.log('Print: Opening print window with', allMembers.length, 'members')
+    
+    if (allMembers.length === 0) {
+      ElMessage.warning('No members to print')
+      return
+    }
+    
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      throw new Error('Failed to open print window. Please allow popups for this site.')
+    }
+    
+    const tableHeaders = ['Name', 'Age', 'Address', 'Email', 'Phone', 'Join Date', 'Position']
+    
+    // Get current user info for printed by
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const printedBy = userInfo?.member 
+      ? `${userInfo.member.firstname || ''} ${userInfo.member.middle_name || ''} ${userInfo.member.lastname || ''}`.trim()
+      : userInfo?.account?.email || 'Admin'
+    
+    let tableRows = ''
+    allMembers.forEach((member) => {
+      const name = getMemberName(member)
+      const joinDate = formatDate(member.date_created)
+      
+      tableRows += `
+        <tr>
+          <td>${name}</td>
+          <td>${member.age || 'N/A'}</td>
+          <td>${member.address || 'N/A'}</td>
+          <td>${member.email || 'N/A'}</td>
+          <td>${member.phone_number || 'N/A'}</td>
+          <td>${joinDate}</td>
+          <td>${member.position || 'N/A'}</td>
+        </tr>
+      `
+    })
+    
+    const currentDate = new Date().toLocaleString()
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Church Members - Print</title>
+          <style>
+            @media print {
+              @page { margin: 1cm; }
+            }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #333;
+            }
+            .header img {
+              width: 60px;
+              height: 60px;
+              margin-right: 15px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 24px;
+            }
+            .header .subtitle {
+              font-size: 14px;
+              color: #666;
+              margin-top: 5px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+              display: flex;
+              justify-content: space-between;
+              font-size: 12px;
+              color: #666;
+            }
+            .footer-info {
+              text-align: right;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="/logo.png" alt="Church Logo" onerror="this.style.display='none'" />
+            <div>
+              <h1>Church Members</h1>
+              <div class="subtitle">Biblical Bread Ministries</div>
+            </div>
           </div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
-          </tbody>
-        </table>
-        <div class="footer">
-          <div>Total Records: ${memberStore.members.length}</div>
-          <div class="footer-info">
-            <div>Printed on: ${currentDate}</div>
-            <div>Printed by: ${printedBy}</div>
+          <table>
+            <thead>
+              <tr>
+                ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
+            </tbody>
+          </table>
+          <div class="footer">
+            <div>Total Records: ${allMembers.length}</div>
+            <div class="footer-info">
+              <div>Printed on: ${currentDate}</div>
+              <div>Printed by: ${printedBy}</div>
+            </div>
           </div>
-        </div>
-      </body>
-    </html>
-  `)
-  
-  printWindow.document.close()
-  printWindow.focus()
-  setTimeout(() => {
-    printWindow.print()
-    printWindow.close()
-  }, 250)
+        </body>
+      </html>
+    `)
+    
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      try {
+        printWindow.print()
+      } catch (e) {
+        console.error('Print error:', e)
+      }
+    }, 250)
+    
+  } catch (error) {
+    console.error('Print error:', error)
+    ElMessage.error('Failed to print: ' + (error.message || 'Please try again.'))
+  } finally {
+    memberStore.loading = false
+  }
 }
 
 // Fetch data on mount
@@ -500,6 +611,7 @@ onMounted(() => {
     pageSize: memberStore.itemsPerPage,
     search: memberStore.searchQuery,
     ageRange: memberStore.filters.ageRange,
+    gender: memberStore.filters.gender,
     joinMonth: memberStore.filters.joinMonth,
     sortBy: memberStore.filters.sortBy
   })

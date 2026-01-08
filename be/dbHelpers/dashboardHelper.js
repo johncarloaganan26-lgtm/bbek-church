@@ -93,6 +93,14 @@ async function getDashboardStats() {
       donationChangeText = '+100% from last month';
     }
     
+    // Get total all-time donations from tbl_tithes where status is 'completed'
+    const [totalAllDonationsResult] = await query(
+      `SELECT COALESCE(SUM(amount), 0) as total 
+       FROM tbl_tithes 
+       WHERE status = 'completed'`
+    );
+    const totalAllDonations = parseFloat(totalAllDonationsResult[0]?.total || 0);
+    
     // Get total prayer request forms
     const [totalMessagesResult] = await query(
       'SELECT COUNT(*) as total FROM tbl_forms WHERE form_type = ?',
@@ -107,29 +115,33 @@ async function getDashboardStats() {
     );
     const unreadMessages = unreadMessagesResult[0]?.total || 0;
     
-    // Get water baptisms scheduled this month (approved or ongoing status, with baptism_date this month)
+    // Get water baptisms scheduled this month (approved or ongoing status)
+    // Count records with baptism_date this month OR approved/ongoing without a date
     const [waterBaptismThisMonthResult] = await query(
       `SELECT COUNT(*) as total FROM tbl_waterbaptism 
        WHERE status IN ('approved', 'ongoing') 
-       AND DATE_FORMAT(baptism_date, "%Y-%m") = ?`,
+       AND (DATE_FORMAT(baptism_date, "%Y-%m") = ? OR baptism_date IS NULL)`,
       [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
     );
     const waterBaptismThisMonth = waterBaptismThisMonthResult[0]?.total || 0;
     
-    // Get child dedications scheduled this month (approved or ongoing status, with preferred_dedication_date this month)
+    // Get child dedications scheduled this month (approved or ongoing status)
+    // Count records with preferred_dedication_date this month OR approved/ongoing without a date
     const [childDedicationThisMonthResult] = await query(
       `SELECT COUNT(*) as total FROM tbl_childdedications 
        WHERE status IN ('approved', 'ongoing') 
-       AND DATE_FORMAT(preferred_dedication_date, "%Y-%m") = ?`,
+       AND (DATE_FORMAT(preferred_dedication_date, "%Y-%m") = ? 
+            OR preferred_dedication_date IS NULL)`,
       [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
     );
     const childDedicationThisMonth = childDedicationThisMonthResult[0]?.total || 0;
     
-    // Get burial services scheduled this month (approved or ongoing status, with service_date this month)
+    // Get burial services scheduled this month (approved or ongoing status)
+    // Count records with service_date this month OR approved/ongoing without a date
     const [burialServiceThisMonthResult] = await query(
       `SELECT COUNT(*) as total FROM tbl_burialservice 
        WHERE status IN ('approved', 'ongoing') 
-       AND DATE_FORMAT(service_date, "%Y-%m") = ?`,
+       AND (DATE_FORMAT(service_date, "%Y-%m") = ? OR service_date IS NULL)`,
       [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
     );
     const burialServiceThisMonth = burialServiceThisMonthResult[0]?.total || 0;
@@ -152,7 +164,8 @@ async function getDashboardStats() {
           currentMonth: currentMonthDonations,
           lastMonth: lastMonthDonations,
           changePercent: donationChangePercent,
-          changeText: donationChangeText
+          changeText: donationChangeText,
+          totalAll: totalAllDonations
         },
         messages: {
           total: totalMessages,

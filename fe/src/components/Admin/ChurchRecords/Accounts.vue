@@ -53,17 +53,6 @@
           </v-col>
           <v-col cols="12" md="2">
             <v-select
-              v-model="filters.createdMonth"
-              :items="createdMonthOptions"
-              label="Created Month"
-              variant="outlined"
-              density="compact"
-              :disabled="loading"
-              hide-details
-            ></v-select>
-          </v-col>
-          <v-col cols="12" md="2">
-            <v-select
               v-model="filters.sortBy"
               :items="sortByOptions"
               label="Sort By"
@@ -278,10 +267,9 @@ const sortByOptions = [
   'Date Created (Oldest)',
   'Position (A-Z)',
   'Status (A-Z)',
-  'This Month',
-  'Last Month',
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'Group by Member',
+  'Group by Staff',
+  'Group by Admin'
 ]
 
 // Watch for filter changes
@@ -291,10 +279,6 @@ watch(() => filters.value.status, (newStatus) => {
 
 watch(() => filters.value.position, (newPosition) => {
   accountsStore.setFilters({ position: newPosition })
-})
-
-watch(() => filters.value.createdMonth, (newMonth) => {
-  accountsStore.setFilters({ createdMonth: newMonth })
 })
 
 watch(() => filters.value.sortBy, (newSortBy) => {

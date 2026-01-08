@@ -649,6 +649,7 @@ async function getAllMembers(options = {}) {
       const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
       const ageRange = options.ageRange || null;
       const joinMonth = options.joinMonth || null;
+      const gender = options.gender || null;
       const sortBy = options.sortBy || null;
       
       // Build base query for counting total records
@@ -726,6 +727,23 @@ async function getAllMembers(options = {}) {
         }
       }
   
+      // Add gender filter
+      // Handle gender parameter (e.g., "Male", "Female")
+      if (gender && gender !== 'All Genders' && gender.trim() !== '') {
+        const genderValue = gender.trim();
+        // Map display name to database value
+        const genderMap = {
+          'Male': 'M',
+          'Female': 'F'
+        };
+        const dbGender = genderMap[genderValue] || genderValue;
+        
+        whereConditions.push('gender = ?');
+        countParams.push(dbGender);
+        params.push(dbGender);
+        hasWhere = true;
+      }
+  
       // Apply WHERE clause if any conditions exist
       if (hasWhere) {
         const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -757,6 +775,12 @@ async function getAllMembers(options = {}) {
         case 'Age (High to Low)':
           // Cast age to number for proper numeric sorting (age is stored as VARCHAR)
           orderByClause += 'CAST(age AS UNSIGNED) DESC';
+          break;
+        case 'Gender (Male First)':
+          orderByClause += 'gender ASC';
+          break;
+        case 'Gender (Female First)':
+          orderByClause += 'gender DESC';
           break;
         default:
           orderByClause += 'date_created DESC'; // Default sorting

@@ -127,7 +127,7 @@
                     <span class="text-caption">Account: {{ userInfo.account?.email }}</span>
                   </div>
                   <v-btn color="teal" size="large" block @click="showChildDedicationDialog = true">
-                    Open Child Dedication Dialog
+                    Request Child Dedication Service
                   </v-btn>
                 </v-card-text>
               </v-card>

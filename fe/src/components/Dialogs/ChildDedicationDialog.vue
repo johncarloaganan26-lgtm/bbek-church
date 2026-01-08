@@ -2,7 +2,7 @@
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
-    :title="isEditMode ? 'Update Child Dedication Request' : 'Add Child Dedication Request'"
+    :title="isEditMode ? 'Update Child Dedication Request' : (!isMemberUser ? 'New Child Dedication' : 'Request Child Dedication Service')"
     :width="dialogWidth"
     :close-on-click-modal="false"
     :close-on-press-escape="true"
@@ -529,7 +529,7 @@
           :loading="loading"
           :disabled="loading"
         >
-          {{ isEditMode ? 'Update' : 'Submit' }} Request
+          {{ isEditMode ? 'Update' : (!isMemberUser ? 'Add' : 'Submit') }} Request
         </el-button>
       </div>
     </template>

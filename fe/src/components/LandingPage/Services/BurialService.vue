@@ -402,10 +402,10 @@
               </v-card>
               <v-card class="registration-card fade-in-up" style="animation-delay: 800ms;" v-else>
                 <v-card-title class="registration-title">
-                  Burial Service Request
+                  Request Burial Service
                 </v-card-title>
                 <v-card-subtitle class="registration-subtitle">
-                  You are signed in as a member. Use the dialog below to submit or update a burial service request.
+                  You are signed in as a member. Use the button below to submit a burial service request.
                 </v-card-subtitle>
                 <v-card-text class="d-flex flex-column gap-4">
                   <div class="d-flex flex-column gap-2">
@@ -413,7 +413,7 @@
                     <span class="text-caption">Account: {{ userInfo.account?.email }}</span>
                   </div>
                   <v-btn color="teal" size="large" block @click="showBurialDialog = true">
-                    Open Burial Service Dialog
+                    Request Burial Service
                   </v-btn>
                 </v-card-text>
               </v-card>

@@ -74,6 +74,8 @@ import BurialService from '../components/LandingPage/Services/BurialService.vue'
 import PasswordManagement from '../components/PasswordManagement.vue'
 // Certificate Preview
 import CertificatePreview from '../views/CertificatePreview.vue'
+// Not Found Page
+import NotFound from '../views/NotFound.vue'
 // Member Transaction
 import Transaction from '../components/Transaction.vue'
 
@@ -386,6 +388,12 @@ const routes = [
     path: '/landpage/transactions',
     name: 'MemberTransactions',
     component: Transaction
+  },
+  // Catch-all route for 404 - must be last
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: NotFound
   }
 ]
 

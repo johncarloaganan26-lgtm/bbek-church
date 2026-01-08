@@ -2,7 +2,7 @@
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
-    :title="isEditMode ? 'Update Burial Service' : 'Add Burial Service'"
+    :title="isEditMode ? 'Update Burial Service' : (userInfo.account.position === 'admin' || userInfo.account.position === 'staff' ? 'New Burial Service' : 'Request Burial Service')"
     :width="dialogWidth"
     :close-on-click-modal="false"
     :close-on-press-escape="true"
@@ -197,7 +197,7 @@
          :loading="loading"
          :disabled="loading"
        >
-         {{ isEditMode ? 'Update' : userInfo.account.position === 'admin' || userInfo.account.position === 'staff' ? 'Add' : 'Send' }} Record
+         {{ isEditMode ? 'Update' : userInfo.account.position === 'admin' || userInfo.account.position === 'staff' ? 'Add' : 'Send' }} Request
        </el-button>
      </div>
    </template>
