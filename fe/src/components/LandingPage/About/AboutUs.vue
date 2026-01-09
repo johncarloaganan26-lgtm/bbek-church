@@ -78,17 +78,6 @@
         <v-row>
           <v-col cols="12" md="6">
             <div class="text-center mb-8">
-              <v-icon size="32" color="teal" class="mb-4">mdi-check-circle</v-icon>
-              <h2 class="text-h4 font-weight-bold text-teal mb-4">Our Mission</h2>
-            </div>
-            <v-card class="pa-8" variant="flat" color="grey-lighten-5">
-              <p class="text-h6 text-grey-darken-1 italic">
-                "{{ ourStoryData.mission || mission }}"
-              </p>
-            </v-card>
-          </v-col>
-          <v-col cols="12" md="6">
-            <div class="text-center mb-8">
               <v-icon size="32" color="teal" class="mb-4">mdi-eye</v-icon>
               <h2 class="text-h4 font-weight-bold text-teal mb-4">Our Vision</h2>
             </div>
@@ -97,6 +86,17 @@
                 "{{ ourStoryData.vision || vision }}"
               </p>
               <p class="text-body-2 text-grey-darken-1">{{ ourStoryData.visionVerse || 'Matthew 28:19-20' }}</p>
+            </v-card>
+          </v-col>
+          <v-col cols="12" md="6">
+            <div class="text-center mb-8">
+              <v-icon size="32" color="teal" class="mb-4">mdi-check-circle</v-icon>
+              <h2 class="text-h4 font-weight-bold text-teal mb-4">Our Mission</h2>
+            </div>
+            <v-card class="pa-8" variant="flat" color="grey-lighten-5">
+              <p class="text-h6 text-grey-darken-1 italic">
+                "{{ ourStoryData.mission || mission }}"
+              </p>
             </v-card>
           </v-col>
         </v-row>
@@ -115,14 +115,17 @@
           </p>
         </div>
 
-        <div class="timeline-container">
+        <div class="timeline-container" ref="timelineContainer">
+          <!-- Animated Progress Line -->
+          <div class="timeline-progress-line" :style="{ height: `${scrollProgress}%` }"></div>
           <div
             v-for="(milestone, index) in timelineData"
             :key="index"
-            :class="`timeline-item timeline-item-${index + 1} ${index % 2 === 1 ? 'timeline-item-right' : ''}`"
+            :ref="el => timelineItemRefs[index] = el"
+            :class="`timeline-item timeline-item-${index + 1} ${index % 2 === 1 ? 'timeline-item-right' : ''} ${visibleItems[index] ? 'timeline-item-visible' : ''}`"
           >
-            <div class="timeline-marker"></div>
-            <div class="timeline-content">
+            <div class="timeline-marker" :class="{ 'marker-active': visibleItems[index], 'marker-past': scrollProgress > (index + 1) * 20 }"></div>
+            <div class="timeline-content" :class="{ 'content-visible': visibleItems[index] }">
               <div class="timeline-year">{{ milestone.year }}</div>
               <v-card class="pa-6" elevation="2">
                 <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-3">
@@ -149,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from '@/api/axios'
 
 const getImageUrl = (imagePath) => {
@@ -163,6 +166,65 @@ const handleHeroImageError = (event) => {
   const target = event.target || event.currentTarget
   if (target) {
     target.style.backgroundImage = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+  }
+}
+
+// Timeline scroll animation refs
+const timelineContainer = ref(null)
+const timelineItemRefs = ref([])
+const visibleItems = ref({})
+const scrollProgress = ref(0)
+let observer = null
+
+// Setup scroll tracking for progress line
+const handleScroll = () => {
+  if (!timelineContainer.value) return
+  
+  const containerRect = timelineContainer.value.getBoundingClientRect()
+  const containerTop = containerRect.top
+  const containerHeight = containerRect.height
+  const viewportHeight = window.innerHeight
+  
+  // Calculate how far we've scrolled through the timeline
+  const startOffset = viewportHeight * 0.6
+  const endOffset = containerHeight + 100
+  
+  let progress = (startOffset - containerTop) / endOffset * 100
+  progress = Math.max(0, Math.min(100, progress))
+  
+  scrollProgress.value = progress
+}
+
+// Setup Intersection Observer for timeline scroll animations
+const setupTimelineObserver = () => {
+  const options = {
+    root: null,
+    rootMargin: '-50px 0px -50% 0px',
+    threshold: 0.1
+  }
+  
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const index = timelineItemRefs.value.findIndex(el => el === entry.target)
+        if (index !== -1) {
+          visibleItems.value[index] = true
+        }
+      }
+    })
+  }, options)
+  
+  // Observe all timeline items
+  timelineItemRefs.value.forEach((el) => {
+    if (el) observer.observe(el)
+  })
+}
+
+// Cleanup observer on unmount
+const cleanupTimelineObserver = () => {
+  if (observer) {
+    observer.disconnect()
+    observer = null
   }
 }
 
@@ -342,6 +404,17 @@ const fetchOurStoryData = async () => {
 
 onMounted(async () => {
   await fetchOurStoryData()
+  // Setup scroll observer after DOM is ready
+  setTimeout(() => {
+    setupTimelineObserver()
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+  }, 100)
+})
+
+onUnmounted(() => {
+  cleanupTimelineObserver()
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -438,8 +511,22 @@ onMounted(async () => {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #14b8a6;
+  background: #e0e0e0;
   transform: translateX(-50%);
+}
+
+/* Animated Progress Line */
+.timeline-progress-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #14b8a6, #0d9488);
+  transform: translateX(-50%);
+  z-index: 1;
+  transition: height 0.1s linear;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
 }
 
 .timeline-item {
@@ -447,28 +534,21 @@ onMounted(async () => {
   margin-bottom: 60px;
   display: flex;
   align-items: center;
-  animation: fadeInUp 0.6s ease-out both;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s ease-out;
 }
 
-.timeline-item-1 {
-  animation-delay: 200ms;
+.timeline-item-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.timeline-item-2 {
-  animation-delay: 300ms;
-}
-
-.timeline-item-3 {
-  animation-delay: 400ms;
-}
-
-.timeline-item-4 {
-  animation-delay: 500ms;
-}
-
-.timeline-item-5 {
-  animation-delay: 600ms;
-}
+.timeline-item-1 { transition-delay: 0ms; }
+.timeline-item-2 { transition-delay: 100ms; }
+.timeline-item-3 { transition-delay: 200ms; }
+.timeline-item-4 { transition-delay: 300ms; }
+.timeline-item-5 { transition-delay: 400ms; }
 
 .timeline-item :deep(.v-card) {
   transition: all 0.3s ease;
@@ -488,11 +568,42 @@ onMounted(async () => {
   left: 50%;
   width: 16px;
   height: 16px;
-  background: #14b8a6;
+  background: #ccc;
   border: 4px solid white;
   border-radius: 50%;
   transform: translateX(-50%);
   z-index: 2;
+  transition: all 0.4s ease;
+  box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+}
+
+.timeline-marker.marker-active {
+  background: #14b8a6;
+  box-shadow: 0 0 0 6px rgba(20, 184, 166, 0.3);
+  transform: translateX(-50%) scale(1.3);
+}
+
+.timeline-marker.marker-past {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  transform: translateX(-50%) scale(1.2);
+}
+
+.timeline-content {
+  width: 45%;
+  padding: 0 20px;
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all 0.5s ease-out 0.2s;
+}
+
+.timeline-item-right .timeline-content {
+  transform: translateX(20px);
+}
+
+.timeline-content.content-visible {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .timeline-content {
@@ -514,6 +625,12 @@ onMounted(async () => {
 @media (max-width: 960px) {
   .timeline-container::before {
     left: 20px;
+    background: #e0e0e0;
+  }
+  
+  .timeline-progress-line {
+    left: 20px;
+    transform: translateX(-50%);
   }
   
   .timeline-marker {

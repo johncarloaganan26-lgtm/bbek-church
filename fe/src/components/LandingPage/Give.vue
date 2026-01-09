@@ -87,7 +87,7 @@
               </v-col>
               <v-col cols="12" md="6">
                 <h4 class="text-h6 font-weight-bold mb-4">Other Ways to Give</h4>
-                <GiveInPersonCard />
+                <GiveInPersonCard :giveInPersonData="giveInPersonData" />
               </v-col>
             </v-row>
           </v-card>
@@ -134,6 +134,15 @@ const giveData = ref({
   backButtonColor: '#00bcd4'
 })
 
+const giveInPersonData = ref({
+  giveInPersonTitle: 'Give in Person',
+  giveInPersonText: 'You can give during any of our worship services by placing your donation in the offering box.',
+  sundayServicesLabel: 'Sunday Services:',
+  sundayServicesTime: '9:00 AM - 11:00 AM',
+  scheduledGivingTitle: 'Scheduled Giving',
+  scheduledGivingText: "If you'd like to set up regular, scheduled giving, please contact our church office for assistance. We can help you establish a consistent giving plan that works for you."
+})
+
 const floatingElements = ref([
   { style: { top: '80px', left: '80px', width: '48px', height: '48px', animationDelay: '0s' } },
   { style: { top: '33%', right: '64px', width: '32px', height: '32px', animationDelay: '1.5s' } },
@@ -176,6 +185,14 @@ const fetchGiveData = async () => {
         giveData.value.backButtonColor = content.backButtonColor
         console.log('Back button color from CMS:', content.backButtonColor)
       }
+      
+      // Update giveInPerson data from content
+      if (content.giveInPersonTitle) giveInPersonData.value.giveInPersonTitle = content.giveInPersonTitle
+      if (content.giveInPersonText) giveInPersonData.value.giveInPersonText = content.giveInPersonText
+      if (content.sundayServicesLabel) giveInPersonData.value.sundayServicesLabel = content.sundayServicesLabel
+      if (content.sundayServicesTime) giveInPersonData.value.sundayServicesTime = content.sundayServicesTime
+      if (content.scheduledGivingTitle) giveInPersonData.value.scheduledGivingTitle = content.scheduledGivingTitle
+      if (content.scheduledGivingText) giveInPersonData.value.scheduledGivingText = content.scheduledGivingText
       
       // Handle hero image - images are stored as BLOB, returned as base64 in images object
       // The image is stored with field_name = 'heroImage' in tbl_cms_images

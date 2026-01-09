@@ -3,13 +3,24 @@
     <!-- Header -->
     <div class="page-header">
       <div class="header-content">
-        <h1 class="page-title">
-          <el-icon><Document /></el-icon>
-          System Logs
-        </h1>
-        <p class="page-subtitle">Track all user actions and system activities (v2 - Raw Data)</p>
+        <!-- <img src="/logo.png" alt="Logo" class="header-logo" /> -->
+        <div class="header-text">
+          <h1 class="page-title">
+            <el-icon><Document /></el-icon>
+            System Logs
+          </h1>
+          <p class="page-subtitle">Track all user actions and system activities</p>
+        </div>
       </div>
       <div class="header-actions">
+        <el-button type="success" @click="exportToCSV">
+          <el-icon><Download /></el-icon>
+          Export CSV
+        </el-button>
+        <el-button type="info" @click="printData">
+          <el-icon><Printer /></el-icon>
+          Print
+        </el-button>
         <el-button type="primary" @click="refreshData" :loading="loading">
           <el-icon><Refresh /></el-icon>
           Refresh
@@ -123,6 +134,35 @@
 
     <!-- Data Table -->
     <el-card class="data-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>System Logs</span>
+          <div class="header-actions">
+            <!-- Page Size Select -->
+            <el-select
+              v-model="itemsPerPage"
+              @change="handlePageSizeChange"
+              :disabled="loading"
+              style="width: 120px; margin-right: 10px"
+            >
+              <el-option
+                v-for="size in pageSizeOptions"
+                :key="size"
+                :label="size === -1 ? 'All' : `${size} / page`"
+                :value="size"
+              />
+            </el-select>
+            <el-button
+              :icon="Refresh"
+              circle
+              @click="fetchData"
+              :loading="loading"
+              :disabled="loading"
+            />
+          </div>
+        </div>
+      </template>
+
       <el-table
         :data="logs"
         v-loading="loading"
@@ -190,27 +230,121 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
+
+        <el-table-column label="Actions" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="viewLogDetails(row)">
+              <el-icon><View /></el-icon>
+              View
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- Pagination -->
-      <div class="pagination-container">
+      <div class="pagination-container" v-if="totalPages > 1 && itemsPerPage !== -1">
+        <div class="pagination-info">
+          Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to
+          {{ Math.min(currentPage * itemsPerPage, totalCount) }} of {{ totalCount }} entries
+        </div>
         <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 25, 50, 100]"
-          :total="pagination.totalCount"
+          v-model:current-page="currentPage"
+          :page-size="itemsPerPage"
+          :total="totalCount"
+          :page-sizes="pageSizeOptions.filter(s => s !== -1)"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="fetchData"
-          @current-change="fetchData"
+          @current-change="handlePageChange"
+          @size-change="handlePageSizeChange"
+          :disabled="loading"
         />
       </div>
+      <!-- Show All Info -->
+      <div class="pagination-container" v-else-if="itemsPerPage === -1">
+        <div class="pagination-info">
+          Showing all {{ totalCount }} entries
+        </div>
+      </div>
     </el-card>
+
+    <!-- View Log Details Dialog -->
+    <el-dialog
+      v-model="viewDialogVisible"
+      title="System Log Details"
+      width="700px"
+      destroy-on-close
+    >
+      <template v-if="selectedLog">
+        <!-- Action Summary -->
+        <div class="log-summary">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="Date & Time">
+              {{ formatDate(selectedLog.date_created) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="User Email">
+              <el-tag type="info" size="small">{{ selectedLog.user_email || 'System' }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="Action">
+              <el-tag :type="getActionTypeColor(selectedLog.action_type)" size="small">
+                {{ selectedLog.action_type }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="Entity">
+              <el-tag type="primary" size="small">{{ selectedLog.entity_type }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="Entity Name" :span="2">
+              {{ selectedLog.entity_name || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="IP Address">
+              {{ selectedLog.ip_address || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Status">
+              <el-tag :type="getStatusColor(selectedLog.status)" size="small">
+                {{ selectedLog.status }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- Description -->
+        <div class="log-description-section">
+          <h4>Description</h4>
+          <el-input
+            type="textarea"
+            :rows="3"
+            :value="selectedLog.description"
+            readonly
+          />
+        </div>
+
+        <!-- Raw Data -->
+        <div class="log-raw-data-section">
+          <h4>Raw Data</h4>
+          <el-input
+            type="textarea"
+            :rows="10"
+            :value="formatRawData(selectedLog)"
+            readonly
+            class="raw-data-textarea"
+          />
+        </div>
+
+        <!-- Error Message (if any) -->
+        <div v-if="selectedLog.error_message" class="log-error-section">
+          <h4>Error Message</h4>
+          <el-alert
+            type="error"
+            :closable="false"
+            :description="selectedLog.error_message"
+          />
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { Document, Refresh, Search, CircleCheck, CircleClose, Calendar, RefreshRight, Warning } from '@element-plus/icons-vue'
+import { Document, Refresh, Search, CircleCheck, CircleClose, Calendar, RefreshRight, Download, Printer, View } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useSystemLogsStore } from '@/stores/Admin/systemLogsStore'
 
@@ -225,6 +359,10 @@ const stats = reactive({
   today_count: 0
 })
 
+// View Dialog State
+const viewDialogVisible = ref(false)
+const selectedLog = ref(null)
+
 // Filters
 const filters = reactive({
   search: '',
@@ -234,12 +372,25 @@ const filters = reactive({
   dateRange: null
 })
 
-// Pagination
-const pagination = reactive({
-  page: 1,
-  pageSize: 25,
-  totalCount: 0
+// Pagination - Using computed like Archive
+const currentPage = computed({
+  get: () => systemLogsStore.pagination?.page || 1,
+  set: (value) => { systemLogsStore.pagination.page = value }
 })
+
+const totalPages = computed(() => systemLogsStore.pagination?.totalPages || 1)
+
+const totalCount = computed(() => systemLogsStore.pagination?.totalCount || 0)
+
+const itemsPerPage = computed({
+  get: () => systemLogsStore.pagination?.pageSize || 100,
+  set: (value) => { 
+    systemLogsStore.pagination.pageSize = value
+    systemLogsStore.pagination.page = 1
+  }
+})
+
+const pageSizeOptions = computed(() => systemLogsStore.pagination?.pageSizeOptions || [25, 50, 100, 200, -1])
 
 // Computed
 const getStatusCount = (status) => {
@@ -290,13 +441,22 @@ const getStatusColor = (status) => {
 const handleSearch = () => {
   clearTimeout(window.searchTimeout)
   window.searchTimeout = setTimeout(() => {
-    pagination.page = 1
+    systemLogsStore.pagination.page = 1
     fetchData()
   }, 300)
 }
 
+const handlePageChange = (page) => {
+  systemLogsStore.pagination.page = page
+  fetchData()
+}
+
+const handlePageSizeChange = () => {
+  fetchData()
+}
+
 const handleDateChange = () => {
-  pagination.page = 1
+  systemLogsStore.pagination.page = 1
   fetchData()
 }
 
@@ -306,7 +466,7 @@ const resetFilters = () => {
   filters.entity_type = ''
   filters.status = ''
   filters.dateRange = null
-  pagination.page = 1
+  systemLogsStore.pagination.page = 1
   fetchData()
 }
 
@@ -314,21 +474,22 @@ const fetchData = async () => {
   loading.value = true
   try {
     const params = {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      page: itemsPerPage.value === -1 ? 1 : systemLogsStore.pagination.page,
+      pageSize: itemsPerPage.value === -1 ? -1 : systemLogsStore.pagination.pageSize,
       search: filters.search || undefined,
       action_type: filters.action_type || undefined,
       entity_type: filters.entity_type || undefined,
       status: filters.status || undefined,
       date_from: filters.dateRange ? filters.dateRange[0] : undefined,
-      date_to: filters.dateRange ? filters.dateRange[1] : undefined
+      date_to: filters.dateRange ? filters.dateRange[1] : undefined,
+      // Send showAll when pageSize is -1
+      showAll: itemsPerPage.value === -1 || undefined
     }
 
     const result = await systemLogsStore.fetchLogs(params)
     
     if (result && result.success) {
       logs.value = result.data || []
-      pagination.totalCount = result.totalCount || 0
     }
 
     await fetchStats()
@@ -353,8 +514,166 @@ const fetchStats = async () => {
 }
 
 const refreshData = () => {
-  pagination.page = 1
+  systemLogsStore.pagination.page = 1
   fetchData()
+}
+
+const exportToCSV = () => {
+  const headers = ['Date & Time', 'User Email', 'Action', 'Entity', 'Entity Name', 'Description', 'IP Address', 'Status', 'Error']
+  const rows = logs.value.map(log => [
+    formatDate(log.date_created),
+    log.user_email || 'System',
+    log.action_type,
+    log.entity_type,
+    log.entity_name || '-',
+    log.description,
+    log.ip_address || '-',
+    log.status,
+    log.error_message || '-'
+  ])
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `system_logs_${new Date().toISOString().split('T')[0]}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  ElMessage.success('System logs exported successfully')
+}
+
+const printData = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['Date & Time', 'User Email', 'Action', 'Entity', 'Entity Name', 'IP Address', 'Status']
+  
+  // Get current user info for print footer
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+  const printedBy = currentUser.email || currentUser.name || 'Admin'
+  
+  const rows = logs.value.map(log => `
+    <tr>
+      <td>${formatDate(log.date_created)}</td>
+      <td>${log.user_email || 'System'}</td>
+      <td>${log.action_type}</td>
+      <td>${log.entity_type}</td>
+      <td>${log.entity_name || '-'}</td>
+      <td>${log.ip_address || '-'}</td>
+      <td>${log.status}</td>
+    </tr>
+  `).join('')
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>System Logs - Print</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            opacity: 0.08;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .watermark img {
+            width: 100%;
+            height: auto;
+          }
+          .header-logo {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: 80px;
+          }
+          h1 { color: #1a365d; text-align: center; margin: 5px 0; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+          th { background-color: #1a365d; color: white; }
+          .print-info { 
+            text-align: right; 
+            color: #666; 
+            font-size: 10px; 
+            margin-bottom: 10px;
+          }
+          .org-name { text-align: center; color: #1a365d; font-weight: bold; margin-bottom: 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="watermark">
+          <img src="/logo.png" alt="Watermark" />
+        </div>
+        <img src="/logo.png" alt="Logo" class="header-logo" />
+        <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
+        <h1>System Logs</h1>
+        <p class="subtitle">Audit Trail Report</p>
+        <div class="print-info">
+          Printed on: ${new Date().toLocaleString()}<br/>
+          Printed by: ${printedBy}
+        </div>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="7" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
+}
+
+const viewLogDetails = (log) => {
+  selectedLog.value = log
+  viewDialogVisible.value = true
+}
+
+const formatRawData = (log) => {
+  // Build a readable raw data representation
+  const rawDataParts = []
+  
+  // Basic info
+  rawDataParts.push('=== BASIC INFO ===')
+  rawDataParts.push(`Log ID: ${log.log_id || 'N/A'}`)
+  rawDataParts.push(`Date: ${formatDate(log.date_created)}`)
+  rawDataParts.push(`User: ${log.user_email || 'System'}`)
+  rawDataParts.push(`IP Address: ${log.ip_address || 'N/A'}`)
+  
+  // Action details
+  rawDataParts.push('')
+  rawDataParts.push('=== ACTION DETAILS ===')
+  rawDataParts.push(`Action: ${log.action_type}`)
+  rawDataParts.push(`Entity Type: ${log.entity_type}`)
+  rawDataParts.push(`Entity Name: ${log.entity_name || '(not specified)'}`)
+  rawDataParts.push(`Status: ${log.status}`)
+  
+  // Full description (this contains the actual data that was actioned)
+  rawDataParts.push('')
+  rawDataParts.push('=== RAW DATA (What was submitted/changed) ===')
+  rawDataParts.push(log.description || '(no data)')
+  
+  // Error if any
+  if (log.error_message) {
+    rawDataParts.push('')
+    rawDataParts.push('=== ERROR ===')
+    rawDataParts.push(log.error_message)
+  }
+  
+  return rawDataParts.join('\n')
 }
 
 onMounted(() => {
@@ -377,6 +696,18 @@ onMounted(() => {
 }
 
 .header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-logo {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.header-text {
   display: flex;
   flex-direction: column;
 }
@@ -454,6 +785,18 @@ onMounted(() => {
   border-radius: 12px;
 }
 
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .description-text {
   font-size: 12px;
   color: #606266;
@@ -469,10 +812,43 @@ onMounted(() => {
 
 .pagination-container {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #EBEEF5;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #909399;
+}
+
+/* View Dialog Styles */
+.log-summary {
+  margin-bottom: 20px;
+}
+
+.log-description-section,
+.log-raw-data-section,
+.log-error-section {
+  margin-top: 16px;
+}
+
+.log-description-section h4,
+.log-raw-data-section h4,
+.log-error-section h4 {
+  margin-bottom: 8px;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.raw-data-textarea {
+  font-family: monospace;
+  font-size: 12px;
 }
 
 @media (max-width: 1200px) {
@@ -483,7 +859,7 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .stats-row {
-    grid-template-columns: 1fr;
+    grid-template: 1fr;
   }
   
   .filter-row {
@@ -492,6 +868,11 @@ onMounted(() => {
   
   .search-input {
     width: 100%;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    text-align: center;
   }
 }
 </style>

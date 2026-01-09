@@ -1,4 +1,7 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const {
   saveCmsPage,
   getCmsPage,
@@ -12,6 +15,59 @@ const {
 
 const router = express.Router();
 
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+/**
+ * POST - Upload image to public folder
+ * POST /api/cms/upload-image
+ * MUST be before /:pageName routes to avoid being matched as a pageName
+ */
+router.post('/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file provided' });
+    }
+    
+    const imageFile = req.file;
+    const type = req.body.type || 'info';
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 10000);
+    const ext = path.extname(imageFile.originalname) || '.jpg';
+    const filename = `cms_${type}_${timestamp}_${randomNum}${ext}`;
+    
+    // Save to frontend public/img folder (for Vite dev server and production)
+    // Navigate from be/ to fe/public/img/
+    const uploadDir = path.resolve(__dirname, '../../fe/public/img');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    const filePath = path.join(uploadDir, filename);
+    
+    // Write file from memory buffer
+    fs.writeFileSync(filePath, imageFile.buffer);
+    
+    const imagePath = `/img/${filename}`;
+    
+    res.status(200).json({
+      success: true,
+      message: 'Image uploaded successfully',
+      imagePath: imagePath
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to upload image' });
+  }
+});
+
 /**
  * GET - Get CMS page data
  * GET /api/cms/:pageName
@@ -19,7 +75,10 @@ const router = express.Router();
 router.get('/:pageName', async (req, res) => {
   try {
     const { pageName } = req.params;
+    console.log(`[CMS] Loading page: ${pageName}`);
+    
     const result = await getCmsPage(pageName);
+    console.log(`[CMS] Load result for ${pageName}:`, result.success ? 'success' : result.message);
     
     if (result.success) {
       res.status(200).json({
@@ -35,7 +94,7 @@ router.get('/:pageName', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error fetching CMS page:', error);
+    console.error('[CMS] Error fetching CMS page:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch CMS page'
@@ -53,14 +112,23 @@ router.post('/:pageName', async (req, res) => {
     const { pageName } = req.params;
     const { content } = req.body;
 
+    console.log(`[CMS] POST /cms/${pageName} - Saving page...`);
+    console.log(`[CMS] Request body:`, JSON.stringify(req.body).substring(0, 500));
+
     if (!content) {
+      console.error(`[CMS] No content provided for page: ${pageName}`);
       return res.status(400).json({
         success: false,
         error: 'Content data is required'
       });
     }
 
+    console.log(`[CMS] Calling saveCmsPage for page: ${pageName}`);
+    const startTime = Date.now();
     const result = await saveCmsPage(pageName, content);
+    const duration = Date.now() - startTime;
+    console.log(`[CMS] saveCmsPage completed in ${duration}ms`);
+    console.log(`[CMS] saveCmsPage result:`, result);
     
     if (result.success) {
       res.status(200).json({
@@ -76,7 +144,8 @@ router.post('/:pageName', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error saving CMS page:', error);
+    console.error('[CMS] Error saving CMS page:', error);
+    console.error('[CMS] Error stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to save CMS page'
@@ -552,4 +621,3 @@ router.get('/:pageName/full', async (req, res) => {
 });
 
 module.exports = router;
-

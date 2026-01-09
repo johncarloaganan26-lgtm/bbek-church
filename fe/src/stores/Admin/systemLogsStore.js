@@ -16,9 +16,10 @@ export const useSystemLogsStore = defineStore('systemLogs', {
     },
     pagination: {
       page: 1,
-      pageSize: 25,
+      pageSize: 100, // Default to 100 per page
       totalCount: 0,
-      totalPages: 0
+      totalPages: 0,
+      pageSizeOptions: [100, 500, 1000, -1] // -1 means "Show All"
     },
     stats: {
       total_count: 0,

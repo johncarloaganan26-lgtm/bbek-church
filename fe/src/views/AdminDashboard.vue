@@ -14,7 +14,7 @@
           </v-avatar>
           <span class="text-h6 font-weight-bold">{{ headerData.acronym || 'BBEK' }} Church</span>
         </div>
-        <div class="text-uppercase text-caption grey--text mb-6">ADMIN PANEL</div>
+        <div class="text-uppercase text-caption grey--text mb-6">{{ isAdmin ? 'ADMIN PANEL' : 'STAFF PANEL' }}</div>
       </div>
 
       <v-list nav density="compact" class="pa-0">
@@ -149,6 +149,7 @@
             <v-list-item v-bind="props" title="MAINTENANCE"></v-list-item>
           </template>
           <v-list-item 
+            v-if="isAdmin"
             prepend-icon="mdi-file-document" 
             title="Audit Trail" 
             :to="{ name: 'AuditTrail' }"
@@ -156,6 +157,7 @@
             @click="closeDrawerOnMobile"
           ></v-list-item>
           <v-list-item 
+            v-if="isAdmin"
             prepend-icon="mdi-folder" 
             title="Archives" 
             :to="{ name: 'Archive' }"
@@ -245,6 +247,11 @@ const { mobile } = useDisplay()
 
 // User info from token
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')) || null)
+
+// Check if user is admin
+const isAdmin = computed(() => {
+  return userInfo.value?.account?.position === 'admin'
+})
 
 // Loading state for CMS data
 const isLoadingHeader = computed(() => cmsStore.isPageLoading('header'))

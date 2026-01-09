@@ -218,6 +218,8 @@ const sortByOptions = [
   'Name (Z-A)',
   'Join Date (Newest)',
   'Join Date (Oldest)',
+  'Join Month (Jan-Dec)',
+  'Join Month (Dec-Jan)',
   'Age (Low to High)',
   'Age (High to Low)',
   'Gender (Male First)',
@@ -436,6 +438,20 @@ const handlePrint = async () => {
           return new Date(b.date_created || 0) - new Date(a.date_created || 0)
         case 'Join Date (Oldest)':
           return new Date(a.date_created || 0) - new Date(b.date_created || 0)
+        case 'Join Month (Jan-Dec)':
+          const dateA = new Date(a.date_created || 0)
+          const dateB = new Date(b.date_created || 0)
+          if (dateA.getFullYear() === dateB.getFullYear()) {
+            return dateA.getMonth() - dateB.getMonth()
+          }
+          return dateA.getFullYear() - dateB.getFullYear()
+        case 'Join Month (Dec-Jan)':
+          const dateC = new Date(b.date_created || 0)
+          const dateD = new Date(a.date_created || 0)
+          if (dateC.getFullYear() === dateD.getFullYear()) {
+            return dateC.getMonth() - dateD.getMonth()
+          }
+          return dateC.getFullYear() - dateD.getFullYear()
         case 'Age (Low to High)':
           return (a.age || 0) - (b.age || 0)
         case 'Age (High to Low)':
@@ -503,6 +519,21 @@ const handlePrint = async () => {
             body {
               font-family: Arial, sans-serif;
               margin: 20px;
+              position: relative;
+            }
+            .watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 80%;
+              opacity: 0.08;
+              z-index: -1;
+              pointer-events: none;
+            }
+            .watermark img {
+              width: 100%;
+              height: auto;
             }
             .header {
               display: flex;
@@ -520,11 +551,19 @@ const handlePrint = async () => {
             .header h1 {
               margin: 0;
               font-size: 24px;
+              color: #1a365d;
             }
             .header .subtitle {
               font-size: 14px;
               color: #666;
               margin-top: 5px;
+            }
+            .org-name {
+              text-align: center;
+              color: #1a365d;
+              font-weight: bold;
+              font-size: 18px;
+              margin-bottom: 5px;
             }
             table {
               width: 100%;
@@ -537,7 +576,8 @@ const handlePrint = async () => {
               text-align: left;
             }
             th {
-              background-color: #f2f2f2;
+              background-color: #1a365d;
+              color: white;
               font-weight: bold;
             }
             tr:nth-child(even) {
@@ -558,13 +598,17 @@ const handlePrint = async () => {
           </style>
         </head>
         <body>
+          <div class="watermark">
+            <img src="/logo.png" alt="Watermark" />
+          </div>
           <div class="header">
             <img src="/logo.png" alt="Church Logo" onerror="this.style.display='none'" />
             <div>
               <h1>Church Members</h1>
-              <div class="subtitle">Biblical Bread Ministries</div>
+              <div class="subtitle">Membership Report</div>
             </div>
           </div>
+          <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
           <table>
             <thead>
               <tr>

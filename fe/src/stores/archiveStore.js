@@ -17,8 +17,8 @@ export const useArchiveStore = defineStore('archive', {
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
-    itemsPerPage: 10,
-    pageSizeOptions: [10, 25, 50, 100],
+    itemsPerPage: 100, // Default to 100 per page
+    pageSizeOptions: [25, 50, 100, 200],
     summaryStats: null
   }),
 
@@ -151,6 +151,38 @@ export const useArchiveStore = defineStore('archive', {
         }
       } catch (error) {
         console.error('Error fetching summary stats:', error)
+      }
+    },
+
+    async deleteArchivePermanently(id) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        const response = await axios.delete(`/archives/deleteArchive/${id}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        })
+
+        if (response.data.success) {
+          // Refresh the archives list and summary stats
+          await this.fetchArchives()
+          await this.fetchSummaryStats()
+          return { success: true, data: response.data.data }
+        } else {
+          throw new Error(response.data.message || 'Failed to permanently delete archive')
+        }
+      } catch (error) {
+        console.error('Error permanently deleting archive:', error)
+        const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to permanently delete archive'
+        this.error = errorMessage
+        const deleteError = new Error(errorMessage)
+        deleteError.response = error.response
+        throw deleteError
+      } finally {
+        this.loading = false
       }
     },
 

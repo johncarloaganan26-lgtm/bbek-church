@@ -122,6 +122,9 @@ async function getAllSystemLogs(options = {}) {
     let sql = `SELECT * FROM ${TABLE_NAME}`;
     const params = [];
 
+    // Check if requesting all data (no pagination)
+    const showAll = options.showAll === true || options.pageSize === -1;
+
     // WHERE conditions
     const whereConditions = [];
 
@@ -200,8 +203,42 @@ async function getAllSystemLogs(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Add pagination
-    const finalLimit = Math.min(Math.max(1, limit), 100);
+    // Add pagination - support "show all" and increase max limit
+    let logRows;
+    if (showAll) {
+      // Fetch all data without limit
+      const [rows] = await query(sql, params);
+      logRows = rows.map(row => {
+        const converted = {};
+        for (const [key, value] of Object.entries(row)) {
+          // Preserve date_created as Date object for frontend formatting
+          if (key === 'date_created' && (value instanceof Date || typeof value === 'string')) {
+            converted[key] = value;
+          } else {
+            converted[key] = toPlainText(value);
+          }
+        }
+        return converted;
+      });
+      return {
+        success: true,
+        message: 'All system logs retrieved successfully',
+        data: logRows,
+        count: logRows.length,
+        totalCount: logRows.length,
+        pagination: {
+          page: 1,
+          pageSize: -1, // Keep as -1 to indicate "Show All"
+          totalPages: 1,
+          totalCount: logRows.length,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          showAll: true
+        }
+      };
+    }
+
+    const finalLimit = Math.min(Math.max(1, pageSize), 1000); // Increased to 1000 max, use pageSize
     const finalOffset = Math.max(0, offset);
 
     if (finalOffset > 0) {

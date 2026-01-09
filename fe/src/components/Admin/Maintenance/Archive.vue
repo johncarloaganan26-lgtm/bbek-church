@@ -233,7 +233,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="Actions" width="100" align="center" fixed="right">
+          <el-table-column label="Actions" width="160" align="center" fixed="right">
             <template #default="{ row }">
               <el-tooltip content="View Details" placement="top">
                 <el-button
@@ -253,6 +253,17 @@
                   @click="handleRestore(row)"
                   :disabled="loading"
                   type="success"
+                  text
+                />
+              </el-tooltip>
+              <el-tooltip v-if="!row.restored" content="Delete Permanently" placement="top">
+                <el-button
+                  :icon="Delete"
+                  circle
+                  size="small"
+                  @click="handleDelete(row)"
+                  :disabled="loading"
+                  type="danger"
                   text
                 />
               </el-tooltip>
@@ -368,6 +379,39 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Permanent Delete Confirmation Dialog -->
+    <el-dialog
+      v-model="deleteDialog"
+      title="Permanently Delete Archive"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="delete-warning">
+        <el-icon :size="48" color="#F56C6C" class="mb-4"><Delete /></el-icon>
+        <p class="delete-title">Are you sure you want to permanently delete this archive?</p>
+        <p class="delete-message">This action <strong>cannot be undone</strong>. The archive record will be permanently removed from the database.</p>
+        <el-descriptions :column="1" border class="mt-4">
+          <el-descriptions-item label="Table">
+            {{ deleteTarget?.table }}
+          </el-descriptions-item>
+          <el-descriptions-item label="Original ID">
+            {{ deleteTarget?.id }}
+          </el-descriptions-item>
+          <el-descriptions-item label="Archive ID">
+            {{ deleteTarget?.archive_id }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="deleteDialog = false">Cancel</el-button>
+          <el-button type="danger" @click="confirmDelete" :loading="deleting">
+           Delete Permanently
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -385,7 +429,8 @@ import {
   Loading,
   Refresh,
   Download,
-  Printer
+  Printer,
+  Delete
 } from '@element-plus/icons-vue'
 
 const archiveStore = useArchiveStore()
@@ -421,6 +466,9 @@ const restoreDialog = ref(false)
 const restoreTarget = ref(null)
 const restoreNotes = ref('')
 const restoring = ref(false)
+const deleteDialog = ref(false)
+const deleteTarget = ref(null)
+const deleting = ref(false)
 const sortBy = computed({
   get: () => archiveStore.filters.sortBy || 'Date (Newest)',
   set: (value) => archiveStore.setFilters({ sortBy: value })
@@ -553,6 +601,36 @@ const confirmRestore = async () => {
   }
 }
 
+const handleDelete = (item) => {
+  deleteTarget.value = {
+    archive_id: item.archive_id,
+    table: formatTableName(item.original_table),
+    id: item.original_id
+  }
+  deleteDialog.value = true
+}
+
+const confirmDelete = async () => {
+  if (!deleteTarget.value) return
+
+  deleting.value = true
+  try {
+    await archiveStore.deleteArchivePermanently(deleteTarget.value.archive_id)
+    ElMessage.success('Archive permanently deleted')
+    deleteDialog.value = false
+    deleteTarget.value = null
+    // Refresh the archives list
+    await fetchArchives()
+    await fetchSummaryStats()
+  } catch (error) {
+    console.error('Error deleting archive:', error)
+    const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to delete archive'
+    ElMessage.error(errorMessage)
+  } finally {
+    deleting.value = false
+  }
+}
+
 const formatDateTime = (dateString) => {
   if (!dateString) return 'N/A'
   // Handle MySQL DATETIME format "YYYY-MM-DD HH:mm:ss"
@@ -609,6 +687,10 @@ const printData = () => {
   const printWindow = window.open('', '_blank')
   const tableHeaders = ['Archived Date', 'Original Table', 'Original ID', 'Archived By', 'Status']
   
+  // Get current user info for print footer
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+  const printedBy = currentUser.email || currentUser.name || 'Admin'
+  
   const rows = archives.value.map(archive => `
     <tr>
       <td>${formatDateTime(archive.archived_at)}</td>
@@ -624,19 +706,56 @@ const printData = () => {
       <head>
         <title>Archives - Print</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #1a365d; text-align: center; }
-          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            opacity: 0.08;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .watermark img {
+            width: 100%;
+            height: auto;
+          }
+          .header-logo {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: 80px;
+          }
+          h1 { color: #1a365d; text-align: center; margin: 5px 0; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 11px; }
           th { background-color: #1a365d; color: white; }
-          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+          .print-info { 
+            text-align: right; 
+            color: #666; 
+            font-size: 10px; 
+            margin-bottom: 10px;
+          }
+          .org-name { text-align: center; color: #1a365d; font-weight: bold; margin-bottom: 5px; }
         </style>
       </head>
       <body>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="watermark">
+          <img src="/logo.png" alt="Watermark" />
+        </div>
+        <img src="/logo.png" alt="Logo" class="header-logo" />
+        <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
         <h1>Archives</h1>
-        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <p class="subtitle">Archived Records Report</p>
+        <div class="print-info">
+          Printed on: ${new Date().toLocaleString()}<br/>
+          Printed by: ${printedBy}
+        </div>
         <table>
           <thead>
             <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
@@ -819,6 +938,29 @@ onMounted(async () => {
 
 .mt-4 {
   margin-top: 16px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.delete-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.delete-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #F56C6C;
+  margin: 16px 0 8px 0;
+}
+
+.delete-message {
+  color: #606266;
+  margin: 0;
 }
 
 @media (max-width: 768px) {

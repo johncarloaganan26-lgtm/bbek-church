@@ -1,5 +1,52 @@
 <template>
   <div class="info-list pa-4">
+    <!-- Background Image -->
+    <v-card class="mb-4" elevation="2">
+      <v-card-title class="text-h6 font-weight-bold">
+        Background Image
+      </v-card-title>
+      <v-card-text>
+        <!-- Upload Button -->
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-upload"
+          class="mb-2"
+          @click="triggerFileUpload"
+        >
+          Upload Image
+        </v-btn>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          @change="handleImageUpload"
+        />
+        
+        <!-- Current Image Path -->
+        <v-text-field
+          v-model="infoData.backgroundImage"
+          label="Background Image Path"
+          placeholder="/img/your-image.jpg"
+          hint="Enter the image path or upload a new image"
+          persistent-hint
+          variant="outlined"
+          density="compact"
+          class="mb-2"
+        />
+        
+        <div v-if="infoData.backgroundImage" class="mt-2">
+          <p class="text-body-2 text-grey mb-2">Preview:</p>
+          <v-img
+            :src="infoData.backgroundImage"
+            max-height="200"
+            contain
+            class="bg-grey-lighten-3"
+          />
+        </div>
+      </v-card-text>
+    </v-card>
+
     <!-- Column 1 Settings -->
     <v-card class="mb-4" elevation="2">
       <v-card-title class="text-h6 font-weight-bold">
@@ -203,7 +250,7 @@
 
 <script setup>
 import { reactive, ref, onMounted, watch } from 'vue'
-import { useCms } from '@/composables/useCms'
+import axios from '@/api/axios'
 
 const props = defineProps({
   infoData: {
@@ -217,11 +264,18 @@ const props = defineProps({
   }
 })
 
-// Initialize CMS composable
-const { loading, saving, loadPageData, savePageData } = useCms('info')
+// File input ref
+const fileInput = ref(null)
+
+// Saving state
+const saving = ref(false)
+
+// Save status
+const saveStatus = ref(null)
 
 // Default data structure
 const defaultInfoData = {
+  backgroundImage: '/img/abt.jpg',
   column1Icon: 'mdi-clock-outline',
   column1Title: 'SUNDAY SERVICE',
   column1Text: 'Bible Baptist Ekklesia of Kawit<br>Time: 10:00am<br>Location: 485 Acacia St., Villa Ramirez, Tabon 1, Kawit, Cavite',
@@ -238,64 +292,142 @@ const defaultInfoData = {
   buttonColor: '#008080'
 }
 
+// Initialize reactive data with defaults
+const infoData = reactive(JSON.parse(JSON.stringify(defaultInfoData)))
+
 // Create a reactive copy of the data
 const createReactiveCopy = (data) => {
   if (!data) return reactive(JSON.parse(JSON.stringify(defaultInfoData)))
   return reactive(JSON.parse(JSON.stringify(data)))
 }
 
-// Initialize with defaults to ensure all fields are reactive
-const infoData = reactive(JSON.parse(JSON.stringify(defaultInfoData)))
-
-// If props provide data, merge it
-if (props.infoData) {
-  const propData = createReactiveCopy(props.infoData)
-  Object.keys(propData).forEach(key => {
-    infoData[key] = propData[key]
-  })
+// Trigger file upload dialog
+const triggerFileUpload = () => {
+  fileInput.value?.click()
 }
 
-const saveStatus = ref(null)
-
-// Save function
-const saveInfoData = async () => {
+// Handle image upload
+const handleImageUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) {
+    console.log('No file selected')
+    return
+  }
+  
+  console.log('=== Image Upload ===')
+  console.log('File:', file.name, file.size, file.type)
+  
   try {
-    console.log('Saving Info data:', infoData)
-    const contentToSave = JSON.parse(JSON.stringify(infoData))
+    saving.value = true
+    const formData = new FormData()
+    formData.append('image', file)
+    formData.append('type', 'info')
     
-    // The savePageData expects content directly, pageName is already set in useCms('info')
-    const response = await savePageData(contentToSave)
+    console.log('Uploading to /cms/upload-image...')
+    const response = await axios.post('/cms/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
     
-    if (response) {
-      saveStatus.value = { type: 'success', message: 'Saved successfully!' }
-      console.log('✅ Info page saved successfully!')
-      
-      // Reload the data to ensure we have the latest
-      const loadedData = await loadPageData()
-      if (loadedData) {
-        // Merge reloaded data
-        Object.keys(defaultInfoData).forEach(key => {
-          if (loadedData.hasOwnProperty(key)) {
-            infoData[key] = loadedData[key]
-          }
-        })
-        
-        // Also merge any additional fields that might have been added
-        Object.keys(loadedData).forEach(key => {
-          if (!defaultInfoData.hasOwnProperty(key)) {
-            infoData[key] = loadedData[key]
-          }
-        })
-        
-        console.log('Updated infoData after reload:', infoData)
-      }
+    console.log('Upload response:', response.data)
+    
+    if (response.data.success) {
+      infoData.backgroundImage = response.data.imagePath
+      console.log('Updated backgroundImage to:', response.data.imagePath)
+      saveStatus.value = { type: 'success', message: 'Image uploaded!' }
     } else {
-      saveStatus.value = { type: 'error', message: 'Failed to save' }
-      console.error('❌ Failed to save Info page:', response)
+      saveStatus.value = { type: 'error', message: response.data.message || 'Upload failed' }
     }
   } catch (error) {
-    saveStatus.value = { type: 'error', message: 'Error saving' }
-    console.error('Error saving Info page:', error)
+    console.error('Upload error:', error)
+    console.error('Response:', error.response)
+    saveStatus.value = { type: 'error', message: 'Upload failed' }
+  } finally {
+    saving.value = false
+  }
+}
+
+// Load function - using direct axios call
+const loadInfoData = async () => {
+  try {
+    const response = await axios.get('/cms/info')
+    if (response.data.success && response.data.data) {
+      const content = response.data.data.content
+      if (content) {
+        Object.keys(defaultInfoData).forEach(key => {
+          if (content.hasOwnProperty(key)) {
+            infoData[key] = content[key]
+          }
+        })
+        console.log('Info data loaded:', infoData)
+        return content
+      }
+    }
+    return null
+  } catch (error) {
+    console.log('No existing info data, using defaults')
+    return null
+  }
+}
+
+// Save function - using direct axios call
+const saveInfoData = async () => {
+  try {
+    saving.value = true
+    saveStatus.value = null
+    console.log('=== Starting Save ===')
+    console.log('Current infoData:', JSON.stringify(infoData, null, 2))
+    
+    const contentToSave = JSON.parse(JSON.stringify(infoData))
+    console.log('Content to save:', JSON.stringify(contentToSave, null, 2))
+    
+    // Direct save to /api/cms/info endpoint
+    console.log('Sending POST to /cms/info...')
+    const response = await axios.post('/cms/info', {
+      content: contentToSave
+    })
+    
+    console.log('=== Response Details ===')
+    console.log('Full response object:', response)
+    console.log('response.status:', response.status)
+    console.log('response.statusText:', response.statusText)
+    console.log('response.data:', response.data)
+    console.log('response.data.success:', response.data?.success)
+    console.log('typeof response.data:', typeof response.data)
+    
+    if (response.data && response.data.success) {
+      saveStatus.value = { type: 'success', message: 'Saved successfully!' }
+      console.log('✅ Save successful!')
+      
+      // Reload the data
+      setTimeout(async () => {
+        console.log('=== Reloading Data ===')
+        const loadedData = await loadInfoData()
+        console.log('Loaded data:', loadedData)
+        if (loadedData) {
+          Object.keys(defaultInfoData).forEach(key => {
+            if (loadedData.hasOwnProperty(key)) {
+              infoData[key] = loadedData[key]
+              console.log(`Updated ${key}:`, loadedData[key])
+            }
+          })
+        }
+      }, 500)
+    } else {
+      saveStatus.value = { type: 'error', message: response.data?.message || response.data?.error || 'Failed to save' }
+      console.error('❌ Save failed:', response.data)
+    }
+  } catch (error) {
+    console.error('=== Save Error ===')
+    console.error('Error name:', error.name)
+    console.error('Error message:', error.message)
+    console.error('Error code:', error.code)
+    if (error.response) {
+      console.error('Response status:', error.response.status)
+      console.error('Response data:', error.response.data)
+    }
+    saveStatus.value = { type: 'error', message: error.response?.data?.message || error.message || 'Error saving' }
+  } finally {
+    saving.value = false
   }
 }
 
@@ -312,7 +444,7 @@ watch(() => props.infoData, (newData) => {
 onMounted(async () => {
   if (props.activeSection === 'info') {
     console.log('Loading Info CMS data...')
-    const loadedData = await loadPageData()
+    const loadedData = await loadInfoData()
     if (loadedData) {
       // Merge loaded data into reactive object, preserving defaults for missing fields
       Object.keys(defaultInfoData).forEach(key => {

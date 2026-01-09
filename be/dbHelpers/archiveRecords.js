@@ -242,6 +242,9 @@ async function getAllArchives(options = {}) {
     `;
     const params = [];
 
+    // Check if requesting all data (no pagination)
+    const showAll = options.showAll === true || options.pageSize === -1;
+
     // Build WHERE conditions array
     const whereConditions = [];
     let hasWhere = false;
@@ -319,21 +322,48 @@ async function getAllArchives(options = {}) {
     }
     sql += orderByClause;
 
-    // Determine pagination values - always enforce a limit to prevent sort memory issues
-    // Reduced max limits for cloud deployment to prevent out-of-memory errors
+    // Determine pagination values - support "show all" and increase max limit
     let finalLimit, finalOffset;
+
+    // If showAll, fetch all data without limit
+    if (showAll) {
+      // Get total count first
+      const [countResult] = await query(countSql, countParams);
+      const totalCount = countResult[0]?.total || 0;
+      
+      // Execute query without limit
+      const [rows] = await query(sql, params);
+      const parsedRows = rows.map(row => convertRowBuffersToText(row));
+      
+      return {
+        success: true,
+        message: 'All archived records retrieved successfully',
+        data: parsedRows,
+        count: parsedRows.length,
+        totalCount: parsedRows.length,
+        pagination: {
+          page: 1,
+          pageSize: parsedRows.length,
+          totalPages: 1,
+          totalCount: parsedRows.length,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          showAll: true
+        }
+      };
+    }
 
     if (page !== undefined && pageSize !== undefined) {
       const pageNum = parseInt(page) || 1;
-      const size = Math.min(parseInt(pageSize) || 25, 50); // Max 50 per page (reduced from 100)
+      const size = Math.min(parseInt(pageSize) || 100, 1000); // Max 1000 per page
       finalLimit = size;
       finalOffset = (pageNum - 1) * size;
     } else if (limit !== undefined) {
-      finalLimit = Math.min(parseInt(limit) || 25, 50); // Max 50 per request (reduced from 100)
+      finalLimit = Math.min(parseInt(limit) || 100, 1000); // Max 1000 per request
       finalOffset = offset !== undefined ? parseInt(offset) : 0;
     } else {
-      // Default limit to prevent loading all records at once
-      finalLimit = 25; // Reduced from 50
+      // Default limit
+      finalLimit = 100; // Default to 100 per page
       finalOffset = 0;
     }
 
@@ -341,8 +371,8 @@ async function getAllArchives(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Always add pagination to main query to prevent sort memory issues
-    const limitValue = Math.max(1, Math.min(parseInt(finalLimit) || 25, 50)); // Enforce max 50 (reduced from 100)
+    // Add pagination with increased limit
+    const limitValue = Math.max(1, Math.min(parseInt(finalLimit) || 100, 1000)); // Enforce max 1000
     const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
 
     if (offsetValue > 0) {
@@ -887,12 +917,63 @@ async function getArchiveSummary() {
   }
 }
 
+/**
+ * DELETE PERMANENTLY - Permanently delete an archive record
+ * @param {Number} archiveId - Archive ID to delete
+ * @returns {Promise<Object>} Result object
+ */
+async function deleteArchivePermanently(archiveId) {
+  try {
+    if (!archiveId) {
+      throw new Error('Archive ID is required');
+    }
+
+    // First, get the archive record to return info about what was deleted
+    const archiveResult = await getArchiveById(archiveId);
+    if (!archiveResult.success) {
+      return {
+        success: false,
+        message: 'Archive record not found',
+        data: null
+      };
+    }
+
+    const archive = archiveResult.data;
+
+    // Permanently delete the archive record
+    const sql = 'DELETE FROM tbl_archives WHERE archive_id = ?';
+    const [result] = await query(sql, [archiveId]);
+
+    if (result.affectedRows === 0) {
+      return {
+        success: false,
+        message: 'Archive record not found',
+        data: null
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Archive record permanently deleted',
+      data: {
+        archive_id: archiveId,
+        original_table: archive.original_table,
+        original_id: archive.original_id
+      }
+    };
+  } catch (error) {
+    console.error('Error permanently deleting archive:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   archiveRecord,
   getAllArchives,
   getArchiveById,
   restoreArchive,
   getArchiveSummary,
-  getArchivesByDateRange
+  getArchivesByDateRange,
+  deleteArchivePermanently
 };
 

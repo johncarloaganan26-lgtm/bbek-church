@@ -550,6 +550,21 @@ const handlePrint = () => {
           body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            opacity: 0.08;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .watermark img {
+            width: 100%;
+            height: auto;
           }
           .header {
             display: flex;
@@ -567,11 +582,19 @@ const handlePrint = () => {
           .header h1 {
             margin: 0;
             font-size: 24px;
+            color: #1a365d;
           }
           .header .subtitle {
             font-size: 14px;
             color: #666;
             margin-top: 5px;
+          }
+          .org-name {
+            text-align: center;
+            color: #1a365d;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
           }
           table {
             width: 100%;
@@ -584,7 +607,8 @@ const handlePrint = () => {
             text-align: left;
           }
           th {
-            background-color: #f2f2f2;
+            background-color: #1a365d;
+            color: white;
             font-weight: bold;
           }
           tr:nth-child(even) {
@@ -605,13 +629,17 @@ const handlePrint = () => {
         </style>
       </head>
       <body>
+        <div class="watermark">
+          <img src="/logo.png" alt="Watermark" />
+        </div>
         <div class="header">
           <img src="/logo.png" alt="Church Logo" />
           <div>
             <h1>Burial Services</h1>
-            <div class="subtitle">Biblical Bread Ministries</div>
+            <div class="subtitle">Burial Services Report</div>
           </div>
         </div>
+        <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
         <table>
           <thead>
             <tr>

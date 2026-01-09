@@ -10,10 +10,25 @@ const {
 const router = express.Router();
 
 /**
+ * Admin-only middleware
+ * Checks if the user is an admin based on the decoded token
+ */
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.position !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied. Admin privileges required.',
+      message: 'Only administrators can access this resource.'
+    });
+  }
+  next();
+};
+
+/**
  * CREATE - Create audit log entry (for manual logging)
  * POST /api/audit-trail/create
  */
-router.post('/create', async (req, res) => {
+router.post('/create', requireAdmin, async (req, res) => {
   try {
     const result = await createAuditLog(req.body);
     
@@ -44,7 +59,7 @@ router.post('/create', async (req, res) => {
  * GET /api/audit-trail/getAll
  * POST /api/audit-trail/getAll
  */
-router.get('/getAll', async (req, res) => {
+router.get('/getAll', requireAdmin, async (req, res) => {
   try {
     const options = req.query;
     const result = await getAllAuditLogs(options);
@@ -73,7 +88,7 @@ router.get('/getAll', async (req, res) => {
   }
 });
 
-router.post('/getAll', async (req, res) => {
+router.post('/getAll', requireAdmin, async (req, res) => {
   try {
     const options = req.body;
     const result = await getAllAuditLogs(options);
@@ -106,7 +121,7 @@ router.post('/getAll', async (req, res) => {
  * READ ONE - Get single audit log by ID
  * GET /api/audit-trail/getById/:id
  */
-router.get('/getById/:id', async (req, res) => {
+router.get('/getById/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const auditId = parseInt(id);
@@ -145,7 +160,7 @@ router.get('/getById/:id', async (req, res) => {
  * GET STATS - Get audit log statistics
  * GET /api/audit-trail/stats
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const result = await getAuditStats();
     
@@ -174,7 +189,7 @@ router.get('/stats', async (req, res) => {
  * DELETE - Delete old audit logs
  * DELETE /api/audit-trail/deleteOld
  */
-router.delete('/deleteOld', async (req, res) => {
+router.delete('/deleteOld', requireAdmin, async (req, res) => {
   try {
     const { date_before } = req.body;
     

@@ -242,25 +242,6 @@
     </div>
     <el-divider />
 
-    <!-- Mission -->
-    <div class="list-item">
-      <div class="item-label">Mission</div>
-      <div class="item-preview">
-        <span class="text-grey">{{ storyData.mission }}</span>
-      </div>
-      <div class="item-action">
-        <el-input
-          v-model="storyData.mission"
-          type="textarea"
-          :rows="4"
-          size="small"
-          placeholder="Enter mission statement"
-          style="max-width: 400px;"
-        ></el-input>
-      </div>
-    </div>
-    <el-divider />
-
     <!-- Vision -->
     <div class="list-item">
       <div class="item-label">Vision</div>
@@ -274,6 +255,25 @@
           :rows="4"
           size="small"
           placeholder="Enter vision statement"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Mission -->
+    <div class="list-item">
+      <div class="item-label">Mission</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ storyData.mission }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="storyData.mission"
+          type="textarea"
+          :rows="4"
+          size="small"
+          placeholder="Enter mission statement"
           style="max-width: 400px;"
         ></el-input>
       </div>

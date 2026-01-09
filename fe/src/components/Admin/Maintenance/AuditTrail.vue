@@ -20,7 +20,7 @@
         </el-button>
         <el-button type="primary" @click="refreshData" :loading="loading">
           <el-icon><Refresh /></el-icon>
-          Refresh
+          Refreshdd
         </el-button>
       </div>
     </div>
@@ -79,6 +79,13 @@
           @change="handleDateChange"
         />
 
+        <el-select v-model="filters.sortBy" placeholder="Sort By" clearable @change="fetchData">
+          <el-option label="Date (Newest)" value="Date (Newest)" />
+          <el-option label="Date (Oldest)" value="Date (Oldest)" />
+          <el-option label="Action (A-Z)" value="Action (A-Z)" />
+          <el-option label="Entity (A-Z)" value="Entity (A-Z)" />
+        </el-select>
+
         <el-button @click="resetFilters" :disabled="loading">
           <el-icon><RefreshRight /></el-icon>
           Reset
@@ -131,6 +138,35 @@
 
     <!-- Data Table -->
     <el-card class="data-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span>Audit Trail Records</span>
+          <div class="header-actions">
+            <!-- Page Size Select -->
+            <el-select
+              v-model="itemsPerPage"
+              @change="handlePageSizeChange"
+              :disabled="loading"
+              style="width: 120px; margin-right: 10px"
+            >
+              <el-option
+                v-for="size in pageSizeOptions"
+                :key="size"
+                :label="size === -1 ? 'All' : `${size} / page`"
+                :value="size"
+              />
+            </el-select>
+            <el-button
+              :icon="Refresh"
+              circle
+              @click="fetchData"
+              :loading="loading"
+              :disabled="loading"
+            />
+          </div>
+        </div>
+      </template>
+
       <el-table
         :data="auditLogs"
         v-loading="loading"
@@ -201,16 +237,27 @@
       </el-table>
 
       <!-- Pagination -->
-      <div class="pagination-container">
+      <div class="pagination-container" v-if="totalPages > 1 && itemsPerPage !== -1">
+        <div class="pagination-info">
+          Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to
+          {{ Math.min(currentPage * itemsPerPage, totalCount) }} of {{ totalCount }} entries
+        </div>
         <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 25, 50, 100]"
-          :total="pagination.totalCount"
+          v-model:current-page="currentPage"
+          :page-size="itemsPerPage"
+          :total="totalCount"
+          :page-sizes="pageSizeOptions.filter(s => s !== -1)"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="fetchData"
-          @current-change="fetchData"
+          @current-change="handlePageChange"
+          @size-change="handlePageSizeChange"
+          :disabled="loading"
         />
+      </div>
+      <!-- Show All Info -->
+      <div class="pagination-container" v-else-if="itemsPerPage === -1">
+        <div class="pagination-info">
+          Showing all {{ totalCount }} entries
+        </div>
       </div>
     </el-card>
   </div>
@@ -239,15 +286,29 @@ const filters = reactive({
   action_type: '',
   entity_type: '',
   status: '',
-  dateRange: null
+  dateRange: null,
+  sortBy: 'Date (Newest)'
 })
 
-// Pagination
-const pagination = reactive({
-  page: 1,
-  pageSize: 25,
-  totalCount: 0
+// Pagination - Using computed like Archive
+const currentPage = computed({
+  get: () => auditTrailStore.pagination?.page || 1,
+  set: (value) => { auditTrailStore.pagination.page = value }
 })
+
+const totalPages = computed(() => auditTrailStore.pagination?.totalPages || 1)
+
+const totalCount = computed(() => auditTrailStore.pagination?.totalCount || 0)
+
+const itemsPerPage = computed({
+  get: () => auditTrailStore.pagination?.pageSize || 100,
+  set: (value) => { 
+    auditTrailStore.pagination.pageSize = value
+    auditTrailStore.pagination.page = 1
+  }
+})
+
+const pageSizeOptions = computed(() => auditTrailStore.pagination?.pageSizeOptions || [25, 50, 100, 200])
 
 // Computed
 const getStatusCount = (status) => {
@@ -291,16 +352,24 @@ const getStatusColor = (status) => {
 }
 
 const handleSearch = () => {
-  // Debounce search
   clearTimeout(window.searchTimeout)
   window.searchTimeout = setTimeout(() => {
-    pagination.page = 1
+    auditTrailStore.pagination.page = 1
     fetchData()
   }, 300)
 }
 
+const handlePageChange = (page) => {
+  auditTrailStore.pagination.page = page
+  fetchData()
+}
+
+const handlePageSizeChange = () => {
+  fetchData()
+}
+
 const handleDateChange = () => {
-  pagination.page = 1
+  auditTrailStore.pagination.page = 1
   fetchData()
 }
 
@@ -310,7 +379,8 @@ const resetFilters = () => {
   filters.entity_type = ''
   filters.status = ''
   filters.dateRange = null
-  pagination.page = 1
+  filters.sortBy = 'Date (Newest)'
+  auditTrailStore.pagination.page = 1
   fetchData()
 }
 
@@ -318,21 +388,23 @@ const fetchData = async () => {
   loading.value = true
   try {
     const params = {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      page: itemsPerPage.value === -1 ? 1 : auditTrailStore.pagination.page,
+      pageSize: itemsPerPage.value === -1 ? -1 : auditTrailStore.pagination.pageSize,
       search: filters.search || undefined,
       action_type: filters.action_type || undefined,
       entity_type: filters.entity_type || undefined,
       status: filters.status || undefined,
       date_from: filters.dateRange ? filters.dateRange[0] : undefined,
-      date_to: filters.dateRange ? filters.dateRange[1] : undefined
+      date_to: filters.dateRange ? filters.dateRange[1] : undefined,
+      sortBy: filters.sortBy || 'Date (Newest)',
+      // Send showAll when pageSize is -1
+      showAll: itemsPerPage.value === -1 || undefined
     }
 
     const result = await auditTrailStore.fetchAuditLogs(params)
     
     if (result && result.success) {
       auditLogs.value = result.data || []
-      pagination.totalCount = result.totalCount || 0
     }
 
     // Fetch stats
@@ -358,7 +430,7 @@ const fetchStats = async () => {
 }
 
 const refreshData = () => {
-  pagination.page = 1
+  auditTrailStore.pagination.page = 1
   fetchData()
 }
 
@@ -539,6 +611,18 @@ onMounted(() => {
   border-radius: 12px;
 }
 
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .description-text {
   font-size: 12px;
   color: #606266;
@@ -554,10 +638,18 @@ onMounted(() => {
 
 .pagination-container {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #EBEEF5;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #909399;
 }
 
 @media (max-width: 1200px) {

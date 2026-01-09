@@ -103,8 +103,8 @@
     </v-row>
 
     <v-row>
-      <!-- Recent Activities -->
-      <v-col cols="12" md="5">
+      <!-- Recent Activities (Admin Only) -->
+      <v-col v-if="isAdmin" cols="12" md="5">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between mb-4">
             <h2 class="text-h6 font-weight-bold">Recent Activities</h2>
@@ -151,7 +151,7 @@
       </v-col>
 
       <!-- Quick Actions -->
-      <v-col cols="12" md="7">
+      <v-col :cols="isAdmin ? 7 : 12">
         <v-card class="pa-4" elevation="2">
           <h2 class="text-h6 font-weight-bold mb-4">Quick Actions</h2>
           <v-row>
@@ -238,6 +238,12 @@ import TithesOfferingsDialog from '@/components/Dialogs/TithesOfferingsDialog.vu
 
 const router = useRouter()
 const systemLogsStore = useSystemLogsStore()
+
+// Check if user is admin
+const isAdmin = computed(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  return userInfo?.account?.position === 'admin'
+})
 
 // Dashboard statistics
 const totalMembers = ref(0)

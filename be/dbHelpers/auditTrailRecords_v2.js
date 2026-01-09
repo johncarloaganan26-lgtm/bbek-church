@@ -121,6 +121,9 @@ async function getAllAuditLogs(options = {}) {
     let sql = 'SELECT * FROM tbl_audit_trail';
     const params = [];
 
+    // Check if requesting all data (no pagination)
+    const showAll = options.showAll === true || options.pageSize === -1;
+
     // WHERE conditions
     const whereConditions = [];
 
@@ -199,8 +202,37 @@ async function getAllAuditLogs(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Add pagination
-    const finalLimit = Math.min(Math.max(1, limit), 100);
+    // Add pagination - support "show all" and increase max limit
+    let auditRows;
+    if (showAll) {
+      // Fetch all data without limit
+      const [rows] = await query(sql, params);
+      auditRows = rows.map(row => {
+        const converted = {};
+        for (const [key, value] of Object.entries(row)) {
+          converted[key] = toPlainText(value);
+        }
+        return converted;
+      });
+      return {
+        success: true,
+        message: 'All audit logs retrieved successfully',
+        data: auditRows,
+        count: auditRows.length,
+        totalCount: auditRows.length,
+        pagination: {
+          page: 1,
+          pageSize: auditRows.length,
+          totalPages: 1,
+          totalCount: auditRows.length,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          showAll: true
+        }
+      };
+    }
+
+    const finalLimit = Math.min(Math.max(1, pageSize), 1000); // Increased to 1000 max, use pageSize instead of limit
     const finalOffset = Math.max(0, offset);
 
     if (finalOffset > 0) {

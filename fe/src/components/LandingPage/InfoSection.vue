@@ -1,5 +1,8 @@
 <template>
-  <section class="info-section" style="position: relative;">
+  <section class="info-section" :style="sectionStyle">
+    <!-- Dark overlay for readability -->
+    <div class="section-overlay"></div>
+    
     <!-- Loading overlay -->
     <v-overlay :model-value="isLoadingInfo" contained class="align-center justify-center" style="z-index: 10;">
       <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
@@ -12,9 +15,9 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column1Icon || 'mdi-clock-outline'" size="40" color="#008080"></v-icon>
+              <v-icon :icon="infoData.column1Icon || 'mdi-clock-outline'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold text-teal-darken-1 mb-4" style="font-family: 'Poppins', sans-serif;">
+            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
               {{ infoData.column1Title || 'SUNDAY SERVICE' }}
             </h3>
             <div class="text-body-2 text-grey-darken-2" style="line-height: 1.8;" v-html="formatText(infoData.column1Text)"></div>
@@ -25,18 +28,17 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column2Icon || 'mdi-laptop'" size="40" color="#008080"></v-icon>
+              <v-icon :icon="infoData.column2Icon || 'mdi-laptop'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold text-teal-darken-1 mb-4" style="font-family: 'Poppins', sans-serif;">
+            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
               {{ infoData.column2Title || 'WATCH ONLINE' }}
             </h3>
             <div class="text-body-2 text-grey-darken-2 mb-6" style="line-height: 1.8;" v-html="formatText(infoData.column2Text)"></div>
             <v-btn
-              :color="infoData.buttonColor || '#008080'"
-              variant="flat"
+              variant="outlined"
               size="large"
-              class="text-white px-8"
-              style="font-family: 'Poppins', sans-serif; font-weight: 600;"
+              class="info-btn px-8"
+              :style="`font-family: Poppins, sans-serif; font-weight: 600; border-color: ${infoData.buttonColor || '#008080'}`"
               @click="$router.push(infoData.watchLiveLink || '/live')"
             >
               {{ infoData.watchLiveButtonText || 'WATCH LIVE' }}
@@ -48,18 +50,17 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column3Icon || 'mdi-cash'" size="40" color="#008080"></v-icon>
+              <v-icon :icon="infoData.column3Icon || 'mdi-cash'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold text-teal-darken-1 mb-4" style="font-family: 'Poppins', sans-serif;">
+            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
               {{ infoData.column3Title || 'GIVE' }}
             </h3>
             <div class="text-body-2 text-grey-darken-2 mb-6" style="line-height: 1.8;" v-html="formatText(infoData.column3Text)"></div>
             <v-btn
-              :color="infoData.buttonColor || '#008080'"
-              variant="flat"
+              variant="outlined"
               size="large"
-              class="text-white px-8"
-              style="font-family: 'Poppins', sans-serif; font-weight: 600;"
+              class="info-btn px-8"
+              :style="`font-family: Poppins, sans-serif; font-weight: 600; border-color: ${infoData.buttonColor || '#008080'}`"
               @click="$router.push(infoData.giveLink || '/give')"
             >
               {{ infoData.giveButtonText || 'GIVE' }}
@@ -72,11 +73,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from '@/api/axios'
 
 // Default data structure
 const infoData = ref({
+  backgroundImage: '/img/abt.jpg',
   column1Icon: 'mdi-clock-outline',
   column1Title: 'SUNDAY SERVICE',
   column1Text: 'Bible Baptist Ekklesia of Kawit<br>Time: 10:00am<br>Location: 485 Acacia St., Villa Ramirez, Tabon 1, Kawit, Cavite',
@@ -115,6 +117,7 @@ const fetchInfoData = async () => {
       console.log('CMS Response - Info:', content)
       
       // Update info data from content
+      if (content.backgroundImage) infoData.value.backgroundImage = content.backgroundImage
       if (content.column1Icon) infoData.value.column1Icon = content.column1Icon
       if (content.column1Title) infoData.value.column1Title = content.column1Title
       if (content.column1Text) infoData.value.column1Text = content.column1Text
@@ -145,6 +148,19 @@ const fetchInfoData = async () => {
   }
 }
 
+// Computed background style
+const sectionStyle = computed(() => {
+  const bgImage = infoData.value.backgroundImage || '/img/abt.jpg'
+  const btnColor = infoData.value.buttonColor || '#008080'
+  return {
+    '--btn-color': btnColor,
+    backgroundImage: `url(${bgImage})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed'
+  }
+})
+
 onMounted(async () => {
   await fetchInfoData()
 })
@@ -153,8 +169,18 @@ onMounted(async () => {
 <style scoped>
 .info-section {
   position: relative;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
   padding: 80px 0;
-  background: white;
+  --btn-color: #008080;
+}
+
+.section-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 1;
 }
 
 .info-column {
@@ -163,6 +189,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 2;
 }
 
 .icon-wrapper {
@@ -176,8 +204,38 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
+/* Info Button Styles */
+.info-btn {
+  position: relative;
+  overflow: hidden;
+  color: var(--btn-color) !important;
+  transition: color 0.3s ease;
+  z-index: 1;
+}
+
+.info-btn::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: var(--btn-color);
+  transition: height 0.3s ease;
+  z-index: -1;
+}
+
+.info-btn:hover {
+  color: white !important;
+}
+
+.info-btn:hover::before {
+  height: 100%;
+}
+
 @media (max-width: 960px) {
   .info-section {
+    min-height: 60vh;
     padding: 48px 0;
   }
 
@@ -193,6 +251,7 @@ onMounted(async () => {
 
 @media (max-width: 600px) {
   .info-section {
+    min-height: 70vh;
     padding: 32px 0;
   }
 

@@ -56,6 +56,7 @@ const publicRoutes = [
   '/api/cms/services',
   '/api/cms/events',
   '/api/cms/give',
+  '/api/cms/give/full',
   '/api/cms/footer',
   '/api/cms/planvisit',
   '/api/cms/waterbaptism',
@@ -69,10 +70,15 @@ const publicRoutes = [
   '/api/cms/acceptjesus',
   '/api/cms/belief',
   '/api/cms/churchleader',
+  '/api/cms/churchleader/full',
   '/api/cms/departmentofficer',
+  '/api/cms/departmentofficer/full',
   '/api/cms/ourstory',
   '/api/cms/childdedication',
   '/api/cms/marriageservice',
+  '/api/cms/info',
+  '/api/cms/info/full',
+  '/api/cms/upload-image',
   // forgot password routes
   '/api/church-records/accounts/forgotPassword',
 ];

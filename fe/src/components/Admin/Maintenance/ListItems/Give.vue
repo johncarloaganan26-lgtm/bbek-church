@@ -248,6 +248,112 @@
         ></el-color-picker>
       </div>
     </div>
+    <el-divider />
+
+    <!-- Give In Person - Title -->
+    <div class="list-item">
+      <div class="item-label">Give In Person - Title</div>
+      <div class="item-preview">
+        <span class="text-bold">{{ giveData.giveInPersonTitle }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.giveInPersonTitle"
+          size="small"
+          placeholder="Enter title"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Give In Person - Text -->
+    <div class="list-item">
+      <div class="item-label">Give In Person - Text</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ giveData.giveInPersonText }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.giveInPersonText"
+          type="textarea"
+          :rows="3"
+          size="small"
+          placeholder="Enter text"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Sunday Services Label -->
+    <div class="list-item">
+      <div class="item-label">Sunday Services Label</div>
+      <div class="item-preview">
+        <span>{{ giveData.sundayServicesLabel }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.sundayServicesLabel"
+          size="small"
+          placeholder="Enter label"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Sunday Services Time -->
+    <div class="list-item">
+      <div class="item-label">Sunday Services Time</div>
+      <div class="item-preview">
+        <span>{{ giveData.sundayServicesTime }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.sundayServicesTime"
+          size="small"
+          placeholder="Enter time"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Scheduled Giving Title -->
+    <div class="list-item">
+      <div class="item-label">Scheduled Giving Title</div>
+      <div class="item-preview">
+        <span class="text-bold">{{ giveData.scheduledGivingTitle }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.scheduledGivingTitle"
+          size="small"
+          placeholder="Enter title"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Scheduled Giving Text -->
+    <div class="list-item">
+      <div class="item-label">Scheduled Giving Text</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ giveData.scheduledGivingText }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.scheduledGivingText"
+          type="textarea"
+          :rows="4"
+          size="small"
+          placeholder="Enter text"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
   </div>
 
   <!-- Fixed Actions Bar -->
@@ -299,7 +405,14 @@ const defaultGiveData = {
   gcashText: 'GCash',
   gcashNumber: '09309224324',
   backButtonText: 'Back to Home',
-  backButtonColor: '#00bcd4'
+  backButtonColor: '#00bcd4',
+  // Give In Person Card fields
+  giveInPersonTitle: 'Give in Person',
+  giveInPersonText: 'You can give during any of our worship services by placing your donation in the offering box.',
+  sundayServicesLabel: 'Sunday Services:',
+  sundayServicesTime: '9:00 AM - 11:00 AM',
+  scheduledGivingTitle: 'Scheduled Giving',
+  scheduledGivingText: "If you'd like to set up regular, scheduled giving, please contact our church office for assistance. We can help you establish a consistent giving plan that works for you."
 }
 
 // Create reactive copy of prop data or use default

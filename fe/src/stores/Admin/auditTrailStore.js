@@ -16,9 +16,10 @@ export const useAuditTrailStore = defineStore('auditTrail', {
     },
     pagination: {
       page: 1,
-      pageSize: 25,
+      pageSize: 100, // Default to 100 per page
       totalCount: 0,
-      totalPages: 0
+      totalPages: 0,
+      pageSizeOptions: [100, 500, 1000, -1] // -1 means "Show All"
     },
     stats: {
       total_count: 0,
@@ -53,9 +54,9 @@ export const useAuditTrailStore = defineStore('auditTrail', {
         if (response.data && response.data.success) {
           this.auditLogs = response.data.data || []
           this.pagination.page = response.data.pagination?.page || 1
-          this.pagination.pageSize = response.data.pagination?.pageSize || 25
+          this.pagination.pageSize = response.data.pagination?.pageSize || this.pagination.pageSize
           this.pagination.totalCount = response.data.pagination?.totalCount || 0
-          this.pagination.totalPages = response.data.pagination?.totalPages || 0
+          this.pagination.totalPages = response.data.pagination?.totalPages || Math.ceil((response.data.pagination?.totalCount || 0) / this.pagination.pageSize)
 
           return {
             success: true,

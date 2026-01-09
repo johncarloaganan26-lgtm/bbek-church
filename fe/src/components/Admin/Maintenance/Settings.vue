@@ -568,6 +568,10 @@ const printData = () => {
   const printWindow = window.open('', '_blank')
   const tableHeaders = ['Title', 'Type', 'Priority', 'Audience', 'Status', 'Created Date']
   
+  // Get current user info for print footer
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+  const printedBy = currentUser.email || currentUser.name || 'Admin'
+  
   const rows = announcements.value.map(announcement => `
     <tr>
       <td>${announcement.title}</td>
@@ -584,19 +588,56 @@ const printData = () => {
       <head>
         <title>Announcements - Print</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #1a365d; text-align: center; }
-          .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            opacity: 0.08;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .watermark img {
+            width: 100%;
+            height: auto;
+          }
+          .header-logo {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: 80px;
+          }
+          h1 { color: #1a365d; text-align: center; margin: 5px 0; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 11px; }
           th { background-color: #1a365d; color: white; }
-          .print-date { text-align: right; color: #666; font-size: 12px; margin-bottom: 10px; }
+          .print-info { 
+            text-align: right; 
+            color: #666; 
+            font-size: 10px; 
+            margin-bottom: 10px;
+          }
+          .org-name { text-align: center; color: #1a365d; font-weight: bold; margin-bottom: 5px; }
         </style>
       </head>
       <body>
-        <div class="print-date">Printed on: ${new Date().toLocaleString()}</div>
+        <div class="watermark">
+          <img src="/logo.png" alt="Watermark" />
+        </div>
+        <img src="/logo.png" alt="Logo" class="header-logo" />
+        <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
         <h1>Announcements</h1>
-        <p class="subtitle">Bible Baptist Ekklesia of Kawit</p>
+        <p class="subtitle">System Announcements Report</p>
+        <div class="print-info">
+          Printed on: ${new Date().toLocaleString()}<br/>
+          Printed by: ${printedBy}
+        </div>
         <table>
           <thead>
             <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
