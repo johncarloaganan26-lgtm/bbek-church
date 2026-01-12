@@ -184,9 +184,30 @@
       ref="childDedicationDialogRef"
       :model-value="showChildDedicationDialog"
       @update:model-value="showChildDedicationDialog = $event"
-      :dedication-data="null"
+      :dedication-data="selectedDedicationData"
       @submit="handleChildDedicationDialogSubmit"
+      @switch-to-edit="handleSwitchToEdit"
     />
+
+    <!-- Success Message Popup -->
+    <v-dialog v-model="successDialog.show" max-width="500" persistent>
+      <v-card class="text-center pa-6">
+        <v-avatar color="success" size="80" class="mb-4">
+          <v-icon size="48" color="white">mdi-check</v-icon>
+        </v-avatar>
+        <v-card-title class="text-h5 font-weight-bold">
+          {{ successDialog.title }}
+        </v-card-title>
+        <v-card-text class="text-body-1">
+          {{ successDialog.message }}
+        </v-card-text>
+        <v-card-actions class="justify-center">
+          <v-btn color="teal" variant="flat" @click="closeSuccessDialog">
+            OK
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -226,6 +247,14 @@ const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 // Dialog state
 const showChildDedicationDialog = ref(false)
 const childDedicationDialogRef = ref(null)
+const selectedDedicationData = ref(null)
+
+// Success dialog state
+const successDialog = ref({
+  show: false,
+  title: '',
+  message: ''
+})
 
 // Initialize on mount
 onMounted(async () => {
@@ -253,21 +282,48 @@ const openLoginDialog = () => {
   showLoginDialog.value = true
 }
 
+// Show success dialog
+const showSuccessDialog = (title, message) => {
+  successDialog.value = {
+    show: true,
+    title,
+    message
+  }
+}
+
+// Close success dialog
+const closeSuccessDialog = () => {
+  successDialog.value.show = false
+}
+
 const handleChildDedicationDialogSubmit = async (payload) => {
   if (!childDedicationDialogRef.value) return
   try {
     const { success, error } = await childDedicationStore.createDedication(payload)
     if (success) {
-      ElMessage.success('Child dedication request submitted successfully.')
+      showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
       showChildDedicationDialog.value = false
+      selectedDedicationData.value = null // Clear selected data after successful submission
+      // Refresh unavailable time slots in case new slots are now blocked
+      if (childDedicationDialogRef.value) {
+        childDedicationDialogRef.value.fetchUnavailableTimeSlots()
+      }
     } else {
       ElMessage.error(error || 'Failed to submit child dedication request.')
+      showChildDedicationDialog.value = false
     }
   } catch (err) {
     ElMessage.error(err?.message || 'Failed to submit child dedication request.')
+    showChildDedicationDialog.value = false
   } finally {
     childDedicationDialogRef.value?.resetLoading()
   }
+}
+
+// Handle switch to edit mode
+const handleSwitchToEdit = (dedication) => {
+  selectedDedicationData.value = dedication
+  showChildDedicationDialog.value = true
 }
 </script>
 

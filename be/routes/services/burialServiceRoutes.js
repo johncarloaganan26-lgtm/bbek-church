@@ -8,10 +8,15 @@ const {
   updateBurialService,
   deleteBurialService,
   exportBurialServicesToExcel,
-  searchBurialServicesFulltext
+  searchBurialServicesFulltext,
+  analyzeBurialServiceAvailability
 } = require('../../dbHelpers/services/burialServiceRecords');
+const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
+
+// Apply date formatting middleware to all burial service routes
+router.use(dateFormattingMiddleware);
 
 /**
  * CHECK DUPLICATE - Check if burial service already exists
@@ -31,13 +36,12 @@ router.get('/check-duplicate', async (req, res) => {
     
     const db = require('../../database/db');
     const query = `
-      SELECT burial_id, member_id, deceased_name, deceased_birthdate, date_death, requestor, status
-      FROM burial_services
-      WHERE member_id = ? 
-        AND deceased_name = ? 
+      SELECT burial_id, member_id, deceased_name, deceased_birthdate, date_death, status
+      FROM tbl_burialservice
+      WHERE member_id = ?
+        AND deceased_name = ?
         AND deceased_birthdate = ?
         AND status != 'Deleted'
-        AND is_archived = FALSE
         ${exclude_burial_id ? 'AND burial_id != ?' : ''}
     `;
     
@@ -455,7 +459,7 @@ router.post('/searchFulltext', async (req, res) => {
   try {
     const options = { ...req.body, useFulltext: true };
     const result = await searchBurialServicesFulltext(options);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -478,6 +482,66 @@ router.post('/searchFulltext', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to perform FULLTEXT search'
+    });
+  }
+});
+
+/**
+ * ANALYZE AVAILABILITY - Analyze available dates and times for burial services
+ * GET /api/church-records/burial-services/analyzeAvailability
+ * POST /api/church-records/burial-services/analyzeAvailability
+ * Parameters: startDate, endDate, location (optional), serviceDurationHours (optional), businessHours (optional)
+ */
+router.get('/analyzeAvailability', async (req, res) => {
+  try {
+    const options = req.query;
+    const result = await analyzeBurialServiceAvailability(options);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error analyzing burial service availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to analyze burial service availability'
+    });
+  }
+});
+
+router.post('/analyzeAvailability', async (req, res) => {
+  try {
+    const options = req.body;
+    const result = await analyzeBurialServiceAvailability(options);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error analyzing burial service availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to analyze burial service availability'
     });
   }
 });

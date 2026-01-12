@@ -124,20 +124,9 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="5" class="d-flex align-center gap-2">
-            <v-tooltip text="Print" location="top">
-              <template v-slot:activator="{ props }">
-                <v-btn 
-                  icon="mdi-printer"
-                  variant="outlined"
-                  v-bind="props"
-                  :disabled="loading"
-                  @click="handlePrint"
-                ></v-btn>
-              </template>
-            </v-tooltip>
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-download"
                   variant="outlined"
                   v-bind="props"
@@ -164,6 +153,8 @@
           <tr>
             <!-- <th class="text-left font-weight-bold">Burial ID</th> -->
             <th class="text-left font-weight-bold">Member</th>
+            <th class="text-left font-weight-bold">Requester Name</th>
+            <th class="text-left font-weight-bold">Requester Email</th>
             <th class="text-left font-weight-bold">Deceased Name</th>
             <th class="text-left font-weight-bold">Birthdate</th>
             <th class="text-left font-weight-bold">Date of Death</th>
@@ -178,13 +169,15 @@
         </thead>
         <tbody>
           <tr v-if="!loading && sortedServices.length === 0">
-            <td colspan="10" class="text-center py-12">
+            <td colspan="12" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-for="service in sortedServices" :key="service.burial_id">
             <!-- <td>{{ service.burial_id }}</td> -->
-            <td>{{ service.fullname || service.member_id }}</td>
+            <td>{{ service.member_id ? 'Member' : 'Non-Member' }}</td>
+            <td>{{ service.member_id ? (service.fullname || service.member_id) : (service.requester_name || 'N/A') }}</td>
+            <td>{{ service.member_id ? (service.member_email || service.requester_email || 'N/A') : (service.requester_email || 'N/A') }}</td>
             <td>{{ service.deceased_name }}</td>
             <td>{{ formatDate(service.deceased_birthdate) }}</td>
             <td>{{ formatDateTime(service.date_death) }}</td>
@@ -201,10 +194,10 @@
             <td>
               <v-tooltip text="Edit Burial Service" location="top">
                 <template v-slot:activator="{ props }">
-                  <v-btn 
-                    icon="mdi-pencil" 
-                    variant="text" 
-                    size="small" 
+                  <v-btn
+                    icon="mdi-pencil"
+                    variant="text"
+                    size="small"
                     class="mr-2"
                     :disabled="loading"
                     v-bind="props"
@@ -214,10 +207,10 @@
               </v-tooltip>
               <v-tooltip text="Delete Burial Service" location="top">
                 <template v-slot:activator="{ props }">
-                  <v-btn 
-                    icon="mdi-delete" 
-                    variant="text" 
-                    size="small" 
+                  <v-btn
+                    icon="mdi-delete"
+                    variant="text"
+                    size="small"
                     color="error"
                     :disabled="loading"
                     v-bind="props"
@@ -343,20 +336,34 @@ const handleBurialServiceDialog = () => {
   burialServiceDialog.value = true
 }
 
-const editService = (service) => {
-  burialServiceData.value = {
-    burial_id: service.burial_id,
-    member_id: service.member_id,
-    deceased_name: service.deceased_name,
-    deceased_birthdate: service.deceased_birthdate,
-    date_death: service.date_death,
-    relationship: service.relationship,
-    location: service.location,
-    pastor_name: service.pastor_name,
-    service_date: service.service_date,
-    status: service.status
+const editService = async (service) => {
+  try {
+    // Fetch full service details from backend to ensure we have all data
+    const fullService = await burialServiceStore.fetchServiceById(service.burial_id)
+    
+    if (fullService) {
+      burialServiceData.value = {
+        burial_id: fullService.burial_id,
+        member_id: fullService.member_id,
+        requester_name: fullService.requester_name,
+        requester_email: fullService.requester_email,
+        deceased_name: fullService.deceased_name,
+        deceased_birthdate: fullService.deceased_birthdate,
+        date_death: fullService.date_death,
+        relationship: fullService.relationship,
+        location: fullService.location,
+        pastor_name: fullService.pastor_name,
+        service_date: fullService.service_date,
+        status: fullService.status
+      }
+      burialServiceDialog.value = true
+    } else {
+      ElMessage.error('Failed to load burial service details')
+    }
+  } catch (error) {
+    console.error('Error loading burial service:', error)
+    ElMessage.error('Failed to load burial service details')
   }
-  burialServiceDialog.value = true
 }
 
 const deleteService = async (id) => {
@@ -389,10 +396,8 @@ const handleSubmit = async (data) => {
   try {
     let result
     if (burialServiceData.value && burialServiceData.value.burial_id) {
-      // Update
       result = await burialServiceStore.updateService(burialServiceData.value.burial_id, data)
     } else {
-      // Create
       result = await burialServiceStore.createService(data)
     }
 
@@ -400,6 +405,9 @@ const handleSubmit = async (data) => {
       ElMessage.success(burialServiceData.value ? 'Burial service updated successfully' : 'Burial service created successfully')
       burialServiceDialog.value = false
       burialServiceData.value = null
+      // Force refresh the table data
+      await new Promise(resolve => setTimeout(resolve, 500))
+      await burialServiceStore.fetchServices()
     } else {
       ElMessage.error(result.error || 'Failed to save burial service')
     }
@@ -455,24 +463,116 @@ const getEndIndex = () => {
 
 const formatDateTime = (dateString) => {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  
+  console.log('formatDateTime input:', dateString, 'type:', typeof dateString)
+
+  try {
+    let date
+
+    if (dateString instanceof Date) {
+      date = dateString
+    }
+    else if (typeof dateString === 'string') {
+      // Handle YYYY-MM-DD HH:mm:ss format - preserve exact time
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+        // Parse as local time to preserve the exact time from database
+        const [datePart, timePart] = dateString.split(' ')
+        const [year, month, day] = datePart.split('-')
+        const [hours, minutes, seconds] = timePart.split(':')
+        date = new Date(year, month - 1, day, hours, minutes, seconds)
+      }
+      else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(dateString)) {
+        date = new Date(dateString)
+      }
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        date = new Date(dateString + 'T00:00:00')
+      }
+      else {
+        date = new Date(dateString)
+      }
+    }
+    else if (typeof dateString === 'number') {
+      date = new Date(dateString)
+    }
+    else {
+      return ''
+    }
+
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid datetime detected:', dateString, 'parsed as:', date)
+      return ''
+    }
+
+    const result = date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+    console.log('formatDateTime output:', result)
+    return result
+  } catch (error) {
+    console.warn('Error formatting datetime:', dateString, error)
+    return ''
+  }
 }
 
 const formatDate = (dateString) => {
   if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
+
+  try {
+    // Handle different date formats
+    let date
+
+    // If it's already a Date object
+    if (dateString instanceof Date) {
+      date = dateString
+    }
+    // If it's a string, try to parse it
+    else if (typeof dateString === 'string') {
+      // Handle YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        date = new Date(dateString + 'T00:00:00')
+      }
+      // Handle YYYY-MM-DD HH:mm:ss format (extract date part)
+      else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+        const datePart = dateString.split(' ')[0]
+        date = new Date(datePart + 'T00:00:00')
+      }
+      // Handle YYYY-MM-DDTHH:mm:ss format (extract date part)
+      else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(dateString)) {
+        const datePart = dateString.split('T')[0]
+        date = new Date(datePart + 'T00:00:00')
+      }
+      // Handle other formats
+      else {
+        date = new Date(dateString)
+      }
+    }
+    // If it's a number (timestamp)
+    else if (typeof dateString === 'number') {
+      date = new Date(dateString)
+    }
+    else {
+      return ''
+    }
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date detected:', dateString, 'parsed as:', date)
+      return ''
+    }
+
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch (error) {
+    console.warn('Error formatting date:', dateString, error)
+    return ''
+  }
 }
 
 const formatStatus = (status) => {
@@ -516,13 +616,15 @@ const handlePrint = () => {
     : userInfo?.account?.email || 'Admin'
   
   ElMessage.success('Print preview opened. Please check your browser tabs.')
-  const tableHeaders = ['Member', 'Deceased Name', 'Birthdate', 'Date of Death', 'Relationship', 'Location', 'Pastor Name', 'Service Date', 'Status', 'Date Created']
+  const tableHeaders = ['Member', 'Requester Name', 'Requester Email', 'Deceased Name', 'Birthdate', 'Date of Death', 'Relationship', 'Location', 'Pastor Name', 'Service Date', 'Status', 'Date Created']
   
   let tableRows = ''
   sortedServices.value.forEach((service) => {
     tableRows += `
       <tr>
-        <td>${service.fullname || service.member_id || 'N/A'}</td>
+        <td>${service.member_id ? 'Member' : 'Non-Member'}</td>
+        <td>${service.member_id ? (service.fullname || service.member_id) : (service.requester_name || 'N/A')}</td>
+        <td>${service.member_id ? (service.member_email || service.requester_email || 'N/A') : (service.requester_email || 'N/A')}</td>
         <td>${service.deceased_name || 'N/A'}</td>
         <td>${formatDate(service.deceased_birthdate)}</td>
         <td>${formatDateTime(service.date_death)}</td>

@@ -273,20 +273,35 @@
       <!-- Baptism Details Section -->
       <el-divider content-position="left">Baptism Details</el-divider>
 
-      <!-- Baptism Date -->
-      <el-form-item label="Baptism Date" prop="baptism_date">
-        <el-date-picker
-          v-model="formData.baptism_date"
-          type="date"
-          placeholder="Select baptism date"
-          size="large"
-          format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD"
-          style="width: 100%"
-          :disabled="loading"
-          @change="updateStatusFromBaptismDate"
-        />
-      </el-form-item>
+      <!-- Baptism Date and Time -->
+      <div class="baptism-datetime-row">
+        <el-form-item label="Baptism Date" prop="baptism_date" class="baptism-date-item">
+          <el-date-picker
+            v-model="formData.baptism_date"
+            type="date"
+            placeholder="Select baptism date"
+            size="large"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+            :disabled="loading"
+            @change="updateStatusFromBaptismDate"
+          />
+        </el-form-item>
+
+        <el-form-item label="Baptism Time" class="baptism-time-item">
+          <el-time-picker
+            v-model="formData.baptism_time"
+            placeholder="Select baptism time"
+            size="large"
+            format="HH:mm:ss"
+            value-format="HH:mm:ss"
+            style="width: 100%"
+            :disabled="loading"
+            clearable
+          />
+        </el-form-item>
+      </div>
 
       <!-- Location -->
       <el-form-item label="Location" prop="location">
@@ -469,6 +484,7 @@ const statusOptions = [
 const formData = reactive({
   baptism_id: '',
   baptism_date: null,
+  baptism_time: null,
   location: '',
   pastor_name: '',
   status: 'pending', // Default status
@@ -651,6 +667,7 @@ watch(() => props.baptismData, async (newData) => {
   if (newData && props.modelValue) {
     formData.baptism_id = newData.baptism_id || ''
     formData.baptism_date = newData.baptism_date || null
+    formData.baptism_time = newData.baptism_time || null
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
     formData.status = newData.status || 'pending'
@@ -693,6 +710,7 @@ watch(() => props.modelValue, async (isOpen) => {
     const data = props.baptismData
     formData.baptism_id = data.baptism_id || ''
     formData.baptism_date = data.baptism_date || null
+    formData.baptism_time = data.baptism_time || null
     formData.location = data.location || ''
     formData.pastor_name = data.pastor_name || ''
     formData.status = data.status || 'pending'
@@ -731,6 +749,7 @@ watch(() => props.modelValue, async (isOpen) => {
 const resetForm = () => {
   formData.baptism_id = ''
   formData.baptism_date = null
+  formData.baptism_time = null
   formData.location = ''
   formData.pastor_name = ''
   formData.status = 'pending' // Reset to default
@@ -803,6 +822,7 @@ const handleSubmit = async () => {
     const submitData = {
       baptism_id: formData.baptism_id || null,
       baptism_date: formData.baptism_date, // Required
+      baptism_time: formData.baptism_time || null,
       location: formData.location?.trim() || null,
       pastor_name: formData.pastor_name || null,
       status: formData.status || 'pending',
@@ -826,6 +846,7 @@ const handleSubmit = async () => {
       email: formData.email?.trim() || null,
       phone_number: formData.phone_number?.trim() || null
     }
+
 
     // Emit submit event with data
     emit('submit', submitData)
@@ -1051,6 +1072,34 @@ defineExpose({
 .add-child-btn:hover {
   background-color: #0d9488;
   border-color: #0d9488;
+}
+
+/* Baptism DateTime Row Styles */
+.baptism-datetime-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.baptism-date-item {
+  flex: 1;
+}
+
+.baptism-time-item {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .baptism-datetime-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .baptism-date-item,
+  .baptism-time-item {
+    flex: none;
+    width: 100%;
+  }
 }
 </style>
 

@@ -91,34 +91,34 @@
               </div>
               <div class="info-field-row">
                 <span class="label">Baptism Location:</span>
-                <span class="value">{{ location || '_________' }}</span>
+                <span class="value">{{ location || 'N/A' }}</span>
               </div>
               <div class="info-field-row">
                 <span class="label">Civil Status:</span>
-                <span class="value">{{ civilStatus || '_______' }}</span>
+                <span class="value">{{ civilStatus || 'N/A' }}</span>
               </div>
               <div class="info-field-row">
                 <span class="label">Profession:</span>
-                <span class="value">{{ profession || '____________' }}</span>
+                <span class="value">{{ profession || 'N/A' }}</span>
               </div>
               <div class="info-field-row">
                 <span class="label">Address:</span>
-                <span class="value">{{ address || '________________________________' }}</span>
+                <span class="value">{{ address || 'N/A' }}</span>
               </div>
               <div class="info-field-row">
                 <span class="label">Phone:</span>
-                <span class="value">{{ phoneNumber || '____________' }}</span>
+                <span class="value">{{ phoneNumber || 'N/A' }}</span>
               </div>
              
             </div>
             <div class="info-column right-column">
                <div class="info-field-row">
                  <span class="label">Ministry Interest:</span>
-                 <span class="value">{{ desireMinistry || '____________' }}</span>
+                 <span class="value">{{ desireMinistry || 'N/A' }}</span>
                </div>
               <div class="info-field-row">
                 <span class="label">Age:</span>
-                <span class="value">{{ age || '__' }}</span>
+                <span class="value">{{ age || 'N/A' }}</span>
               </div>
               <div class="info-field-row">
                 <span class="label">Gender:</span>
@@ -131,18 +131,18 @@
            
               <div class="info-field-row">
                 <span class="label">Email:</span>
-                <span class="value">{{ email || '________________________' }}</span>
+                <span class="value">{{ email || 'N/A' }}</span>
               </div>
               
             </div>
           </div>
 
           <!-- Family Information (if applicable) -->
-          <div class="family-section" v-if="hasFamilyInfo">
+          <div class="family-section">
             <div class="section-title">FAMILY INFORMATION</div>
             <div class="info-field-row" v-if="spouseName">
               <span class="label">Spouse:</span>
-              <span class="value">{{ spouseName }}</span>
+              <span class="value">{{ spouseName || 'N/A' }}</span>
             </div>
             <div class="info-field-row" v-if="formattedMarriageDate">
               <span class="label">Marriage Date:</span>
@@ -155,15 +155,15 @@
           </div>
 
           <!-- Guardian Information (if applicable) -->
-          <div class="guardian-section" v-if="displayGuardianName">
+          <div class="guardian-section">
             <div class="section-title">GUARDIAN INFORMATION</div>
             <div class="info-field-row">
               <span class="label">Guardian's Name:</span>
-              <span class="value">{{ displayGuardianName }}</span>
+              <span class="value">{{ displayGuardianName || 'N/A' }}</span>
             </div>
             <div class="info-field-row">
               <span class="label">Contact Number:</span>
-              <span class="value">{{ displayGuardianContact || '_________________' }}</span>
+              <span class="value">{{ displayGuardianContact || 'N/A' }}</span>
             </div>
             <div class="info-field-row">
               <span class="label">Relationship:</span>
@@ -174,7 +174,7 @@
           <!-- Minister Signature -->
           <div class="minister-section">
             <div class="minister-info">
-              <p class="minister-name">{{ pastorName || 'Rev. Fresco Q. Sulapas' }}</p>
+              <p class="minister-name">{{ pastorName || 'N/A' }}</p>
               <div class="signature-line"></div>
               <p class="signature-label">Church Pastor / Minister</p>
             </div>
@@ -205,6 +205,7 @@ const props = defineProps({
   baptismId: { type: String, default: '' },
   memberId: { type: [String, Number], default: '' },
   baptismDate: { type: [String, Date], default: '' },
+  baptismTime: { type: [String, Date], default: '' },
   location: { type: String, default: '' },
   pastorName: { type: String, default: '' },
   status: { type: String, default: 'pending' },
@@ -258,12 +259,12 @@ const fullName = computed(() => {
   if (props.firstName) parts.push(props.firstName)
   if (props.middleName) parts.push(props.middleName)
   if (props.lastName) parts.push(props.lastName)
-  return parts.length > 0 ? parts.join(' ') : '_________________'
+  return parts.length > 0 ? parts.join(' ') : 'N/A'
 })
 
 // Format gender for display
 const formattedGender = computed(() => {
-  if (!props.gender) return '_________'
+  if (!props.gender) return 'N/A'
   const genderMap = {
     'M': 'Male',
     'm': 'Male',
@@ -277,27 +278,52 @@ const formattedGender = computed(() => {
 
 // Format birthdate for display
 const formattedBirthdate = computed(() => {
-  if (!props.birthdate) return '_________'
+  if (!props.birthdate) return 'N/A'
   try {
     const date = new Date(props.birthdate)
-    if (isNaN(date.getTime())) return '_________'
+    if (isNaN(date.getTime())) return 'N/A'
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch {
-    return '_________'
+    return 'N/A'
   }
 })
 
-// Format baptism date for display
+// Format baptism date and time for display
 const formattedBaptismDate = computed(() => {
-  if (!props.baptismDate) return '_________'
+  if (!props.baptismDate) return 'N/A'
   try {
     const date = new Date(props.baptismDate)
-    if (isNaN(date.getTime())) return '_________'
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    if (isNaN(date.getTime())) return 'N/A'
+
+    const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+    if (props.baptismTime) {
+      // Convert time to AM/PM format
+      const timeStr = formatTimeToAMPM(props.baptismTime)
+      return `${dateStr} at ${timeStr}`
+    } else {
+      return dateStr
+    }
   } catch {
-    return '_________'
+    return 'N/A'
   }
 })
+
+// Helper function to format time to AM/PM
+const formatTimeToAMPM = (timeStr) => {
+  if (!timeStr) return ''
+  try {
+    // Handle different time formats (HH:mm:ss, HH:mm, etc.)
+    const [hours, minutes] = timeStr.split(':')
+    let hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12
+    hour = hour ? hour : 12 // 0 should be 12
+    return `${hour}:${minutes} ${ampm}`
+  } catch {
+    return timeStr // fallback to original if parsing fails
+  }
+}
 
 // Issue date
 const formattedIssueDate = computed(() => {
@@ -321,7 +347,7 @@ const displayGuardianRelationship = computed(() => {
 // Format guardian relationship for display
 const formattedGuardianRelationship = computed(() => {
   const relationship = displayGuardianRelationship.value
-  if (!relationship) return '_________'
+  if (!relationship) return 'N/A'
   const relationships = {
     'parent': 'Parent',
     'grandparent': 'Grandparent',
@@ -349,32 +375,32 @@ const isAdminOrStaffPosition = computed(() => {
 
 // Format marriage date for display
 const formattedMarriageDate = computed(() => {
-  if (!props.marriageDate) return ''
+  if (!props.marriageDate) return 'N/A'
   try {
     const date = new Date(props.marriageDate)
-    if (isNaN(date.getTime())) return ''
+    if (isNaN(date.getTime())) return 'N/A'
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch {
-    return ''
+    return 'N/A'
   }
 })
 
 // Format children array for display
 const formattedChildren = computed(() => {
-  if (!props.children || props.children.length === 0) return ''
+  if (!props.children || props.children.length === 0) return 'N/A'
 
   let childrenArray = []
   if (typeof props.children === 'string') {
     try {
       childrenArray = JSON.parse(props.children)
     } catch {
-      return ''
+      return 'N/A'
     }
   } else {
     childrenArray = props.children
   }
 
-  if (!Array.isArray(childrenArray) || childrenArray.length === 0) return ''
+  if (!Array.isArray(childrenArray) || childrenArray.length === 0) return 'N/A'
 
   const childrenNames = childrenArray.map(child => {
     const name = child.name || ''

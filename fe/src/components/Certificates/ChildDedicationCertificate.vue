@@ -77,7 +77,7 @@
 
           <!-- Child Name -->
           <div class="child-name-section">
-            <span class="child-fullname">{{ childFullname || childFirstName + ' ' + (childMiddleName ? childMiddleName + ' ' : '') + (childLastName || '') || '_________________' }}</span>
+            <span class="child-fullname">{{ childFullname || childFirstName + ' ' + (childMiddleName ? childMiddleName + ' ' : '') + (childLastName || '') || 'N/A' }}</span>
           </div>
 
           <!-- Child Information -->
@@ -89,7 +89,7 @@
               </div>
               <div class="field-group">
                 <span class="field-label">Place of Birth:</span>
-                <span class="field-value">{{ placeOfBirth || '_________________' }}</span>
+                <span class="field-value">{{ placeOfBirth || 'N/A' }}</span>
               </div>
             </div>
             <div class="child-row">
@@ -98,8 +98,14 @@
                 <span class="field-value">{{ formattedGender }}</span>
               </div>
               <div class="field-group">
-                <span class="field-label">Date of Dedication:</span>
+                <span class="field-label">Date and Time of Dedication:</span>
                 <span class="field-value">{{ formattedDedicationDate }}</span>
+              </div>
+            </div>
+            <div class="child-row">
+              <div class="field-group">
+                <span class="field-label">Location:</span>
+                <span class="field-value">{{ location || 'N/A' }}</span>
               </div>
             </div>
           </div>
@@ -107,78 +113,78 @@
           <!-- Parents Section - Father Left, Mother Right -->
           <div class="parents-container">
             <!-- Father's Information -->
-            <div class="parent-section" v-if="fatherFirstName || fatherLastName">
+            <div class="parent-section">
               <div class="section-title">Father's Information</div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">First Name:</span>
-                  <span class="field-value">{{ fatherFirstName || '_________________' }}</span>
+                  <span class="field-value">{{ fatherFirstName || 'N/A' }}</span>
                 </div>
                 <div class="field-group">
                   <span class="field-label">Last Name:</span>
-                  <span class="field-value">{{ fatherLastName || '_________________' }}</span>
+                  <span class="field-value">{{ fatherLastName || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">Middle Name:</span>
-                  <span class="field-value">{{ fatherMiddleName || '_________________' }}</span>
+                  <span class="field-value">{{ fatherMiddleName || 'N/A' }}</span>
                 </div>
                 <div class="field-group">
                   <span class="field-label">Phone:</span>
-                  <span class="field-value">{{ fatherPhoneNumber || '_________________' }}</span>
+                  <span class="field-value">{{ fatherPhoneNumber || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">Email:</span>
-                  <span class="field-value">{{ fatherEmail || '_________________' }}</span>
+                  <span class="field-value">{{ fatherEmail || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row full">
                 <span class="field-label">Address:</span>
-                <span class="field-value">{{ fatherAddress || '_________________' }}</span>
+                <span class="field-value">{{ fatherAddress || 'N/A' }}</span>
               </div>
             </div>
 
             <!-- Mother's Information -->
-            <div class="parent-section" v-if="motherFirstName || motherLastName">
+            <div class="parent-section">
               <div class="section-title">Mother's Information</div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">First Name:</span>
-                  <span class="field-value">{{ motherFirstName || '_________________' }}</span>
+                  <span class="field-value">{{ motherFirstName || 'N/A' }}</span>
                 </div>
                 <div class="field-group">
                   <span class="field-label">Last Name:</span>
-                  <span class="field-value">{{ motherLastName || '_________________' }}</span>
+                  <span class="field-value">{{ motherLastName || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">Middle Name:</span>
-                  <span class="field-value">{{ motherMiddleName || '_________________' }}</span>
+                  <span class="field-value">{{ motherMiddleName || 'N/A' }}</span>
                 </div>
                 <div class="field-group">
                   <span class="field-label">Phone:</span>
-                  <span class="field-value">{{ motherPhoneNumber || '_________________' }}</span>
+                  <span class="field-value">{{ motherPhoneNumber || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row">
                 <div class="field-group">
                   <span class="field-label">Email:</span>
-                  <span class="field-value">{{ motherEmail || '_________________' }}</span>
+                  <span class="field-value">{{ motherEmail || 'N/A' }}</span>
                 </div>
               </div>
               <div class="parent-row full">
                 <span class="field-label">Address:</span>
-                <span class="field-value">{{ motherAddress || '_________________' }}</span>
+                <span class="field-value">{{ motherAddress || 'N/A' }}</span>
               </div>
             </div>
           </div>
 
           <!-- Sponsors Section -->
-          <div class="sponsors-section" v-if="sponsors && sponsors.length > 0">
+          <div class="sponsors-section">
             <div class="section-title">SPONSORS</div>
             <div class="sponsors-grid">
               <div class="sponsor-column">
@@ -197,7 +203,7 @@
           <!-- Minister Signature -->
           <div class="minister-section">
             <div class="minister-info">
-              <p class="minister-name">{{ pastor || pastorName || 'Rev. Fresco Q. Sulapas' }}</p>
+              <p class="minister-name">{{ pastor || pastorName || 'N/A' }}</p>
               <div class="signature-line"></div>
               <p class="signature-label">With: Church Minister</p>
             </div>
@@ -234,6 +240,7 @@ const props = defineProps({
   placeOfBirth: { type: String, default: '' },
   gender: { type: String, default: '' },
   preferredDedicationDate: { type: [String, Date], default: '' },
+  preferredDedicationTime: { type: [String, Date], default: '' },
   dateCompleted: { type: [String, Date], default: '' },
   contactPhoneNumber: { type: String, default: '' },
   contactEmail: { type: String, default: '' },
@@ -262,6 +269,7 @@ const props = defineProps({
   requesterMiddleName: { type: String, default: '' },
   requesterFullname: { type: String, default: '' },
   requesterGender: { type: String, default: '' },
+  requesterRelationship: { type: String, default: '' },
   
   // Computed full name from API
   childFullname: { type: String, default: '' },
@@ -284,33 +292,61 @@ const effectiveLogo = computed(() => {
 
 // Format birthdate for display
 const formattedBirthDate = computed(() => {
-  if (!props.dateOfBirth) return '_________________'
+  if (!props.dateOfBirth) return 'N/A'
   try {
     const date = new Date(props.dateOfBirth)
-    if (isNaN(date.getTime())) return '_________________'
+    if (isNaN(date.getTime())) return 'N/A'
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   } catch {
-    return '_________________'
+    return 'N/A'
   }
 })
 
-// Format dedication/completion date for display
+// Format dedication/completion date and time for display
 const formattedDedicationDate = computed(() => {
   // Use completed date if available, otherwise fall back to preferred date
   const dateToUse = props.dateCompleted || props.preferredDedicationDate
-  if (!dateToUse) return '_________________'
+  const timeToUse = props.preferredDedicationTime
+
+  if (!dateToUse) return 'N/A'
+
   try {
     const date = new Date(dateToUse)
-    if (isNaN(date.getTime())) return '_________________'
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    if (isNaN(date.getTime())) return 'N/A'
+
+    const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+    if (timeToUse) {
+      // Convert time to AM/PM format
+      const timeStr = formatTimeToAMPM(timeToUse)
+      return `${dateStr} at ${timeStr}`
+    } else {
+      return dateStr
+    }
   } catch {
-    return '_________________'
+    return 'N/A'
   }
 })
 
+// Helper function to format time to AM/PM
+const formatTimeToAMPM = (timeStr) => {
+  if (!timeStr) return ''
+  try {
+    // Handle different time formats (HH:mm:ss, HH:mm, etc.)
+    const [hours, minutes] = timeStr.split(':')
+    let hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12
+    hour = hour ? hour : 12 // 0 should be 12
+    return `${hour}:${minutes} ${ampm}`
+  } catch {
+    return timeStr // fallback to original if parsing fails
+  }
+}
+
 // Format gender for display
 const formattedGender = computed(() => {
-  if (!props.gender) return '_________________'
+  if (!props.gender) return 'N/A'
   const genderMap = {
     'M': 'Male',
     'm': 'Male',
@@ -905,7 +941,7 @@ onMounted(async () => {
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    color-adjust: exact !important;
+    color-adtust: exact !important;
   }
 
   .watermark-logo {

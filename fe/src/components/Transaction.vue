@@ -105,7 +105,7 @@
             <!-- All Transactions Table -->
             <v-col v-if="selectedServiceTypeFilter === 'all'" cols="12">
               <v-card variant="outlined" class="mx-auto" style="max-width: 1200px;">
-                <v-card-title class="text-h6 font-weight-bold text-center">Recent Transactions</v-card-title>
+                <v-card-title class="text-h6 font-weight-bold text-center">All Transactions</v-card-title>
                 <v-card-text>
                   <v-table density="compact" sort-by="[{ key: 'sort_date', order: 'desc' }]">
                     <thead>
@@ -134,7 +134,7 @@
                         <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ formatDateTime(transaction.date_created) }}</td>
                         <td>
                           <v-btn
-                            v-if="transaction.status?.toLowerCase() === 'completed'"
+                            v-if="transaction.status?.toLowerCase() === 'completed' && transaction.service_type !== 'Burial Service'"
                             icon="mdi-certificate"
                             variant="text"
                             size="small"
@@ -277,18 +277,7 @@
                             {{ service.status }}
                           </v-chip>
                         </td>
-                        <td>
-                          <v-btn
-                            v-if="service.status?.toLowerCase() === 'completed'"
-                            icon="mdi-certificate"
-                            variant="text"
-                            size="small"
-                            color="primary"
-                            @click.stop="viewServiceCertificate(service, 'burial')"
-                            title="View Certificate"
-                          ></v-btn>
-                        </td>
-                      </tr>
+                     </tr>
                     </tbody>
                   </v-table>
                 </v-card-text>
@@ -680,7 +669,29 @@ const allTransactions = computed(() => {
       sort_date: new Date(service.date_created || service.preferred_dedication_date || 0)
     })
   })
-  return transactions.sort((a, b) => b.sort_date - a.sort_date) // Sort by date descending
+  
+  // Sort by status priority first, then by date descending
+  return transactions.sort((a, b) => {
+    // Status priority order: pending, approved, disapproved, completed, cancelled
+    const statusOrder = {
+      'pending': 1,
+      'approved': 2,
+      'disapproved': 3,
+      'completed': 4,
+      'cancelled': 5
+    }
+    
+    const aPriority = statusOrder[a.status?.toLowerCase()] || 999
+    const bPriority = statusOrder[b.status?.toLowerCase()] || 999
+    
+    // If status priority is different, sort by priority
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority
+    }
+    
+    // If status priority is the same, sort by date descending
+    return b.sort_date - a.sort_date
+  })
 })
 
 // Dialog state

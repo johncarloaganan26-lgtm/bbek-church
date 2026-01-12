@@ -313,10 +313,24 @@ onMounted(async () => {
 
   .service-card {
     height: 320px !important;
+    margin-bottom: 16px;
   }
 
   .service-content {
-    padding: 24px;
+    padding: 20px;
+  }
+
+  .service-content :deep(.v-icon) {
+    font-size: 40px !important;
+  }
+
+  .service-content :deep(.text-h5) {
+    font-size: 1.1rem !important;
+  }
+
+  .service-content :deep(.text-body-2) {
+    font-size: 0.9rem !important;
+    line-height: 1.5;
   }
 
   .floating-element {
@@ -326,27 +340,43 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .services-section {
-    padding: 32px 0;
+    padding: 24px 0;
   }
 
   .services-section :deep(.text-h3) {
-    font-size: 1.5rem !important;
+    font-size: 1.4rem !important;
+  }
+
+  .services-section :deep(.text-h6) {
+    font-size: 0.95rem !important;
   }
 
   .service-card {
-    height: 280px !important;
+    height: 260px !important;
+    margin-bottom: 12px;
   }
 
   .service-content {
-    padding: 16px;
+    padding: 14px;
   }
 
   .service-content :deep(.v-icon) {
-    font-size: 36px !important;
+    font-size: 32px !important;
   }
 
   .service-content :deep(.text-h5) {
-    font-size: 1.25rem !important;
+    font-size: 1.1rem !important;
+  }
+
+  .service-content :deep(.text-body-2) {
+    font-size: 0.85rem !important;
+    line-height: 1.5;
+  }
+
+  .service-content :deep(.v-btn) {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    min-height: 36px;
   }
 }
 </style>

@@ -13,6 +13,7 @@ const { sendWaterBaptismDetails } = require('../emailHelperSendGrid');
  * - member_id (VARCHAR(45), nullable for non-members)
  * - firstname, lastname, middle_name, email, phone_number, birthdate, age, gender, address, civil_status (for non-members)
  * - baptism_date (DATETIME, nullable) - can be null for pending baptisms
+ * - preferred_baptism_time (TIME, nullable) - preferred time for baptism
  * - status (VARCHAR(45), NN, default: 'pending')
  * - date_created (VARCHAR(45), NN)
  * - is_member (TINYINT(1), default 1) - 1=member, 0=non-member
@@ -130,6 +131,7 @@ async function getNextBaptismId() {
  * @param {string} baptismData.email - Email (for non-members)
  * @param {string} baptismData.phone_number - Phone number (for non-members)
  * @param {Date|string|null} baptismData.baptism_date - Baptism date (optional, can be null)
+ * @param {string|null} baptismData.baptism_time - Baptism time (optional, HH:MM format)
  * @param {string} baptismData.status - Status (default: 'pending')
  * @returns {Promise<Object>} Result object
  */
@@ -159,6 +161,7 @@ async function createWaterBaptism(baptismData) {
       children,
       desire_ministry,
       baptism_date,
+      baptism_time,
       location,
       pastor_name,
       status = 'pending',
@@ -209,41 +212,7 @@ async function createWaterBaptism(baptismData) {
       // Omit baptism_date column when it's null
       sql = `
         INSERT INTO tbl_waterbaptism
-          (baptism_id, member_id, is_member, firstname, lastname, middle_name, email, phone_number, birthdate, age, gender, address, civil_status, profession, spouse_name, marriage_date, children, desire_ministry, location, pastor_name, status, guardian_name, guardian_contact, guardian_relationship, date_created)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      params = [
-        final_baptism_id,
-        final_member_id,
-        is_member ? 1 : 0,
-        firstname || null,
-        lastname || null,
-        middle_name || null,
-        email || null,
-        phone_number || null,
-        formattedBirthdate,
-        age || null,
-        gender || null,
-        address || null,
-        civil_status || null,
-        profession || null,
-        spouse_name || null,
-        formattedMarriageDate,
-        children || null,
-        desire_ministry || null,
-        location || null,
-        pastor_name || null,
-        status,
-        guardian_name || null,
-        guardian_contact || null,
-        guardian_relationship || null,
-        formattedDateCreated
-      ];
-    } else {
-      // Include baptism_date when it has a value
-      sql = `
-        INSERT INTO tbl_waterbaptism
-          (baptism_id, member_id, is_member, firstname, lastname, middle_name, email, phone_number, birthdate, age, gender, address, civil_status, profession, spouse_name, marriage_date, children, desire_ministry, baptism_date, location, pastor_name, status, guardian_name, guardian_contact, guardian_relationship, date_created)
+          (baptism_id, member_id, is_member, firstname, lastname, middle_name, email, phone_number, birthdate, age, gender, address, civil_status, profession, spouse_name, marriage_date, children, desire_ministry, preferred_baptism_time, location, pastor_name, status, guardian_name, guardian_contact, guardian_relationship, date_created)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       params = [
@@ -265,7 +234,43 @@ async function createWaterBaptism(baptismData) {
         formattedMarriageDate,
         children || null,
         desire_ministry || null,
+        baptism_time || null,
+        location || null,
+        pastor_name || null,
+        status,
+        guardian_name || null,
+        guardian_contact || null,
+        guardian_relationship || null,
+        formattedDateCreated
+      ];
+    } else {
+      // Include baptism_date when it has a value
+      sql = `
+        INSERT INTO tbl_waterbaptism
+          (baptism_id, member_id, is_member, firstname, lastname, middle_name, email, phone_number, birthdate, age, gender, address, civil_status, profession, spouse_name, marriage_date, children, desire_ministry, baptism_date, preferred_baptism_time, location, pastor_name, status, guardian_name, guardian_contact, guardian_relationship, date_created)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      params = [
+        final_baptism_id,
+        final_member_id,
+        is_member ? 1 : 0,
+        firstname || null,
+        lastname || null,
+        middle_name || null,
+        email || null,
+        phone_number || null,
+        formattedBirthdate,
+        age || null,
+        gender || null,
+        address || null,
+        civil_status || null,
+        profession || null,
+        spouse_name || null,
+        formattedMarriageDate,
+        children || null,
+        desire_ministry || null,
         formattedBaptismDate,
+        baptism_time || null,
         location || null,
         pastor_name || null,
         status,
@@ -355,8 +360,9 @@ async function getAllWaterBaptisms(options = {}) {
 
     // Build query for fetching records with member data
     // Use LEFT JOIN to include non-member records (where member_id is null)
-    let sql = `SELECT 
+    let sql = `SELECT
       wb.*,
+      wb.preferred_baptism_time as baptism_time,
       m.firstname as member_firstname,
       m.lastname as member_lastname,
       m.middle_name as member_middle_name,
@@ -692,20 +698,20 @@ async function getWaterBaptismById(baptismId) {
  * @returns {Promise<Object>} Result object
  */
 async function updateWaterBaptism(baptismId, baptismData) {
-  try {
-    if (!baptismId) {
-      throw new Error('Baptism ID is required');
-    }
+   try {
+     if (!baptismId) {
+       throw new Error('Baptism ID is required');
+     }
 
-    // Check if baptism exists
-    const baptismCheck = await getWaterBaptismById(baptismId);
-    if (!baptismCheck.success) {
-      return {
-        success: false,
-        message: 'Water baptism not found',
-        data: null
-      };
-    }
+     // Check if baptism exists
+     const baptismCheck = await getWaterBaptismById(baptismId);
+     if (!baptismCheck.success) {
+       return {
+         success: false,
+         message: 'Water baptism not found',
+         data: null
+       };
+     }
 
     const {
       member_id,
@@ -726,6 +732,7 @@ async function updateWaterBaptism(baptismId, baptismData) {
       children,
       desire_ministry,
       baptism_date,
+      baptism_time,
       location,
       pastor_name,
       status,
@@ -830,6 +837,11 @@ async function updateWaterBaptism(baptismId, baptismData) {
       const formattedBaptismDate = moment(baptism_date).format('YYYY-MM-DD HH:mm:ss');
       fields.push('baptism_date = ?');
       params.push(formattedBaptismDate);
+    }
+
+    if (baptism_time !== undefined) {
+      fields.push('preferred_baptism_time = ?');
+      params.push(baptism_time && baptism_time.trim() !== '' ? baptism_time : null);
     }
 
     if (location !== undefined) {
@@ -1047,7 +1059,8 @@ async function exportWaterBaptismsToExcel(options = {}) {
         'Desire Ministry': baptism.desire_ministry || '',
         'Location': baptism.location || '',
         'Pastor Name': baptism.pastor_name || '',
-        'Baptism Date': baptism.baptism_date ? moment(baptism.baptism_date).format('YYYY-MM-DD HH:mm:ss') : '',
+        'Baptism Date': baptism.baptism_date ? moment(baptism.baptism_date).format('YYYY-MM-DD') : '',
+        'Baptism Time': baptism.baptism_time || '',
         'Status': baptism.status || '',
         'Guardian Name': baptism.guardian_name || '',
         'Guardian Contact': baptism.guardian_contact || '',
@@ -1081,6 +1094,7 @@ async function exportWaterBaptismsToExcel(options = {}) {
       { wch: 25 },  // Location
       { wch: 20 },  // Pastor Name
       { wch: 20 },  // Baptism Date
+      { wch: 15 },  // Baptism Time
       { wch: 15 },  // Status
       { wch: 20 },  // Guardian Name
       { wch: 20 },  // Guardian Contact

@@ -157,7 +157,7 @@
             <!-- <th class="text-left font-weight-bold">Child ID</th> -->
             <th class="text-left font-weight-bold">Child Name</th>
             <th class="text-left font-weight-bold">Requester</th>
-            <th class="text-left font-weight-bold">Preferred Date</th>
+            <th class="text-left font-weight-bold">Preferred Date & Time</th>
             <th class="text-left font-weight-bold">Pastor</th>
             <th class="text-left font-weight-bold">Location</th>
             <th class="text-left font-weight-bold">Father</th>
@@ -177,7 +177,7 @@
             <!-- <td>{{ dedication.child_id }}</td> -->
             <td>{{ dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() }}</td>
             <td>{{ dedication.requester_fullname || dedication.requested_by }}</td>
-            <td>{{ formatDateTime(dedication.preferred_dedication_date) }}</td>
+            <td>{{ formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time) }}</td>
             <td>{{ dedication.pastor || 'N/A' }}</td>
             <td>{{ dedication.location || 'N/A' }}</td>
             <td>{{ getFatherDisplayName(dedication) }}</td>
@@ -353,6 +353,7 @@ const editDedication = (dedication) => {
   dedicationData.value = {
     child_id: dedication.child_id,
     requested_by: dedication.requested_by,
+    requester_relationship: dedication.requester_relationship,
     child_firstname: dedication.child_firstname,
     child_lastname: dedication.child_lastname,
     child_middle_name: dedication.child_middle_name,
@@ -360,6 +361,7 @@ const editDedication = (dedication) => {
     place_of_birth: dedication.place_of_birth,
     gender: dedication.gender,
     preferred_dedication_date: dedication.preferred_dedication_date,
+    preferred_dedication_time: dedication.preferred_dedication_time,
     contact_phone_number: dedication.contact_phone_number,
     contact_email: dedication.contact_email,
     contact_address: dedication.contact_address,
@@ -484,6 +486,28 @@ const formatDateTime = (dateString) => {
   })
 }
 
+const formatDateTimeWithTime = (dateString, timeString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const formattedDate = date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+  
+  if (timeString) {
+    // Convert 24-hour format to 12-hour format with AM/PM
+    const [hours, minutes] = timeString.split(':')
+    const hour = parseInt(hours, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    const formattedTime = `${displayHour}:${minutes} ${ampm}`
+    return `${formattedDate} • ${formattedTime}`
+  }
+  
+  return formattedDate
+}
+
 const getFatherDisplayName = (dedication) => {
   if (dedication?.father_fullname && dedication.father_fullname.trim()) {
     return dedication.father_fullname.trim()
@@ -551,7 +575,7 @@ const getStatusColor = (status) => {
 
 const handlePrint = () => {
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Child Name', 'Requester', 'Preferred Date', 'Pastor', 'Location', 'Father', 'Mother', 'Status', 'Date Created']
+  const tableHeaders = ['Child Name', 'Requester', 'Preferred Date & Time', 'Pastor', 'Location', 'Father', 'Mother', 'Status', 'Date Created']
 
   // Get current user info for printed by
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
@@ -569,7 +593,7 @@ const handlePrint = () => {
       <tr>
         <td>${childName}</td>
         <td>${requesterName}</td>
-        <td>${formatDateTime(dedication.preferred_dedication_date)}</td>
+        <td>${formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time)}</td>
         <td>${pastorName}</td>
         <td>${locationName}</td>
         <td>${getFatherDisplayName(dedication)}</td>

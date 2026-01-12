@@ -4,49 +4,20 @@ const XLSX = require('xlsx');
 const { sendBurialDetails } = require('../emailHelperSendGrid');
 const { archiveBeforeDelete } = require('../archiveHelper');
 
-/**
- * Burial Service Records CRUD Operations
- * Based on tbl_burialservice schema:
- * - burial_id (VARCHAR(45), PK, NN)
- * - relationship (VARCHAR(45), NN)
- * - location (VARCHAR(45), NN)
- * - pastor_id (VARCHAR(45), NN)
- * - service_date (DATETIME, NN)
- * - status (VARCHAR(45), NN, default: 'pending')
- * - date_created (DATETIME, NN)
- * - member_id (VARCHAR(45), NN)
- * - deceased_name (VARCHAR(100))
- * - deceased_birthdate (DATE)
- * - date_death (DATETIME)
- */
-
-/**
- * Get the next burial_id (incremental)
- * @returns {Promise<String>} Next burial_id as zero-padded string
- */
 async function getNextBurialId() {
   try {
     const sql = 'SELECT MAX(burial_id) AS max_burial_id FROM tbl_burialservice';
     const [rows] = await query(sql);
-    
-    // If no records exist, start with 1, otherwise increment by 1
     const maxId = rows[0]?.max_burial_id || null;
-    
     if (!maxId) {
-      // First record - return "0000000001"
       return '0000000001';
     }
-    
-    // Extract numeric part if burial_id has prefix (e.g., "BURIAL0000000001" -> 1)
-    // Or if it's just numeric, use it directly
     const numericMatch = maxId.match(/\d+$/);
     if (numericMatch) {
       const numericPart = parseInt(numericMatch[0]);
       const newNumericId = numericPart + 1;
       return newNumericId.toString().padStart(9, '0');
     }
-    
-    // If no numeric part found, start from 1
     return '0000000001';
   } catch (error) {
     console.error('Error getting next burial ID:', error);
@@ -54,20 +25,16 @@ async function getNextBurialId() {
   }
 }
 
-/**
- * CREATE - Insert a new burial service record
- * @param {Object} burialData - Burial service data object
- * @returns {Promise<Object>} Result object
- */
 async function createBurialService(burialData) {
   try {
-    // Get next burial_id if not provided
     const new_burial_id = await getNextBurialId();
     console.log('New burial ID:', new_burial_id);
     
     const {
       burial_id = new_burial_id,
       member_id,
+      requester_name,
+      requester_email,
       relationship,
       location,
       pastor_name,
@@ -79,9 +46,12 @@ async function createBurialService(burialData) {
       date_death = null
     } = burialData;
 
-    // Validate required fields (burial_id is auto-generated if not provided)
-    if (!member_id) {
-      throw new Error('Missing required field: member_id');
+    // Member ID is now optional for non-member requests
+    if (!requester_name && !member_id) {
+      throw new Error('Either member_id or requester_name is required');
+    }
+    if (!requester_email && !member_id) {
+      throw new Error('Either member_id or requester_email is required');
     }
     if (!relationship) {
       throw new Error('Missing required field: relationship');
@@ -89,22 +59,17 @@ async function createBurialService(burialData) {
     if (!location) {
       throw new Error('Missing required field: location');
     }
-    // service_date is now optional
-    // if (!service_date) {
-    //   throw new Error('Missing required field: service_date');
-    // }
-   
 
-    // Check for possible duplicate: same member + same deceased name + same birthdate (if provided)
+    // For non-member requests, check by requester_email instead of member_id
     const duplicateCheckSql = `
-      SELECT burial_id 
+      SELECT burial_id
       FROM tbl_burialservice
-      WHERE member_id = ?
+      WHERE ${member_id ? 'member_id = ?' : 'requester_email = ?'}
         AND (${deceased_name ? 'deceased_name = ?' : '1=1'})
         AND (${deceased_birthdate ? 'deceased_birthdate = ?' : '1=1'})
       LIMIT 1
     `;
-    const duplicateParams = [String(member_id).trim()];
+    const duplicateParams = [member_id ? String(member_id).trim() : String(requester_email).trim()];
     if (deceased_name) duplicateParams.push(deceased_name.trim());
     if (deceased_birthdate) duplicateParams.push(moment(deceased_birthdate).format('YYYY-MM-DD'));
 
@@ -116,31 +81,32 @@ async function createBurialService(burialData) {
       };
     }
 
-    // Ensure burial_id is set and convert to string
     const final_burial_id = String(burial_id || new_burial_id).trim();
-    
-    // Convert member_id to string, pastor_name to string
-    const final_member_id = String(member_id).trim();
+    const final_member_id = member_id ? String(member_id).trim() : null;
+    const final_requester_name = requester_name ? String(requester_name).trim() : null;
+    const final_requester_email = requester_email ? String(requester_email).trim() : null;
     const final_pastor_name = pastor_name ? String(pastor_name).trim() : null;
 
-    // Format dates
-    // Handle null, empty string, or falsy values as null for service_date
     const formattedServiceDate = (service_date === null || service_date === '' || !service_date) 
       ? null 
       : moment(service_date).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
-    const formattedBirthdate = deceased_birthdate ? moment(deceased_birthdate).format('YYYY-MM-DD') : null;
+    const formattedBirthdate = deceased_birthdate && moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
+      ? deceased_birthdate
+      : moment(deceased_birthdate).format('YYYY-MM-DD');
     const formattedDateDeath = date_death ? moment(date_death).format('YYYY-MM-DD HH:mm:ss') : null;
 
     const sql = `
-      INSERT INTO tbl_burialservice 
-        (burial_id, member_id, relationship, location, pastor_name, service_date, status, date_created, deceased_name, deceased_birthdate, date_death)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbl_burialservice
+        (burial_id, member_id, requester_name, requester_email, relationship, location, pastor_name, service_date, status, date_created, deceased_name, deceased_birthdate, date_death)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
       final_burial_id,
       final_member_id,
+      final_requester_name,
+      final_requester_email,
       relationship.trim(),
       location.trim(),
       final_pastor_name,
@@ -153,37 +119,49 @@ async function createBurialService(burialData) {
     ];
 
     const [result] = await query(sql, params);
-    
-    // Fetch the created burial service
     const createdBurialService = await getBurialServiceById(final_burial_id);
 
-    // Send email notification to the member (best-effort; do not fail creation)
     try {
-      const [memberRows] = await query(
-        `SELECT firstname, lastname, middle_name, email, phone_number
-         FROM tbl_members
-         WHERE member_id = ?`,
-        [final_member_id]
-      );
+      // Send email to member if member_id exists, otherwise send to requester_email
+      if (final_member_id) {
+        const [memberRows] = await query(
+          `SELECT firstname, lastname, middle_name, email, phone_number
+           FROM tbl_members
+           WHERE member_id = ?`,
+          [final_member_id]
+        );
 
-      if (memberRows && memberRows.length > 0 && memberRows[0].email) {
-        const member = memberRows[0];
-        const recipientName = `${member.firstname || ''} ${member.middle_name ? member.middle_name + ' ' : ''}${member.lastname || ''}`.trim() || 'Valued Member';
+        if (memberRows && memberRows.length > 0 && memberRows[0].email) {
+          const member = memberRows[0];
+          const recipientName = `${member.firstname || ''} ${member.middle_name ? member.middle_name + ' ' : ''}${member.lastname || ''}`.trim() || 'Valued Member';
 
+          await sendBurialDetails({
+            email: member.email,
+            status: createdBurialService.data.status,
+            deceasedName: createdBurialService.data.deceased_name,
+            familyContact: recipientName || member.phone_number || 'N/A',
+            burialDate: createdBurialService.data.service_date
+              ? moment(createdBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
+              : 'To be determined',
+            location: createdBurialService.data.location,
+            recipientName
+          });
+        }
+      } else if (final_requester_email) {
+        // Send email to non-member requester
         await sendBurialDetails({
-          email: member.email,
+          email: final_requester_email,
           status: createdBurialService.data.status,
           deceasedName: createdBurialService.data.deceased_name,
-          familyContact: recipientName || member.phone_number || 'N/A',
+          familyContact: final_requester_name || 'N/A',
           burialDate: createdBurialService.data.service_date
             ? moment(createdBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
           location: createdBurialService.data.location,
-          recipientName
+          recipientName: final_requester_name || 'Requester'
         });
       }
     } catch (emailError) {
-      // Log but don't block record creation if email fails
       console.error('Error sending burial creation email:', emailError);
     }
 
@@ -198,75 +176,45 @@ async function createBurialService(burialData) {
   }
 }
 
-/**
- * READ ALL - Get all burial service records with pagination and filters
- * Enhanced with FULLTEXT search capabilities
- * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, status, sortBy, useFulltext)
- * @returns {Promise<Object>} Object with paginated burial service records and metadata
- */
 async function getAllBurialServices(options = {}) {
   try {
-    // Extract and normalize parameters from options
     const search = options.search || options.q || null;
     const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
-    const offset = options.offset !== undefined ? parseInt(offset) : undefined;
+    const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
     const page = options.page !== undefined ? parseInt(options.page) : undefined;
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
-    const useFulltext = options.useFulltext === true; // Default to false for broader compatibility
+    const useFulltext = options.useFulltext === true;
 
-    // Build base query for counting total records (with JOIN for accurate count)
     let countSql = 'SELECT COUNT(*) as total FROM tbl_burialservice bs INNER JOIN tbl_members m ON bs.member_id = m.member_id';
     let countParams = [];
 
-    // Build query for fetching records with member data using FULLTEXT
-    let sql = `SELECT 
-      bs.*,
-      m.firstname,
-      m.lastname,
-      m.middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
-      ) as fullname
-    FROM tbl_burialservice bs
-    INNER JOIN tbl_members m ON bs.member_id = m.member_id`;
+    let sql = `SELECT bs.burial_id, bs.member_id, bs.requester_name, bs.requester_email, bs.relationship, bs.location, bs.pastor_name, bs.service_date, bs.status, bs.date_created, bs.deceased_name, bs.deceased_birthdate, bs.date_death, m.firstname, m.lastname, m.middle_name, m.email as member_email, CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname FROM tbl_burialservice bs LEFT JOIN tbl_members m ON bs.member_id = m.member_id`;
     const params = [];
 
-    // Build WHERE conditions array
     const whereConditions = [];
     let hasWhere = false;
 
-    // Add search functionality with FULLTEXT support
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
       if (useFulltext) {
-        // Use FULLTEXT search for better performance and relevance
-        const fulltextCondition = `MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE)`;
+        const fulltextCondition = `MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name, bs.requester_name, bs.requester_email) AGAINST(? IN NATURAL LANGUAGE MODE)`;
         const memberFulltextCondition = `MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE)`;
-        
-        // Combine FULLTEXT conditions with OR logic
         const searchCondition = `(${fulltextCondition} OR ${memberFulltextCondition})`;
-        
         whereConditions.push(searchCondition);
         countParams.push(searchValue, searchValue);
         params.push(searchValue, searchValue);
       } else {
-        // Fallback to LIKE search for compatibility
-        const searchCondition = `(bs.burial_id LIKE ? OR bs.deceased_name LIKE ? OR bs.location LIKE ? OR bs.pastor_name LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?)`;
+        const searchCondition = `(bs.burial_id LIKE ? OR bs.deceased_name LIKE ? OR bs.location LIKE ? OR bs.pastor_name LIKE ? OR bs.requester_name LIKE ? OR bs.requester_email LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?)`;
         const searchPattern = `%${searchValue}%`;
-
         whereConditions.push(searchCondition);
-        countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-        params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+        countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+        params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       }
       hasWhere = true;
     }
 
-    // Add status filter
     if (status && status !== 'All Statuses') {
       whereConditions.push('status = ?');
       countParams.push(status);
@@ -274,13 +222,11 @@ async function getAllBurialServices(options = {}) {
       hasWhere = true;
     }
 
-    // Initialize sortByValue before using it
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
 
-    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     if (sortByValue && monthNames.includes(sortByValue)) {
-      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
+      const monthIndex = monthNames.indexOf(sortByValue) + 1;
       whereConditions.push('MONTH(bs.service_date) = ? AND YEAR(bs.service_date) = YEAR(CURDATE())');
       countParams.push(monthIndex);
       params.push(monthIndex);
@@ -293,14 +239,12 @@ async function getAllBurialServices(options = {}) {
       hasWhere = true;
     }
 
-    // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
       countSql += whereClause;
       sql += whereClause;
     }
 
-    // Add sorting with FULLTEXT relevance support
     let orderByClause = ' ORDER BY ';
     switch (sortByValue) {
       case 'Burial ID (A-Z)':
@@ -325,14 +269,7 @@ async function getAllBurialServices(options = {}) {
         orderByClause += 'bs.status ASC';
         break;
       case 'Status (Pending First)':
-        orderByClause += `CASE bs.status 
-          WHEN 'Pending' THEN 1 
-          WHEN 'Approved' THEN 2 
-          WHEN 'Disapproved' THEN 3 
-          WHEN 'Completed' THEN 4 
-          WHEN 'Cancelled' THEN 5 
-          ELSE 6 
-        END, bs.date_created DESC`;
+        orderByClause += `CASE bs.status WHEN 'Pending' THEN 1 WHEN 'Approved' THEN 2 WHEN 'Disapproved' THEN 3 WHEN 'Completed' THEN 4 WHEN 'Cancelled' THEN 5 ELSE 6 END, bs.date_created DESC`;
         break;
       case 'Pastor Name (A-Z)':
         orderByClause += 'bs.pastor_name ASC';
@@ -347,19 +284,17 @@ async function getAllBurialServices(options = {}) {
         orderByClause += 'bs.location DESC';
         break;
       case 'Relevance':
-        // Only available with FULLTEXT search
         if (useFulltext && searchValue) {
-          orderByClause += 'MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE) DESC, ';
+          orderByClause += 'MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name, bs.requester_name, bs.requester_email) AGAINST(? IN NATURAL LANGUAGE MODE) DESC, ';
           params.push(searchValue);
         }
         orderByClause += 'bs.date_created DESC';
         break;
       default:
-        orderByClause += 'bs.date_created DESC'; // Default sorting
+        orderByClause += 'bs.date_created DESC';
     }
     sql += orderByClause;
 
-    // Determine pagination values
     let finalLimit, finalOffset;
 
     if (page !== undefined && pageSize !== undefined) {
@@ -375,14 +310,10 @@ async function getAllBurialServices(options = {}) {
       finalOffset = null;
     }
 
-    // Get total count (before pagination)
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Get summary statistics from ALL records (ignoring filters for summary cards)
-    const [allStatusCountsResult] = await query(
-      'SELECT status, COUNT(*) as count FROM tbl_burialservice GROUP BY status'
-    );
+    const [allStatusCountsResult] = await query('SELECT status, COUNT(*) as count FROM tbl_burialservice GROUP BY status');
     const summaryStats = {
       total: 0,
       completed: 0,
@@ -394,18 +325,15 @@ async function getAllBurialServices(options = {}) {
       ongoing: 0
     };
     
-    // Get total count of all records
     const [allTotalResult] = await query('SELECT COUNT(*) as total FROM tbl_burialservice');
     summaryStats.total = allTotalResult[0]?.total || 0;
     
-    // Map status counts
     allStatusCountsResult.forEach(row => {
       if (summaryStats.hasOwnProperty(row.status)) {
         summaryStats[row.status] = row.count;
       }
     });
 
-    // Add pagination to main query
     if (finalLimit !== null) {
       const limitValue = Math.max(1, parseInt(finalLimit) || 10);
       const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
@@ -417,10 +345,8 @@ async function getAllBurialServices(options = {}) {
       }
     }
 
-    // Execute query to get paginated results
     const [rows] = await query(sql, params);
 
-    // Calculate pagination metadata
     const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
     const currentPageSize = finalLimit || rows.length;
     const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
@@ -447,21 +373,15 @@ async function getAllBurialServices(options = {}) {
   }
 }
 
-/**
- * READ - Get burial services by member_id
- * @param {String} memberId - Member ID
- * @returns {Promise<Object>} Burial service records
- */
 async function getBurialServicesByMemberId(memberId) {
   try {
     if (!memberId) {
       throw new Error('Member ID is required');
     }
 
-    // Convert member_id to string for comparison (burial service uses VARCHAR member_id)
     const memberIdStr = String(memberId).trim();
 
-    const sql = `SELECT 
+    const sql = `SELECT
       bs.*,
       m.firstname,
       m.lastname,
@@ -473,7 +393,7 @@ async function getBurialServicesByMemberId(memberId) {
         m.lastname
       ) as fullname
     FROM tbl_burialservice bs
-    INNER JOIN tbl_members m ON bs.member_id = m.member_id
+    LEFT JOIN tbl_members m ON bs.member_id = m.member_id
     WHERE bs.member_id = ?
     ORDER BY bs.date_created DESC`;
     const [rows] = await query(sql, [memberIdStr]);
@@ -489,18 +409,30 @@ async function getBurialServicesByMemberId(memberId) {
   }
 }
 
-/**
- * READ ONE - Get a single burial service by ID
- * @param {String} burialId - Burial ID
- * @returns {Promise<Object>} Burial service record
- */
 async function getBurialServiceById(burialId) {
   try {
     if (!burialId) {
       throw new Error('Burial ID is required');
     }
 
-    const sql = 'SELECT * FROM tbl_burialservice WHERE burial_id = ?';
+    const sql = `SELECT
+      bs.*,
+      m.firstname,
+      m.lastname,
+      m.middle_name,
+      m.email as member_email,
+      m.birthdate as member_birthdate,
+      m.age as member_age,
+      bs.deceased_birthdate,
+      CONCAT(
+        m.firstname,
+        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
+        ' ',
+        m.lastname
+      ) as fullname
+    FROM tbl_burialservice bs
+    LEFT JOIN tbl_members m ON bs.member_id = m.member_id
+    WHERE bs.burial_id = ?`;
     const [rows] = await query(sql, [burialId]);
 
     if (rows.length === 0) {
@@ -522,19 +454,12 @@ async function getBurialServiceById(burialId) {
   }
 }
 
-/**
- * UPDATE - Update an existing burial service record
- * @param {String} burialId - Burial ID
- * @param {Object} burialData - Updated burial service data
- * @returns {Promise<Object>} Result object
- */
 async function updateBurialService(burialId, burialData) {
   try {
     if (!burialId) {
       throw new Error('Burial ID is required');
     }
 
-    // Check if burial service exists
     const burialCheck = await getBurialServiceById(burialId);
     if (!burialCheck.success) {
       return {
@@ -557,68 +482,90 @@ async function updateBurialService(burialId, burialData) {
       date_death
     } = burialData;
 
-    // Build dynamic update query based on provided fields
     const fields = [];
     const params = [];
 
-    if (member_id !== undefined) {
+    if (member_id !== undefined && member_id !== null && member_id !== '') {
       fields.push('member_id = ?');
       params.push(String(member_id).trim());
+    } else if (member_id === null || member_id === '') {
+      fields.push('member_id = NULL');
     }
 
-    if (relationship !== undefined) {
+    if (requester_name !== undefined && requester_name !== null && requester_name !== '') {
+      fields.push('requester_name = ?');
+      params.push(String(requester_name).trim());
+    } else if (requester_name === null || requester_name === '') {
+      fields.push('requester_name = NULL');
+    }
+
+    if (requester_email !== undefined && requester_email !== null && requester_email !== '') {
+      fields.push('requester_email = ?');
+      params.push(String(requester_email).trim());
+    } else if (requester_email === null || requester_email === '') {
+      fields.push('requester_email = NULL');
+    }
+
+    if (relationship !== undefined && relationship !== null && relationship !== '') {
       fields.push('relationship = ?');
       params.push(relationship.trim());
     }
 
-    if (location !== undefined) {
+    if (location !== undefined && location !== null && location !== '') {
       fields.push('location = ?');
       params.push(location.trim());
     }
 
-    if (pastor_name !== undefined) {
+    if (pastor_name !== undefined && pastor_name !== null && pastor_name !== '') {
       fields.push('pastor_name = ?');
-      params.push(pastor_name ? String(pastor_name).trim() : null);
+      params.push(String(pastor_name).trim());
     }
 
     if (service_date !== undefined) {
-      // Handle null, empty string, or falsy values as null
       if (service_date === null || service_date === '' || !service_date) {
         fields.push('service_date = ?');
         params.push(null);
       } else {
-      const formattedServiceDate = moment(service_date).format('YYYY-MM-DD HH:mm:ss');
-      fields.push('service_date = ?');
-      params.push(formattedServiceDate);
+        const formattedServiceDate = moment(service_date).format('YYYY-MM-DD HH:mm:ss');
+        fields.push('service_date = ?');
+        params.push(formattedServiceDate);
       }
     }
 
-    if (status !== undefined) {
+    if (status !== undefined && status !== null && status !== '') {
       fields.push('status = ?');
       params.push(status);
     }
 
-    if (date_created !== undefined) {
+    if (date_created !== undefined && date_created !== null && date_created !== '') {
       const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
       fields.push('date_created = ?');
       params.push(formattedDateCreated);
     }
 
-    if (deceased_name !== undefined) {
+    if (deceased_name !== undefined && deceased_name !== null && deceased_name !== '') {
       fields.push('deceased_name = ?');
-      params.push(deceased_name ? deceased_name.trim() : null);
+      params.push(deceased_name.trim());
+    } else if (deceased_name === null || deceased_name === '') {
+      fields.push('deceased_name = NULL');
     }
 
-    if (deceased_birthdate !== undefined) {
-      const formattedBirthdate = deceased_birthdate ? moment(deceased_birthdate).format('YYYY-MM-DD') : null;
+    if (deceased_birthdate !== undefined && deceased_birthdate !== null && deceased_birthdate !== '') {
+      const formattedBirthdate = moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
+        ? deceased_birthdate
+        : moment(deceased_birthdate).format('YYYY-MM-DD');
       fields.push('deceased_birthdate = ?');
       params.push(formattedBirthdate);
+    } else if (deceased_birthdate === null || deceased_birthdate === '') {
+      fields.push('deceased_birthdate = NULL');
     }
 
-    if (date_death !== undefined) {
-      const formattedDateDeath = date_death ? moment(date_death).format('YYYY-MM-DD HH:mm:ss') : null;
+    if (date_death !== undefined && date_death !== null && date_death !== '') {
+      const formattedDateDeath = moment(date_death).format('YYYY-MM-DD HH:mm:ss');
       fields.push('date_death = ?');
       params.push(formattedDateDeath);
+    } else if (date_death === null || date_death === '') {
+      fields.push('date_death = NULL');
     }
 
     if (fields.length === 0) {
@@ -647,37 +594,49 @@ async function updateBurialService(burialId, burialData) {
       };
     }
 
-    // Fetch updated burial service
     const updatedBurialService = await getBurialServiceById(burialId);
 
-    // Send email notification to the member (if we can resolve email)
     try {
-      // Get member contact details
-      const [memberRows] = await query(
-        `SELECT firstname, lastname, middle_name, email, phone_number
-         FROM tbl_members
-         WHERE member_id = ?`,
-        [updatedBurialService.data.member_id]
-      );
+      // Send email to member if member_id exists, otherwise send to requester_email
+      if (updatedBurialService.data.member_id) {
+        const [memberRows] = await query(
+          `SELECT firstname, lastname, middle_name, email, phone_number
+           FROM tbl_members
+           WHERE member_id = ?`,
+          [updatedBurialService.data.member_id]
+        );
 
-      if (memberRows && memberRows.length > 0) {
-        const member = memberRows[0];
-        const recipientName = `${member.firstname || ''} ${member.middle_name ? member.middle_name + ' ' : ''}${member.lastname || ''}`.trim() || 'Valued Member';
+        if (memberRows && memberRows.length > 0 && memberRows[0].email) {
+          const member = memberRows[0];
+          const recipientName = `${member.firstname || ''} ${member.middle_name ? member.middle_name + ' ' : ''}${member.lastname || ''}`.trim() || 'Valued Member';
 
+          await sendBurialDetails({
+            email: member.email,
+            status: updatedBurialService.data.status,
+            deceasedName: updatedBurialService.data.deceased_name,
+            familyContact: recipientName || member.phone_number || 'N/A',
+            burialDate: updatedBurialService.data.service_date
+              ? moment(updatedBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
+              : 'To be determined',
+            location: updatedBurialService.data.location,
+            recipientName
+          });
+        }
+      } else if (updatedBurialService.data.requester_email) {
+        // Send email to non-member requester
         await sendBurialDetails({
-          email: member.email,
+          email: updatedBurialService.data.requester_email,
           status: updatedBurialService.data.status,
           deceasedName: updatedBurialService.data.deceased_name,
-          familyContact: recipientName || member.phone_number || 'N/A',
+          familyContact: updatedBurialService.data.requester_name || 'N/A',
           burialDate: updatedBurialService.data.service_date
             ? moment(updatedBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
           location: updatedBurialService.data.location,
-          recipientName
+          recipientName: updatedBurialService.data.requester_name || 'Requester'
         });
       }
     } catch (emailError) {
-      // Do not block update flow on email failure, just log for diagnostics
       console.error('Error sending burial update email:', emailError);
     }
 
@@ -692,19 +651,12 @@ async function updateBurialService(burialId, burialData) {
   }
 }
 
-/**
- * DELETE - Delete a burial service record (archives it first)
- * @param {String} burialId - Burial ID
- * @param {String} archivedBy - User ID who is deleting/archiving the record (optional)
- * @returns {Promise<Object>} Result object
- */
 async function deleteBurialService(burialId, archivedBy = null) {
   try {
     if (!burialId) {
       throw new Error('Burial ID is required');
     }
 
-    // Check if burial service exists
     const burialCheck = await getBurialServiceById(burialId);
     if (!burialCheck.success) {
       return {
@@ -714,7 +666,6 @@ async function deleteBurialService(burialId, archivedBy = null) {
       };
     }
 
-    // Archive the record before deleting
     await archiveBeforeDelete(
       'tbl_burialservice',
       String(burialId),
@@ -722,7 +673,6 @@ async function deleteBurialService(burialId, archivedBy = null) {
       archivedBy
     );
 
-    // Delete from original table
     const sql = 'DELETE FROM tbl_burialservice WHERE burial_id = ?';
     const [result] = await query(sql, [burialId]);
 
@@ -745,11 +695,166 @@ async function deleteBurialService(burialId, archivedBy = null) {
   }
 }
 
-/**
- * EXPORT - Export burial service records to Excel
- * @param {Object} options - Optional query parameters (same as getAllBurialServices: search, status, sortBy)
- * @returns {Promise<Buffer>} Excel file buffer
- */
+async function searchBurialServicesFulltext(options = {}) {
+  try {
+    const search = options.search || options.q || null;
+    const limit = options.limit !== undefined ? parseInt(options.limit) : 10;
+    const offset = options.offset !== undefined ? parseInt(options.offset) : 0;
+    const minRelevance = options.minRelevance !== undefined ? parseFloat(options.minRelevance) : 0.1;
+
+    if (!search || search.trim() === '') {
+      throw new Error('Search term is required for fulltext search');
+    }
+
+    const searchValue = search.trim();
+
+    const countSql = `
+      SELECT COUNT(*) as total
+      FROM tbl_burialservice bs
+      INNER JOIN tbl_members m ON bs.member_id = m.member_id
+      WHERE (
+        MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name, bs.requester_email) AGAINST(? IN NATURAL LANGUAGE MODE) > ?
+        OR MATCH(m.firstname, m.lastname, m.middle_name, m.email) AGAINST(? IN NATURAL LANGUAGE MODE) > ?
+      )
+    `;
+
+    const sql = `
+      SELECT 
+        bs.burial_id, bs.member_id, bs.relationship, bs.location, bs.pastor_name, 
+        bs.service_date, bs.status, bs.date_created, bs.deceased_name, 
+        bs.deceased_birthdate, bs.date_death,
+        m.firstname, m.lastname, m.middle_name, m.email,
+        CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname,
+        GREATEST(
+          MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name, bs.requester_email) AGAINST(? IN NATURAL LANGUAGE MODE),
+          MATCH(m.firstname, m.lastname, m.middle_name, m.email) AGAINST(? IN NATURAL LANGUAGE MODE)
+        ) as relevance_score
+      FROM tbl_burialservice bs 
+      INNER JOIN tbl_members m ON bs.member_id = m.member_id
+      WHERE (
+        MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name, bs.requester_email) AGAINST(? IN NATURAL LANGUAGE MODE) > ?
+        OR MATCH(m.firstname, m.lastname, m.middle_name, m.email) AGAINST(? IN NATURAL LANGUAGE MODE) > ?
+      )
+      ORDER BY relevance_score DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const countParams = [searchValue, minRelevance, searchValue, minRelevance];
+    const params = [searchValue, searchValue, searchValue, minRelevance, searchValue, minRelevance, limit, offset];
+
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+
+    const [rows] = await query(sql, params);
+
+    return {
+      success: true,
+      message: 'Fulltext search completed successfully',
+      data: rows,
+      count: rows.length,
+      totalCount: totalCount,
+      searchTerm: searchValue,
+      relevanceThreshold: minRelevance
+    };
+  } catch (error) {
+    console.error('Error in fulltext search:', error);
+    throw error;
+  }
+}
+
+async function analyzeBurialServiceAvailability(options = {}) {
+  try {
+    const {
+      startDate,
+      endDate,
+      location = null,
+      serviceDurationHours = 2,
+      businessHours = { start: 8, end: 18 }
+    } = options;
+
+    if (!startDate || !endDate) {
+      throw new Error('Start date and end date are required');
+    }
+
+    const start = moment(startDate).format('YYYY-MM-DD');
+    const end = moment(endDate).format('YYYY-MM-DD');
+
+    let sql = `
+      SELECT 
+        DATE(service_date) as service_day,
+        TIME(service_date) as service_time,
+        location,
+        COUNT(*) as service_count
+      FROM tbl_burialservice 
+      WHERE service_date BETWEEN ? AND ?
+        AND status NOT IN ('Cancelled', 'Disapproved')
+    `;
+    
+    const params = [start + ' 00:00:00', end + ' 23:59:59'];
+
+    if (location) {
+      sql += ' AND location = ?';
+      params.push(location);
+    }
+
+    sql += ' GROUP BY DATE(service_date), TIME(service_date), location ORDER BY service_date';
+
+    const [existingServices] = await query(sql, params);
+
+    const availabilityAnalysis = {
+      dateRange: { start, end },
+      location: location || 'All locations',
+      serviceDurationHours,
+      businessHours,
+      existingServices: existingServices.length,
+      busyDays: [],
+      availableDays: [],
+      recommendations: []
+    };
+
+    const current = moment(startDate);
+    const endMoment = moment(endDate);
+
+    while (current.isSameOrBefore(endMoment)) {
+      const dayServices = existingServices.filter(service => 
+        moment(service.service_day).isSame(current, 'day')
+      );
+
+      const dayAnalysis = {
+        date: current.format('YYYY-MM-DD'),
+        dayOfWeek: current.format('dddd'),
+        servicesScheduled: dayServices.length,
+        availableSlots: Math.floor((businessHours.end - businessHours.start) / serviceDurationHours) - dayServices.length,
+        services: dayServices
+      };
+
+      if (dayAnalysis.servicesScheduled >= 3) {
+        availabilityAnalysis.busyDays.push(dayAnalysis);
+      } else {
+        availabilityAnalysis.availableDays.push(dayAnalysis);
+      }
+
+      current.add(1, 'day');
+    }
+
+    if (availabilityAnalysis.availableDays.length > 0) {
+      availabilityAnalysis.recommendations.push('Consider scheduling on available days with fewer conflicts');
+    }
+    if (availabilityAnalysis.busyDays.length > availabilityAnalysis.availableDays.length) {
+      availabilityAnalysis.recommendations.push('Consider extending the date range for better availability');
+    }
+
+    return {
+      success: true,
+      message: 'Availability analysis completed successfully',
+      data: availabilityAnalysis
+    };
+  } catch (error) {
+    console.error('Error analyzing burial service availability:', error);
+    throw error;
+  }
+}
+
 async function exportBurialServicesToExcel(options = {}) {
   try {
     const exportOptions = { ...options };
@@ -771,6 +876,8 @@ async function exportBurialServicesToExcel(options = {}) {
         'No.': index + 1,
         'Burial ID': service.burial_id || '',
         'Member ID': service.member_id || '',
+        'Requester Name': service.requester_name || '',
+        'Requester Email': service.member_email || service.requester_email || '',
         'Member Name': service.fullname || '',
         'Deceased Name': service.deceased_name || '',
         'Relationship': service.relationship || '',
@@ -788,19 +895,19 @@ async function exportBurialServicesToExcel(options = {}) {
     const worksheet = XLSX.utils.json_to_sheet(excelData);
 
     const columnWidths = [
-      { wch: 5 },   // No.
-      { wch: 15 },  // Burial ID
-      { wch: 15 },  // Member ID
-      { wch: 25 },  // Member Name
-      { wch: 30 },  // Deceased Name
-      { wch: 20 },  // Relationship
-      { wch: 25 },  // Location
-      { wch: 25 },  // Pastor Name
-      { wch: 20 },  // Service Date
-      { wch: 15 },  // Status
-      { wch: 20 },  // Date Created
-      { wch: 18 },  // Deceased Birthdate
-      { wch: 22 }   // Date of Death
+      { wch: 5 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 22 }
     ];
     worksheet['!cols'] = columnWidths;
 
@@ -819,91 +926,6 @@ async function exportBurialServicesToExcel(options = {}) {
   }
 }
 
-/**
- * FULLTEXT SEARCH - Specialized function for advanced search using FULLTEXT indexes
- * @param {Object} options - Search options
- * @returns {Promise<Object>} Search results with relevance scoring
- */
-async function searchBurialServicesFulltext(options = {}) {
-  try {
-    const {
-      search,
-      limit = 50,
-      offset = 0,
-      minRelevance = 0
-    } = options;
-
-    if (!search || search.trim() === '') {
-      return {
-        success: false,
-        message: 'Search term is required for FULLTEXT search',
-        data: [],
-        count: 0
-      };
-    }
-
-    const searchTerm = search.trim();
-
-    // FULLTEXT search query with relevance scoring
-    const sql = `SELECT 
-      bs.*,
-      m.firstname,
-      m.lastname,
-      m.middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
-      ) as fullname,
-      MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE) as burial_relevance,
-      MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE) as member_relevance,
-      (MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE) +
-       MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE)) as total_relevance
-    FROM tbl_burialservice bs
-    INNER JOIN tbl_members m ON bs.member_id = m.member_id
-    WHERE MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE)
-       OR MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE)
-    HAVING total_relevance > ?
-    ORDER BY total_relevance DESC, bs.date_created DESC
-    LIMIT ? OFFSET ?`;
-
-    const params = [
-      searchTerm, searchTerm, searchTerm, // For MATCH AGAINST
-      minRelevance,
-      parseInt(limit),
-      parseInt(offset)
-    ];
-
-    const [rows] = await query(sql, params);
-
-    // Get total count for pagination
-    const countSql = `SELECT COUNT(*) as total
-      FROM tbl_burialservice bs
-      INNER JOIN tbl_members m ON bs.member_id = m.member_id
-      WHERE MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE)
-         OR MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE)
-      HAVING (MATCH(bs.burial_id, bs.location, bs.deceased_name, bs.relationship, bs.status, bs.pastor_name) AGAINST(? IN NATURAL LANGUAGE MODE) +
-              MATCH(m.firstname, m.lastname, m.middle_name) AGAINST(? IN NATURAL LANGUAGE MODE)) > ?`;
-    
-    const [countResult] = await query(countSql, [searchTerm, searchTerm, searchTerm, searchTerm, minRelevance]);
-    const totalCount = countResult[0]?.total || 0;
-
-    return {
-      success: true,
-      message: 'FULLTEXT search completed successfully',
-      data: rows,
-      count: rows.length,
-      totalCount: totalCount,
-      searchTerm: searchTerm,
-      relevanceThreshold: minRelevance
-    };
-  } catch (error) {
-    console.error('Error in FULLTEXT search:', error);
-    throw error;
-  }
-}
-
 module.exports = {
   createBurialService,
   getAllBurialServices,
@@ -912,6 +934,6 @@ module.exports = {
   updateBurialService,
   deleteBurialService,
   exportBurialServicesToExcel,
-  searchBurialServicesFulltext  // New FULLTEXT search function
+  searchBurialServicesFulltext,
+  analyzeBurialServiceAvailability
 };
-

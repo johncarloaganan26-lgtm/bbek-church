@@ -31,10 +31,10 @@ const getConnectionLimit = () => {
     return parseInt(process.env.DB_CONNECTION_LIMIT, 10);
   }
   
-  // Default: 2 for production (cloud - very conservative to avoid max_user_connections),
+  // Default: 1 for production (cloud - very conservative to avoid max_user_connections),
   // 10 for development (local)
-  // Using 2 instead of 3 to be extra safe with max_user_connections limit of 5
-  return IS_PRODUCTION ? 2 : 10;
+  // Using 1 to be extra safe with max_user_connections limit of 5
+  return IS_PRODUCTION ? 1 : 10;
 };
 
 const dbConfig = {

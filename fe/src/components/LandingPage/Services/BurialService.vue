@@ -151,7 +151,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -163,7 +163,7 @@
                           variant="outlined"
                           density="compact"
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                     </div>
@@ -181,7 +181,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -196,7 +196,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                     </div>
@@ -216,7 +216,7 @@
                           required
                           readonly
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -228,7 +228,7 @@
                           placeholder="Select sex"
                           size="large"
                           style="width: 100%"
-                          :disabled="memberRegistrationStore.loading"
+                          :disabled="burialServiceStore.loading"
                         >
                           <el-option label="Male" value="M" />
                           <el-option label="Female" value="F" />
@@ -248,7 +248,7 @@
                         density="compact"
                         required
                         hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                       ></v-text-field>
                     </div>
 
@@ -266,7 +266,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -276,7 +276,7 @@
                         placeholder="Select civil status"
                         size="large"
                         style="width: 100%"
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                       >
                         <el-option label="Single" value="single" />
                         <el-option label="Married" value="married" />
@@ -295,7 +295,7 @@
                         placeholder="9XXXXXXXXX"
                         size="large"
                         :maxlength="10"
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                       >
                         <template #prepend>+63</template>
                       </el-input>
@@ -315,7 +315,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -330,7 +330,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                     </div>
@@ -348,7 +348,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -365,7 +365,7 @@
                           required
                           readonly
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                       <div class="form-group">
@@ -380,7 +380,7 @@
                           density="compact"
                           required
                           hide-details
-                        :disabled="memberRegistrationStore.loading"
+                        :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
                     </div>
@@ -456,14 +456,12 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useMemberRegistrationStore } from '@/stores/memberRegistrationStore'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
 import axios from '@/api/axios'
 import { useCms } from '@/composables/useCms'
 
 const router = useRouter()
-const memberRegistrationStore = useMemberRegistrationStore()
 const burialServiceStore = useBurialServiceStore()
 
 // CMS Data
@@ -639,7 +637,7 @@ const handleSubmit = async (e) => {
   try {
     // Show confirmation dialog
     await ElMessageBox.confirm(
-      'Are you sure you want to submit this burial service request?',
+      'Are you sure you want to submit this burial service request? This will create a burial service record without creating a member account.',
       'Confirm Submission',
       {
         confirmButtonText: 'Submit',
@@ -650,38 +648,31 @@ const handleSubmit = async (e) => {
 
     isSubmitting.value = true
 
-    // Prepare payload matching backend expectations
+    // Prepare payload matching backend burial service expectations
     const payload = {
-      firstname: firstname.value.trim(),
-      middleName: middleName.value.trim() || null,
-      lastname: lastname.value.trim(),
-      birthdate: birthdate.value,
-      age: age.value,
-      gender: gender.value.trim(),
-      address: address.value.trim(),
-      email: email.value.trim().toLowerCase(),
-      phoneNumber: formatPhoneNumber(phoneNumber.value),
+      requester_name: `${firstname.value.trim()} ${middleName.value.trim() || ''} ${lastname.value.trim()}`.trim(),
+      requester_email: email.value.trim().toLowerCase(),
       relationship: relationship.value.trim(),
-      deceasedName: deceasedName.value.trim(),
-      deceasedBirthDate: deceasedBirthDate.value,
-      deceasedDeathDate: deceasedDeathDate.value,
-      civilStatus: civilStatus.value
+      location: 'To be determined',
+      pastor_name: null,
+      service_date: null,
+      status: 'pending',
+      deceased_name: deceasedName.value.trim(),
+      deceased_birthdate: deceasedBirthDate.value,
+      date_death: deceasedDeathDate.value,
+      // No member_id - this is for non-member requests
+      member_id: null
     }
 
-    const result = await memberRegistrationStore.registerMemberFromBurialService(payload)
+    const result = await burialServiceStore.createService(payload)
     
     if (result.success) {
-      showSuccessDialog('Success!', result.message || 'Burial service request submitted successfully! Our pastoral team will support you during this time.')
+      showSuccessDialog('Success!', 'Burial service request submitted successfully! Our pastoral team will support you during this time. No member account was created.')
       
       // Clear form after successful submission
       resetForm()
     } else {
-      // Display all errors from the errors array if available
-      if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
-        submitError.value = result.errors.join(', ')
-      } else {
-        submitError.value = result.error || 'An error occurred while submitting the request. Please try again.'
-      }
+      submitError.value = result.error || 'An error occurred while submitting the request. Please try again.'
       ElMessage.error(submitError.value)
     }
   } catch (error) {
@@ -1143,4 +1134,3 @@ const handleBurialDialogSubmit = async (payload) => {
   margin-top: 8px;
 }
 </style>
-

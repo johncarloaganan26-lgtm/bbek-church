@@ -8,10 +8,15 @@ const {
   updateChildDedication,
   deleteChildDedication,
   exportChildDedicationsToExcel,
-  checkDuplicateChildDedication
+  checkDuplicateChildDedication,
+  checkTimeSlotAvailability
 } = require('../../dbHelpers/services/childDedicationRecords');
+const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
+
+// Apply date formatting middleware to all child dedication routes
+router.use(dateFormattingMiddleware);
 
 /**
  * CHECK DUPLICATE - Check if child dedication already exists
@@ -55,6 +60,53 @@ router.get('/check-duplicate', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to check duplicate'
+    });
+  }
+});
+
+/**
+ * CHECK TIME SLOT - Check if a time slot is available for child dedication
+ * GET /api/church-records/child-dedications/check-time-slot
+ * Query params: preferred_dedication_date, preferred_dedication_time, exclude_id (optional)
+ */
+router.get('/check-time-slot', async (req, res) => {
+  try {
+    const { preferred_dedication_date, preferred_dedication_time, exclude_id } = req.query;
+
+    if (!preferred_dedication_date || !preferred_dedication_time) {
+      return res.status(400).json({
+        success: false,
+        message: 'preferred_dedication_date and preferred_dedication_time are required'
+      });
+    }
+
+    const result = await checkTimeSlotAvailability(
+      preferred_dedication_date,
+      preferred_dedication_time,
+      exclude_id || null
+    );
+
+    if (result.isBooked) {
+      return res.status(200).json({
+        success: true,
+        message: 'Time slot is booked',
+        data: {
+          isBooked: true,
+          conflictingDedication: result.conflictingDedication
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Time slot is available',
+      data: { isBooked: false }
+    });
+  } catch (error) {
+    console.error('Error checking time slot availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to check time slot availability'
     });
   }
 });

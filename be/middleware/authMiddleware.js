@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
  * - /api/member-registration/**
  * - /api/example
  */
-
+  
 // List of public routes that don't require authentication
 const publicRoutes = [
   '/api/health',
@@ -40,6 +40,15 @@ const publicRoutes = [
   '/api/member-registration/register/burial-service',
   // Water baptism non-member registration (public - no auth required)
   '/api/services/water-baptisms/register-non-member',
+  // Burial service routes (public for non-member requests)
+  '/api/church-records/burial-services/createBurialService',
+  '/api/church-records/burial-services/getAllBurialServices',
+  '/api/church-records/burial-services/getBurialServiceById',
+  '/api/church-records/burial-services/check-duplicate',
+  '/api/church-records/burial-services/check-member-burial',
+  '/api/church-records/burial-services/exportExcel',
+  '/api/church-records/burial-services/searchFulltext',
+  '/api/church-records/burial-services/analyzeAvailability',
   // Announcement routes (public for viewing)
   '/api/announcements/getActiveAnnouncementsForUser',
   '/api/announcements/markAsViewed',
@@ -81,6 +90,10 @@ const publicRoutes = [
   '/api/cms/upload-image',
   // forgot password routes
   '/api/church-records/accounts/forgotPassword',
+  // Child dedication routes (public for member creation)
+  '/api/church-records/child-dedications/createChildDedication',
+  '/api/church-records/child-dedications/check-duplicate',
+  '/api/church-records/child-dedications/check-member-dedication',
 ];
 
 /**
@@ -163,4 +176,3 @@ module.exports = {
   authenticateToken,
   isPublicRoute
 };
-

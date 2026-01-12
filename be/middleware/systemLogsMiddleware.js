@@ -402,7 +402,7 @@ const systemLogsMiddleware = async (req, res, next) => {
       let entityData = null;
       if ((action === 'UPDATE' || action === 'DELETE') && entityId) {
         entityData = await fetchEntityData(entityType, entityId);
-      } else if (action === 'CREATE' && body) {
+      } else if (action === 'CREATE' && req.body) {
         // For CREATE, use the submitted data
         entityData = req.body;
       }

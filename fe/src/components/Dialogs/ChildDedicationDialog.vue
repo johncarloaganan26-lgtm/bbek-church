@@ -22,7 +22,7 @@
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
       <el-form-item v-if="!isMemberUser" prop="requested_by">
         <template #label>
-          <span>Requested By (Member) <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Requested By (Member) <span class="required-text">Required</span></span>
         </template>
         <el-select
           v-model="formData.requested_by"
@@ -57,7 +57,7 @@
       <!-- Child First Name -->
       <el-form-item prop="child_firstname">
         <template #label>
-          <span>Child's First Name <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Child's First Name <span class="required-text">Required</span></span>
         </template>
         <el-input
           v-model="formData.child_firstname"
@@ -71,7 +71,7 @@
       <!-- Child Last Name -->
       <el-form-item prop="child_lastname">
         <template #label>
-          <span>Child's Last Name <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Child's Last Name <span class="required-text">Required</span></span>
         </template>
         <el-input
           v-model="formData.child_lastname"
@@ -96,7 +96,7 @@
       <!-- Date of Birth -->
       <el-form-item prop="date_of_birth">
         <template #label>
-          <span>Date of Birth <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Date of Birth <span class="required-text">Required</span></span>
         </template>
         <el-date-picker
           v-model="formData.date_of_birth"
@@ -108,13 +108,14 @@
           style="width: 100%"
           :disabled="loading"
           :disabled-date="(date) => date > new Date()"
+          :default-time="() => new Date(0, 0, 0, 12, 0, 0)"
         />
       </el-form-item>
 
       <!-- Place of Birth -->
       <el-form-item prop="place_of_birth">
         <template #label>
-          <span>Place of Birth <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Place of Birth <span class="required-text">Required</span></span>
         </template>
         <el-input
           v-model="formData.place_of_birth"
@@ -128,7 +129,7 @@
       <!-- Gender -->
       <el-form-item prop="gender">
         <template #label>
-          <span>Gender <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Gender <span class="required-text">Required</span></span>
         </template>
         <el-radio-group v-model="formData.gender" size="large" :disabled="loading">
           <el-radio label="M">Male</el-radio>
@@ -136,10 +137,32 @@
         </el-radio-group>
       </el-form-item>
 
-      <!-- Preferred Dedication Date -->
-      <el-form-item prop="preferred_dedication_date">
+      <!-- Relationship to Child -->
+      <el-form-item prop="requester_relationship">
         <template #label>
-          <span>Preferred Dedication Date <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Your Relationship to the Child <span class="required-text">Required</span></span>
+        </template>
+        <el-select
+          v-model="formData.requester_relationship"
+          placeholder="Select your relationship to the child"
+          size="large"
+          style="width: 100%"
+          :disabled="loading"
+          @change="onRelationshipChange"
+        >
+          <el-option label="Father" value="father" />
+          <el-option label="Mother" value="mother" />
+          <el-option label="Grandparent" value="grandparent" />
+          <el-option label="Guardian" value="guardian" />
+          <el-option label="Other Family Member" value="other_family" />
+          <el-option label="Other" value="other" />
+        </el-select>
+      </el-form-item>
+
+      <!-- Preferred Dedication Date and Time - Only for Admin/Staff users -->
+      <el-form-item v-if="!isMemberUser" prop="preferred_dedication_date">
+        <template #label>
+          <span>Preferred Dedication Date <span class="required-text">Required</span></span>
         </template>
         <el-date-picker
           v-model="formData.preferred_dedication_date"
@@ -150,7 +173,30 @@
           value-format="YYYY-MM-DD"
           style="width: 100%"
           :disabled="loading"
-          :disabled-date="(date) => date < new Date(new Date().setHours(0, 0, 0, 0))"
+          :disabled-date="isDateDisabled"
+          :default-time="() => new Date(0, 0, 0, 12, 0, 0)"
+          @change="onDateChange"
+        />
+      </el-form-item>
+
+      <!-- Preferred Dedication Time - Only for Admin/Staff users -->
+      <el-form-item v-if="!isMemberUser" prop="preferred_dedication_time">
+        <template #label>
+          <span>Preferred Dedication Time <span class="required-text">Required</span></span>
+        </template>
+        <el-time-picker
+          v-model="formData.preferred_dedication_time"
+          placeholder="Select preferred dedication time"
+          size="large"
+          format="hh:mm A"
+          value-format="HH:mm"
+          style="width: 100%"
+          :disabled="loading"
+          :disabled-hours="getDisabledHours"
+          :disabled-minutes="getDisabledMinutes"
+          start="08:00"
+          end="18:00"
+          step="30"
         />
       </el-form-item>
 
@@ -421,13 +467,10 @@
       <el-divider content-position="left">Contact Details</el-divider>
 
       <!-- Contact Phone Number -->
-      <el-form-item prop="contact_phone_number">
-        <template #label>
-          <span>Contact Phone Number <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
+      <el-form-item label="Contact Phone Number" prop="contact_phone_number">
         <el-input
           v-model="formData.contact_phone_number"
-          placeholder="Enter contact phone number"
+          placeholder="Enter contact phone number (optional)"
           size="large"
           clearable
           :disabled="loading"
@@ -447,15 +490,12 @@
       </el-form-item>
 
       <!-- Contact Address -->
-      <el-form-item prop="contact_address">
-        <template #label>
-          <span>Contact Address <span class="required">*</span> <span class="required-text">Required</span></span>
-        </template>
+      <el-form-item label="Contact Address" prop="contact_address">
         <el-input
           v-model="formData.contact_address"
           type="textarea"
           :rows="3"
-          placeholder="Enter contact address"
+          placeholder="Enter contact address (optional)"
           size="large"
           clearable
           :disabled="loading"
@@ -465,7 +505,7 @@
       <!-- Pastor (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="pastor">
         <template #label>
-          <span>Pastor <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Pastor <span class="required-text">Required</span></span>
         </template>
         <el-select
           v-model="formData.pastor"
@@ -489,7 +529,7 @@
       <!-- Location (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="location">
         <template #label>
-          <span>Location <span class="required">*</span> <span class="required-text">Required</span></span>
+          <span>Location <span class="required-text">Required</span></span>
         </template>
         <el-input
           v-model="formData.location"
@@ -543,6 +583,7 @@ import { Delete } from '@element-plus/icons-vue'
 import axios from '@/api/axios'
 
 const userInfo = ref(null)
+const selectedMemberData = ref(null) // Store selected member data for admin/staff users
 
 // Function to get user from localStorage safely
 const getUserFromStorage = () => {
@@ -571,7 +612,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'submit'])
+const emit = defineEmits(['update:modelValue', 'submit', 'switch-to-edit'])
 
 // Refs
 const formRef = ref(null)
@@ -611,6 +652,10 @@ const memberOptions = ref([])
 
 // Pastor options - will be fetched from API
 const pastorOptions = ref([])
+
+// Unavailable dates and time slots for scheduling
+const unavailableDates = ref([])
+const unavailableTimeSlots = ref([]) // Array of {date: 'YYYY-MM-DD', time: 'HH:mm'} objects
 
 // Check if user is a member (has member object and is not admin/staff)
 const isMemberUser = computed(() => {
@@ -653,19 +698,176 @@ const fetchPastorOptions = async () => {
   }
 }
 
+// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
+const fetchUnavailableTimeSlots = async () => {
+  try {
+    // Get all child dedications with preferred dates and times (only approved status)
+    const response = await axios.get('/church-records/child-dedications/getAllChildDedications', {
+      params: {
+        status: 'approved', // Only get approved dedications to block time slots
+        limit: 1000 // Get enough records to cover scheduling
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      // Extract time slots that are already approved/scheduled
+      const scheduledTimeSlots = []
+
+      response.data.data.forEach(dedication => {
+        if (dedication.preferred_dedication_date && dedication.preferred_dedication_time && dedication.status === 'approved') {
+          // Add time slot for blocking (same day allowed, same time blocked)
+          scheduledTimeSlots.push({
+            date: dedication.preferred_dedication_date,
+            time: dedication.preferred_dedication_time,
+            id: dedication.child_id // For edit mode exception
+          })
+        }
+      })
+
+      // Store time slots for blocking logic
+      unavailableTimeSlots.value = scheduledTimeSlots
+
+      // Note: We don't block entire dates anymore - same day is allowed
+      unavailableDates.value = []
+    }
+  } catch (error) {
+    console.error('Error fetching unavailable time slots:', error)
+    // Don't show error to user, just allow all slots if fetch fails
+  }
+}
+
+// Enhanced time slot validation function
+const validateTimeSlot = async (date, time, excludeId = null) => {
+  if (!date || !time) return true
+
+  try {
+    const response = await axios.get('/church-records/child-dedications/check-time-slot', {
+      params: {
+        preferred_dedication_date: date,
+        preferred_dedication_time: time,
+        exclude_id: excludeId
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      return !response.data.data.isBooked
+    }
+  } catch (error) {
+    console.error('Error validating time slot:', error)
+    // If validation fails, allow the time slot
+    return true
+  }
+
+  return true
+}
+
+// Date analyzer function - only checks for past dates (same day allowed, only time slots blocked)
+const isDateDisabled = (date) => {
+  // Only check: date cannot be in the past
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  return date < today // Disable past dates only
+}
+
+// Get disabled hours for time picker based on selected date
+const getDisabledHours = () => {
+  if (!formData.preferred_dedication_date) return []
+
+  const selectedDateStr = formData.preferred_dedication_date
+  const bookedTimesForDate = unavailableTimeSlots.value
+    .filter(slot => {
+      // Allow current dedication's time slot if editing
+      if (isEditMode.value && props.dedicationData?.child_id === slot.id) {
+        return false
+      }
+      return slot.date === selectedDateStr
+    })
+    .map(slot => parseInt(slot.time.split(':')[0]))
+
+  // Return array of hours that are booked (0-23)
+  return bookedTimesForDate
+}
+
+// Get disabled minutes for time picker based on selected date and hour
+const getDisabledMinutes = (hour) => {
+  if (!formData.preferred_dedication_date || hour === undefined) return []
+
+  const selectedDateStr = formData.preferred_dedication_date
+  const bookedTimesForDateAndHour = unavailableTimeSlots.value
+    .filter(slot => {
+      // Allow current dedication's time slot if editing
+      if (isEditMode.value && props.dedicationData?.child_id === slot.id) {
+        return false
+      }
+      return slot.date === selectedDateStr && parseInt(slot.time.split(':')[0]) === hour
+    })
+    .map(slot => parseInt(slot.time.split(':')[1]))
+
+  // Return array of minutes that are booked for this hour
+  return bookedTimesForDateAndHour
+}
+
 // Handle pastor selection change
 const onPastorChange = (pastorName) => {
   // Optional: Could auto-fill location based on pastor, but keeping it simple for now
   console.log('Pastor selected:', pastorName)
 }
 
+// Handle date change - NO error trapping for dates (multiple services allowed on same date)
+const onDateChange = async (date) => {
+  // Only validate for admin/staff users and if time is already selected
+  if (isMemberUser.value || !date || !formData.preferred_dedication_time) return
+
+  try {
+    const isValid = await validateTimeSlot(date, formData.preferred_dedication_time, isEditMode.value ? props.dedicationData?.child_id : null)
+
+    if (!isValid) {
+      // Show immediate toast notification for time slot conflict only
+      ElMessage.error({
+        message: `Time slot conflict: ${date} at ${formData.preferred_dedication_time} is already booked. Please choose a different time.`,
+        duration: 5000, // Show for 5 seconds
+        showClose: true,
+        dangerouslyUseHTMLString: false
+      })
+    }
+  } catch (error) {
+    console.error('Error validating time slot on date change:', error)
+    // Don't show error to user for validation failures, just log
+  }
+}
+
+// Handle time change - show immediate toast notification for conflicts
+const onTimeChange = async (time) => {
+  // Only validate for admin/staff users
+  if (isMemberUser.value || !formData.preferred_dedication_date || !time) return
+
+  try {
+    const isValid = await validateTimeSlot(formData.preferred_dedication_date, time, isEditMode.value ? props.dedicationData?.child_id : null)
+
+    if (!isValid) {
+      // Show immediate toast notification
+      ElMessage.error({
+        message: `Time slot conflict: ${formData.preferred_dedication_date} at ${time} is already booked. Please choose a different time.`,
+        duration: 5000, // Show for 5 seconds
+        showClose: true,
+        dangerouslyUseHTMLString: false
+      })
+    }
+  } catch (error) {
+    console.error('Error validating time slot on change:', error)
+    // Don't show error to user for validation failures, just log
+  }
+}
+
 // Handle member selection change - auto-fill contact details
 const onMemberChange = async (memberId) => {
   if (!memberId) {
-    // Clear contact fields if no member selected
+    // Clear contact fields and selected member data if no member selected
     formData.contact_phone_number = ''
     formData.contact_email = ''
     formData.contact_address = ''
+    selectedMemberData.value = null
     return
   }
 
@@ -673,6 +875,8 @@ const onMemberChange = async (memberId) => {
     const response = await axios.get(`/church-records/members/getMemberById/${memberId}`)
     if (response.data.data) {
       const member = response.data.data
+      // Store selected member data for relationship auto-population
+      selectedMemberData.value = member
       // Auto-fill contact details from member info
       formData.contact_phone_number = member.phone_number || ''
       formData.contact_email = member.email || ''
@@ -684,9 +888,72 @@ const onMemberChange = async (memberId) => {
   }
 }
 
+// Handle relationship change - auto-populate parent fields
+const onRelationshipChange = (relationship) => {
+  // Determine which member data to use: selected member for admin/staff, or logged-in member for member users
+  const memberData = !isMemberUser.value ? selectedMemberData.value : userInfo.value?.member
+
+  // Clear all parent fields first
+  formData.father_firstname = ''
+  formData.father_lastname = ''
+  formData.father_middle_name = ''
+  formData.father_phone_number = ''
+  formData.father_email = ''
+  formData.father_address = ''
+
+  formData.mother_firstname = ''
+  formData.mother_lastname = ''
+  formData.mother_middle_name = ''
+  formData.mother_phone_number = ''
+  formData.mother_email = ''
+  formData.mother_address = ''
+
+  // Clear contact fields if they were auto-populated from member data
+  const memberPhone = memberData?.phone_number
+  const memberEmail = userInfo.value?.account?.email || memberData?.email
+  const memberAddress = memberData?.address
+
+  if (formData.contact_phone_number === memberPhone) {
+    formData.contact_phone_number = ''
+  }
+  if (formData.contact_email === memberEmail) {
+    formData.contact_email = ''
+  }
+  if (formData.contact_address === memberAddress) {
+    formData.contact_address = ''
+  }
+
+  // Auto-populate based on relationship
+  if (relationship === 'father' && memberData) {
+    formData.father_firstname = memberData.firstname || ''
+    formData.father_lastname = memberData.lastname || ''
+    formData.father_middle_name = memberData.middle_name || ''
+    formData.father_phone_number = memberData.phone_number || ''
+    formData.father_email = memberData.email || userInfo.value?.account?.email || ''
+    formData.father_address = memberData.address || ''
+    // For father/mother relationships, do NOT populate contact details
+  } else if (relationship === 'mother' && memberData) {
+    formData.mother_firstname = memberData.firstname || ''
+    formData.mother_lastname = memberData.lastname || ''
+    formData.mother_middle_name = memberData.middle_name || ''
+    formData.mother_phone_number = memberData.phone_number || ''
+    formData.mother_email = memberData.email || userInfo.value?.account?.email || ''
+    formData.mother_address = memberData.address || ''
+    // For father/mother relationships, do NOT populate contact details
+  } else {
+    // For other relationships, populate contact details
+    if (memberData) {
+      formData.contact_phone_number = memberData.phone_number || ''
+      formData.contact_email = memberData.email || userInfo.value?.account?.email || ''
+      formData.contact_address = memberData.address || ''
+    }
+  }
+}
+
 // Form data
 const formData = reactive({
   requested_by: '',
+  requester_relationship: '',
   child_firstname: '',
   child_lastname: '',
   child_middle_name: '',
@@ -694,6 +961,7 @@ const formData = reactive({
   place_of_birth: '',
   gender: '',
   preferred_dedication_date: '',
+  preferred_dedication_time: '',
   contact_phone_number: '',
   contact_email: '',
   contact_address: '',
@@ -728,6 +996,19 @@ const statusOptions = [
 const rules = {
   requested_by: [
     { required: true, message: 'Requested by (member) is required', trigger: 'change' }
+  ],
+  requester_relationship: [
+    {
+      validator: (rule, value, callback) => {
+        // Only require relationship for new requests, not for updating pending requests
+        if (!isEditMode.value && (!value || !value.trim())) {
+          callback(new Error('Relationship to the child is required'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
   ],
   child_firstname: [
     { required: true, message: 'Child\'s first name is required', trigger: 'blur' },
@@ -777,18 +1058,62 @@ const rules = {
   preferred_dedication_date: [
     {
       validator: (rule, value, callback) => {
-        // Required for all users
-        if (!value || !value.trim()) {
+        // Only required for admin/staff users
+        if (!isMemberUser.value && (!value || !value.trim())) {
           callback(new Error('Preferred dedication date is required'))
           return
         }
-        const preferredDate = new Date(value)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        preferredDate.setHours(0, 0, 0, 0)
-        if (preferredDate < today) {
-          callback(new Error('Preferred dedication date cannot be in the past'))
+        // If value is provided, validate it's not in the past
+        if (value && value.trim()) {
+          const preferredDate = new Date(value)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          preferredDate.setHours(0, 0, 0, 0)
+          if (preferredDate < today) {
+            callback(new Error('Preferred dedication date cannot be in the past'))
+            return
+          }
+        }
+        callback()
+      },
+      trigger: ['change', 'blur']
+    }
+  ],
+  preferred_dedication_time: [
+    {
+      validator: async (rule, value, callback) => {
+        // Only required for admin/staff users
+        if (!isMemberUser.value && (!value || !value.trim())) {
+          callback(new Error('Preferred dedication time is required'))
           return
+        }
+        // If value is provided, validate it's within business hours
+        if (value && value.trim()) {
+          const [hours, minutes] = value.split(':').map(Number)
+          const totalMinutes = hours * 60 + minutes
+
+          // Business hours: 8:00 AM to 6:00 PM
+          const startMinutes = 8 * 60 // 8:00 AM
+          const endMinutes = 18 * 60 // 6:00 PM
+
+          if (totalMinutes < startMinutes || totalMinutes > endMinutes) {
+            callback(new Error('Preferred dedication time must be between 8:00 AM and 6:00 PM'))
+            return
+          }
+
+          // Additional validation: check if time slot is already booked
+          if (formData.preferred_dedication_date) {
+            const isValid = await validateTimeSlot(
+              formData.preferred_dedication_date,
+              value,
+              isEditMode.value ? props.dedicationData?.child_id : null
+            )
+            
+            if (!isValid) {
+              callback(new Error('This time slot is already booked. Please choose a different time.'))
+              return
+            }
+          }
         }
         callback()
       },
@@ -796,16 +1121,14 @@ const rules = {
     }
   ],
   contact_phone_number: [
-    { required: true, message: 'Contact phone number is required', trigger: 'blur' },
-    { min: 1, max: 45, message: 'Phone number must be between 1 and 45 characters', trigger: 'blur' }
+    // Contact phone is optional - no validation required
   ],
   contact_email: [
     { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' },
     { max: 255, message: 'Email must not exceed 255 characters', trigger: 'blur' }
   ],
   contact_address: [
-    { required: true, message: 'Contact address is required', trigger: 'blur' },
-    { min: 1, max: 500, message: 'Address must be between 1 and 500 characters', trigger: 'blur' }
+    // Contact address is optional - no validation required
   ],
   sponsors: [
     {
@@ -892,6 +1215,7 @@ watch(() => props.dedicationData, (newData) => {
     formData.place_of_birth = newData.place_of_birth || ''
     formData.gender = newData.gender || ''
     formData.preferred_dedication_date = newData.preferred_dedication_date || ''
+    formData.preferred_dedication_time = newData.preferred_dedication_time || ''
     formData.contact_phone_number = newData.contact_phone_number || ''
     formData.contact_email = newData.contact_email || ''
     formData.contact_address = newData.contact_address || ''
@@ -934,14 +1258,16 @@ watch(() => props.modelValue, async (isOpen) => {
     console.log('ChildDedicationDialog - User info:', userInfo.value)
     console.log('ChildDedicationDialog - User position:', userInfo.value?.account?.position)
 
-    // Fetch member options and pastor options when dialog opens
+    // Fetch member options, pastor options, and unavailable time slots when dialog opens
     await fetchMemberOptions()
     await fetchPastorOptions()
+    await fetchUnavailableTimeSlots()
 
     if (props.dedicationData) {
       // Populate form when dialog opens in edit mode
       const data = props.dedicationData
       formData.requested_by = data.requested_by || ''
+      formData.requester_relationship = data.requester_relationship || ''
       formData.child_firstname = data.child_firstname || ''
       formData.child_lastname = data.child_lastname || ''
       formData.child_middle_name = data.child_middle_name || ''
@@ -949,6 +1275,7 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.place_of_birth = data.place_of_birth || ''
       formData.gender = data.gender || ''
       formData.preferred_dedication_date = data.preferred_dedication_date || ''
+      formData.preferred_dedication_time = data.preferred_dedication_time || ''
       formData.contact_phone_number = data.contact_phone_number || ''
       formData.contact_email = data.contact_email || ''
       formData.contact_address = data.contact_address || ''
@@ -976,6 +1303,18 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.pastor = data.pastor || ''
       formData.location = data.location || ''
       formData.status = data.status || 'pending'
+
+      // For edit mode, if admin/staff user, fetch the selected member's data
+      if (!isMemberUser.value && data.requested_by) {
+        try {
+          const response = await axios.get(`/church-records/members/getMemberById/${data.requested_by}`)
+          if (response.data.data) {
+            selectedMemberData.value = response.data.data
+          }
+        } catch (error) {
+          console.error('Error fetching member details for edit:', error)
+        }
+      }
     } else {
       // Reset form for add mode
       resetForm()
@@ -984,15 +1323,22 @@ watch(() => props.modelValue, async (isOpen) => {
       if (isMemberUser.value && userInfo.value?.member?.member_id) {
         formData.requested_by = userInfo.value.member.member_id
 
-        // Auto-fill contact details from member info if available
-        if (userInfo.value.member.phone_number) {
-          formData.contact_phone_number = userInfo.value.member.phone_number
-        }
-        if (userInfo.value.member.email) {
-          formData.contact_email = userInfo.value.member.email
-        }
-        if (userInfo.value.member.address) {
-          formData.contact_address = userInfo.value.member.address
+        // Check if member already has a pending child dedication request
+        try {
+          const response = await axios.get(`/church-records/child-dedications/getChildDedicationsByRequester/${userInfo.value.member.member_id}`)
+          if (response.data.success && response.data.data && response.data.data.length > 0) {
+            // Find the most recent pending request
+            const pendingDedication = response.data.data.find(d => d.status === 'pending')
+            if (pendingDedication) {
+              // Instead of pre-populating in add mode, emit an event to switch to edit mode
+              // This will allow the parent component to reopen the dialog in edit mode
+              emit('switch-to-edit', pendingDedication)
+              return // Exit early, dialog will be reopened in edit mode
+            }
+          }
+        } catch (error) {
+          console.error('Error checking for existing child dedication:', error)
+          // Continue with empty form if check fails
         }
       }
     }
@@ -1003,14 +1349,16 @@ watch(() => props.modelValue, async (isOpen) => {
 onMounted(async () => {
   // Initialize userInfo from localStorage
   userInfo.value = getUserFromStorage()
-  
+
   await fetchMemberOptions()
   await fetchPastorOptions()
+  await fetchUnavailableTimeSlots()
 })
 
 // Reset form
 const resetForm = () => {
   formData.requested_by = ''
+  formData.requester_relationship = ''
   formData.child_firstname = ''
   formData.child_lastname = ''
   formData.child_middle_name = ''
@@ -1018,6 +1366,7 @@ const resetForm = () => {
   formData.place_of_birth = ''
   formData.gender = ''
   formData.preferred_dedication_date = ''
+  formData.preferred_dedication_time = ''
   formData.contact_phone_number = ''
   formData.contact_email = ''
   formData.contact_address = ''
@@ -1038,6 +1387,9 @@ const resetForm = () => {
   formData.location = ''
   formData.status = 'pending'
 
+  // Clear selected member data
+  selectedMemberData.value = null
+
   // Clear validation
   if (formRef.value) {
     formRef.value.clearValidate()
@@ -1049,12 +1401,15 @@ const handleClose = () => {
   emit('update:modelValue', false)
 }
 
-// Handle submit
+// Handle submit - Comprehensive error trapping that stops process on any error
 const handleSubmit = async () => {
   if (!formRef.value) return
 
   try {
-    // Check for duplicate child dedication before validation
+    console.log('Starting child dedication submission process...')
+
+    // STEP 1: Check for duplicate child dedication - STOP PROCESS if found
+    console.log('Step 1: Checking for duplicate child dedication...')
     if (formData.requested_by && formData.child_firstname && formData.child_lastname && formData.date_of_birth) {
       try {
         const checkResponse = await axios.get('/church-records/child-dedications/check-duplicate', {
@@ -1065,39 +1420,96 @@ const handleSubmit = async () => {
             date_of_birth: formData.date_of_birth
           }
         })
-        
+
         if (checkResponse.data.success && checkResponse.data.data && checkResponse.data.data.exists) {
           const existingDedication = checkResponse.data.data.dedication
-          ElMessage.error(`A child dedication request for "${formData.child_firstname} ${formData.child_lastname}" (DOB: ${formData.date_of_birth}) already exists from this member. Please check existing records or update the existing request instead.`)
-          return
+          ElMessage.error({
+            message: `Duplicate Found: A child dedication request for "${formData.child_firstname} ${formData.child_lastname}" (DOB: ${formData.date_of_birth}) already exists from this member. Process stopped.`,
+            duration: 8000,
+            showClose: true
+          })
+          console.log('Process STOPPED: Duplicate child dedication found')
+          return // STOP PROCESS - Do not proceed with submission
         }
       } catch (checkError) {
-        // If the error indicates duplicate exists, show the error message
+        // If the error indicates duplicate exists, show the error message and stop
         if (checkError.response?.data?.message && checkError.response.data.message.includes('already exists')) {
-          ElMessage.error(checkError.response.data.message)
-          return
+          ElMessage.error({
+            message: `Duplicate Error: ${checkError.response.data.message}. Process stopped.`,
+            duration: 8000,
+            showClose: true
+          })
+          console.log('Process STOPPED: Duplicate error from server')
+          return // STOP PROCESS - Do not proceed with submission
         }
         // For other errors, log but continue with form validation
         console.error('Error checking for duplicates:', checkError)
       }
     }
+    console.log('Step 1 completed: No duplicates found')
 
-    // Validate form
-    await formRef.value.validate()
+    // STEP 2: Time slot validation for admin/staff users - STOP PROCESS if booked
+    console.log('Step 2: Checking time slot availability...')
+    if (!isMemberUser.value && formData.preferred_dedication_date && formData.preferred_dedication_time) {
+      try {
+        const timeCheckResponse = await axios.get('/church-records/child-dedications/check-time-slot', {
+          params: {
+            preferred_dedication_date: formData.preferred_dedication_date,
+            preferred_dedication_time: formData.preferred_dedication_time,
+            exclude_id: isEditMode.value ? props.dedicationData?.child_id : null
+          }
+        })
 
+        if (timeCheckResponse.data.success && timeCheckResponse.data.data && timeCheckResponse.data.data.isBooked) {
+          const conflictingDedication = timeCheckResponse.data.data.conflictingDedication
+          ElMessage.error({
+            message: `Time Slot Conflict: The selected time slot (${formData.preferred_dedication_date} at ${formData.preferred_dedication_time}) is already booked. Process stopped.`,
+            duration: 8000,
+            showClose: true
+          })
+          console.log('Process STOPPED: Time slot already booked')
+          return // STOP PROCESS - Do not proceed with submission
+        }
+      } catch (timeError) {
+        console.error('Error checking time slot availability:', timeError)
+        // Continue with submission even if time check fails
+      }
+    }
+    console.log('Step 2 completed: Time slot available')
+
+    // STEP 3: Form validation - STOP PROCESS if validation fails
+    console.log('Step 3: Validating form data...')
+    try {
+      await formRef.value.validate()
+      console.log('Step 3 completed: Form validation passed')
+    } catch (validationError) {
+      console.log('Process STOPPED: Form validation failed')
+      throw validationError // Re-throw to be caught by outer catch block
+    }
+
+    // STEP 4: User confirmation - STOP PROCESS if cancelled
+    console.log('Step 4: Waiting for user confirmation...')
     const actionText = isEditMode.value ? 'update' : 'create'
     const actionTitle = isEditMode.value ? 'Update' : 'Create'
 
-    await ElMessageBox.confirm(
-      `Are you sure you want to ${actionText} this child dedication request?`,
-      `Confirm ${actionTitle} Child Dedication Request`,
-      {
-        confirmButtonText: actionTitle,
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      }
-    )
+    try {
+      await ElMessageBox.confirm(
+        `Are you sure you want to ${actionText} this child dedication request?`,
+        `Confirm ${actionTitle} Child Dedication Request`,
+        {
+          confirmButtonText: actionTitle,
+          cancelButtonText: 'Cancel',
+          type: 'warning',
+        }
+      )
+      console.log('Step 4 completed: User confirmed submission')
+    } catch (confirmError) {
+      console.log('Process STOPPED: User cancelled submission')
+      throw confirmError // Re-throw to be caught by outer catch block
+    }
 
+    // STEP 5: Prepare and submit data
+    console.log('Step 5: Preparing and submitting data...')
     loading.value = true
     loadingInstanceRef.value = ElLoading.service({
       target: '.child-dedication-dialog',
@@ -1108,13 +1520,15 @@ const handleSubmit = async () => {
     // Prepare data for submission
     const submitData = {
       requested_by: formData.requested_by.trim(),
+      requester_relationship: formData.requester_relationship,
       child_firstname: formData.child_firstname.trim(),
       child_lastname: formData.child_lastname.trim(),
       child_middle_name: formData.child_middle_name ? formData.child_middle_name.trim() : null,
       date_of_birth: formData.date_of_birth,
       place_of_birth: formData.place_of_birth.trim(),
       gender: formData.gender,
-      preferred_dedication_date: formData.preferred_dedication_date,
+      preferred_dedication_date: formData.preferred_dedication_date || null,
+      preferred_dedication_time: formData.preferred_dedication_time || null,
       contact_phone_number: formData.contact_phone_number.trim(),
       contact_email: formData.contact_email ? formData.contact_email.trim() : null,
       contact_address: formData.contact_address.trim(),
@@ -1149,18 +1563,27 @@ const handleSubmit = async () => {
     }
 
     // Emit submit event with data
+    console.log('Submitting child dedication data...')
     emit('submit', submitData)
-    
+
     // Reset form fields after submission
     // Parent component will handle API call and close dialog on success
     resetForm()
+    console.log('Process COMPLETED: Child dedication submitted successfully')
+
   } catch (error) {
     // Reset loading state
     resetLoading()
-    
+
     if (error !== 'cancel') {
-      console.error('Validation failed or submission cancelled:', error)
-      ElMessage.error('Please fill in all required fields correctly or operation cancelled.')
+      console.error('Process STOPPED due to error:', error)
+      ElMessage.error({
+        message: 'Submission failed: Please check all required fields and try again. Process stopped.',
+        duration: 6000,
+        showClose: true
+      })
+    } else {
+      console.log('Process STOPPED: User cancelled submission')
     }
   }
 }
@@ -1213,7 +1636,9 @@ const resetLoading = () => {
 // Expose methods for parent component
 defineExpose({
   resetLoading,
-  resetForm
+  resetForm,
+  fetchUnavailableTimeSlots,
+  validateTimeSlot
 })
 </script>
 

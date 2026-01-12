@@ -211,6 +211,7 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
           phone_number: baptismData.phone_number,
           // Baptism details
           baptism_date: baptismData.baptism_date,
+          baptism_time: baptismData.baptism_time,
           location: baptismData.location,
           pastor_name: baptismData.pastor_name,
           status: baptismData.status,

@@ -145,10 +145,18 @@
           text
           circle
           class="mobile-menu-button"
+          aria-label="Toggle mobile menu"
           @click="mobileMenuOpen = !mobileMenuOpen"
         >
-          <el-icon v-if="mobileMenuOpen"><Close /></el-icon>
-          <el-icon v-else><MenuIcon /></el-icon>
+          <div v-if="mobileMenuOpen" class="close-icon">
+            <span class="close-line close-line-1"></span>
+            <span class="close-line close-line-2"></span>
+          </div>
+          <div v-else class="hamburger-icon">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+          </div>
         </el-button>
       </div>
     </div>
@@ -374,29 +382,57 @@ const ABOUT_SUBMENU_ORDER = [
   'Department Officers'
 ]
 
+// Desired order for Services submenu children
+const SERVICES_SUBMENU_ORDER = [
+  'Water Baptism',
+  'Burial Service',
+  'Child Dedication'
+]
+
 // Computed property to ensure menus are always sorted correctly
 const sortedMenus = computed(() => {
   const menus = headerData.value.menus || []
-  
+
   return menus.map(menu => {
     if (!menu.children || !Array.isArray(menu.children)) {
       return menu
     }
-    
-    // Sort children
-    const sortedChildren = [...menu.children].sort((a, b) => {
-      const aIndex = ABOUT_SUBMENU_ORDER.indexOf(a.label)
-      const bIndex = ABOUT_SUBMENU_ORDER.indexOf(b.label)
-      
-      // Items in the order list come first
-      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-      if (aIndex !== -1) return -1
-      if (bIndex !== -1) return 1
-      
-      // Other items sorted alphabetically
-      return a.label?.localeCompare(b.label)
-    })
-    
+
+    // Sort children based on menu type
+    let sortedChildren
+    if (menu.value === 'about' || menu.label === 'About') {
+      // Sort About submenu
+      sortedChildren = [...menu.children].sort((a, b) => {
+        const aIndex = ABOUT_SUBMENU_ORDER.indexOf(a.label)
+        const bIndex = ABOUT_SUBMENU_ORDER.indexOf(b.label)
+
+        // Items in the order list come first
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+        if (aIndex !== -1) return -1
+        if (bIndex !== -1) return 1
+
+        // Other items sorted alphabetically
+        return a.label?.localeCompare(b.label)
+      })
+    } else if (menu.value === 'services' || menu.label === 'Services') {
+      // Sort Services submenu
+      sortedChildren = [...menu.children].sort((a, b) => {
+        const aIndex = SERVICES_SUBMENU_ORDER.indexOf(a.label)
+        const bIndex = SERVICES_SUBMENU_ORDER.indexOf(b.label)
+
+        // Items in the order list come first
+        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+        if (aIndex !== -1) return -1
+        if (bIndex !== -1) return 1
+
+        // Other items sorted alphabetically
+        return a.label?.localeCompare(b.label)
+      })
+    } else {
+      // Default sorting for other menus
+      sortedChildren = [...menu.children].sort((a, b) => a.label?.localeCompare(b.label))
+    }
+
     return { ...menu, children: sortedChildren }
   })
 })
@@ -445,7 +481,11 @@ const defaultHeaderData = {
     {label: 'Ministry', value: 'ministry',to:'/ministries', children:[
         { label:'All Ministries', value: 'all-ministries',to:'/ministries'},
     ]},
-    {label: 'Services', value: 'services',to:'/services'},
+    {label: 'Services', value: 'services',to:'/services', children:[
+        {label: 'Water Baptism', value: 'water-baptism',to:'/services/water-baptism'},
+        {label: 'Burial Service', value: 'burial-service',to:'/services/burial-service'},
+        {label: 'Child Dedication', value: 'child-dedication',to:'/services/child-dedication'},
+    ]},
     {label: 'Sermons', value: 'sermons',to:'/live'}
   ],
   hoverColor: '#14b8a6',
@@ -816,12 +856,85 @@ const handleLogout = async () => {
 .mobile-menu-button {
   display: block;
   margin-left: auto;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 12px;
 }
 
 @media (min-width: 1024px) {
   .mobile-menu-button {
     display: none;
   }
+}
+
+/* Ensure mobile menu is always available on non-desktop devices */
+@media (max-width: 1023px) {
+  .desktop-menu {
+    display: none !important;
+  }
+  
+  .mobile-menu-button {
+    display: block !important;
+  }
+  
+  /* Force mobile menu to be visible on tablets and mobile */
+  .mobile-menu-drawer {
+    display: block !important;
+  }
+}
+
+/* Hamburger Icon Styles */
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 24px;
+  height: 18px;
+}
+
+.hamburger-line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background-color: #424242;
+  transition: all 0.3s ease;
+  border-radius: 2px;
+}
+
+.close-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 24px;
+  height: 18px;
+}
+
+.close-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background-color: #424242;
+  transition: all 0.3s ease;
+  border-radius: 2px;
+}
+
+.close-line-1 {
+  transform: rotate(45deg);
+}
+
+.close-line-2 {
+  transform: rotate(-45deg);
+}
+
+/* Hamburger to Close Animation */
+.mobile-menu-button:hover .hamburger-line {
+  background-color: var(--hover-color, #14b8a6);
+}
+
+.mobile-menu-button:hover .close-line {
+  background-color: var(--hover-color, #14b8a6);
 }
 
 /* Utility Classes */
@@ -873,6 +986,12 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
   color: #424242;
   font-size: 0.9375rem;
+  min-height: 48px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.mobile-menu-item:last-child {
+  border-bottom: none;
 }
 
 .mobile-menu-item:hover {

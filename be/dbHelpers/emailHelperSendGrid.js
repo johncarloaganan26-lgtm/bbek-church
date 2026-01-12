@@ -321,6 +321,26 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     
     const recipientName = dedicationDetails.recipientName || 'Brother/Sister';
     
+    // Build dedication details based on status
+    let dedicationDetailsItems = [
+      { label: 'Child Name', value: dedicationDetails.childName || 'N/A' },
+      { label: 'Parent(s)', value: dedicationDetails.parentName || 'N/A' },
+      { label: 'Dedication Date', value: dedicationDetails.dedicationDate || 'To be determined' },
+      { label: 'Location', value: dedicationDetails.location || 'To be determined' }
+    ];
+    
+    // Add additional details for approved status
+    if (status === 'approved') {
+      dedicationDetailsItems = [
+        { label: 'Child Name', value: dedicationDetails.childName || 'N/A' },
+        { label: 'Parent(s)', value: dedicationDetails.parentName || 'N/A' },
+        { label: 'Dedication Date', value: dedicationDetails.dedicationDate || 'To be determined' },
+        { label: 'Dedication Time', value: dedicationDetails.dedicationTime || 'To be determined' },
+        { label: 'Location', value: dedicationDetails.location || 'To be determined' },
+        { label: 'Pastor', value: dedicationDetails.pastor || 'To be determined' }
+      ];
+    }
+    
     const msg = {
       to: dedicationDetails.email,
       from: {
@@ -332,12 +352,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
         <p style="font-size: 16px; color: #555;">Dear ${recipientName},</p>
         <p style="font-size: 15px; color: #555;">${statusMessages[status] || 'Your child dedication service status has been updated.'}</p>
         ${getStatusBadge(status, {}, statusMessages)}
-        ${getInfoBox('Dedication Details', [
-          { label: 'Child Name', value: dedicationDetails.childName || 'N/A' },
-          { label: 'Parent(s)', value: dedicationDetails.parentName || 'N/A' },
-          { label: 'Dedication Date', value: dedicationDetails.dedicationDate || 'To be determined' },
-          { label: 'Location', value: dedicationDetails.location || 'To be determined' }
-        ])}
+        ${getInfoBox('Dedication Details', dedicationDetailsItems)}
         ${status === 'approved' ? getNextSteps([
           'Prepare for this special dedication ceremony',
           'Invite family and friends to witness this moment',

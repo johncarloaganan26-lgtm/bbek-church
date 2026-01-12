@@ -462,6 +462,8 @@ onUnmounted(() => {
   color: white;
   padding: 1.25rem 2rem;
   line-height: 1.5;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
 .hero-title {
@@ -644,23 +646,38 @@ onUnmounted(() => {
 
   .hero-title {
     font-size: 1.75rem;
+    line-height: 1.2;
   }
 
   .hero-subtitle {
     font-size: 1rem;
+    line-height: 1.3;
   }
 
   .hero-text {
     font-size: 0.875rem;
+    line-height: 1.4;
   }
 
   .hero-text-container {
-    padding: 0.75rem;
-    border-width: 10px;
+    padding: 1rem;
+    border-width: 8px;
+    max-width: 100%;
+    margin: 0 auto;
   }
 
   .hero-content {
     padding: 16px;
+  }
+
+  .hero-buttons {
+    gap: 0.5rem;
+  }
+
+  .hero-buttons :deep(.v-btn) {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    min-height: 44px;
   }
 
   .video-controls {

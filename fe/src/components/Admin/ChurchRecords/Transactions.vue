@@ -1,4 +1,4 @@
-<template>
+g<template>
   <div class="transactions">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Transactions</h1>

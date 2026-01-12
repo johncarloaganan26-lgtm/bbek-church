@@ -135,11 +135,10 @@ export const useBurialServiceStore = defineStore('burialService', {
     async createService(serviceData) {
       this.loading = true
       this.error = null
-      const accessToken = localStorage.getItem('accessToken')
       try {
+        // For public burial service creation (non-member requests), don't include authorization header
         const response = await axios.post('/church-records/burial-services/createBurialService', serviceData, {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         })
@@ -305,4 +304,3 @@ export const useBurialServiceStore = defineStore('burialService', {
     }
   }
 })
-

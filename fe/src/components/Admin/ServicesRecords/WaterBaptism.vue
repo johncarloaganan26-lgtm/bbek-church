@@ -156,7 +156,7 @@
           <tr>
             <!-- <th class="text-left font-weight-bold">Baptism ID</th> -->
             <th class="text-left font-weight-bold">Member</th>
-            <th class="text-left font-weight-bold">Baptism Date</th>
+            <th class="text-left font-weight-bold">Baptism Date & Time</th>
             <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Date Created</th>
             <th class="text-left font-weight-bold">Actions</th>
@@ -171,7 +171,7 @@
           <tr v-for="baptism in sortedBaptisms" :key="baptism.baptism_id">
             <!-- <td>{{ baptism.baptism_id }}</td> -->
             <td>{{ baptism.fullname || baptism.member_id }}</td>
-            <td>{{ formatDateTime(baptism.baptism_date) }}</td>
+            <td>{{ formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time) }}</td>
             <td>
               <v-chip :color="getStatusColor(baptism.status)" size="small">
                 {{ formatStatus(baptism.status) }}
@@ -344,6 +344,7 @@ const editBaptism = (baptism) => {
     baptism_id: baptism.baptism_id,
     member_id: baptism.member_id,
     baptism_date: baptism.baptism_date,
+    baptism_time: baptism.baptism_time,
     location: baptism.location,
     pastor_name: baptism.pastor_name,
     status: baptism.status,
@@ -477,6 +478,24 @@ const formatDateTime = (dateString) => {
   })
 }
 
+const formatBaptismDateTime = (dateString, timeString) => {
+  if (!dateString) return 'Not scheduled'
+
+  const date = new Date(dateString)
+  const datePart = date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+
+  if (timeString) {
+    return `${datePart} at ${timeString}`
+  }
+
+  // If no time specified, just show the date
+  return datePart
+}
+
 const formatStatus = (status) => {
   const statusMap = {
     'pending': 'Pending',
@@ -501,7 +520,7 @@ const getStatusColor = (status) => {
 
 const handlePrint = () => {
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Member', 'Baptism Date', 'Status', 'Date Created']
+  const tableHeaders = ['Member', 'Baptism Date & Time', 'Status', 'Date Created']
   
   // Get current user info for printed by
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
@@ -514,7 +533,7 @@ const handlePrint = () => {
     tableRows += `
       <tr>
         <td>${baptism.fullname || baptism.member_id || 'N/A'}</td>
-        <td>${formatDateTime(baptism.baptism_date)}</td>
+        <td>${formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time)}</td>
         <td>${formatStatus(baptism.status)}</td>
         <td>${formatDateTime(baptism.date_created)}</td>
       </tr>

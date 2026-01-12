@@ -16,6 +16,7 @@ const { sendChildDedicationDetails } = require('../emailHelperSendGrid');
  * - place_of_birth (VARCHAR(255), NN)
  * - gender (VARCHAR(1), NN) - 'M' or 'F'
  * - preferred_dedication_date (DATE, NN)
+ * - preferred_dedication_time (TIME, NULL) - Preferred time for dedication ceremony
  * - date_completed (DATE, NULL) - Actual date when dedication was completed
  * - contact_phone_number (VARCHAR(45), NN)
  * - contact_email (VARCHAR(255), NULL)
@@ -25,6 +26,7 @@ const { sendChildDedicationDetails } = require('../emailHelperSendGrid');
  * - sponsors (VARCHAR(1000), NULL) - JSON stringified array of sponsor objects
  * - pastor (VARCHAR(255), NULL) - Name of the pastor conducting the dedication
  * - location (VARCHAR(255), NULL) - Location where the dedication will take place
+ * - requester_relationship (VARCHAR(45), NULL) - Relationship of requester to child
  * - status (VARCHAR(45), NN, default: 'pending')
  * - date_created (DATETIME, NN)
  */
@@ -74,62 +76,9 @@ async function checkDuplicateChildDedication(requestedBy, childFirstname, childL
  */
 async function checkPreferredDedicationDateConflict(preferredDedicationDate, requestedBy, excludeChildId = null) {
   try {
-    const formattedDate = moment(preferredDedicationDate).format('YYYY-MM-DD');
-    const conflictConditions = [];
-    const conflictParams = [];
-
-    // Check for requester conflict (if requestedBy is provided)
-    if (requestedBy) {
-      conflictConditions.push('(requested_by = ? AND preferred_dedication_date = ?)');
-      conflictParams.push(requestedBy.trim(), formattedDate);
-    }
-
-    // If no conditions to check, return null (no conflict possible)
-    if (conflictConditions.length === 0) {
-      return null;
-    }
-
-    // Build conflict check query
-    let conflictSql = `
-      SELECT child_id, requested_by, preferred_dedication_date, status, child_firstname, child_lastname
-      FROM tbl_childdedications
-      WHERE (${conflictConditions.join(' OR ')})
-    `;
-
-    // Exclude current child_id if provided (for update operations)
-    if (excludeChildId) {
-      conflictSql += ' AND child_id != ?';
-      conflictParams.push(excludeChildId.trim());
-    }
-
-    const [conflictRows] = await query(conflictSql, conflictParams);
-
-    if (conflictRows && conflictRows.length > 0) {
-      // Determine conflict type
-      const conflict = conflictRows[0];
-      let conflictType = [];
-      let conflictMessage = 'Preferred dedication date conflict detected: ';
-
-      if (requestedBy && conflict.requested_by === requestedBy.trim()) {
-        conflictType.push('requester');
-        const childName = `${conflict.child_firstname || ''} ${conflict.child_lastname || ''}`.trim();
-        conflictMessage += `Requester already has a child dedication scheduled on this date (${childName || 'Child ID: ' + conflict.child_id}). `;
-      }
-
-      return {
-        hasConflict: true,
-        conflictType: conflictType,
-        message: conflictMessage.trim(),
-        conflictingDedication: {
-          child_id: conflict.child_id,
-          preferred_dedication_date: conflict.preferred_dedication_date,
-          status: conflict.status,
-          child_name: `${conflict.child_firstname || ''} ${conflict.child_lastname || ''}`.trim()
-        }
-      };
-    }
-
-    return null; // No conflict
+    // NOTE: Date conflicts are now allowed - multiple child dedications can be scheduled on the same date
+    // Only time slot conflicts are checked in checkTimeSlotAvailability function
+    return null; // No date conflict checking - always return null
   } catch (error) {
     console.error('Error checking preferred dedication date conflict:', error);
     // Don't throw - allow the operation to proceed if conflict check fails
@@ -185,6 +134,7 @@ async function createChildDedication(dedicationData) {
     const {
       child_id = new_child_id,
       requested_by,
+      requester_relationship = null,
       child_firstname,
       child_lastname,
       child_middle_name = null,
@@ -192,6 +142,7 @@ async function createChildDedication(dedicationData) {
       place_of_birth,
       gender,
       preferred_dedication_date,
+      preferred_dedication_time = null,
       date_completed = null,
       contact_phone_number,
       contact_email = null,
@@ -234,15 +185,15 @@ async function createChildDedication(dedicationData) {
     if (!gender || !['M', 'F'].includes(gender.toUpperCase())) {
       throw new Error('Missing or invalid required field: gender (must be M or F)');
     }
-    if (!preferred_dedication_date) {
+    // Preferred dedication date is required only for admin/staff users
+    // Admin/staff users are identified by having pastor/location fields set (not null/undefined)
+    const isAdminStaffUser = pastor !== null && pastor !== undefined && location !== null && location !== undefined;
+
+    if (isAdminStaffUser && !preferred_dedication_date) {
       throw new Error('Missing required field: preferred_dedication_date');
     }
-    if (!contact_phone_number || !contact_phone_number.trim()) {
-      throw new Error('Missing required field: contact_phone_number');
-    }
-    if (!contact_address || !contact_address.trim()) {
-      throw new Error('Missing required field: contact_address');
-    }
+    // Contact phone and address are optional for all users (can be auto-filled from member data)
+    // Admin/staff users are identified by having pastor/location fields set
 
     // Validate pastor and location if provided (admin/staff fields)
     if (pastor !== undefined && pastor !== null) {
@@ -302,7 +253,9 @@ async function createChildDedication(dedicationData) {
       requested_by.trim(),
       child_firstname.trim(),
       child_lastname.trim(),
-      moment(date_of_birth).format('YYYY-MM-DD')
+      date_of_birth && moment(date_of_birth, 'YYYY-MM-DD', true).isValid()
+        ? date_of_birth
+        : moment(date_of_birth).format('YYYY-MM-DD')
     );
     
     if (duplicateCheck.isDuplicate) {
@@ -316,26 +269,43 @@ async function createChildDedication(dedicationData) {
     // Ensure child_id is set
     const final_child_id = child_id || new_child_id;
 
-    // Format dates
-    const formattedDateOfBirth = moment(date_of_birth).format('YYYY-MM-DD');
-    const formattedPreferredDate = moment(preferred_dedication_date).format('YYYY-MM-DD');
-    const formattedDateCompleted = date_completed ? moment(date_completed).format('YYYY-MM-DD') : null;
+    // Format dates - check if already in YYYY-MM-DD format to avoid timezone issues
+    const formattedDateOfBirth = date_of_birth && moment(date_of_birth, 'YYYY-MM-DD', true).isValid()
+      ? date_of_birth
+      : moment(date_of_birth).format('YYYY-MM-DD');
+    
+    // Handle preferred_dedication_date - can be null for member users
+    const formattedPreferredDate = preferred_dedication_date && preferred_dedication_date.trim() !== ''
+      ? (moment(preferred_dedication_date, 'YYYY-MM-DD', true).isValid()
+          ? preferred_dedication_date
+          : moment(preferred_dedication_date).format('YYYY-MM-DD'))
+      : null;
+    
+    const formattedDateCompleted = date_completed
+      ? (moment(date_completed, 'YYYY-MM-DD', true).isValid()
+          ? date_completed
+          : moment(date_completed).format('YYYY-MM-DD'))
+      : null;
+    
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
-    // Check for preferred dedication date conflicts
-    const conflictCheck = await checkPreferredDedicationDateConflict(
-      preferred_dedication_date,
-      requested_by.trim(),
-      null // No exclusion for new records
-    );
+    // Check for time slot conflicts - Only check time, not date
+    // Multiple child dedications are allowed on the same date, but not at the same time
+    if (preferred_dedication_date && preferred_dedication_time) {
+      const timeSlotCheck = await checkTimeSlotAvailability(
+        preferred_dedication_date,
+        preferred_dedication_time,
+        null // No exclusion for new records
+      );
 
-    if (conflictCheck && conflictCheck.hasConflict) {
-      return {
-        success: false,
-        message: conflictCheck.message,
-        error: 'Preferred dedication date conflict',
-        conflict: conflictCheck.conflictingDedication
-      };
+      if (timeSlotCheck && timeSlotCheck.isBooked) {
+        return {
+          success: false,
+          message: `Time slot conflict: ${preferred_dedication_date} at ${preferred_dedication_time} is already booked.`,
+          error: 'Time slot conflict',
+          conflict: timeSlotCheck.conflictingDedication
+        };
+      }
     }
 
     // Normalize gender to uppercase
@@ -343,18 +313,19 @@ async function createChildDedication(dedicationData) {
 
     const sql = `
       INSERT INTO tbl_childdedications
-        (child_id, requested_by, child_firstname, child_lastname, child_middle_name,
-         date_of_birth, place_of_birth, gender, preferred_dedication_date, date_completed,
+        (child_id, requested_by, requester_relationship, child_firstname, child_lastname, child_middle_name,
+         date_of_birth, place_of_birth, gender, preferred_dedication_date, preferred_dedication_time, date_completed,
          contact_phone_number, contact_email, contact_address,
          father_firstname, father_lastname, father_middle_name, father_phone_number, father_email, father_address,
          mother_firstname, mother_lastname, mother_middle_name, mother_phone_number, mother_email, mother_address,
          sponsors, pastor, location, status, date_created)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
       final_child_id.trim(),
       requested_by.trim(),
+      requester_relationship ? requester_relationship.trim() : null,
       child_firstname.trim(),
       child_lastname.trim(),
       child_middle_name ? child_middle_name.trim() : null,
@@ -362,6 +333,7 @@ async function createChildDedication(dedicationData) {
       place_of_birth.trim(),
       normalizedGender,
       formattedPreferredDate,
+      preferred_dedication_time,
       formattedDateCompleted,
       contact_phone_number.trim(),
       contact_email ? contact_email.trim() : null,
@@ -421,6 +393,7 @@ async function createChildDedication(dedicationData) {
         : 'To be determined';
 
       const dedicationStatus = createdDedication.data?.status || 'pending';
+      const dedicationLocation = createdDedication.data?.location || 'Church';
 
       // Collect unique email addresses to send to (to avoid duplicates)
       const emailRecipients = new Set();
@@ -439,7 +412,9 @@ async function createChildDedication(dedicationData) {
           childName: childName,
           parentName: recipientName,
           dedicationDate: dedicationDate,
-          location: 'Church'
+          dedicationTime: createdDedication.data?.preferred_dedication_time || null,
+          location: dedicationLocation,
+          pastor: createdDedication.data?.pastor || null
         });
       }
 
@@ -455,7 +430,9 @@ async function createChildDedication(dedicationData) {
             childName: childName,
             parentName: 'Valued Member',
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: createdDedication.data?.pastor || null
           });
         }
       }
@@ -465,8 +442,8 @@ async function createChildDedication(dedicationData) {
         const fatherEmailLower = father_email.trim().toLowerCase();
         if (!emailRecipients.has(fatherEmailLower)) {
           emailRecipients.add(fatherEmailLower);
-          const fatherName = father_firstname || father_lastname 
-            ? `${father_firstname || ''} ${father_middle_name ? father_middle_name + ' ' : ''}${father_lastname || ''}`.trim() 
+          const fatherName = father_firstname || father_lastname
+            ? `${father_firstname || ''} ${father_middle_name ? father_middle_name + ' ' : ''}${father_lastname || ''}`.trim()
             : 'Valued Member';
           await sendChildDedicationDetails({
             email: father_email.trim(),
@@ -475,7 +452,9 @@ async function createChildDedication(dedicationData) {
             childName: childName,
             parentName: fatherName,
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: createdDedication.data?.pastor || null
           });
         }
       }
@@ -485,8 +464,8 @@ async function createChildDedication(dedicationData) {
         const motherEmailLower = mother_email.trim().toLowerCase();
         if (!emailRecipients.has(motherEmailLower)) {
           emailRecipients.add(motherEmailLower);
-          const motherName = mother_firstname || mother_lastname 
-            ? `${mother_firstname || ''} ${mother_middle_name ? mother_middle_name + ' ' : ''}${mother_lastname || ''}`.trim() 
+          const motherName = mother_firstname || mother_lastname
+            ? `${mother_firstname || ''} ${mother_middle_name ? mother_middle_name + ' ' : ''}${mother_lastname || ''}`.trim()
             : 'Valued Member';
           await sendChildDedicationDetails({
             email: mother_email.trim(),
@@ -495,7 +474,9 @@ async function createChildDedication(dedicationData) {
             childName: childName,
             parentName: motherName,
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: createdDedication.data?.pastor || null
           });
         }
       }
@@ -509,6 +490,8 @@ async function createChildDedication(dedicationData) {
       message: 'Child dedication request created successfully',
       data: createdDedication.data || {
         child_id: final_child_id,
+        requested_by,
+        requester_relationship,
         child_firstname,
         child_lastname,
         child_middle_name,
@@ -516,6 +499,7 @@ async function createChildDedication(dedicationData) {
         place_of_birth,
         gender: normalizedGender,
         preferred_dedication_date: formattedPreferredDate,
+        preferred_dedication_time,
         date_completed: formattedDateCompleted,
         contact_phone_number,
         contact_email,
@@ -958,6 +942,7 @@ async function updateChildDedication(childId, dedicationData) {
 
     const {
       requested_by,
+      requester_relationship,
       child_firstname,
       child_lastname,
       child_middle_name,
@@ -965,6 +950,7 @@ async function updateChildDedication(childId, dedicationData) {
       place_of_birth,
       gender,
       preferred_dedication_date,
+      preferred_dedication_time,
       date_completed,
       contact_phone_number,
       contact_email,
@@ -997,6 +983,11 @@ async function updateChildDedication(childId, dedicationData) {
       params.push(requested_by.trim());
     }
 
+    if (requester_relationship !== undefined) {
+      fields.push('requester_relationship = ?');
+      params.push(requester_relationship ? requester_relationship.trim() : null);
+    }
+
     if (child_firstname !== undefined) {
       fields.push('child_firstname = ?');
       params.push(child_firstname.trim());
@@ -1013,7 +1004,9 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     if (date_of_birth !== undefined) {
-      const formattedDateOfBirth = moment(date_of_birth).format('YYYY-MM-DD');
+      const formattedDateOfBirth = date_of_birth && moment(date_of_birth, 'YYYY-MM-DD', true).isValid()
+        ? date_of_birth
+        : moment(date_of_birth).format('YYYY-MM-DD');
       fields.push('date_of_birth = ?');
       params.push(formattedDateOfBirth);
     }
@@ -1088,25 +1081,25 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     if (preferred_dedication_date !== undefined) {
-      // Check for preferred dedication date conflicts before updating
+      // Check for time slot conflicts before updating
       const currentData = dedicationCheck.data;
-      const finalRequestedBy = requested_by !== undefined ? requested_by.trim() : currentData.requested_by;
       const finalPreferredDate = preferred_dedication_date;
+      const finalPreferredTime = preferred_dedication_time !== undefined ? preferred_dedication_time : currentData.preferred_dedication_time;
 
-      // Only check conflicts if preferred_dedication_date is being updated or if requester is changing
-      if (preferred_dedication_date !== undefined || (requested_by !== undefined && requested_by.trim() !== currentData.requested_by)) {
-        const conflictCheck = await checkPreferredDedicationDateConflict(
+      // Only check conflicts if preferred_dedication_date or preferred_dedication_time is being updated
+      if (preferred_dedication_date !== undefined || preferred_dedication_time !== undefined) {
+        const timeSlotCheck = await checkTimeSlotAvailability(
           finalPreferredDate,
-          finalRequestedBy,
+          finalPreferredTime,
           childId // Exclude current child dedication for update
         );
 
-        if (conflictCheck && conflictCheck.hasConflict) {
+        if (timeSlotCheck && timeSlotCheck.isBooked) {
           return {
             success: false,
-            message: conflictCheck.message,
-            error: 'Preferred dedication date conflict',
-            conflict: conflictCheck.conflictingDedication
+            message: `Time slot conflict: ${finalPreferredDate} at ${finalPreferredTime} is already booked.`,
+            error: 'Time slot conflict',
+            conflict: timeSlotCheck.conflictingDedication
           };
         }
       }
@@ -1114,6 +1107,11 @@ async function updateChildDedication(childId, dedicationData) {
       const formattedPreferredDate = moment(preferred_dedication_date).format('YYYY-MM-DD');
       fields.push('preferred_dedication_date = ?');
       params.push(formattedPreferredDate);
+    }
+
+    if (preferred_dedication_time !== undefined) {
+      fields.push('preferred_dedication_time = ?');
+      params.push(preferred_dedication_time);
     }
 
     if (date_completed !== undefined) {
@@ -1125,22 +1123,24 @@ async function updateChildDedication(childId, dedicationData) {
     if (contact_phone_number !== undefined) {
       // If only requester is being updated, still check for conflicts with current preferred date
       const currentData = dedicationCheck.data;
-      if (currentData.preferred_dedication_date) {
-        const conflictCheck = await checkPreferredDedicationDateConflict(
-          currentData.preferred_dedication_date,
-          requested_by.trim(),
-          childId // Exclude current child dedication for update
-        );
+      // Check for preferred dedication date conflicts - DISABLED
+      // Multiple child dedications are allowed on the same date
+      // if (currentData.preferred_dedication_date) {
+      //   const conflictCheck = await checkPreferredDedicationDateConflict(
+      //     currentData.preferred_dedication_date,
+      //     requested_by.trim(),
+      //     childId // Exclude current child dedication for update
+      //   );
 
-        if (conflictCheck && conflictCheck.hasConflict) {
-          return {
-            success: false,
-            message: conflictCheck.message,
-            error: 'Preferred dedication date conflict',
-            conflict: conflictCheck.conflictingDedication
-          };
-        }
-      }
+      //   if (conflictCheck && conflictCheck.hasConflict) {
+      //     return {
+      //       success: false,
+      //       message: conflictCheck.message,
+      //       error: 'Preferred dedication date conflict',
+      //       conflict: conflictCheck.conflictingDedication
+      //     };
+      //   }
+      // }
     }
 
     if (contact_phone_number !== undefined) {
@@ -1282,7 +1282,9 @@ async function updateChildDedication(childId, dedicationData) {
         checkRequestedBy,
         checkFirstname,
         checkLastname,
-        moment(checkDateOfBirth).format('YYYY-MM-DD'),
+        checkDateOfBirth && moment(checkDateOfBirth, 'YYYY-MM-DD', true).isValid()
+          ? checkDateOfBirth
+          : moment(checkDateOfBirth).format('YYYY-MM-DD'),
         childId
       );
       
@@ -1351,6 +1353,7 @@ async function updateChildDedication(childId, dedicationData) {
         : 'To be determined';
 
       const dedicationStatus = updatedDedication.data?.status || 'pending';
+      const dedicationLocation = updatedDedication.data?.location || 'Church';
 
       // Get the latest data (including father/mother emails from updated record)
       const contactEmail = contact_email !== undefined ? contact_email : updatedDedication.data?.contact_email;
@@ -1373,15 +1376,17 @@ async function updateChildDedication(childId, dedicationData) {
         emailRecipients.add(member.email.toLowerCase());
 
         // Send email to requester
-        await sendChildDedicationDetails({
-          email: member.email,
-          status: dedicationStatus,
-          recipientName: recipientName,
-          childName: childName,
-          parentName: recipientName,
-          dedicationDate: dedicationDate,
-          location: 'Church'
-        });
+         await sendChildDedicationDetails({
+           email: member.email,
+           status: dedicationStatus,
+           recipientName: recipientName,
+           childName: childName,
+           parentName: recipientName,
+           dedicationDate: dedicationDate,
+           dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
+           location: dedicationLocation,
+           pastor: updatedDedication.data?.pastor || null
+         });
       }
 
       // 2. Contact email (if different from requester)
@@ -1396,7 +1401,9 @@ async function updateChildDedication(childId, dedicationData) {
             childName: childName,
             parentName: 'Valued Member',
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: updatedDedication.data?.pastor || null
           });
         }
       }
@@ -1415,7 +1422,9 @@ async function updateChildDedication(childId, dedicationData) {
             childName: childName,
             parentName: fatherName,
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: updatedDedication.data?.pastor || null
           });
         }
       }
@@ -1434,7 +1443,9 @@ async function updateChildDedication(childId, dedicationData) {
             childName: childName,
             parentName: motherName,
             dedicationDate: dedicationDate,
-            location: 'Church'
+            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
+            location: dedicationLocation,
+            pastor: updatedDedication.data?.pastor || null
           });
         }
       }
@@ -1536,10 +1547,14 @@ async function exportChildDedicationsToExcel(options = {}) {
         'No.': index + 1,
         'Child ID': dedication.child_id || '',
         'Child Full Name': childFullname,
-        'Date of Birth': dedication.date_of_birth ? moment(dedication.date_of_birth).format('YYYY-MM-DD') : '',
+        'Date of Birth': dedication.date_of_birth ? (moment(dedication.date_of_birth, 'YYYY-MM-DD', true).isValid()
+          ? dedication.date_of_birth
+          : moment(dedication.date_of_birth).format('YYYY-MM-DD')) : '',
         'Place of Birth': dedication.place_of_birth || '',
         'Gender': dedication.gender || '',
-        'Preferred Dedication Date': dedication.preferred_dedication_date ? moment(dedication.preferred_dedication_date).format('YYYY-MM-DD') : '',
+        'Preferred Dedication Date': dedication.preferred_dedication_date ? (moment(dedication.preferred_dedication_date, 'YYYY-MM-DD', true).isValid()
+          ? dedication.preferred_dedication_date
+          : moment(dedication.preferred_dedication_date).format('YYYY-MM-DD')) : '',
         'Contact Phone': dedication.contact_phone_number || '',
         'Contact Email': dedication.contact_email || '',
         'Contact Address': dedication.contact_address || '',
@@ -1584,7 +1599,55 @@ async function exportChildDedicationsToExcel(options = {}) {
   }
 }
 
+/**
+ * Check if a time slot is available for child dedication
+ * @param {String} preferredDedicationDate - Preferred dedication date to check
+ * @param {String} preferredDedicationTime - Preferred dedication time to check
+ * @param {String} excludeChildId - Optional child_id to exclude from check (for updates)
+ * @returns {Promise<Object>} Object with isBooked flag and conflicting dedication details
+ */
+async function checkTimeSlotAvailability(preferredDedicationDate, preferredDedicationTime, excludeChildId = null) {
+  try {
+    const formattedDate = preferredDedicationDate && moment(preferredDedicationDate, 'YYYY-MM-DD', true).isValid()
+      ? preferredDedicationDate
+      : moment(preferredDedicationDate).format('YYYY-MM-DD');
+    const formattedTime = preferredDedicationTime;
+    
+    let sql = `
+      SELECT child_id, requested_by, preferred_dedication_date, preferred_dedication_time, status,
+             child_firstname, child_lastname
+      FROM tbl_childdedications
+      WHERE preferred_dedication_date = ?
+      AND preferred_dedication_time = ?
+      AND status = 'approved'
+    `;
+    const params = [formattedDate, formattedTime];
+
+    if (excludeChildId) {
+      sql += ' AND child_id != ?';
+      params.push(excludeChildId);
+    }
+
+    const [rows] = await query(sql, params);
+
+    return {
+      isBooked: rows.length > 0,
+      conflictingDedication: rows.length > 0 ? rows[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking time slot availability:', error);
+    // Don't throw - allow the operation to proceed if check fails
+    return {
+      isBooked: false,
+      conflictingDedication: null
+    };
+  }
+}
+
 module.exports = {
+  checkDuplicateChildDedication,
+  checkPreferredDedicationDateConflict,
+  checkTimeSlotAvailability,
   createChildDedication,
   getAllChildDedications,
   getChildDedicationById,
