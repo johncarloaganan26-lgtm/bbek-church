@@ -49,7 +49,7 @@
       </div>
 
       <div v-if="events.length > 0">
-        <!-- 4-Column Grid with RTL Auto-Scroll for 4+ events -->
+        <!-- 4-Column Grid with RTL Auto-Scroll for 3+ events -->
         <div
           ref="eventsScrollContainer"
           class="events-grid-container"
@@ -83,18 +83,21 @@
             <div class="event-overlay"></div>
             <div class="event-content">
               <h3
-                class="text-h5 font-weight-bold text-white mb-4"
+                class="text-h5 font-weight-bold text-white mb-3"
                 style="font-family: 'Georgia', serif; font-style: italic"
               >
                 {{ event.eventName }}
               </h3>
-              <p class="text-white mb-6 text-body-2">
-                {{
-                  event.description.length > 150
-                    ? event.description.substring(0, 150) + "..."
-                    : event.description
-                }}
-              </p>
+              <div class="event-details mb-4">
+                <p class="event-date text-white mb-1">
+                  <v-icon size="small" class="mr-1">mdi-calendar</v-icon>
+                  {{ formatDate(event.start_date) }}
+                </p>
+                <p class="event-time text-white mb-1">
+                  <v-icon size="small" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ formatTime(event.start_date) }}
+                </p>
+              </div>
               <v-btn
                 color="rgba(255, 255, 255, 0.2)"
                 variant="outlined"
@@ -151,7 +154,7 @@ const isLoadingHome = computed(() => cmsStore.isPageLoading("home"));
 
 // Duplicated events for infinite scroll
 const duplicatedEvents = computed(() => {
-  if (events.value.length >= 4) {
+  if (events.value.length >= 3) {
     return [...events.value, ...events.value];
   }
   return events.value;
@@ -159,7 +162,7 @@ const duplicatedEvents = computed(() => {
 
 // Displayed events (for 4-column grid with RTL scroll - reversed order)
 const displayedEvents = computed(() => {
-  if (events.value.length >= 4) {
+  if (events.value.length >= 3) {
     // Reverse the order for RTL scrolling effect (right to left)
     const reversed = [...events.value].reverse();
     // Duplicate for seamless looping
@@ -387,17 +390,17 @@ const startAutoScroll = () => {
     if (isAutoScrolling.value && eventsScrollContainer.value) {
       const container = eventsScrollContainer.value;
       const scrollAmount = 2; // pixels per frame
-      
-      // Since we have 3 copies of events (reversed), scroll to 1/3 of total width for seamless loop
+
+      // Since we have 3 copies of reversed events, scroll to 1/3 of total width for seamless loop
       const oneSetWidth = container.scrollWidth / 3;
 
-      // Smoothly scroll and reset when reaching the second set
-      if (container.scrollLeft >= oneSetWidth * 2) {
-        container.scrollLeft = oneSetWidth; // Reset to middle set
+      // Smoothly scroll RTL and reset when reaching the beginning
+      if (container.scrollLeft <= oneSetWidth) {
+        container.scrollLeft = oneSetWidth * 2; // Reset to end set
       } else {
-        container.scrollLeft += scrollAmount; // Continuous scroll
+        container.scrollLeft -= scrollAmount; // Continuous RTL scroll
       }
-      
+
       // Update cinema focus
       updateCinemaFocus();
     }
@@ -419,26 +422,48 @@ const goToLearnMore = (event) => {
   });
 };
 
+// Format date for display
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+// Format time for display
+const formatTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 onMounted(async () => {
   await fetchPastEventsData();
   await fetchEvents();
 
-  // Start auto-scroll if there are 4+ events
-  if (events.value.length >= 4) {
+  // Start auto-scroll if there are 3+ events
+  if (events.value.length >= 3) {
     await nextTick();
     // Position container for RTL scrolling
     if (eventsScrollContainer.value) {
-      eventsScrollContainer.value.scrollLeft = 0;
+      eventsScrollContainer.value.scrollLeft = eventsScrollContainer.value.scrollWidth / 3 * 2;
     }
     startAutoScroll();
   }
 
-  // Setup scroll listener for cinema effect (3+ events)
+  // Add scroll listener for cinema effect if 3+ events
   if (events.value.length >= 3 && eventsScrollContainer.value) {
     eventsScrollContainer.value.addEventListener('scroll', updateCinemaFocus);
     scrollListenerActive.value = true;
-    
-    // Call once on mount to set initial focus
+    // Initial focus
+    await nextTick();
     updateCinemaFocus();
   }
 });
@@ -689,14 +714,14 @@ onBeforeUnmount(() => {
 }
 
 .event-content {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
   padding: 1.5rem;
   color: white;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
 }
 
 .event-title {

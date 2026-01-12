@@ -9,10 +9,16 @@
       <v-row align="center" class="gap-12">
         <!-- Left Side - Text Content -->
         <v-col cols="12" md="6">
-          <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6">
+          <h2
+            class="vision-title text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6"
+            style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+          >
             {{ visionTitle }}
           </h2>
-          <p class="text-h6 text-grey-darken-1 mb-6">
+          <p
+            class="vision-subtitle text-h6 text-grey-darken-1 mb-8"
+            style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); line-height: 1.6;"
+          >
             {{ visionSubtitle }}
           </p>
 
@@ -20,15 +26,22 @@
             <v-card
               v-for="(item, index) in visionItems"
               :key="index"
-              :class="`mb-4 vision-card vision-card-${index + 1}`"
+              :class="`mb-6 vision-card vision-card-${index + 1}`"
               variant="flat"
               color="teal-lighten-5"
+              elevation="1"
             >
-              <v-card-text>
-                <h3 class="text-h6 font-weight-bold text-teal-darken-3 mb-2">
+              <v-card-text class="pa-6">
+                <h3
+                  class="vision-item-title text-h6 font-weight-bold text-teal-darken-3 mb-3"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                >
                   {{ item.title }}
                 </h3>
-                <p class="text-teal-darken-2">
+                <p
+                  class="vision-item-description text-body-1 text-teal-darken-2"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); line-height: 1.7;"
+                >
                   {{ item.description }}
                 </p>
               </v-card-text>
@@ -60,23 +73,23 @@ const cmsStore = useCmsStore()
 // Loading state for CMS data
 const isLoadingHome = computed(() => cmsStore.isPageLoading('home'))
 
-const visionTitle = ref('we look forward to meeting you')
-const visionSubtitle = ref('We look forward to welcoming you into our family of faith. Our vision is to be a Christ-centered community that:')
+const visionTitle = ref('We look forward to meeting you')
+const visionSubtitle = ref('We look forward to welcoming you into our family of faith. Our vision is to be a Christ-centered community that...')
 const visionImage = ref('/img/hm.jpg')
 const visionBgColor = ref('#ffffff')
 
 const visionItems = ref([
   {
     title: 'Live By Faith',
-    description: 'Boldly proclaim and practice the Gospel in daily life\nTrust God\'s promises with unwavering confidence'
+    description: 'Live by Faith - Boldly proclaim and position the Gospel in daily life. Trust God\'s promises with unwavering confidence.'
   },
   {
     title: 'Known By Love',
-    description: 'Extend grace without judgment — love first, listen deeply\nServe others sacrificially, going beyond what is expected'
+    description: 'Known by Love - Extend grace without judgment - love God, love people. Serve others sacrificially, going beyond what is expected.'
   },
   {
     title: 'A Vision of Hope',
-    description: 'Declare Jesus as our "Blessed Redeemer" (Colossians 3:12)\nKeep our eyes fixed on eternity, living with Kingdom perspective'
+    description: 'A Vision of Hope - Declare Jesus as our \'Blessed Redeemer\' (Colossians 3:12). Keep our eyes fixed on eternity, living with Kingdom perspective.'
   }
 ])
 
@@ -132,6 +145,8 @@ onMounted(async () => {
   border-left: 4px solid #14b8a6;
   transition: all 0.3s ease;
   animation: fadeInUp 0.6s ease-out both;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .vision-card-1 {
@@ -147,9 +162,10 @@ onMounted(async () => {
 }
 
 .vision-card:hover {
-  transform: translateX(8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateX(8px) translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
   border-left-width: 6px;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.05), rgba(20, 184, 166, 0.02));
 }
 
 .vision-section :deep(.v-img) {

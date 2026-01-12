@@ -39,10 +39,10 @@
         </div>
 
         <div class="max-w-7xl mx-auto flex flex-col">
-          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ ministriesData.sectionTitle || 'Our Ministries' }}
           </h2>
-          <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+          <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ ministriesData.sectionSubtitle || 'Discover our various ministries designed to help you grow in faith and serve our community.' }}
           </p>
 
@@ -65,7 +65,7 @@
           <!-- Loading State -->
           <div v-if="loading" class="text-center py-16 flex flex-col items-center justify-center">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
-            <p class="mt-4 text-grey">Loading ministries...</p>
+            <p class="mt-4 text-grey" style="font-family: 'Georgia', serif; font-style: italic;">Loading ministries...</p>
           </div>
 
           <!-- Ministries Grid -->
@@ -94,12 +94,12 @@
                 >
                   {{ getMinistryCategory(ministry.department_name) }}
                 </v-chip>
-                <h3 class="ministry-title">{{ ministry.ministry_name }}</h3>
+                <h3 class="ministry-title" style="font-family: 'Georgia', serif; font-style: italic;">{{ ministry.ministry_name }}</h3>
                 <v-btn
                   size="small"
                   variant="outlined"
                   class="mt-4 learn-more-btn"
-                  :style="{ color: ministriesData.learnMoreButtonColor || '#ffffff', borderColor: ministriesData.learnMoreButtonColor || '#ffffff' }"
+                  :style="{ color: ministriesData.learnMoreButtonColor || '#ffffff', borderColor: ministriesData.learnMoreButtonColor || '#ffffff', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
                   @click="goToLearnMore(ministry)"
                 >
                   Learn More
@@ -117,7 +117,7 @@
             >
               &laquo; Previous
             </v-btn>
-            <span class="mx-4">
+            <span class="mx-4" style="font-family: 'Georgia', serif; font-style: italic;">
               Page {{ pageNumber }} of {{ totalPage }}
             </span>
             <v-btn
@@ -131,7 +131,7 @@
 
           <!-- Empty State -->
           <div v-if="!loading && ministryData.length === 0" class="text-center py-16 flex flex-col items-center justify-center">
-            <p class="text-lg text-grey">No ministries found.</p>
+            <p class="text-lg text-grey" style="font-family: 'Georgia', serif; font-style: italic;">No ministries found.</p>
           </div>
         </div>
       </section>
@@ -140,10 +140,10 @@
       <section class="join-section py-16 bg-white text-black">
         <v-container>
           <div class="text-center flex flex-col items-center justify-center">
-            <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ ministriesData.joinCommunityTitle || 'Join Our Faith Community' }}
             </h2>
-            <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ ministriesData.joinCommunityText || 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.' }}
             </p>
             <v-btn
@@ -459,7 +459,7 @@ watch(() => route.query.category, (newCategory) => {
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .hero-content {
@@ -476,14 +476,14 @@ watch(() => route.query.category, (newCategory) => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .hero-subtitle {
   font-size: 1.125rem;
   max-width: 42rem;
   margin: 0 auto;
-  font-family: 'Poppins', 'Inter', sans-serif;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .floating-elements {
@@ -599,14 +599,14 @@ watch(() => route.query.category, (newCategory) => {
 }
 
 .ministry-content {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
   padding: 1.5rem;
   color: white;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
 }
 
 .ministry-title {

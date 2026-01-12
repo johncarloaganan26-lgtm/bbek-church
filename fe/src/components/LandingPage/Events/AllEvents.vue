@@ -39,10 +39,10 @@
         </div>
 
         <div class="max-w-7xl mx-auto">
-          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center fade-in-up" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+          <h2 class="text-4xl md:text-5xl font-weight-bold text-black mb-6 text-center fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ eventsData.sectionTitle || 'Upcoming Events' }}
           </h2>
-          <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8 fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+          <p class="text-lg md:text-xl text-black text-center leading-relaxed mb-8 fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ eventsData.sectionSubtitle || 'Join us for exciting upcoming events that bring our community together in faith and fellowship.' }}
           </p>
 
@@ -54,13 +54,13 @@
               color="#14b8a6"
               size="64"
             ></v-progress-circular>
-            <p class="mt-4 text-lg">Loading events...</p>
+            <p class="mt-4 text-lg" style="font-family: 'Georgia', serif; font-style: italic;">Loading events...</p>
           </div>
 
           <!-- Empty State -->
           <div v-else-if="!eventsStore.loading && eventData.length === 0" class="text-center py-16">
-            <p class="text-xl text-grey-darken-1">No events found.</p>
-            <p class="text-md text-grey mt-2">Please check back later for upcoming events.</p>
+            <p class="text-xl text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">No events found.</p>
+            <p class="text-md text-grey mt-2" style="font-family: 'Georgia', serif; font-style: italic;">Please check back later for upcoming events.</p>
           </div>
 
           <!-- Events Grid -->
@@ -81,14 +81,23 @@
               ></div>
               <div class="event-overlay"></div>
               <div class="event-content">
-                <h3 class="event-title">{{ event.eventName || event.title }}</h3>
-                <p class="event-date">{{ event.start_date }} - {{ event.end_date }}</p>
-                <p class="event-location">{{ event.location }}</p>
+                <h3 class="event-title" style="font-family: 'Georgia', serif; font-style: italic;">{{ event.eventName || event.title }}</h3>
+                <div class="event-details">
+                  <p class="event-date text-white mb-1">
+                    <v-icon size="small" class="mr-1">mdi-calendar</v-icon>
+                    {{ formatDate(event.start_date) }}
+                  </p>
+                  <p class="event-time text-white mb-1">
+                    <v-icon size="small" class="mr-1">mdi-clock-outline</v-icon>
+                    {{ formatTime(event.start_date) }}
+                  </p>
+                </div>
+                <p class="event-location" style="font-family: 'Georgia', serif; font-style: italic;">{{ event.location }}</p>
                 <v-btn
                   size="small"
                   variant="outlined"
                   class="mt-4 learn-more-btn"
-                  :style="{ color: eventsData.learnMoreButtonColor || '#ffffff', borderColor: eventsData.learnMoreButtonColor || '#ffffff' }"
+                  :style="{ color: eventsData.learnMoreButtonColor || '#ffffff', borderColor: eventsData.learnMoreButtonColor || '#ffffff', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
                   @click="goToLearnMore(event)"
                 >
                   Learn More
@@ -106,7 +115,7 @@
             >
               &laquo; Previous
             </v-btn>
-            <span class="mx-4">
+            <span class="mx-4" style="font-family: 'Georgia', serif; font-style: italic;">
               Page {{ pageNumber }} of {{ totalPage }}
             </span>
             <v-btn
@@ -124,10 +133,10 @@
       <section class="join-section py-16 bg-white text-black">
         <v-container>
           <div class="text-center">
-            <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            <h2 class="text-4xl font-weight-bold mb-6 text-black" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ eventsData.joinCommunityTitle || 'Join Our Community' }}
             </h2>
-            <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            <p class="text-xl mb-10 max-w-2xl mx-auto text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ eventsData.joinCommunityText || 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.' }}
             </p>
             <v-btn
@@ -306,6 +315,28 @@ const goToLearnMore = (event) => {
   })
 }
 
+// Format date for display
+const formatDate = (dateString) => {
+  if (!dateString) return 'TBA'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+}
+
+// Format time for display
+const formatTime = (dateString) => {
+  if (!dateString) return 'TBA'
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
 const previousPage = () => {
   if (pageNumber.value > 1) {
     pageNumber.value--
@@ -383,7 +414,7 @@ onMounted(async () => {
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .hero-content {
@@ -400,14 +431,14 @@ onMounted(async () => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .hero-subtitle {
   font-size: 1.125rem;
   max-width: 42rem;
   margin: 0 auto;
-  font-family: 'Poppins', 'Inter', sans-serif;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .events-section {
@@ -520,14 +551,14 @@ onMounted(async () => {
 }
 
 .event-content {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
   padding: 1.5rem;
   color: white;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
 }
 
 .event-title {
@@ -538,7 +569,19 @@ onMounted(async () => {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+.event-details {
+  margin-bottom: 0.75rem;
+}
+
 .event-date {
+  color: white;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  font-family: 'Poppins', 'Inter', sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.event-time {
   color: white;
   font-size: 0.875rem;
   margin-bottom: 0.5rem;

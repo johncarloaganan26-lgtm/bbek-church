@@ -30,7 +30,7 @@
     <!-- Leadership Section -->
     <section class="py-20 bg-white">
       <v-container>
-        <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16">
+        <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16" style="font-family: 'Georgia', serif; font-style: italic;">
           {{ leadershipData.sectionTitle || 'Meet Our Leaders' }}
         </h2>
         <v-row>
@@ -50,13 +50,13 @@
                 ></v-img>
               </div>
               <v-card-text class="text-center pa-8">
-                <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-2">
+                <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-2" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ leader.name }}
                 </h3>
-                <p class="text-h6 text-teal mb-4 font-weight-semibold">
+                <p class="text-h6 text-teal mb-4 font-weight-semibold" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ leader.position }}
                 </p>
-                <p class="text-body-1 text-grey-darken-1">
+                <p class="text-body-1 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ leader.bio }}
                 </p>
               </v-card-text>
@@ -74,6 +74,7 @@
         size="large"
         rounded
         @click="$router.push('/about')"
+        style="font-family: 'Georgia', serif; font-style: italic;"
       >
         {{ leadershipData.backButtonText || 'Back to About' }}
       </v-btn>
@@ -256,7 +257,7 @@ onMounted(async () => {
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -297,14 +298,12 @@ onMounted(async () => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .fade-in-up {

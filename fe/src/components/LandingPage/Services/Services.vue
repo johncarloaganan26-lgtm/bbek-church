@@ -259,6 +259,14 @@ onMounted(async () => {
   opacity: 0.3;
 }
 
+.hero-background::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
+  z-index: 1;
+}
+
 .floating-bounce {
   position: absolute;
   border-radius: 50%;
@@ -335,13 +343,14 @@ onMounted(async () => {
   letter-spacing: -0.025em;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .hero-subtitle {
   font-size: 1.125rem;
   color: white;
   font-weight: 300;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .fade-in-up {
@@ -516,12 +525,16 @@ onMounted(async () => {
   font-weight: bold;
   margin-bottom: 16px;
   color: #1f2937;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .service-description {
   color: #4b5563;
   font-size: 1.125rem;
   line-height: 1.75;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 @media (min-width: 768px) {
@@ -623,6 +636,8 @@ onMounted(async () => {
   line-height: 1;
   letter-spacing: -0.025em;
   color: #1f2937;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .service-card-description {
@@ -634,6 +649,8 @@ onMounted(async () => {
   color: #4b5563;
   line-height: 1.6;
   margin: 0;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 @media (min-width: 768px) {

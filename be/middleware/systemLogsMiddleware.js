@@ -27,6 +27,12 @@ function getActionType(req) {
   if (path.includes('/logout')) {
     return 'LOGOUT';
   }
+  if (path.includes('/restoreArchive')) {
+    return 'RESTORE';
+  }
+  if (path.includes('/export') || path.includes('/print')) {
+    return 'PRINT';
+  }
 
   switch (method) {
     case 'POST':
@@ -67,7 +73,9 @@ function getEntityType(req) {
     '/transactions': 'Transaction',
     '/announcements': 'Announcement',
     '/cms': 'CMS',
-    '/archives': 'Archive'
+    '/archives': 'Archive',
+    '/church-records/accounts/login': 'User Session',
+    '/church-records/accounts/logout': 'User Session'
   };
 
   for (const [route, entity] of Object.entries(entityMappings)) {
@@ -372,9 +380,9 @@ const systemLogsMiddleware = async (req, res, next) => {
     return next();
   }
 
-  // Skip GET requests (they're just viewing)
+  // Skip GET requests (they're just viewing) but allow LOGIN, LOGOUT, RESTORE, PRINT
   const actionType = getActionType(req);
-  if (actionType === 'VIEW_LIST' || actionType === 'LOGIN' || actionType === 'LOGOUT') {
+  if (actionType === 'VIEW_LIST') {
     return next();
   }
 
@@ -398,20 +406,36 @@ const systemLogsMiddleware = async (req, res, next) => {
       const entityId = getEntityId(req);
       const action = getActionType(req);
 
-      // Fetch actual entity data from database (for UPDATE/DELETE)
       let entityData = null;
-      if ((action === 'UPDATE' || action === 'DELETE') && entityId) {
-        entityData = await fetchEntityData(entityType, entityId);
-      } else if (action === 'CREATE' && req.body) {
-        // For CREATE, use the submitted data
-        entityData = req.body;
+      let description = '';
+      let entityName = '';
+
+      // Handle special actions (LOGIN, LOGOUT, RESTORE, PRINT)
+      if (action === 'LOGIN' || action === 'LOGOUT') {
+        description = `${action} to system`;
+        entityName = action === 'LOGIN' ? (req.body?.email || 'Unknown User') : (req.user?.email || 'Unknown User');
+      } else if (action === 'RESTORE') {
+        description = `Restored archived record`;
+        entityName = `Archive ID: ${req.params?.id || 'Unknown'}`;
+      } else if (action === 'PRINT') {
+        description = `Exported/printed data`;
+        entityName = 'Data Export';
+      } else {
+        // Handle regular CRUD operations
+        // Fetch actual entity data from database (for UPDATE/DELETE)
+        if ((action === 'UPDATE' || action === 'DELETE') && entityId) {
+          entityData = await fetchEntityData(entityType, entityId);
+        } else if (action === 'CREATE' && req.body) {
+          // For CREATE, use the submitted data
+          entityData = req.body;
+        }
+
+        // Build full description with entity data
+        description = await buildFullDescription(req, req.body, action, entityType, entityId, entityData);
+
+        // Get display name
+        entityName = getEntityDisplayName(entityData, entityType);
       }
-
-      // Build full description with entity data
-      const description = await buildFullDescription(req, req.body, action, entityType, entityId, entityData);
-
-      // Get display name
-      const entityName = getEntityDisplayName(entityData, entityType);
 
       // Build log data (all plain text)
       const logData = {

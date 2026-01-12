@@ -35,7 +35,7 @@
           :key="deptIndex"
           class="mb-16"
         >
-          <h2 class="text-h4 font-weight-bold text-center text-teal mb-8">
+          <h2 class="text-h4 font-weight-bold text-center text-teal mb-8" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ dept.name }}
           </h2>
           <v-row>
@@ -47,8 +47,8 @@
               md="4"
               lg="3"
             >
-              <v-card class="text-center pa-6" elevation="2" hover>
-                <v-avatar size="120" class="mb-4">
+              <v-card class="text-center pa-6" elevation="2" hover style="border-left: 4px solid #14b8a6; background: linear-gradient(to bottom, rgba(15, 118, 110, 0.05), rgba(17, 94, 89, 0.1)); transition: all 0.3s ease;">
+                <v-avatar size="160" class="mb-4">
                   <v-img
                     :src="officer.image && officer.image.startsWith('data:') ? officer.image : getImageUrl(officer.image)"
                     :alt="officer.name"
@@ -65,10 +65,10 @@
                     </template>
                   </v-img>
                 </v-avatar>
-                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">
+                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ officer.name }}
                 </h3>
-                <p class="text-body-2 text-teal font-weight-semibold">
+                <p class="text-body-2 text-teal font-weight-semibold" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ officer.role }}
                 </p>
               </v-card>
@@ -86,6 +86,7 @@
         size="large"
         rounded
         @click="$router.push('/about')"
+        style="font-family: 'Georgia', serif; font-style: italic;"
       >
         {{ deptOfficersData.backButtonText || 'Back to About' }}
       </v-btn>
@@ -318,7 +319,7 @@ onMounted(async () => {
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -359,14 +360,12 @@ onMounted(async () => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .fade-in-up {
@@ -388,11 +387,17 @@ onMounted(async () => {
   }
 }
 
+.department-officers-page :deep(.v-card:hover) {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  border-left-width: 6px;
+}
+
 @media (max-width: 960px) {
   .hero-title {
     font-size: 2rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1rem;
   }

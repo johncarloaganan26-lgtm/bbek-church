@@ -28,10 +28,10 @@
         </div>
 
         <div class="hero-content">
-          <h1 class="hero-title fade-in-up">
+          <h1 class="hero-title fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ childDedicationData.heroTitle }}
           </h1>
-          <p class="hero-subtitle fade-in-up-delay">
+          <p class="hero-subtitle fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ childDedicationData.heroDescription }}
           </p>
         </div>
@@ -59,49 +59,49 @@
           <div class="content-grid">
             <!-- Left Column: What is Child Dedication -->
             <div class="left-column">
-              <h2 class="section-title fade-in" style="animation-delay: 200ms;">
+              <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
                 {{ childDedicationData.sectionTitle }}
               </h2>
               
               <div class="info-cards">
-                <v-card class="info-card fade-in-up" style="animation-delay: 300ms;">
-                  <v-card-title class="card-title">
+                <v-card class="info-card fade-in-up" style="animation-delay: 300ms;" variant="flat" color="teal-lighten-5">
+                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
                     {{ childDedicationData.biblicalFoundationTitle }}
                   </v-card-title>
                   <v-card-text>
-                    <p>
+                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
                       {{ childDedicationData.biblicalFoundationText }}
                     </p>
                   </v-card-text>
                 </v-card>
 
-                <v-card class="info-card fade-in-up" style="animation-delay: 400ms;">
-                  <v-card-title class="card-title">
+                <v-card class="info-card fade-in-up" style="animation-delay: 400ms;" variant="flat" color="teal-lighten-5">
+                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
                     {{ childDedicationData.ourCommitmentTitle }}
                   </v-card-title>
                   <v-card-text>
-                    <p>
+                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
                       {{ childDedicationData.ourCommitmentText }}
                     </p>
                   </v-card-text>
                 </v-card>
               </div>
 
-              <v-card class="who-baptized-card fade-in" style="animation-delay: 500ms;">
-                <v-card-title class="who-title">{{ childDedicationData.whatWeOfferTitle }}</v-card-title>
+              <v-card class="who-baptized-card fade-in" style="animation-delay: 500ms;" variant="flat" color="teal-lighten-5">
+                <v-card-title class="who-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">{{ childDedicationData.whatWeOfferTitle }}</v-card-title>
                 <v-card-text>
                   <ul class="baptized-list">
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ childDedicationData.offerPoint1 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ childDedicationData.offerPoint1 }}</span>
                     </li>
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ childDedicationData.offerPoint2 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ childDedicationData.offerPoint2 }}</span>
                     </li>
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ childDedicationData.offerPoint3 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ childDedicationData.offerPoint3 }}</span>
                     </li>
                   </ul>
                 </v-card-text>
@@ -359,13 +359,13 @@ const handleSwitchToEdit = (dedication) => {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-color: #4b5563;
+  background-attachment: fixed;
 }
 
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(243, 244, 246, 0.4), rgba(229, 231, 235, 0.4));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -606,6 +606,14 @@ const handleSwitchToEdit = (dedication) => {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left-width: 6px;
 }
 
 .card-title {
@@ -616,9 +624,15 @@ const handleSwitchToEdit = (dedication) => {
 }
 
 .who-baptized-card {
-  background: #f9fafb;
   padding: 24px;
   border-radius: 8px;
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+}
+
+.who-baptized-card:hover {
+  transform: translateX(8px);
+  border-left-width: 6px;
 }
 
 .who-title {

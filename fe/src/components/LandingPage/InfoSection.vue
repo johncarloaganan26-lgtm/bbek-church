@@ -17,10 +17,17 @@
             <div class="icon-wrapper">
               <v-icon :icon="infoData.column1Icon || 'mdi-clock-outline'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
+            <h3
+              class="text-h5 font-weight-bold mb-4"
+              :style="`font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); color: ${infoData.buttonColor || '#008080'}`"
+            >
               {{ infoData.column1Title || 'SUNDAY SERVICE' }}
             </h3>
-            <div class="text-body-2 text-grey-darken-2" style="line-height: 1.8;" v-html="formatText(infoData.column1Text)"></div>
+            <div
+              class="text-body-2 text-grey-darken-2"
+              style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); line-height: 1.8;"
+              v-html="formatText(infoData.column1Text)"
+            ></div>
           </div>
         </v-col>
 
@@ -30,10 +37,17 @@
             <div class="icon-wrapper">
               <v-icon :icon="infoData.column2Icon || 'mdi-laptop'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
+            <h3
+              class="text-h5 font-weight-bold mb-4"
+              :style="`font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); color: ${infoData.buttonColor || '#008080'}`"
+            >
               {{ infoData.column2Title || 'WATCH ONLINE' }}
             </h3>
-            <div class="text-body-2 text-grey-darken-2 mb-6" style="line-height: 1.8;" v-html="formatText(infoData.column2Text)"></div>
+            <div
+              class="text-body-2 text-grey-darken-2 mb-6"
+              style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); line-height: 1.8;"
+              v-html="formatText(infoData.column2Text)"
+            ></div>
             <v-btn
               variant="outlined"
               size="large"
@@ -52,10 +66,17 @@
             <div class="icon-wrapper">
               <v-icon :icon="infoData.column3Icon || 'mdi-cash'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
-            <h3 class="text-h5 font-weight-bold mb-4" :style="`font-family: 'Poppins', sans-serif; color: ${infoData.buttonColor || '#008080'}`">
+            <h3
+              class="text-h5 font-weight-bold mb-4"
+              :style="`font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); color: ${infoData.buttonColor || '#008080'}`"
+            >
               {{ infoData.column3Title || 'GIVE' }}
             </h3>
-            <div class="text-body-2 text-grey-darken-2 mb-6" style="line-height: 1.8;" v-html="formatText(infoData.column3Text)"></div>
+            <div
+              class="text-body-2 text-grey-darken-2 mb-6"
+              style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); line-height: 1.8;"
+              v-html="formatText(infoData.column3Text)"
+            ></div>
             <v-btn
               variant="outlined"
               size="large"

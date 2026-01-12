@@ -46,27 +46,19 @@
             ></div>
             <div class="service-overlay"></div>
             <div class="service-content">
-              <v-icon
-                :icon="service.icon"
-                size="48"
-                color="white"
-                class="mb-4"
-              ></v-icon>
-              <h3 class="text-h5 font-weight-bold text-white mb-4 text-center">
+              <h3 class="service-title">
                 {{ service.title }}
               </h3>
-              <p class="text-white mb-6 text-body-2 text-center">
+              <p class="service-description">
                 {{ service.description }}
               </p>
-              <v-btn
-                color="rgba(255, 255, 255, 0.2)"
-                variant="outlined"
-                class="text-white"
-                rounded
+              <v-icon
+                icon="mdi-arrow-right"
+                size="24"
+                color="white"
+                class="learn-more-arrow"
                 @click.stop="$router.push(service.route)"
-              >
-                Learn More
-              </v-btn>
+              ></v-icon>
             </div>
           </v-card>
         </v-col>
@@ -260,14 +252,49 @@ onMounted(async () => {
 }
 
 .service-content {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 3;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 32px;
+  padding: 24px;
   color: white;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
+}
+
+.service-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  margin: 0 0 0.5rem 0;
+  text-align: left;
+}
+
+.service-description {
+  font-size: 0.9rem;
+  font-weight: 400;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin: 0 0 1rem 0;
+  text-align: left;
+  line-height: 1.3;
+  max-width: 280px;
+}
+
+.learn-more-arrow {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  opacity: 0.8;
+}
+
+.learn-more-arrow:hover {
+  opacity: 1;
+  transform: translateX(4px);
 }
 
 .service-content :deep(.v-btn) {

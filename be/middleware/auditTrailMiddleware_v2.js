@@ -25,6 +25,12 @@ function getActionType(req) {
   if (path.includes('/logout')) {
     return 'LOGOUT';
   }
+  if (path.includes('/restoreArchive')) {
+    return 'RESTORE';
+  }
+  if (path.includes('/export') || path.includes('/print')) {
+    return 'PRINT';
+  }
 
   switch (method) {
     case 'POST':
@@ -65,7 +71,9 @@ function getEntityType(req) {
     '/transactions': 'Transaction',
     '/announcements': 'Announcement',
     '/cms': 'CMS',
-    '/archives': 'Archive'
+    '/archives': 'Archive',
+    '/church-records/accounts/logout': 'User Session',
+    '/church-records/accounts/login': 'User Session'
   };
 
   for (const [route, entity] of Object.entries(entityMappings)) {

@@ -2,16 +2,6 @@
   <div class="accounts">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Accounts</h1>
-      <v-btn 
-        color="success" 
-        prepend-icon="mdi-account-plus" 
-        size="small" 
-        :disabled="loading"
-        :loading="loading"
-        @click="openAccountDialog"
-      >
-        Add New Account
-      </v-btn>
     </div>
 
     <!-- Filtering and Sorting Section -->

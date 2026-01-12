@@ -3,12 +3,12 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text class="text-center">
         <v-icon size="48" color="blue" class="mb-4">mdi-cash</v-icon>
-        <h3 class="text-h5 font-weight-bold mb-2">{{ giveInPersonData.giveInPersonTitle || 'Give in Person' }}</h3>
-        <p class="text-body-1 text-grey-darken-1 mb-4">
+        <h3 class="text-h5 font-weight-bold mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ giveInPersonData.giveInPersonTitle || 'Give in Person' }}</h3>
+        <p class="text-body-1 text-grey-darken-1 mb-4" style="font-family: 'Georgia', serif; font-style: italic;">
           {{ giveInPersonData.giveInPersonText || 'You can give during any of our worship services by placing your donation in the offering box.' }}
         </p>
         <v-card variant="flat" color="grey-lighten-4" class="pa-3">
-          <p class="text-body-2 mb-0">
+          <p class="text-body-2 mb-0" style="font-family: 'Georgia', serif; font-style: italic;">
             <span class="font-weight-semibold">{{ giveInPersonData.sundayServicesLabel || 'Sunday Services:' }} {{ giveInPersonData.sundayServicesTime || '9:00 AM - 11:00 AM' }}</span>
           </p>
         </v-card>
@@ -19,8 +19,8 @@
       <div class="d-flex align-start gap-3">
         <v-icon color="blue" size="24">mdi-calendar</v-icon>
         <div>
-          <h3 class="text-h6 font-weight-bold mb-2">{{ giveInPersonData.scheduledGivingTitle || 'Scheduled Giving' }}</h3>
-          <p class="text-body-2 text-grey-darken-1">
+          <h3 class="text-h6 font-weight-bold mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ giveInPersonData.scheduledGivingTitle || 'Scheduled Giving' }}</h3>
+          <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ giveInPersonData.scheduledGivingText || "If you'd like to set up regular, scheduled giving, please contact our church office for assistance. We can help you establish a consistent giving plan that works for you." }}
           </p>
         </div>

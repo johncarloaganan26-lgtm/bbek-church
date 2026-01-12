@@ -340,19 +340,38 @@ const handleLogout = async () => {
         confirmButtonClass: 'el-button--danger'
       }
     )
-    
+
     // User confirmed logout
+    try {
+      // Call logout API to record audit trail
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('auth_token') || localStorage.getItem('token')
+      if (token) {
+        await fetch('http://localhost:5000/api/church-records/accounts/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            logout_reason: 'User initiated logout from admin dashboard'
+          })
+        })
+      }
+    } catch (apiError) {
+      console.warn('Logout API call failed, but proceeding with local logout:', apiError)
+    }
+
     // Clear tokens
     localStorage.removeItem('accessToken')
     localStorage.removeItem('auth_token')
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
-    
+
     // Clear any user data
     userInfo.value = null
-    
+
     ElMessage.success('Logged out successfully')
-    
+
     // Redirect to landing page
     router.push({ name: 'LandingPage' })
   } catch (error) {

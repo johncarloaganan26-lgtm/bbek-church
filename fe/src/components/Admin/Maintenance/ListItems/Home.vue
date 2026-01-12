@@ -156,38 +156,20 @@
       <div class="item-label">Plan Your Visit Button Text</div>
       <div class="item-preview">
         <el-button
-          :style="{ backgroundColor: homeData.planVisitButtonColor, borderColor: homeData.planVisitButtonColor }"
+          :style="{ backgroundColor: homeData.buttonColor, borderColor: homeData.buttonColor }"
           size="small"
           type="primary"
         >
-          {{ homeData.planVisitButtonText }}
+          {{ homeData.button1Text }}
         </el-button>
       </div>
       <div class="item-action">
         <el-input
-          v-model="homeData.planVisitButtonText"
+          v-model="homeData.button1Text"
           size="small"
           placeholder="Button text"
           style="max-width: 300px;"
         ></el-input>
-      </div>
-    </div>
-    <el-divider />
-
-    <!-- Plan Your Visit Button Color -->
-    <div class="list-item">
-      <div class="item-label">Plan Your Visit Button Color</div>
-      <div class="item-preview">
-        <div
-          class="color-preview"
-          :style="{ backgroundColor: homeData.planVisitButtonColor }"
-        ></div>
-      </div>
-      <div class="item-action">
-        <el-color-picker
-          v-model="homeData.planVisitButtonColor"
-          size="small"
-        ></el-color-picker>
       </div>
     </div>
     <el-divider />
@@ -197,16 +179,16 @@
       <div class="item-label">Be One Of Us Button Text</div>
       <div class="item-preview">
         <el-button
-          :style="{ backgroundColor: homeData.beOneOfUsButtonColor, borderColor: homeData.beOneOfUsButtonColor }"
+          :style="{ backgroundColor: homeData.buttonColor, borderColor: homeData.buttonColor }"
           size="small"
           type="primary"
         >
-          {{ homeData.beOneOfUsButtonText }}
+          {{ homeData.button2Text }}
         </el-button>
       </div>
       <div class="item-action">
         <el-input
-          v-model="homeData.beOneOfUsButtonText"
+          v-model="homeData.button2Text"
           size="small"
           placeholder="Button text"
           style="max-width: 300px;"
@@ -215,18 +197,18 @@
     </div>
     <el-divider />
 
-    <!-- Be One Of Us Button Color -->
+    <!-- Shared Button Color -->
     <div class="list-item">
-      <div class="item-label">Be One Of Us Button Color</div>
+      <div class="item-label">Button Color</div>
       <div class="item-preview">
         <div
           class="color-preview"
-          :style="{ backgroundColor: homeData.beOneOfUsButtonColor }"
+          :style="{ backgroundColor: homeData.buttonColor }"
         ></div>
       </div>
       <div class="item-action">
         <el-color-picker
-          v-model="homeData.beOneOfUsButtonColor"
+          v-model="homeData.buttonColor"
           size="small"
         ></el-color-picker>
       </div>
@@ -618,10 +600,9 @@ const defaultHomeData = {
   welcomeText: 'Welcome to Bible Baptist Church of Kwali',
   sundayService: 'Sunday Worship 9:30 AM - 12:00 PM',
   wednesdayService: 'Wednesday Service 7:00 PM - 9:00 PM',
-  planVisitButtonText: 'Plan Your Visit',
-  planVisitButtonColor: '#14b8a6',
-  beOneOfUsButtonText: 'Be One Of Us',
-  beOneOfUsButtonColor: '#14b8a6',
+  button1Text: 'Plan Your Visit',
+  button2Text: 'Be One Of Us',
+  buttonColor: '#14b8a6',
   servicesTitle: 'Our Services',
   servicesSubtitle: 'We offer various services to support our community in their spiritual journey.',
   services: [
@@ -687,6 +668,11 @@ onMounted(async () => {
         homeVideoType: typeof loadedData.homeVideo,
         homeVideoLength: loadedData.homeVideo ? loadedData.homeVideo.length : 0
       })
+      // Handle button color migration from old separate fields to new shared field
+      if (loadedData.planVisitButtonColor && !loadedData.buttonColor) {
+        homeData.buttonColor = loadedData.planVisitButtonColor
+      }
+
       // Merge loaded data into homeData
       Object.keys(loadedData).forEach(key => {
         if (key === 'services' && Array.isArray(loadedData[key])) {
@@ -1010,7 +996,12 @@ const saveChanges = async () => {
     if (success) {
       // Wait a moment for database to update and commit transaction
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
+      // Dispatch event to notify other components (like HeroSection) to refresh
+      window.dispatchEvent(new CustomEvent('cms-page-updated', {
+        detail: { page: 'home', timestamp: Date.now() }
+      }))
+
       // Force refresh to bypass any caching
       const loadedData = await loadPageData(true)
       if (loadedData) {
@@ -1020,8 +1011,8 @@ const saveChanges = async () => {
           } else if (key === 'homeVideo' || key === 'visionImage') {
             // Explicitly handle video/image - clear if deleted
             const value = loadedData[key]
-            if (value && 
-                typeof value === 'string' && 
+            if (value &&
+                typeof value === 'string' &&
                 value.length > 0 &&
                 (value.startsWith('data:image/') || value.startsWith('data:video/'))) {
               homeData[key] = value
@@ -1039,11 +1030,11 @@ const saveChanges = async () => {
             homeData[key] = loadedData[key]
           }
         })
-        
+
         // Verify video was saved or deleted
         if (imagesToSave.homeVideo === null) {
           // Video was marked for deletion
-          if (!loadedData.homeVideo || 
+          if (!loadedData.homeVideo ||
               (typeof loadedData.homeVideo === 'string' && loadedData.homeVideo.length === 0)) {
             ElMessage.success('Video deleted successfully!')
           } else {
@@ -1058,7 +1049,7 @@ const saveChanges = async () => {
             savedLength,
             match: savedLength === sentLength
           })
-          
+
           if (Math.abs(savedLength - sentLength) > 100) {
             ElMessage.warning('Video may not have been saved correctly. Please try saving again.')
           } else {

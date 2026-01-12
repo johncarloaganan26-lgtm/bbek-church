@@ -22,6 +22,33 @@
 
             <!-- Event Info Cards -->
             <div class="event-items">
+              <!-- Event Status -->
+              <v-card
+                class="mb-4 event-card event-card-0"
+                variant="flat"
+                :color="eventModel?.status === 'completed' ? 'grey-lighten-4' : 'teal-lighten-5'"
+              >
+                <v-card-text>
+                  <div class="d-flex align-start gap-3">
+                    <v-icon :color="eventModel?.status === 'completed' ? 'grey-darken-1' : 'teal-darken-3'" size="24" class="mt-1">
+                      {{ eventModel?.status === 'completed' ? 'mdi-check-circle' : 'mdi-information' }}
+                    </v-icon>
+                    <div>
+                      <h3 class="text-h6 font-weight-bold mb-2" :style="{ color: eventModel?.status === 'completed' ? '#374151' : '#0f766e' }">
+                        Event Status
+                      </h3>
+                      <v-chip
+                        :color="getStatusColor(eventModel?.status)"
+                        size="small"
+                        variant="flat"
+                      >
+                        {{ getStatusText(eventModel?.status) }}
+                      </v-chip>
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+
               <!-- Date & Time -->
               <v-card
                 class="mb-4 event-card event-card-1"
@@ -141,7 +168,39 @@ const formatDate = (date) => {
   return dayjs(date).format('MMMM D, YYYY - h:mm A')
 }
 
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'completed':
+      return 'grey'
+    case 'ongoing':
+      return 'green'
+    case 'upcoming':
+      return 'blue'
+    default:
+      return 'grey'
+  }
+}
+
+const getStatusText = (status) => {
+  switch (status) {
+    case 'completed':
+      return 'Completed'
+    case 'ongoing':
+      return 'Ongoing'
+    case 'upcoming':
+      return 'Upcoming'
+    default:
+      return 'Unknown'
+  }
+}
+
 const handleJoinEvent = async () => {
+  // Check if event is completed
+  if (eventModel.value?.status === 'completed') {
+    ElMessage.warning('This event has already been completed and is no longer accepting new registrations.')
+    return
+  }
+
   if (approvalStatus.value !== null) {
     ElMessage.warning('You have already submitted a request for this event.')
     return
@@ -239,7 +298,9 @@ const { loading: cmsLoading, loadPageData } = useCms('learnmoreevents')
 
 // Computed properties for button states
 const getButtonText = computed(() => {
-  if (approvalStatus.value === 'pending') {
+  if (eventModel.value?.status === 'completed') {
+    return 'Event Completed'
+  } else if (approvalStatus.value === 'pending') {
     return learnMoreEventsData.pendingText || 'Pending Request'
   } else if (approvalStatus.value === 'approved') {
     return learnMoreEventsData.approvedText || 'You Already Join'
@@ -257,7 +318,9 @@ const getButtonClass = computed(() => {
 })
 
 const getButtonColor = computed(() => {
-  if (approvalStatus.value === 'pending') {
+  if (eventModel.value?.status === 'completed') {
+    return '#6b7280' // Gray color for completed events
+  } else if (approvalStatus.value === 'pending') {
     return '#f59e0b'
   } else if (approvalStatus.value === 'approved') {
     return '#10b981'
@@ -268,7 +331,7 @@ const getButtonColor = computed(() => {
 })
 
 const getButtonDisabled = computed(() => {
-  return approvalStatus.value !== null
+  return approvalStatus.value !== null || eventModel.value?.status === 'completed'
 })
 
 onMounted(async () => {
@@ -306,6 +369,10 @@ onMounted(async () => {
   border-left: 4px solid #14b8a6;
   transition: all 0.3s ease;
   animation: fadeInUp 0.6s ease-out both;
+}
+
+.event-card-0 {
+  animation-delay: 100ms;
 }
 
 .event-card-1 {

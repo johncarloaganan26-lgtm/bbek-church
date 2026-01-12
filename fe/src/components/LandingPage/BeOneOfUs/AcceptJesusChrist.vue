@@ -43,10 +43,10 @@
           <!-- Right Side - Content -->
           <v-col cols="12" lg="6" class="order-1 order-lg-2">
             <div class="content-wrapper">
-              <h1 class="text-h3 text-md-h4 text-lg-h2 font-weight-bold text-grey-darken-3 mb-4 fade-in-up">
+              <h1 class="text-h3 text-md-h4 text-lg-h2 font-weight-bold text-grey-darken-3 mb-4 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
                 Accept Jesus Christ
               </h1>
-              <p class="text-h6 text-grey-darken-1 mb-8 fade-in-up-delay">
+              <p class="text-h6 text-grey-darken-1 mb-8 fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
                 Begin your journey of faith with Jesus Christ
               </p>
 
@@ -59,13 +59,13 @@
                   class="pa-4 accept-card"
                   :class="`accept-card-${index + 1}`"
                 >
-                  <h3 class="text-h6 font-weight-bold mb-2">{{ section.title }}</h3>
-                  <ol v-if="hasNumberedList(section.text)" class="text-body-2 pl-4">
+                  <h3 class="text-h6 font-weight-bold mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ section.title }}</h3>
+                  <ol v-if="hasNumberedList(section.text)" class="text-body-2 pl-4" style="font-family: 'Georgia', serif; font-style: italic;">
                     <li v-for="(line, lineIndex) in parseTextWithList(section.text)" :key="lineIndex">
                       {{ line.replace(/^\d+\.\s*/, '') }}
                     </li>
                   </ol>
-                  <p v-else class="text-body-2">
+                  <p v-else class="text-body-2" style="font-family: 'Georgia', serif; font-style: italic;">
                     {{ section.text }}
                   </p>
                 </v-card>
@@ -89,7 +89,7 @@
     <!-- Worship Services Section -->
     <section class="worship-services-section py-16">
       <v-container>
-        <h2 class="text-h3 text-md-h4 text-lg-h2 font-weight-bold text-center text-grey-darken-3 mb-12">
+        <h2 class="text-h3 text-md-h4 text-lg-h2 font-weight-bold text-center text-grey-darken-3 mb-12" style="font-family: 'Georgia', serif; font-style: italic;">
           Join Our Worship Services
         </h2>
         <v-row>
@@ -484,16 +484,22 @@ onUnmounted(() => {
   font-weight: bold;
   color: #212121;
   font-size: 0.95rem;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .service-dash {
   margin: 0 4px;
   color: #212121;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 
 .service-description {
   color: #212121;
   font-size: 0.95rem;
+  font-family: 'Georgia', serif;
+  font-style: italic;
 }
 </style>
 

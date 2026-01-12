@@ -214,8 +214,8 @@ app.post('/api/example', (req, res) => {
 // Public routes are handled within the middleware itself
 app.use(authenticateToken);
 
-// Apply audit trail middleware to log all actions (after authentication)
-const { auditTrailMiddleware } = require('./middleware/auditTrailMiddleware');
+// Apply audit trail middleware v2 to log all actions (after authentication)
+const auditTrailMiddleware = require('./middleware/auditTrailMiddleware_v2');
 app.use(auditTrailMiddleware);
 
 // Apply system logs middleware (v2 - raw data only)

@@ -1,4 +1,4 @@
-<template>
+ <template>
   <div class="leaders-officers-page">
     <!-- Hero Section -->
     <section class="hero-section">

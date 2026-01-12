@@ -27,7 +27,7 @@
     </section>
 
     <!-- Main Content -->
-    <section class="main-content py-20">
+    <section class="main-content" style="padding: 100px 0 80px 0;">
       <v-container>
         <v-row>
           <!-- Left Column - Church Info -->
@@ -35,30 +35,61 @@
             <div class="space-y-12">
               <!-- Church Identity -->
               <div>
-                <h2 class="text-h4 font-weight-bold text-grey-darken-3 mb-4">
+                <h2
+                  class="text-h4 font-weight-bold text-grey-darken-3 mb-4"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                >
                   {{ planVisitData.churchName }}
                 </h2>
-                <p class="text-body-1 text-grey-darken-1">
+                <p
+                  class="text-body-1 text-grey-darken-1"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
+                >
                   {{ planVisitData.churchDescription }}
                 </p>
               </div>
 
               <!-- Service Times -->
               <div>
-                <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">Service Times</h3>
+                <h3
+                  class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                >
+                  Service Times
+                </h3>
                 <div class="space-y-3">
                   <div class="d-flex align-center gap-4">
                     <div class="w-12 h-12 bg-blue rounded-circle"></div>
                     <div>
-                      <p class="font-weight-semibold text-grey-darken-3">Sunday Worship</p>
-                      <p class="text-grey-darken-1">{{ planVisitData.sundayServiceTime }}</p>
+                      <p
+                        class="font-weight-semibold text-grey-darken-3"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        Sunday Worship
+                      </p>
+                      <p
+                        class="text-grey-darken-1"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        {{ planVisitData.sundayServiceTime }}
+                      </p>
                     </div>
                   </div>
                   <div class="d-flex align-center gap-4">
                     <div class="w-12 h-12 bg-blue rounded-circle"></div>
                     <div>
-                      <p class="font-weight-semibold text-grey-darken-3">Wednesday Service</p>
-                      <p class="text-grey-darken-1">{{ planVisitData.wednesdayServiceTime }}</p>
+                      <p
+                        class="font-weight-semibold text-grey-darken-3"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        Wednesday Service
+                      </p>
+                      <p
+                        class="text-grey-darken-1"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        {{ planVisitData.wednesdayServiceTime }}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -66,12 +97,20 @@
 
               <!-- Location -->
               <div>
-                <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">Location</h3>
+                <h3
+                  class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                >
+                  Location
+                </h3>
                 <div class="d-flex align-start gap-4">
                   <v-avatar size="48" color="blue-lighten-5">
                     <v-icon color="blue">mdi-map-marker</v-icon>
                   </v-avatar>
-                  <p class="text-body-1 text-grey-darken-1">
+                  <p
+                    class="text-body-1 text-grey-darken-1"
+                    style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                  >
                     {{ planVisitData.location }}
                   </p>
                 </div>
@@ -86,15 +125,29 @@
 
               <!-- Contact Info -->
               <div>
-                <h3 class="text-h5 font-weight-bold text-grey-darken-3 mb-4">Contact Info</h3>
+                <h3
+                  class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
+                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                >
+                  Contact Info
+                </h3>
                 <div class="space-y-3">
                   <div class="d-flex align-center gap-4">
                     <v-avatar size="48" color="blue-lighten-5">
                       <v-icon color="blue">mdi-phone</v-icon>
                     </v-avatar>
                     <div>
-                      <p class="font-weight-semibold text-grey-darken-3">Phone</p>
-                      <a :href="`tel:${planVisitData.phone}`" class="text-blue text-decoration-none">
+                      <p
+                        class="font-weight-semibold text-grey-darken-3"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        Phone
+                      </p>
+                      <a
+                        :href="`tel:${planVisitData.phone}`"
+                        class="text-blue text-decoration-none"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
                         {{ planVisitData.phone }}
                       </a>
                     </div>
@@ -104,8 +157,17 @@
                       <v-icon color="blue">mdi-email</v-icon>
                     </v-avatar>
                     <div>
-                      <p class="font-weight-semibold text-grey-darken-3">Email</p>
-                      <a :href="`mailto:${planVisitData.email}`" class="text-blue text-decoration-none">
+                      <p
+                        class="font-weight-semibold text-grey-darken-3"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
+                        Email
+                      </p>
+                      <a
+                        :href="`mailto:${planVisitData.email}`"
+                        class="text-blue text-decoration-none"
+                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                      >
                         {{ planVisitData.email }}
                       </a>
                     </div>
@@ -118,10 +180,16 @@
           <!-- Right Column - Contact Form -->
           <v-col cols="12" lg="6">
             <v-card class="pa-8" variant="flat" color="rgba(255, 255, 255, 0.5)">
-              <h2 class="text-h4 font-weight-bold text-grey-darken-3 mb-4">
+              <h2
+                class="text-h4 font-weight-bold text-grey-darken-3 mb-4"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+              >
                 Get In Touch With Us
               </h2>
-              <p class="text-body-1 text-grey-darken-1 mb-8">
+              <p
+                class="text-body-1 text-grey-darken-1 mb-8"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
+              >
                 We'd love to hear from you. Send us a message and we'll respond as soon as possible.
               </p>
 
@@ -501,7 +569,7 @@ onMounted(async () => {
 <style scoped>
 .plan-visit-page {
   min-height: 100vh;
-  margin-top: 64px;
+  margin-top: 120px;
   background-color: var(--page-bg, white);
 }
 

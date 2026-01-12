@@ -84,18 +84,21 @@
             <div class="event-overlay"></div>
             <div class="event-content">
               <h3
-                class="text-h5 font-weight-bold text-white mb-4"
+                class="text-h5 font-weight-bold text-white mb-3"
                 style="font-family: 'Georgia', serif; font-style: italic"
               >
                 {{ event.eventName }}
               </h3>
-              <p class="text-white mb-6 text-body-2">
-                {{
-                  event.description.length > 150
-                    ? event.description.substring(0, 150) + "..."
-                    : event.description
-                }}
-              </p>
+              <div class="event-details mb-4">
+                <p class="event-date text-white mb-1">
+                  <v-icon size="small" class="mr-1">mdi-calendar</v-icon>
+                  {{ formatDate(event.start_date) }}
+                </p>
+                <p class="event-time text-white mb-1">
+                  <v-icon size="small" class="mr-1">mdi-clock-outline</v-icon>
+                  {{ formatTime(event.start_date) }}
+                </p>
+              </div>
               <v-btn
                 color="rgba(255, 255, 255, 0.2)"
                 variant="outlined"
@@ -417,6 +420,28 @@ const goToLearnMore = (event) => {
   });
 };
 
+// Format date for display
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+// Format time for display
+const formatTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 onMounted(async () => {
   await fetchHomeData();
   await fetchEvents();
@@ -689,14 +714,14 @@ onBeforeUnmount(() => {
 }
 
 .event-content {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
   padding: 1.5rem;
   color: white;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
 }
 
 .event-title {

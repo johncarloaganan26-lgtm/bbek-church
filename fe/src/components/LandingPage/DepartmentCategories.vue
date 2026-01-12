@@ -1,115 +1,93 @@
 <template>
-  <section class="department-categories-section py-16 bg-white" style="position: relative;">
-    <!-- Floating Elements -->
-    <div class="floating-elements">
-      <div
-        v-for="(element, index) in floatingElements"
-        :key="index"
-        class="floating-element"
-        :style="element.style"
-      ></div>
-    </div>
-
+  <section class="department-slideshow-section py-16">
     <v-container>
       <!-- Section Header -->
       <div class="text-center mb-16">
-        <h1 
+        <h1
           class="text-h3 text-md-h4 font-weight-bold text-black mb-4 fade-in-up"
           style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"
         >
           {{ cmsData.sectionTitle || 'Our Departments' }}
         </h1>
-        <p class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay">
+        <p
+          class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay"
+          style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
+        >
           {{ cmsData.sectionSubtitle || 'Discover our various ministries designed to help you grow in faith and serve our community.' }}
         </p>
       </div>
 
-      <!-- Department Categories Grid -->
-      <v-row justify="center">
-        <v-col cols="12" md="6" lg="4">
-          <v-card
-            class="department-card department-card-1"
-            height="384"
-            @click="navigateToCategory('adult')"
-          >
-            <div
-              class="department-background"
-              :style="{ backgroundImage: adultBgImage || 'url(/img/events.jpg)' }"
-            ></div>
-            <div class="department-overlay"></div>
-            <div class="department-content">
-              <v-icon icon="mdi-account-group" size="48" color="white" class="mb-4"></v-icon>
-              <h3 class="text-h5 font-weight-bold text-white mb-4 text-center">
-                {{ cmsData.adultTitle || 'Adult Ministry' }}
-              </h3>
-              <p class="text-white mb-6 text-body-2 text-center">
-                {{ cmsData.adultDescription || 'Join our adult fellowship for spiritual growth and community building.' }}
-              </p>
-              <v-btn color="rgba(255,255,255,0.2)" variant="outlined" class="text-white" rounded>
-                {{ cmsData.adultLinkText || 'Learn More' }}
-              </v-btn>
+      <!-- Slideshow Container -->
+      <div class="slideshow-container">
+        <!-- Slides -->
+        <div
+          v-for="(slide, index) in departmentSlides"
+          :key="slide.id"
+          class="slide"
+          :class="{ 'active': currentSlide === index }"
+        >
+          <div class="slide-content">
+            <!-- Left Side - Image -->
+            <div class="slide-image">
+              <v-img
+                :src="slide.image"
+                :alt="slide.title"
+                class="department-image"
+                cover
+              />
             </div>
-          </v-card>
-        </v-col>
 
-        <v-col cols="12" md="6" lg="4">
-          <v-card
-            class="department-card department-card-2"
-            height="384"
-            @click="navigateToCategory('ladies')"
-          >
-            <div
-              class="department-background"
-              :style="{ backgroundImage: ladiesBgImage || 'url(/img/beliefs.jpg)' }"
-            ></div>
-            <div class="department-overlay"></div>
-            <div class="department-content">
-              <v-icon icon="mdi-account-heart" size="48" color="white" class="mb-4"></v-icon>
-              <h3 class="text-h5 font-weight-bold text-white mb-4 text-center">
-                {{ cmsData.ladiesTitle || 'Ladies Ministry' }}
-              </h3>
-              <p class="text-white mb-6 text-body-2 text-center">
-                {{ cmsData.ladiesDescription || 'Empowering women through faith, fellowship, and service.' }}
+            <!-- Right Side - Text Content -->
+            <div class="slide-text">
+              <h2
+                class="slide-title"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+              >
+                {{ slide.title }}
+              </h2>
+              <p
+                class="slide-description"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.7;"
+              >
+                {{ slide.description }}
               </p>
-              <v-btn color="rgba(255,255,255,0.2)" variant="outlined" class="text-white" rounded>
-                {{ cmsData.ladiesLinkText || 'Learn More' }}
+              <v-btn
+                color="#14b8a6"
+                variant="flat"
+                class="learn-more-btn"
+                @click="navigateToCategory(slide.category)"
+              >
+                {{ slide.buttonText }}
               </v-btn>
             </div>
-          </v-card>
-        </v-col>
+          </div>
+        </div>
 
-        <v-col cols="12" md="6" lg="4">
-          <v-card
-            class="department-card department-card-3"
-            height="384"
-            @click="navigateToCategory('youth')"
-          >
-            <div
-              class="department-background"
-              :style="{ backgroundImage: youthBgImage || 'url(/img/CHILDREN%20MINISTRY/480913749_2154533405062033_2452182531715777334_n.jpg)' }"
-            ></div>
-            <div class="department-overlay"></div>
-            <div class="department-content">
-              <v-icon icon="mdi-account-star" size="48" color="white" class="mb-4"></v-icon>
-              <h3 class="text-h5 font-weight-bold text-white mb-4 text-center">
-                {{ cmsData.youthTitle || 'Youth Ministry' }}
-              </h3>
-              <p class="text-white mb-6 text-body-2 text-center">
-                {{ cmsData.youthDescription || 'Building the next generation of leaders through Christ-centered activities.' }}
-              </p>
-              <v-btn color="rgba(255,255,255,0.2)" variant="outlined" class="text-white" rounded>
-                {{ cmsData.youthLinkText || 'Learn More' }}
-              </v-btn>
-            </div>
-          </v-card>
-        </v-col>
-      </v-row>
+        <!-- Navigation Dots -->
+        <div class="slide-navigation">
+          <button
+            v-for="(slide, index) in departmentSlides"
+            :key="slide.id"
+            class="nav-dot"
+            :class="{ 'active': currentSlide === index }"
+            @click="goToSlide(index)"
+          ></button>
+        </div>
+
+        <!-- Navigation Arrows -->
+        <button class="nav-arrow nav-arrow-prev" @click="prevSlide">
+          <v-icon>mdi-chevron-left</v-icon>
+        </button>
+        <button class="nav-arrow nav-arrow-next" @click="nextSlide">
+          <v-icon>mdi-chevron-right</v-icon>
+        </button>
+      </div>
     </v-container>
   </section>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCms } from '@/composables/useCms'
 
@@ -123,66 +101,88 @@ const cmsData = ref({
   sectionTitle: 'Our Departments',
   sectionSubtitle: 'Discover our various ministries designed to help you grow in faith and serve our community.',
   adultTitle: 'Adult Ministry',
-  adultDescription: 'Join our adult fellowship for spiritual growth and community building.',
+  adultDescription: 'Helping adults grow in spiritual maturity, strengthen families, and live out faith through community and service.',
   adultLinkText: 'Learn More',
   ladiesTitle: 'Ladies Ministry',
-  ladiesDescription: 'Empowering women through faith, fellowship, and service.',
+  ladiesDescription: 'Encouraging women to live with grace and faith through prayer, service, and fellowship centered on God\'s Word.',
   ladiesLinkText: 'Learn More',
   youthTitle: 'Youth Ministry',
-  youthDescription: 'Building the next generation of leaders through Christ-centered activities.',
+  youthDescription: 'Guiding the next generation to follow Christ with purpose, energy, and joy through youth activities and Bible study.',
   youthLinkText: 'Learn More',
   buttonColor: '#14b8a6',
-  adultBackgroundImage: null,
-  ladiesBackgroundImage: null,
-  youthBackgroundImage: null
+  adultBackgroundImage: '/img/events.jpg',
+  ladiesBackgroundImage: '/img/beliefs.jpg',
+  youthBackgroundImage: '/img/CHILDREN%20MINISTRY/480913749_2154533405062033_2452182531715777334_n.jpg'
 })
 
-// Floating elements
-const floatingElements = ref([
-  { style: { top: '40px', left: '40px', width: '64px', height: '64px', animationDelay: '0s' } },
-  { style: { top: '80px', right: '80px', width: '48px', height: '48px', animationDelay: '1s' } },
-  { style: { bottom: '80px', left: '80px', width: '56px', height: '56px', animationDelay: '2s' } },
-  { style: { bottom: '40px', right: '40px', width: '40px', height: '40px', animationDelay: '0.5s' } },
-  { style: { top: '50%', left: '33%', width: '32px', height: '32px', animationDelay: '1.5s' } },
-  { style: { top: '25%', right: '25%', width: '24px', height: '24px', animationDelay: '0.8s' } },
-  { style: { bottom: '33%', left: '50%', width: '36px', height: '36px', animationDelay: '2.2s' } },
-  { style: { top: '75%', right: '33%', width: '20px', height: '20px', animationDelay: '1.8s' } },
-  { style: { top: '33%', right: '40px', width: '28px', height: '28px', animationDelay: '0.3s' } },
-  { style: { bottom: '25%', left: '16%', width: '44px', height: '44px', animationDelay: '2.8s' } },
-  { style: { top: '50%', right: '25%', width: '16px', height: '16px', animationDelay: '1.1s' } },
-  { style: { bottom: '50%', left: '20%', width: '52px', height: '52px', animationDelay: '0.9s' } }
+// Slideshow state
+const currentSlide = ref(0)
+const autoPlayInterval = ref(null)
+
+// Department slides data
+const departmentSlides = ref([
+  {
+    id: 1,
+    title: 'Adult Ministry',
+    description: 'Helping adults grow in spiritual maturity, strengthen families, and live out faith through community and service.',
+    image: '/img/events.jpg',
+    buttonText: 'Learn More',
+    category: 'adult'
+  },
+  {
+    id: 2,
+    title: 'Ladies Ministry',
+    description: 'Encouraging women to live with grace and faith through prayer, service, and fellowship centered on God\'s Word.',
+    image: '/img/beliefs.jpg',
+    buttonText: 'Learn More',
+    category: 'ladies'
+  },
+  {
+    id: 3,
+    title: 'Youth Ministry',
+    description: 'Guiding the next generation to follow Christ with purpose, energy, and joy through youth activities and Bible study.',
+    image: '/img/CHILDREN%20MINISTRY/480913749_2154533405062033_2452182531715777334_n.jpg',
+    buttonText: 'Learn More',
+    category: 'youth'
+  }
 ])
 
-// Computed background images
-const adultBgImage = computed(() => {
-  if (cmsData.value.adultBackgroundImage) {
-    return `url(${cmsData.value.adultBackgroundImage})`
-  }
-  return null
-})
+// Slideshow methods
+const nextSlide = () => {
+  currentSlide.value = (currentSlide.value + 1) % departmentSlides.value.length
+}
 
-const ladiesBgImage = computed(() => {
-  if (cmsData.value.ladiesBackgroundImage) {
-    return `url(${cmsData.value.ladiesBackgroundImage})`
-  }
-  return null
-})
+const prevSlide = () => {
+  currentSlide.value = currentSlide.value === 0
+    ? departmentSlides.value.length - 1
+    : currentSlide.value - 1
+}
 
-const youthBgImage = computed(() => {
-  if (cmsData.value.youthBackgroundImage) {
-    return `url(${cmsData.value.youthBackgroundImage})`
+const goToSlide = (index) => {
+  currentSlide.value = index
+}
+
+const startAutoPlay = () => {
+  autoPlayInterval.value = setInterval(() => {
+    nextSlide()
+  }, 5000) // Change slide every 5 seconds
+}
+
+const stopAutoPlay = () => {
+  if (autoPlayInterval.value) {
+    clearInterval(autoPlayInterval.value)
+    autoPlayInterval.value = null
   }
-  return null
-})
+}
 
 // Fetch CMS data using useCms composable for proper caching
 const fetchCmsData = async () => {
   try {
     const cmsContent = await loadPageData()
-    
+
     if (cmsContent) {
       console.log('CMS Data loaded for Department Categories:', cmsContent)
-      
+
       // Update cmsData with loaded content
       if (cmsContent.sectionTitle) cmsData.value.sectionTitle = cmsContent.sectionTitle
       if (cmsContent.sectionSubtitle) cmsData.value.sectionSubtitle = cmsContent.sectionSubtitle
@@ -199,7 +199,35 @@ const fetchCmsData = async () => {
       if (cmsContent.adultBackgroundImage) cmsData.value.adultBackgroundImage = cmsContent.adultBackgroundImage
       if (cmsContent.ladiesBackgroundImage) cmsData.value.ladiesBackgroundImage = cmsContent.ladiesBackgroundImage
       if (cmsContent.youthBackgroundImage) cmsData.value.youthBackgroundImage = cmsContent.youthBackgroundImage
-      
+
+      // Update slides data
+      departmentSlides.value = [
+        {
+          id: 1,
+          title: cmsData.value.adultTitle || 'Adult Ministry',
+          description: cmsData.value.adultDescription || 'Helping adults grow in spiritual maturity, strengthen families, and live out faith through community and service.',
+          image: cmsData.value.adultBackgroundImage || '/img/events.jpg',
+          buttonText: cmsData.value.adultLinkText || 'Learn More',
+          category: 'adult'
+        },
+        {
+          id: 2,
+          title: cmsData.value.ladiesTitle || 'Ladies Ministry',
+          description: cmsData.value.ladiesDescription || 'Encouraging women to live with grace and faith through prayer, service, and fellowship centered on God\'s Word.',
+          image: cmsData.value.ladiesBackgroundImage || '/img/beliefs.jpg',
+          buttonText: cmsData.value.ladiesLinkText || 'Learn More',
+          category: 'ladies'
+        },
+        {
+          id: 3,
+          title: cmsData.value.youthTitle || 'Youth Ministry',
+          description: cmsData.value.youthDescription || 'Guiding the next generation to follow Christ with purpose, energy, and joy through youth activities and Bible study.',
+          image: cmsData.value.youthBackgroundImage || '/img/CHILDREN%20MINISTRY/480913749_2154533405062033_2452182531715777334_n.jpg',
+          buttonText: cmsData.value.youthLinkText || 'Learn More',
+          category: 'youth'
+        }
+      ]
+
       console.log('✅ Department Categories CMS data loaded successfully')
     } else {
       console.log('⚠️ No CMS data found for Department Categories, using defaults')
@@ -219,107 +247,340 @@ const navigateToCategory = (category) => {
 
 onMounted(async () => {
   await fetchCmsData()
+  startAutoPlay()
+})
+
+onUnmounted(() => {
+  stopAutoPlay()
 })
 </script>
 
 <style scoped>
-.department-categories-section {
+.department-slideshow-section {
+  background-color: #ffffff;
   position: relative;
-  padding: 80px 0;
-  background: white;
   overflow: hidden;
 }
 
-.floating-elements {
+/* Accent shapes */
+.department-slideshow-section::before {
+  content: '';
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.floating-element {
-  position: absolute;
-  background: rgba(63, 211, 194, 0.62);
+  top: 10%;
+  right: 5%;
+  width: 120px;
+  height: 120px;
+  background: rgba(20, 184, 166, 0.1);
   border-radius: 50%;
-  animation: float 3.5s ease-in-out infinite;
+  z-index: 0;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(180deg); }
+.department-slideshow-section::after {
+  content: '';
+  position: absolute;
+  bottom: 15%;
+  left: 8%;
+  width: 80px;
+  height: 80px;
+  background: rgba(56, 189, 248, 0.08);
+  border-radius: 50%;
+  z-index: 0;
 }
 
-.department-card {
+.slideshow-container {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 500px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+
+.slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+  display: flex;
+  align-items: center;
+}
+
+.slide.active {
+  opacity: 1;
+}
+
+.slide-content {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+}
+
+.slide-image {
+  flex: 1;
+  height: 100%;
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
-  cursor: pointer;
+}
+
+.department-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px 0 0 16px;
+  object-fit: cover;
+  filter: brightness(1.1) contrast(1.05) saturate(1.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
-  animation: fadeInUp 0.6s ease-out both;
 }
 
-.department-card-1 { animation-delay: 200ms; }
-.department-card-2 { animation-delay: 300ms; }
-.department-card-3 { animation-delay: 400ms; }
-
-.department-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+.slide.active .department-image {
+  filter: brightness(1.15) contrast(1.1) saturate(1.2);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
 }
 
-.department-card:hover .department-background {
-  transform: scale(1.1);
-}
-
-.department-card:hover .department-overlay {
-  background: linear-gradient(to top, rgba(55, 65, 81, 0.85), rgba(75, 85, 99, 0.3), transparent);
-}
-
-.department-background {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  z-index: 1;
-  transition: transform 0.5s ease;
-}
-
-.department-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(55, 65, 81, 0.7), rgba(75, 85, 99, 0.2), transparent);
-  z-index: 2;
-  transition: background 0.3s ease;
-}
-
-.department-content {
-  position: relative;
-  z-index: 3;
+.slide-text {
+  flex: 1;
+  padding: 60px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 32px;
+  border-radius: 0 16px 16px 0;
+}
+
+.slide-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+.slide-description {
+  font-size: 1.125rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  max-width: 500px;
+}
+
+.learn-more-btn {
+  align-self: flex-start;
+  padding: 12px 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  text-transform: none;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+  transition: all 0.3s ease;
+}
+
+.learn-more-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+}
+
+/* Navigation Dots */
+.slide-navigation {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.nav-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  border: 2px solid rgba(20, 184, 166, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.nav-dot.active {
+  background-color: #14b8a6;
+  border-color: #14b8a6;
+  transform: scale(1.2);
+}
+
+.nav-dot:hover {
+  background-color: rgba(20, 184, 166, 0.8);
+  border-color: #14b8a6;
+}
+
+/* Navigation Arrows */
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.nav-arrow:hover {
+  background-color: #14b8a6;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.3);
+}
+
+.nav-arrow-prev {
+  left: 20px;
+}
+
+.nav-arrow-next {
+  right: 20px;
+}
+
+.nav-arrow .v-icon {
+  color: #64748b;
+  font-size: 24px;
+}
+
+.nav-arrow:hover .v-icon {
   color: white;
 }
 
-.fade-in-up { animation: fadeInUp 0.8s ease-out; }
-.fade-in-up-delay { animation: fadeInUp 0.8s ease-out 0.2s both; }
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .slide-text {
+    padding: 40px;
+  }
+
+  .slide-title {
+    font-size: 2rem;
+  }
+
+  .slide-description {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .slideshow-container {
+    height: 600px;
+    margin: 0 20px;
+  }
+
+  .slide-content {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .slide-image {
+    flex: none;
+    height: 300px;
+  }
+
+  .department-image {
+    border-radius: 16px 16px 0 0;
+  }
+
+  .slide-text {
+    flex: none;
+    padding: 30px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .slide-title {
+    font-size: 1.75rem;
+    text-align: center;
+  }
+
+  .slide-description {
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .learn-more-btn {
+    align-self: center;
+  }
+
+  .nav-arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-arrow .v-icon {
+    font-size: 20px;
+  }
+
+  .nav-arrow-prev {
+    left: 10px;
+  }
+
+  .nav-arrow-next {
+    right: 10px;
+  }
+
+  .slide-navigation {
+    bottom: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .slideshow-container {
+    height: 550px;
+    margin: 0 10px;
+  }
+
+  .slide-image {
+    height: 250px;
+  }
+
+  .slide-text {
+    padding: 20px;
+  }
+
+  .slide-title {
+    font-size: 1.5rem;
+  }
+
+  .slide-description {
+    font-size: 0.9rem;
+  }
+}
+
+/* Animation for section header */
+.fade-in-up {
+  animation: fadeInUp 1s ease-out;
+}
+
+.fade-in-up-delay {
+  animation: fadeInUp 1s ease-out 0.3s both;
+}
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@media (max-width: 960px) {
-  .department-categories-section { padding: 48px 0; }
-  .department-card { height: 320px !important; }
-  .department-content { padding: 24px; }
-  .floating-element { display: none; }
-}
-
-@media (max-width: 640px) {
-  .department-categories-section { padding: 32px 0; }
-  .department-card { height: 280px !important; }
-  .department-content { padding: 16px; }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
+

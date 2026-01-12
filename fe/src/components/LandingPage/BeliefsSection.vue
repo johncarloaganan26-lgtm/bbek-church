@@ -1,49 +1,88 @@
 <template>
   <section class="beliefs-section pt-20 pb-10" :style="{ backgroundColor: beliefData.beliefsBgColor || '#ffffff' }">
     <v-container>
-      <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16 fade-in-up">
+      <h2
+        class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16 fade-in-up"
+        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+      >
         {{ beliefData.doctrinalTitle || 'Doctrinal Statement' }}
       </h2>
       <v-card class="pa-12 mb-16" elevation="2">
-        <p class="text-h6 text-grey-darken-1 text-center mb-8">
+        <p
+          class="text-h6 text-grey-darken-1 text-center mb-8"
+          style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+        >
           {{ beliefData.doctrinalText || 'We believe that doctrine matters — not because it divides, but because it anchors our faith in truth. While misunderstandings can create division, essential biblical teachings are non-negotiable for us. At the same time, we honor freedom in areas where Scripture allows for diversity. Above all, we strive to grow in love.' }}
         </p>
         <v-row>
           <v-col cols="12" md="4">
             <div class="text-center pa-4">
-              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.essentialsTitle || 'In essentials, unity.' }}</h3>
-              <p class="text-body-2 text-grey-darken-1">
+              <h3
+                class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+              >
+                {{ beliefData.essentialsTitle || 'In essentials, unity.' }}
+              </h3>
+              <p
+                class="text-body-2 text-grey-darken-1"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+              >
                 {{ beliefData.essentialsText || 'We hold tightly to core Christian truths.' }}
               </p>
             </div>
           </v-col>
           <v-col cols="12" md="4">
             <div class="text-center pa-4">
-              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.libertyTitle || 'In non-essentials, liberty.' }}</h3>
-              <p class="text-body-2 text-grey-darken-1">
+              <h3
+                class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+              >
+                {{ beliefData.libertyTitle || 'In non-essentials, liberty.' }}
+              </h3>
+              <p
+                class="text-body-2 text-grey-darken-1"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+              >
                 {{ beliefData.libertyText || 'We give grace for secondary theological convictions.' }}
               </p>
             </div>
           </v-col>
           <v-col cols="12" md="4">
             <div class="text-center pa-4">
-              <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ beliefData.loveTitle || 'In all things, love.' }}</h3>
-              <p class="text-body-2 text-grey-darken-1">
+              <h3
+                class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+              >
+                {{ beliefData.loveTitle || 'In all things, love.' }}
+              </h3>
+              <p
+                class="text-body-2 text-grey-darken-1"
+                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+              >
                 {{ beliefData.loveText || 'Everything we believe and do is rooted in the love of Christ.' }}
               </p>
             </div>
           </v-col>
         </v-row>
       </v-card>
-      <div class="text-center">
+      <div class="text-center hero-buttons">
         <v-btn
-          color="#14b8a6"
-          class="text-white"
+          :variant="'flat'"
+          :style="{
+            '--button-color': beliefData.backButtonColor || '#14b8a6',
+            color: 'white',
+            backgroundColor: beliefData.backButtonColor || '#14b8a6',
+            borderColor: beliefData.backButtonColor || '#14b8a6'
+          }"
+          :class="[
+            'mr-4 mb-2 hero-btn hero-btn-custom-radius',
+            'hero-btn-dynamic-filled'
+          ]"
           size="large"
           rounded
           @click="$router.push('/about/beliefs')"
         >
-          Our Beliefs
+          {{ beliefData.backButtonText || 'Our beliefs' }}
         </v-btn>
       </div>
     </v-container>
@@ -51,8 +90,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from '@/api/axios'
+import { useCmsStore } from '@/stores/cmsStore'
 
 const beliefData = ref({
   doctrinalTitle: 'Doctrinal Statement',
@@ -105,8 +145,27 @@ const fetchBeliefData = async () => {
   }
 }
 
+const cmsStore = useCmsStore()
+
+// Event listener for CMS updates
+const handleCmsUpdate = async (event) => {
+  if (event.detail?.page === 'belief') {
+    console.log('BeliefsSection: CMS update detected for belief page')
+    setTimeout(async () => {
+      await fetchBeliefData()
+    }, 1500) // Wait for database commit
+  }
+}
+
 onMounted(async () => {
   await fetchBeliefData()
+
+  // Listen for CMS updates
+  window.addEventListener('cms-page-updated', handleCmsUpdate)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('cms-page-updated', handleCmsUpdate)
 })
 </script>
 
@@ -114,6 +173,18 @@ onMounted(async () => {
 .beliefs-section {
   margin-top: 80px; /* Push down from hero section */
   margin-bottom: 40px;
+}
+
+.hero-buttons :deep(.hero-btn-dynamic-filled) {
+  text-transform: none !important;
+  border-radius: 5px !important;
+}
+
+.hero-buttons :deep(.hero-btn-dynamic-filled:hover) {
+  border-color: white !important;
+  color: white !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .belief-card,

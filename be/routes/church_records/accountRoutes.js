@@ -462,6 +462,39 @@ router.post('/forgotPassword', async (req, res) => {
 });
 
 /**
+ * LOGOUT - Log user out and record audit trail
+ * POST /api/church-records/accounts/logout
+ * Body: { logout_reason? }
+ */
+router.post('/logout', async (req, res) => {
+  try {
+    // Get user info from token
+    const userEmail = req.user?.email || null;
+    const userId = req.user?.acc_id || null;
+    const logoutReason = req.body?.logout_reason || 'User initiated logout';
+
+    // Log the logout action (this will be captured by audit middleware)
+    console.log(`User logout: ${userEmail || 'Unknown user'} - ${logoutReason}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+      data: {
+        email: userEmail,
+        acc_id: userId,
+        logout_reason: logoutReason
+      }
+    });
+  } catch (error) {
+    console.error('Error during logout:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to logout'
+    });
+  }
+});
+
+/**
  * SAMPLE ROUTE - Get current user profile (requires authentication)
  * GET /api/church-records/accounts/me
  * This route demonstrates accessing req.user from the JWT token

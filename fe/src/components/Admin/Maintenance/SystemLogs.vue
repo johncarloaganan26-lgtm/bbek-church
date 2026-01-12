@@ -49,6 +49,8 @@
           <el-option label="DELETE" value="DELETE" />
           <el-option label="LOGIN" value="LOGIN" />
           <el-option label="LOGOUT" value="LOGOUT" />
+          <el-option label="RESTORE" value="RESTORE" />
+          <el-option label="PRINT" value="PRINT" />
           <el-option label="EXPORT" value="EXPORT" />
           <el-option label="VIEW_LIST" value="VIEW_LIST" />
         </el-select>
@@ -423,6 +425,8 @@ const getActionTypeColor = (action) => {
     DELETE: 'danger',
     LOGIN: 'info',
     LOGOUT: 'info',
+    RESTORE: 'success',
+    PRINT: 'primary',
     EXPORT: 'primary',
     VIEW_LIST: ''
   }

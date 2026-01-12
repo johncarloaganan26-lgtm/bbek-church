@@ -46,15 +46,25 @@ export const useCmsStore = defineStore('cms', {
         return this.pageCache[pageName]
       }
 
-      // If there's already a pending request, wait for it instead of making a new one
+      // If there's already a pending request and we're not forcing refresh, wait for it
       if (this.pendingRequests[pageName] && !forceRefresh) {
         return this.pendingRequests[pageName]
+      }
+
+      // If forcing refresh, clear cache and any existing pending request to ensure we get fresh data
+      if (forceRefresh) {
+        console.log(`Force refresh requested for ${pageName}, clearing cache and pending requests`)
+        delete this.pageCache[pageName]
+        delete this.pendingRequests[pageName]
+        delete this.cacheTimestamps[pageName]
       }
 
       // Create the request promise and store it
       const requestPromise = (async () => {
         try {
-          const response = await axios.get(`/cms/${pageName}/full`)
+          // Add timestamp to bypass browser cache
+          const timestamp = forceRefresh ? `?t=${Date.now()}` : ''
+          const response = await axios.get(`/cms/${pageName}/full${timestamp}`)
           
           if (response.data.success && response.data.data) {
             const { page, images } = response.data.data

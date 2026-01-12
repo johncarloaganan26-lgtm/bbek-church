@@ -32,28 +32,28 @@
       <v-container>
         <v-row align="center">
           <v-col cols="12" lg="6">
-            <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6">
+            <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ ourStoryData.aboutTitle || 'About Our Church' }}
             </h2>
-            <p class="text-h6 text-grey-darken-1 mb-6">
+            <p class="text-h6 text-grey-darken-1 mb-6" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ ourStoryData.aboutSubtitle || 'We look forward to welcoming you into our family of faith. Our vision is to be a Christ-centered community that:' }}
             </p>
             <div class="space-y-4">
               <v-card class="pa-4" variant="flat" color="grey-lighten-5">
-                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ ourStoryData.liveByFaithTitle || 'Live By Faith' }}</h3>
-                <p class="text-body-2 text-grey-darken-1">
+                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ ourStoryData.liveByFaithTitle || 'Live By Faith' }}</h3>
+                <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ ourStoryData.liveByFaithText || 'Boldly proclaim and practice the Gospel in daily life\nTrust God\'s promises with unwavering confidence' }}
                 </p>
               </v-card>
               <v-card class="pa-4" variant="flat" color="grey-lighten-5">
-                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ ourStoryData.knownByLoveTitle || 'Known By Love' }}</h3>
-                <p class="text-body-2 text-grey-darken-1">
+                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ ourStoryData.knownByLoveTitle || 'Known By Love' }}</h3>
+                <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ ourStoryData.knownByLoveText || 'Extend grace without judgment — love first, listen deeply\nServe others sacrificially, going beyond what is expected' }}
                 </p>
               </v-card>
               <v-card class="pa-4" variant="flat" color="grey-lighten-5">
-                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2">{{ ourStoryData.voiceOfHopeTitle || 'A Voice of Hope' }}</h3>
-                <p class="text-body-2 text-grey-darken-1">
+                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-2" style="font-family: 'Georgia', serif; font-style: italic;">{{ ourStoryData.voiceOfHopeTitle || 'A Voice of Hope' }}</h3>
+                <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ ourStoryData.voiceOfHopeText || 'Declare Jesus as our "Blessed Redeemer" (Galatians 3:13)\nKeep our eyes fixed on eternity, living with Kingdom perspective' }}
                 </p>
               </v-card>
@@ -79,22 +79,22 @@
           <v-col cols="12" md="6">
             <div class="text-center mb-8">
               <v-icon size="32" color="teal" class="mb-4">mdi-eye</v-icon>
-              <h2 class="text-h4 font-weight-bold text-teal mb-4">Our Vision</h2>
+              <h2 class="text-h4 font-weight-bold text-teal mb-4" style="font-family: 'Georgia', serif; font-style: italic;">Our Vision</h2>
             </div>
             <v-card class="pa-8" variant="flat" color="grey-lighten-5">
-              <p class="text-h6 text-grey-darken-1 italic mb-4">
+              <p class="text-h6 text-grey-darken-1 italic mb-4" style="font-family: 'Georgia', serif;">
                 "{{ ourStoryData.vision || vision }}"
               </p>
-              <p class="text-body-2 text-grey-darken-1">{{ ourStoryData.visionVerse || 'Matthew 28:19-20' }}</p>
+              <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">{{ ourStoryData.visionVerse || 'Matthew 28:19-20' }}</p>
             </v-card>
           </v-col>
           <v-col cols="12" md="6">
             <div class="text-center mb-8">
               <v-icon size="32" color="teal" class="mb-4">mdi-check-circle</v-icon>
-              <h2 class="text-h4 font-weight-bold text-teal mb-4">Our Mission</h2>
+              <h2 class="text-h4 font-weight-bold text-teal mb-4" style="font-family: 'Georgia', serif; font-style: italic;">Our Mission</h2>
             </div>
             <v-card class="pa-8" variant="flat" color="grey-lighten-5">
-              <p class="text-h6 text-grey-darken-1 italic">
+              <p class="text-h6 text-grey-darken-1 italic" style="font-family: 'Georgia', serif;">
                 "{{ ourStoryData.mission || mission }}"
               </p>
             </v-card>
@@ -107,10 +107,10 @@
     <section class="py-20 bg-white">
       <v-container>
         <div class="text-center mb-16">
-          <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-grey-darken-3 mb-6 fade-in-up">
+          <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-grey-darken-3 mb-6 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ ourStoryData.historyTitle || 'Our History' }}
           </h2>
-          <p class="text-h6 text-grey-darken-1 max-width-4xl mx-auto fade-in-up-delay">
+          <p class="text-h6 text-grey-darken-1 max-width-4xl mx-auto fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ ourStoryData.historySubtitle || 'Celebrating our journey of faith, missions, and community from humble beginnings to a global vision.' }}
           </p>
         </div>
@@ -126,12 +126,12 @@
           >
             <div class="timeline-marker" :class="{ 'marker-active': visibleItems[index], 'marker-past': scrollProgress > (index + 1) * 20 }"></div>
             <div class="timeline-content" :class="{ 'content-visible': visibleItems[index] }">
-              <div class="timeline-year">{{ milestone.year }}</div>
+              <div class="timeline-year" style="font-family: 'Georgia', serif; font-style: italic;">{{ milestone.year }}</div>
               <v-card class="pa-6" elevation="2">
-                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-3">
+                <h3 class="text-h6 font-weight-bold text-grey-darken-3 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ milestone.title }}
                 </h3>
-                <p class="text-body-2 text-grey-darken-1 mb-4">
+                <p class="text-body-2 text-grey-darken-1 mb-4" style="font-family: 'Georgia', serif; font-style: italic;">
                   {{ milestone.description }}
                 </p>
                 <v-img
@@ -446,7 +446,7 @@ onUnmounted(() => {
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -487,14 +487,12 @@ onUnmounted(() => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .timeline-container {

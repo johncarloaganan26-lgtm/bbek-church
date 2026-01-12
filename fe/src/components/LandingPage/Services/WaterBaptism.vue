@@ -23,10 +23,10 @@
         </div>
 
         <div class="hero-content">
-          <h1 class="hero-title fade-in-up">
+          <h1 class="hero-title fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ waterBaptismData.heroTitle }}
           </h1>
-          <p class="hero-subtitle fade-in-up-delay">
+          <p class="hero-subtitle fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ waterBaptismData.heroDescription }}
           </p>
         </div>
@@ -54,49 +54,49 @@
           <div class="content-grid">
             <!-- Left Column: What is Water Baptism -->
             <div class="left-column">
-              <h2 class="section-title fade-in" style="animation-delay: 200ms;">
+              <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
                 {{ waterBaptismData.sectionTitle }}
               </h2>
               
               <div class="info-cards">
-                <v-card class="info-card fade-in-up" style="animation-delay: 300ms;">
-                  <v-card-title class="card-title">
+                <v-card class="info-card fade-in-up" style="animation-delay: 300ms;" variant="flat" color="teal-lighten-5">
+                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
                     {{ waterBaptismData.biblicalFoundationTitle }}
                   </v-card-title>
                   <v-card-text>
-                    <p>
+                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
                       {{ waterBaptismData.biblicalFoundationText }}
                     </p>
                   </v-card-text>
                 </v-card>
 
-                <v-card class="info-card fade-in-up" style="animation-delay: 400ms;">
-                  <v-card-title class="card-title">
+                <v-card class="info-card fade-in-up" style="animation-delay: 400ms;" variant="flat" color="teal-lighten-5">
+                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
                     {{ waterBaptismData.significanceTitle }}
                   </v-card-title>
                   <v-card-text>
-                    <p>
+                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
                       {{ waterBaptismData.significanceText }}
                     </p>
                   </v-card-text>
                 </v-card>
               </div>
 
-              <v-card class="who-baptized-card fade-in" style="animation-delay: 500ms;">
-                <v-card-title class="who-title">{{ waterBaptismData.whoShouldBeBaptizedTitle }}</v-card-title>
+              <v-card class="who-baptized-card fade-in" style="animation-delay: 500ms;" variant="flat" color="teal-lighten-5">
+                <v-card-title class="who-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">{{ waterBaptismData.whoShouldBeBaptizedTitle }}</v-card-title>
                 <v-card-text>
                   <ul class="baptized-list">
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ waterBaptismData.whoPoint1 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ waterBaptismData.whoPoint1 }}</span>
                     </li>
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ waterBaptismData.whoPoint2 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ waterBaptismData.whoPoint2 }}</span>
                     </li>
                     <li class="baptized-item">
-                      <v-icon color="green" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span>{{ waterBaptismData.whoPoint3 }}</span>
+                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
+                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ waterBaptismData.whoPoint3 }}</span>
                     </li>
                   </ul>
                 </v-card-text>
@@ -109,7 +109,7 @@
                 <template v-if="loadingCertificate">
                   <div class="loading-container">
                     <v-progress-circular indeterminate color="teal" size="48"></v-progress-circular>
-                    <span class="loading-text">Loading your certificate...</span>
+                    <span class="loading-text" style="font-family: 'Georgia', serif; font-style: italic;">Loading your certificate...</span>
                   </div>
                 </template>
                 <template v-else-if="memberBaptismData">
@@ -119,11 +119,11 @@
                         <v-icon icon="mdi-hand-heart" size="60" color="white"></v-icon>
                       </div>
                       <h2 class="welcome-title">Thank You and Welcome to BBek!</h2>
-                      <p class="welcome-message">
+                      <p class="welcome-message" style="font-family: 'Georgia', serif; font-style: italic;">
                         {{ memberBaptismData.firstname }}, we are grateful that you have taken the step
                         of water baptism. You are now part of our church family.
                       </p>
-                      <p class="welcome-submessage">
+                      <p class="welcome-submessage" style="font-family: 'Georgia', serif; font-style: italic;">
                         May God bless you as you continue your journey with Him.
                       </p>
                       <v-btn color="teal" @click="$router.push('/services')" class="welcome-btn">
@@ -134,32 +134,32 @@
                   </v-card>
                 </template>
                 <template v-else>
-                  <h2 class="section-title fade-in" style="animation-delay: 700ms;">
+                  <h2 class="section-title fade-in" style="animation-delay: 700ms; font-family: 'Georgia', serif; font-style: italic;">
                     Welcome Back, Beloved Member!
                   </h2>
                   <v-card class="member-card">
-                    <v-card-title class="member-title">
+                    <v-card-title class="member-title" style="font-family: 'Georgia', serif; font-style: italic;">
                       You Are Already a Member of Our Church Family
                     </v-card-title>
                     <v-card-text>
-                      <p class="member-text">
+                      <p class="member-text" style="font-family: 'Georgia', serif; font-style: italic;">
                         Thank you for being part of our community! As a baptized member,
                         we invite you to continue your spiritual journey with us.
                       </p>
                       <div class="services-info">
-                        <h3 class="services-title">Join Our Sunday Services</h3>
-                        <p class="services-text">
+                        <h3 class="services-title" style="font-family: 'Georgia', serif; font-style: italic;">Join Our Sunday Services</h3>
+                        <p class="services-text" style="font-family: 'Georgia', serif; font-style: italic;">
                           We warmly invite you to join us for our Sunday worship services where we gather
                           to praise, pray, and grow in faith together.
                         </p>
                         <div class="services-list">
                           <div class="service-item">
                             <v-icon color="teal" size="16">mdi-check</v-icon>
-                            <span>Sunday Morning Service: 9:00 AM</span>
+                            <span style="font-family: 'Georgia', serif; font-style: italic;">Sunday Morning Service: 9:00 AM</span>
                           </div>
                           <div class="service-item">
                             <v-icon color="teal" size="16">mdi-check</v-icon>
-                            <span>Sunday Evening Service: 5:00 PM</span>
+                            <span style="font-family: 'Georgia', serif; font-style: italic;">Sunday Evening Service: 5:00 PM</span>
                           </div>
                         </div>
                         <v-btn color="teal" @click="$router.push('/services')" class="services-btn">
@@ -171,14 +171,14 @@
                 </template>
               </template>
               <template v-else>
-                <h2 class="section-title fade-in" style="animation-delay: 700ms;">
+                <h2 class="section-title fade-in" style="animation-delay: 700ms; font-family: 'Georgia', serif; font-style: italic;">
                   Register for Baptism and Become Part of Our Family
                 </h2>
                 <el-card class="registration-card fade-in-up" style="animation-delay: 800ms;" shadow="hover">
                   <template #header>
                     <div class="registration-header">
-                      <h3 class="registration-title">Baptism Registration Form</h3>
-                      <p class="registration-subtitle">
+                      <h3 class="registration-title" style="font-family: 'Georgia', serif; font-style: italic;">Baptism Registration Form</h3>
+                      <p class="registration-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">
                         Please fill out this form to register for an upcoming baptism service.
                       </p>
                     </div>
@@ -383,8 +383,8 @@
 
                       <!-- Children Section -->
                       <div class="children-section">
-                        <h4 class="children-title">Children Information</h4>
-                        <p class="children-subtitle">Add information about your children (optional)</p>
+                        <h4 class="children-title" style="font-family: 'Georgia', serif; font-style: italic;">Children Information</h4>
+                        <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">Add information about your children (optional)</p>
 
                         <div v-for="(child, index) in formData.children" :key="index" class="child-item">
                           <div class="child-header">
@@ -1061,12 +1061,13 @@ const resetForm = () => {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(204, 251, 241, 0.4), rgba(153, 246, 228, 0.4));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -1307,6 +1308,14 @@ const resetForm = () => {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-left-width: 6px;
 }
 
 .card-title {
@@ -1317,9 +1326,15 @@ const resetForm = () => {
 }
 
 .who-baptized-card {
-  background: #f9fafb;
   padding: 24px;
   border-radius: 8px;
+  border-left: 4px solid #14b8a6;
+  transition: all 0.3s ease;
+}
+
+.who-baptized-card:hover {
+  transform: translateX(8px);
+  border-left-width: 6px;
 }
 
 .who-title {

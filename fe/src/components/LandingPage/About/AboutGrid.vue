@@ -38,10 +38,10 @@
     <section class="grid-section py-20">
       <v-container>
         <div class="text-center mb-16">
-          <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-grey-darken-3 mb-6 fade-in-up">
+          <h2 class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-grey-darken-3 mb-6 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ aboutData.gridTitle }}
           </h2>
-          <p class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay">
+          <p class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ aboutData.gridSubtitle }}
           </p>
         </div>
@@ -80,14 +80,14 @@
                   </v-img>
                   <div class="section-overlay"></div>
                   <div class="section-content">
-                    <h3 class="text-h4 text-md-h5 font-weight-bold text-white mb-3">
+                    <h3 class="text-h4 text-md-h5 font-weight-bold text-white mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                       {{ section.title }}
                     </h3>
-                    <p class="text-body-1 text-white opacity-90 mb-4">
+                    <p class="text-body-1 text-white opacity-90 mb-4" style="font-family: 'Georgia', serif; font-style: italic;">
                       {{ section.description }}
                     </p>
                     <div class="d-flex align-center text-white">
-                      <span class="text-body-2 font-weight-semibold mr-2">Explore</span>
+                      <span class="text-body-2 font-weight-semibold mr-2" style="font-family: 'Georgia', serif; font-style: italic;">Explore</span>
                       <v-icon color="white">mdi-arrow-right</v-icon>
                     </div>
                   </div>
@@ -322,7 +322,7 @@ const floatingElements = ref([
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {

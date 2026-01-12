@@ -35,14 +35,14 @@
     <section class="giving-section py-20">
       <v-container>
         <div class="text-center mb-16">
-          <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-4 fade-in-up">
+          <h2 class="text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-4 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
             {{ giveData.sectionTitle }}
           </h2>
         </div>
 
         <div class="giving-content">
           <v-card class="pa-8 mb-8" elevation="2">
-            <p class="text-h6 text-grey-darken-1 text-center mb-8">
+            <p class="text-h6 text-grey-darken-1 text-center mb-8" style="font-family: 'Georgia', serif; font-style: italic;">
               Biblical giving is an act of worship and obedience to God. The Bible teaches us that everything we have comes from God, and we are called to be faithful stewards of His blessings.
             </p>
             <div class="space-y-6">
@@ -53,8 +53,8 @@
                 hover
               >
                 <v-card-text>
-                  <h3 class="text-h6 font-weight-bold mb-3">{{ giveData.biblicalFoundationTitle }}</h3>
-                  <p class="text-body-2 text-grey-darken-1">
+                  <h3 class="text-h6 font-weight-bold mb-3" style="font-family: 'Georgia', serif; font-style: italic;">{{ giveData.biblicalFoundationTitle }}</h3>
+                  <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                     {{ giveData.biblicalFoundationText }}
                   </p>
                 </v-card-text>
@@ -66,8 +66,8 @@
                 hover
               >
                 <v-card-text>
-                  <h3 class="text-h6 font-weight-bold mb-3">{{ giveData.purposeTitle }}</h3>
-                  <p class="text-body-2 text-grey-darken-1">
+                  <h3 class="text-h6 font-weight-bold mb-3" style="font-family: 'Georgia', serif; font-style: italic;">{{ giveData.purposeTitle }}</h3>
+                  <p class="text-body-2 text-grey-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
                     {{ giveData.purposeText }}
                   </p>
                 </v-card-text>
@@ -76,17 +76,17 @@
           </v-card>
 
           <v-card class="pa-6" elevation="2">
-            <p class="text-h6 text-grey-darken-1 text-center mb-8">
+            <p class="text-h6 text-grey-darken-1 text-center mb-8" style="font-family: 'Georgia', serif; font-style: italic;">
               {{ giveData.chooseMethodText }}
             </p>
 
-            <v-row>
-              <v-col cols="12" md="6">
-                <h4 class="text-h6 font-weight-bold mb-4">Give Online</h4>
+            <v-row class="give-methods-row">
+              <v-col cols="12" md="6" class="give-online-col">
+                <h4 class="text-h6 font-weight-bold mb-2" style="font-family: 'Georgia', serif; font-style: italic;">Give Online</h4>
                 <GiveOnlineForm />
               </v-col>
-              <v-col cols="12" md="6">
-                <h4 class="text-h6 font-weight-bold mb-4">Other Ways to Give</h4>
+              <v-col cols="12" md="6" class="give-in-person-col">
+                <h4 class="text-h6 font-weight-bold mb-2" style="font-family: 'Georgia', serif; font-style: italic;">Other Ways to Give</h4>
                 <GiveInPersonCard :giveInPersonData="giveInPersonData" />
               </v-col>
             </v-row>
@@ -103,6 +103,7 @@
         size="large"
         rounded
         @click="$router.push('/')"
+        style="font-family: 'Georgia', serif; font-style: italic;"
       >
         {{ giveData.backButtonText }}
       </v-btn>
@@ -256,7 +257,7 @@ onMounted(async () => {
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
 }
 
 .floating-elements {
@@ -296,14 +297,12 @@ onMounted(async () => {
   margin-bottom: 1.5rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .giving-section {
@@ -354,4 +353,5 @@ onMounted(async () => {
   }
 }
 </style>
+
 

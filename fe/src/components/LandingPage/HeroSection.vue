@@ -1,4 +1,4 @@
-<template>
+u<template>
   <section class="hero-section" style="position: relative;">
     <!-- Loading overlay -->
     <v-overlay :model-value="isLoadingHome" contained class="align-center justify-center" style="z-index: 10;">
@@ -123,23 +123,42 @@
           <p class="hero-text">{{ homeData.wednesdayService || 'Wednesday Service: 7:00 PM - 9:00 PM' }}</p>
         </div>
         <div class="hero-buttons fade-in-up-delay-2">
+          <!-- Button 1 -->
           <v-btn
-            :color="homeData.planVisitButtonColor || '#14b8a6'"
-            class="text-white mr-4 mb-2 hero-btn"
+            :variant="homeData.button1Variant === 'outlined' ? 'outlined' : 'flat'"
+            :style="{
+              '--button-color': homeData.buttonColor || '#14b8a6',
+              color: homeData.button1Variant === 'outlined' ? (homeData.buttonColor || '#14b8a6') : 'white',
+              backgroundColor: homeData.button1Variant === 'outlined' ? 'transparent' : (homeData.buttonColor || '#14b8a6'),
+              borderColor: homeData.buttonColor || '#14b8a6'
+            }"
+            :class="[
+              'mr-4 mb-2 hero-btn hero-btn-custom-radius',
+              homeData.button1Variant === 'outlined' ? 'hero-btn-dynamic-outlined' : 'hero-btn-dynamic-filled'
+            ]"
             size="large"
-            rounded
-            @click="$router.push('/plan-your-visit')"
+            @click="$router.push(homeData.button1Link || '/plan-your-visit')"
           >
-            {{ homeData.planVisitButtonText || 'Plan Your Visit' }}
+            {{ homeData.button1Text || 'Plan Your Visit' }}
           </v-btn>
+
+          <!-- Button 2 -->
           <v-btn
-            :color="homeData.beOneOfUsButtonColor || 'black'"
-            class="text-white mb-2 hero-btn hero-btn-black"
+            :variant="homeData.button2Variant === 'outlined' ? 'outlined' : 'flat'"
+            :style="{
+              '--button-color': homeData.buttonColor || '#14b8a6',
+              color: homeData.button2Variant === 'outlined' ? (homeData.buttonColor || '#14b8a6') : 'white',
+              backgroundColor: homeData.button2Variant === 'outlined' ? 'transparent' : (homeData.buttonColor || '#14b8a6'),
+              borderColor: homeData.buttonColor || '#14b8a6'
+            }"
+            :class="[
+              'mb-2 hero-btn hero-btn-custom-radius',
+              homeData.button2Variant === 'outlined' ? 'hero-btn-dynamic-outlined' : 'hero-btn-dynamic-filled'
+            ]"
             size="large"
-            rounded
-            @click="$router.push('/services/water-baptism')"
+            @click="$router.push(homeData.button2Link || '/services/water-baptism')"
           >
-            {{ homeData.beOneOfUsButtonText || 'Be One Of Us' }}
+            {{ homeData.button2Text || 'Be One Of Us' }}
           </v-btn>
         </div>
       </div>
@@ -176,10 +195,18 @@ const homeData = ref({
   welcomeText: 'Welcome to Bible Baptist Church of Kwali',
   sundayService: 'Sunday Worship 9:30 AM - 12:00 PM',
   wednesdayService: 'Wednesday Service 7:00 PM - 9:00 PM',
-  planVisitButtonText: 'Plan Your Visit',
-  planVisitButtonColor: '#14b8a6',
-  beOneOfUsButtonText: 'Be One Of Us',
-  beOneOfUsButtonColor: '#14b8a6',
+  // Shared button color for both buttons
+  buttonColor: '#14b8a6',
+  // Button 1 (Plan Your Visit)
+  button1Text: 'Plan Your Visit',
+  button1HoverColor: '#0d9488',
+  button1Link: '/plan-your-visit',
+  button1Variant: 'filled', // 'filled' or 'outlined'
+  // Button 2 (Be One Of Us)
+  button2Text: 'Be One Of Us',
+  button2HoverColor: '#0d9488',
+  button2Link: '/services/water-baptism',
+  button2Variant: 'filled', // 'filled' or 'outlined'
   homeVideo: null,
   homeBackgroundImage: null
 })
@@ -261,7 +288,7 @@ const hideControls = () => {
 }
 
 // Fetch home data from CMS
-const fetchHomeData = async () => {
+const fetchHomeData = async (forceRefresh = false) => {
   try {
     // First, clear the video completely to force refresh
     if (videoRef.value) {
@@ -272,24 +299,35 @@ const fetchHomeData = async () => {
     videoSrc.value = null
     videoExists.value = false
     homeData.value.homeVideo = null
-    
+
     // Wait for DOM to update and clear
     await nextTick()
-    
-    const cmsData = await cmsStore.fetchPageData('home')
+
+    const cmsData = await cmsStore.fetchPageData('home', forceRefresh)
     if (cmsData) {
       const { page, images } = cmsData
       const content = page?.content || {}
-      
+
       // Update home data
       homeData.value.backgroundType = content.backgroundType || homeData.value.backgroundType
       homeData.value.welcomeText = content.welcomeText || homeData.value.welcomeText
       homeData.value.sundayService = content.sundayService || homeData.value.sundayService
       homeData.value.wednesdayService = content.wednesdayService || homeData.value.wednesdayService
-      homeData.value.planVisitButtonText = content.planVisitButtonText || homeData.value.planVisitButtonText
-      homeData.value.planVisitButtonColor = content.planVisitButtonColor || homeData.value.planVisitButtonColor
-      homeData.value.beOneOfUsButtonText = content.beOneOfUsButtonText || homeData.value.beOneOfUsButtonText
-      homeData.value.beOneOfUsButtonColor = content.beOneOfUsButtonColor || homeData.value.beOneOfUsButtonColor
+
+      // Update shared button color
+      homeData.value.buttonColor = content.buttonColor || homeData.value.buttonColor
+
+      // Update button 1 (Plan Your Visit)
+      homeData.value.button1Text = content.button1Text || homeData.value.button1Text
+      homeData.value.button1HoverColor = content.button1HoverColor || homeData.value.button1HoverColor
+      homeData.value.button1Link = content.button1Link || homeData.value.button1Link
+      homeData.value.button1Variant = content.button1Variant || homeData.value.button1Variant
+
+      // Update button 2 (Be One Of Us)
+      homeData.value.button2Text = content.button2Text || homeData.value.button2Text
+      homeData.value.button2HoverColor = content.button2HoverColor || homeData.value.button2HoverColor
+      homeData.value.button2Link = content.button2Link || homeData.value.button2Link
+      homeData.value.button2Variant = content.button2Variant || homeData.value.button2Variant
 
       // Handle home background image
       if (images?.homeBackgroundImage) {
@@ -377,14 +415,34 @@ watch([videoSrc, videoExists], async ([newSrc, exists], [oldSrc, oldExists]) => 
   }
 }, { flush: 'post' }) // Use 'post' flush to ensure DOM has updated
 
+// Listen for CMS updates
+const handleCmsUpdate = async (event) => {
+  if (event.detail?.page === 'home') {
+    console.log('CMS home page updated, refreshing HeroSection')
+    console.log('Current buttonColor before refresh:', homeData.value.buttonColor)
+
+    // Wait for database transaction to commit
+    await new Promise(resolve => setTimeout(resolve, 1500))
+
+    await fetchHomeData(true) // Force refresh
+    console.log('HeroSection refreshed, new buttonColor:', homeData.value.buttonColor)
+  }
+}
+
 onMounted(async () => {
   await fetchHomeData()
+
+  // Listen for CMS update events
+  window.addEventListener('cms-page-updated', handleCmsUpdate)
 })
 
 onUnmounted(() => {
   if (controlsTimeout) {
     clearTimeout(controlsTimeout)
   }
+
+  // Remove event listener
+  window.removeEventListener('cms-page-updated', handleCmsUpdate)
 })
 </script>
 
@@ -416,6 +474,7 @@ onUnmounted(() => {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .hero-video {
@@ -435,7 +494,7 @@ onUnmounted(() => {
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom right, rgba(55, 65, 81, 0.4), rgba(75, 85, 99, 0.3), rgba(156, 163, 175, 0.2));
+  background: linear-gradient(to bottom, rgba(55, 65, 81, 0.4), rgba(75, 85, 99, 0.3), rgba(156, 163, 175, 0.2));
   z-index: 2;
   pointer-events: none;
 }
@@ -588,7 +647,74 @@ onUnmounted(() => {
 }
 
 .hero-buttons :deep(.hero-btn:not(.hero-btn-black):hover) {
-  background-color: #000000 !important;
+  /* background-color: #000000 !important; */
+}
+
+/* Reverse hover effects for hero buttons - start filled, become outlined on hover */
+.hero-buttons :deep(.hero-btn-reverse) {
+  position: relative;
+  overflow: hidden;
+  color: white !important;
+  background: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+
+.hero-buttons :deep(.hero-btn-reverse)::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #14b8a6;
+  transition: height 0.3s ease;
+  z-index: -1;
+}
+
+.hero-buttons :deep(.hero-btn-reverse:hover) {
+  /* color: #14b8a6 !important; */
+  background: transparent !important;
+  border-color: #fbffff !important;
+}
+
+.hero-buttons :deep(.hero-btn-reverse:hover)::before {
+  height: 0%;
+}
+
+/* Custom border radius for hero buttons */
+.hero-buttons :deep(.hero-btn-custom-radius) {
+  border-radius: 5px !important;
+  height: 40px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+
+/* Dynamic filled button styles */
+.hero-buttons :deep(.hero-btn-dynamic-filled) {
+  /* Let inline styles handle the colors */
+  transition: all 0.3s ease;
+}
+
+.hero-buttons :deep(.hero-btn-dynamic-filled:hover) {
+  border-color: white !important;
+  color: white !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Dynamic outlined button styles */
+.hero-buttons :deep(.hero-btn-dynamic-outlined) {
+  /* Let inline styles handle the colors */
+  transition: all 0.3s ease;
+}
+
+.hero-buttons :deep(.hero-btn-dynamic-outlined:hover) {
+  background: var(--button-color) !important;
+  color: white !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }
 
 .fade-in-up {
