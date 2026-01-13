@@ -1,462 +1,163 @@
-/**
- * SYSTEM LOGS MIDDLEWARE v3 - Full Entity Data
- * Captures the actual entity data from database for complete audit trail
- * Uses tbl_system_logs table
- */
+const systemLogsRecords = require('../dbHelpers/systemLogsRecords');
 
-const { query } = require('../database/db');
-const { createSystemLog } = require('../dbHelpers/systemLogsRecords');
-
-/**
- * Get action type from request method and route
- * @param {Object} req - Express request object
- * @returns {String} Action type as plain text
- */
-function getActionType(req) {
-  const method = req.method.toUpperCase();
-  const path = req.path || req.originalUrl || '';
-
-  // Skip certain paths
-  if (path.includes('/getAll') || path.includes('/getArchives') || path.includes('/export')) {
-    return 'VIEW_LIST';
-  }
-
-  if (path.includes('/login')) {
-    return 'LOGIN';
-  }
-  if (path.includes('/logout')) {
-    return 'LOGOUT';
-  }
-  if (path.includes('/restoreArchive')) {
-    return 'RESTORE';
-  }
-  if (path.includes('/export') || path.includes('/print')) {
-    return 'PRINT';
-  }
-
-  switch (method) {
-    case 'POST':
-      return 'CREATE';
-    case 'PUT':
-    case 'PATCH':
-      return 'UPDATE';
-    case 'DELETE':
-      return 'DELETE';
-    default:
-      return 'VIEW_LIST';
-  }
-}
-
-/**
- * Get entity type from route path
- * @param {Object} req - Express request object
- * @returns {String} Entity type as plain text
- */
-function getEntityType(req) {
-  const path = req.path || req.originalUrl || '';
-
-  // Map routes to entity types (readable text)
-  const entityMappings = {
-    '/church-records/members': 'Member',
-    '/church-records/accounts': 'Account',
-    '/church-records/departments': 'Department',
-    '/church-records/ministry': 'Ministry',
-    '/church-records/events': 'Event',
-    '/church-records/approval': 'Approval',
-    '/church-records/tithes': 'Tithe',
-    '/church-records/church-leaders': 'Church Leader',
-    '/church-records/department-officers': 'Department Officer',
-    '/services/waterBaptism': 'Water Baptism',
-    '/services/burialService': 'Burial Service',
-    '/services/marriageService': 'Marriage Service',
-    '/services/childDedication': 'Child Dedication',
-    '/transactions': 'Transaction',
-    '/announcements': 'Announcement',
-    '/cms': 'CMS',
-    '/archives': 'Archive',
-    '/church-records/accounts/login': 'User Session',
-    '/church-records/accounts/logout': 'User Session'
-  };
-
-  for (const [route, entity] of Object.entries(entityMappings)) {
-    if (path.includes(route)) {
-      return entity;
-    }
-  }
-
-  // Default fallback
-  return 'System';
-}
-
-/**
- * Get entity ID from request
- * @param {Object} req - Express request object
- * @returns {String} Entity ID or empty string
- */
-function getEntityId(req) {
-  // Try params first (e.g., /:id)
-  if (req.params && req.params.id) {
-    return req.params.id;
-  }
-  // Try body (for DELETE with body)
-  if (req.body && req.body.id) {
-    return req.body.id;
-  }
-  return '';
-}
-
-/**
- * Fetch actual entity data from database
- * @param {String} entityType - Type of entity
- * @param {String} entityId - Entity ID
- * @returns {Object} Entity data or null
- */
-async function fetchEntityData(entityType, entityId) {
-  if (!entityId || !entityType) return null;
-
-  const idNum = parseInt(entityId);
-  if (isNaN(idNum)) return null;
-
-  try {
-    switch (entityType) {
-      case 'Member': {
-        const [rows] = await query(
-          `SELECT id, firstname, lastname, email, contact_number, civil_status, gender, birthday, address, membership_status, date_created 
-           FROM tbl_members WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Account': {
-        const [rows] = await query(
-          `SELECT id, member_id, account_type, account_name, account_number, bank_name, date_created 
-           FROM tbl_accounts WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Department': {
-        const [rows] = await query(
-          `SELECT id, department_name, department_code, description, status, date_created 
-           FROM tbl_departments WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Ministry': {
-        const [rows] = await query(
-          `SELECT id, ministry_name, ministry_code, description, leader_id, status, date_created 
-           FROM tbl_ministries WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Event': {
-        const [rows] = await query(
-          `SELECT id, event_name, event_type, event_date, location, description, status, date_created 
-           FROM tbl_events WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Water Baptism': {
-        const [rows] = await query(
-          `SELECT id, firstname, lastname, email, contact_number, baptism_date, pastor, location, status, date_created 
-           FROM tbl_water_baptism_registration WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Burial Service': {
-        const [rows] = await query(
-          `SELECT id, deceased_name, date_of_birth, date_of_death, contact_person, contact_number, pastor, location, status, date_created 
-           FROM tbl_burial_service WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Marriage Service': {
-        const [rows] = await query(
-          `SELECT id, groom_name, bride_name, marriage_date, contact_person, contact_number, pastor, location, status, date_created 
-           FROM tbl_marriage_service WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Child Dedication': {
-        const [rows] = await query(
-          `SELECT id, child_name, parent_names, dedication_date, pastor, location, status, date_created 
-           FROM tbl_child_dedication WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Tithe': {
-        const [rows] = await query(
-          `SELECT id, member_id, amount, tithe_date, payment_method, reference_number, status, date_created 
-           FROM tbl_tithes WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Transaction': {
-        const [rows] = await query(
-          `SELECT id, transaction_type, member_id, amount, description, payment_method, reference_number, status, date_created 
-           FROM tbl_transactions WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Church Leader': {
-        const [rows] = await query(
-          `SELECT id, firstname, lastname, position, department_id, date_appointed, status, date_created 
-           FROM tbl_church_leaders WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Department Officer': {
-        const [rows] = await query(
-          `SELECT id, member_id, department_id, position, date_appointed, status, date_created 
-           FROM tbl_department_officers WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      case 'Announcement': {
-        const [rows] = await query(
-          `SELECT id, title, content, announcement_type, publish_date, expiry_date, status, date_created 
-           FROM tbl_announcements WHERE id = ?`,
-          [idNum]
-        );
-        return rows[0] || null;
-      }
-      default:
-        return null;
-    }
-  } catch (error) {
-    console.error('Error fetching entity data for audit log:', error);
-    return null;
-  }
-}
-
-/**
- * Format entity data as readable text
- * @param {Object} entityData - Entity data object
- * @param {String} entityType - Type of entity
- * @returns {String} Formatted entity data
- */
-function formatEntityData(entityData, entityType) {
-  if (!entityData) return '(No data found)';
-
-  // Filter out sensitive fields and internal fields
-  const excludeFields = ['password', 'token', 'secret', 'acc_password', 'created_at', 'updated_at'];
-  
-  const filtered = {};
-  for (const [key, value] of Object.entries(entityData)) {
-    if (!excludeFields.includes(key.toLowerCase()) && key !== 'id') {
-      filtered[key] = value;
-    }
-  }
-
-  // Format as readable key-value pairs
-  const entries = Object.entries(filtered).slice(0, 15); // Limit to 15 fields
-  if (entries.length === 0) return '(No data)';
-
-  return entries
-    .map(([k, v]) => {
-      const formattedKey = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      const formattedValue = v === null || v === undefined ? '(null)' : String(v);
-      return `${formattedKey}: ${formattedValue}`;
-    })
-    .join('\n');
-}
-
-/**
- * Get entity name for display
- * @param {Object} entityData - Entity data from database
- * @param {String} entityType - Type of entity
- * @returns {String} Entity name
- */
-function getEntityDisplayName(entityData, entityType) {
-  if (!entityData) return '(not found)';
-
-  // Common name fields
-  const nameFields = ['firstname', 'lastname', 'name', 'event_name', 'department_name', 'ministry_name', 'title', 'deceased_name', 'groom_name', 'bride_name', 'child_name'];
-  
-  for (const field of nameFields) {
-    if (entityData[field]) {
-      // Combine firstname and lastname if both exist
-      if (field === 'firstname' && entityData.lastname) {
-        return `${entityData[field]} ${entityData.lastname}`;
-      }
-      return String(entityData[field]);
-    }
-  }
-
-  // Fallback: show entity type and ID
-  return `${entityType} #${entityData.id}`;
-}
-
-/**
- * Build description text with full entity data
- * @param {Object} req - Express request object
- * @param {Object} body - Request body (sanitized)
- * @param {String} actionType - Action type
- * @param {String} entityType - Entity type
- * @param {String} entityId - Entity ID
- * @param {Object} entityData - Actual entity data from database
- * @returns {String} Description as plain text
- */
-async function buildFullDescription(req, body, actionType, entityType, entityId, entityData) {
-  const path = req.path || req.originalUrl || '';
-  const method = req.method.toUpperCase();
-
-  let description = '';
-
-  // Header with action info
-  description += `=== ${actionType} ${entityType} ===\n`;
-  description += `Path: ${method} ${path}\n\n`;
-
-  // Entity info (the actual data from database)
-  if (entityData) {
-    description += `--- ACTUAL DATA (from database) ---\n`;
-    description += formatEntityData(entityData, entityType);
-    description += '\n\n';
-  }
-
-  // Request data (what was submitted)
-  if (body && Object.keys(body).length > 0) {
-    const sanitized = { ...body };
-    const sensitiveFields = ['password', 'token', 'secret', 'acc_password'];
-    sensitiveFields.forEach(field => {
-      if (sanitized[field]) {
-        sanitized[field] = '[REDACTED]';
-      }
-    });
-
-    // Remove internal fields
-    delete sanitized.id;
-    delete sanitized.date_created;
-
-    if (Object.keys(sanitized).length > 0) {
-      description += `--- SUBMITTED DATA ---\n`;
-      const entries = Object.entries(sanitized).slice(0, 15);
-      entries.forEach(([k, v]) => {
-        description += `${k}: ${v}\n`;
-      });
-    }
-  }
-
-  return description.trim();
-}
-
-/**
- * Get user email from request
- * @param {Object} req - Express request object
- * @returns {String} User email or empty string
- */
-function getUserEmail(req) {
-  if (req.user && req.user.email) {
-    return req.user.email;
-  }
-  if (req.body && req.body.email) {
-    return req.body.email;
-  }
-  if (req.query && req.query.email) {
-    return req.query.email;
-  }
-  return '';
-}
-
-/**
- * System logs middleware v3
- * Logs all requests with full entity data from database
- */
-const systemLogsMiddleware = async (req, res, next) => {
-  // Skip non-API routes
-  const path = req.path || req.originalUrl || '';
-  if (!path.startsWith('/api/') || path.includes('/login') || path.includes('/register')) {
+// Middleware to automatically log user actions to system_logs
+const systemLogsMiddleware = (req, res, next) => {
+  // Only log authenticated requests
+  if (!req.user) {
     return next();
   }
 
-  // Skip GET requests (they're just viewing) but allow LOGIN, LOGOUT, RESTORE, PRINT
-  const actionType = getActionType(req);
-  if (actionType === 'VIEW_LIST') {
-    return next();
-  }
-
-  // Capture original end method
+  // Store original response methods to intercept them
+  const originalJson = res.json;
+  const originalSend = res.send;
   const originalEnd = res.end;
-  let responseBody = '';
 
-  // Override res.end to capture response
-  res.end = function (chunk, encoding) {
-    responseBody = chunk ? chunk.toString() : '';
-    originalEnd.call(this, chunk, encoding);
-  };
+  // Flag to track if we've already logged this request
+  let logged = false;
 
-  // Proceed with request
-  res.on('finish', async () => {
+  // Function to log the action
+  const logAction = async (actionData) => {
+    if (logged) return; // Prevent duplicate logging
+    logged = true;
+
     try {
-      // Determine status
-      const status = res.statusCode >= 200 && res.statusCode < 400 ? 'success' : 'failed';
+      const userInfo = req.user;
+      const memberInfo = req.user.member || {};
 
-      const entityType = getEntityType(req);
-      const entityId = getEntityId(req);
-      const action = getActionType(req);
-
-      let entityData = null;
-      let description = '';
-      let entityName = '';
-
-      // Handle special actions (LOGIN, LOGOUT, RESTORE, PRINT)
-      if (action === 'LOGIN' || action === 'LOGOUT') {
-        description = `${action} to system`;
-        entityName = action === 'LOGIN' ? (req.body?.email || 'Unknown User') : (req.user?.email || 'Unknown User');
-      } else if (action === 'RESTORE') {
-        description = `Restored archived record`;
-        entityName = `Archive ID: ${req.params?.id || 'Unknown'}`;
-      } else if (action === 'PRINT') {
-        description = `Exported/printed data`;
-        entityName = 'Data Export';
-      } else {
-        // Handle regular CRUD operations
-        // Fetch actual entity data from database (for UPDATE/DELETE)
-        if ((action === 'UPDATE' || action === 'DELETE') && entityId) {
-          entityData = await fetchEntityData(entityType, entityId);
-        } else if (action === 'CREATE' && req.body) {
-          // For CREATE, use the submitted data
-          entityData = req.body;
-        }
-
-        // Build full description with entity data
-        description = await buildFullDescription(req, req.body, action, entityType, entityId, entityData);
-
-        // Get display name
-        entityName = getEntityDisplayName(entityData, entityType);
-      }
-
-      // Build log data (all plain text)
       const logData = {
-        user_email: getUserEmail(req),
-        action_type: action,
-        entity_type: entityType,
-        entity_name: entityName,
-        description: description,
-        ip_address: req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'] || '',
-        status: status,
-        error_message: status === 'failed' ? `HTTP ${res.statusCode}` : null
+        user_id: userInfo.account?.acc_id || userInfo.acc_id,
+        user_name: `${memberInfo.firstname || ''} ${memberInfo.lastname || ''}`.trim() || userInfo.email || userInfo.account?.email,
+        role: userInfo.account?.position || userInfo.position || 'member',
+        action: actionData.action,
+        page: actionData.page,
+        description: actionData.description,
+        ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+        device_info: req.get('User-Agent') || 'unknown'
       };
 
-      // Log to database (fire and forget, don't block response)
-      createSystemLog(logData).catch(err => {
-        console.error('System logs logging error:', err);
-      });
+      await systemLogsRecords.createLog(logData);
     } catch (error) {
-      console.error('System logs middleware error:', error);
+      console.error('System logs logging error:', error);
+      // Don't fail the request if logging fails
     }
-  });
+  };
+
+  // Determine action type and details from request
+  const determineActionDetails = () => {
+    const method = req.method;
+    const path = req.path;
+    const baseUrl = req.baseUrl || '';
+
+    // Extract entity ID from path (usually at the end)
+    const pathParts = path.split('/').filter(p => p);
+    const lastPart = pathParts[pathParts.length - 1];
+
+    // Check if last part looks like an ID (numeric or UUID-like)
+    const isId = /^\d+$/.test(lastPart) || /^[a-f0-9-]{8,}$/i.test(lastPart);
+
+    let action = 'View';
+    let page = 'Unknown Page';
+    let description = '';
+
+    // Determine page from path
+    if (path.includes('/members')) {
+      page = 'Member Page';
+    } else if (path.includes('/accounts')) {
+      page = 'Account Page';
+    } else if (path.includes('/events')) {
+      page = 'Events Page';
+    } else if (path.includes('/ministries')) {
+      page = 'Ministries Page';
+    } else if (path.includes('/departments')) {
+      page = 'Departments Page';
+    } else if (path.includes('/tithes')) {
+      page = 'Tithes & Offerings Page';
+    } else if (path.includes('/transactions')) {
+      page = 'Transactions Page';
+    } else if (path.includes('/water-baptisms')) {
+      page = 'Water Baptism Page';
+    } else if (path.includes('/burial-services')) {
+      page = 'Burial Service Page';
+    } else if (path.includes('/child-dedications')) {
+      page = 'Child Dedication Page';
+    } else if (path.includes('/marriage-services')) {
+      page = 'Marriage Service Page';
+    } else if (path.includes('/approvals')) {
+      page = 'Approvals Page';
+    } else if (path.includes('/dashboard')) {
+      page = 'Dashboard';
+    } else if (path.includes('/cms')) {
+      page = 'Content Management Page';
+    } else if (path.includes('/archives')) {
+      page = 'Archives Page';
+    } else if (path.includes('/system-logs')) {
+      page = 'System Logs Page';
+    }
+
+    // Determine action from method and path
+    if (method === 'POST') {
+      if (path.includes('/login')) {
+        action = 'Login';
+        page = 'Login Page';
+        description = 'User logged in successfully';
+      } else if (path.includes('/create') || !isId) {
+        action = 'Create';
+        description = `Created new record on ${page}`;
+      } else {
+        action = 'Update';
+        description = `Updated record on ${page}`;
+      }
+    } else if (method === 'PUT') {
+      action = 'Update';
+      description = `Updated record on ${page}`;
+    } else if (method === 'DELETE') {
+      action = 'Delete';
+      description = `Deleted record on ${page}`;
+    } else if (method === 'GET') {
+      if (path.includes('/export') || path.includes('/download')) {
+        action = 'Export';
+        description = `Exported data from ${page}`;
+      } else if (path.includes('/print')) {
+        action = 'Print';
+        description = `Printed data from ${page}`;
+      } else {
+        action = 'View';
+        description = `Viewed ${page}`;
+      }
+    }
+
+    // Special handling for logout
+    if (path.includes('/logout')) {
+      action = 'Logout';
+      page = 'Dashboard';
+      description = 'User logged out from the system';
+    }
+
+    return {
+      action: action,
+      page: page,
+      description: description
+    };
+  };
+
+  // Intercept response methods to log after response is sent
+  res.json = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalJson.call(this, data);
+  };
+
+  res.send = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalSend.call(this, data);
+  };
+
+  res.end = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalEnd.call(this, data);
+  };
 
   next();
 };

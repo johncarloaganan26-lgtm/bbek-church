@@ -22,10 +22,10 @@ import MarriageRecordAdmin from '../components/Admin/ServicesRecords/MarriageRec
 import Messages from '../components/Admin/CommunicationRecords/Messages.vue'
 // Maintenance Pages
 import ContentManagement from '../components/Admin/Maintenance/ContentManagementPage.vue'
-import AuditTrail from '../components/Admin/Maintenance/AuditTrail.vue'
-import SystemLogs from '../components/Admin/Maintenance/SystemLogs.vue'
 import Archive from '../components/Admin/Maintenance/Archive.vue'
 import Settings from '../components/Admin/Maintenance/Settings.vue'
+import AuditTrail from '../components/Admin/Maintenance/AuditTrail.vue'
+import SystemLogs from '../components/Admin/Maintenance/SystemLogs.vue'
 
 
 // Landing Page Components
@@ -337,11 +337,6 @@ const routes = [
         component: ContentManagement
       },
       {
-        path: 'audit-trail',
-        name: 'AuditTrail',
-        component: SystemLogs
-      },
-      {
         path: 'archive',
         name: 'Archive',
         component: Archive
@@ -350,6 +345,16 @@ const routes = [
         path: 'settings',
         name: 'Settings',
         component: Settings
+      },
+      {
+        path: 'audit-trail',
+        name: 'AuditTrail',
+        component: AuditTrail
+      },
+      {
+        path: 'system-logs',
+        name: 'SystemLogs',
+        component: SystemLogs
       },
       {
         path: 'accounts',

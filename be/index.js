@@ -1,5 +1,7 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+// System Logs Module Integration - Trigger nodemon restart
+
 /**
  * Church Management System Backend API
  * 
@@ -51,13 +53,16 @@ const waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
 const marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
 const transactionRouter = require('./routes/transactionRoutes');
 const memberRegistrationRouter = require('./routes/memberRegistrationRoute');
-const auditTrailRouter = require('./routes/auditTrailRoutes');
 const archiveRouter = require('./routes/archiveRoutes');
-const systemLogsRouter = require('./routes/systemLogsRoutes');
 const announcementRouter = require('./routes/announcementRoutes');
 const formRouter = require('./routes/formRoutes');
 const cmsRouter = require('./routes/cmsRoutes');
 const dashboardRouter = require('./routes/dashboardRoutes');
+const auditTrailRouter = require('./routes/auditTrailRoutes');
+const systemLogsRouter = require('./routes/systemLogsRoutes');
+const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
+const systemLogsMiddleware = require('./middleware/systemLogsMiddleware');
+const authRouter = require('./routes/authRoutes');
 
 const app = express();
 
@@ -210,17 +215,20 @@ app.post('/api/example', (req, res) => {
   res.json({ received: data });
 });
 
+// Authentication routes (public - no auth required)
+app.use('/api/auth', authRouter);
+
 // Apply JWT authentication middleware to all routes
 // Public routes are handled within the middleware itself
 app.use(authenticateToken);
 
-// Apply audit trail middleware v2 to log all actions (after authentication)
-const auditTrailMiddleware = require('./middleware/auditTrailMiddleware_v2');
+// Apply audit trail middleware to log user actions
 app.use(auditTrailMiddleware);
 
-// Apply system logs middleware (v2 - raw data only)
-const systemLogsMiddleware = require('./middleware/systemLogsMiddleware');
-app.use(systemLogsMiddleware);
+// TEMPORARILY DISABLE system logs middleware to reduce database load
+// TODO: Create system_logs table or fix system logs implementation
+// app.use(systemLogsMiddleware);
+
 
 
 // Church records routes
@@ -242,11 +250,7 @@ app.use('/api/transactions', transactionRouter);
 // Member registration routes
 app.use('/api/member-registration', memberRegistrationRouter);
 
-// Audit trail routes
-app.use('/api/audit-trail', auditTrailRouter);
 
-// System logs routes (v2 - raw data only)
-app.use('/api/system-logs', systemLogsRouter);
 
 // Archive routes
 app.use('/api/archives', archiveRouter);
@@ -262,6 +266,12 @@ app.use('/api/cms', cmsRouter);
 
 // Dashboard routes
 app.use('/api/dashboard', dashboardRouter);
+
+// Audit trail routes
+app.use('/api/audit-trail', auditTrailRouter);
+
+// System logs routes
+app.use('/api/system-logs', systemLogsRouter);
 
 
 // Fallback for unknown routes

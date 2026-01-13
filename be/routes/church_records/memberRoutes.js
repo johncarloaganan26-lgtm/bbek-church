@@ -11,7 +11,8 @@ const {
   getAllMembersForSelect,
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
-  getAllMembersWithoutPastorsForSelect
+  getAllMembersWithoutPastorsForSelect,
+  getMembersWithoutBaptism
 } = require('../../dbHelpers/church_records/memberRecords');
 
 const router = express.Router();
@@ -199,6 +200,36 @@ router.get('/getAllMembersWithoutPastorsForSelect', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch members without pastors for select'
+    });
+  }
+});
+
+/**
+ * GET MEMBERS WITHOUT BAPTISM - Get members who don't have baptism records
+ * GET /api/church-records/members/getMembersWithoutBaptism
+ * Returns members who don't have records in water_baptism table
+ */
+router.get('/getMembersWithoutBaptism', async (req, res) => {
+  try {
+    const result = await getMembersWithoutBaptism();
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching members without baptism:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch members without baptism'
     });
   }
 });

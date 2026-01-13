@@ -1,3 +1,4 @@
+
 const { query, pool } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
@@ -1338,6 +1339,50 @@ async function getAllDepartmentMembersForSelect() {
 
 
 
+/**
+ * GET MEMBERS WITHOUT BAPTISM - Get members who don't have baptism records
+ * Returns members who don't have records in water_baptism table
+ * @returns {Promise<Object>} Object with member options array
+ */
+async function getMembersWithoutBaptism() {
+  try {
+    // Query to get members who don't have baptism records
+    const sql = `SELECT
+      m.member_id,
+      m.firstname,
+      m.lastname,
+      m.middle_name,
+      m.email,
+      CONCAT(
+        m.firstname,
+        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
+        ' ',
+        m.lastname
+      ) as name
+    FROM tbl_members m
+    LEFT JOIN tbl_waterbaptism wb ON m.member_id = wb.member_id
+    WHERE wb.member_id IS NULL
+    ORDER BY m.firstname ASC, m.lastname ASC`;
+
+    const [rows] = await query(sql);
+
+    // Format data for select elements: [{ id, name }]
+    const memberOptions = rows.map(member => ({
+      id: member.member_id,
+      name: member.name || `${member.firstname} ${member.lastname}`.trim()
+    }));
+
+    return {
+      success: true,
+      message: 'Members without baptism retrieved successfully',
+      data: memberOptions
+    };
+  } catch (error) {
+    console.error('Error fetching members without baptism:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createMember,
   getAllMembers,
@@ -1351,6 +1396,7 @@ module.exports = {
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
   getAllMembersWithoutPastorsForSelect,
+  getMembersWithoutBaptism,
   getSpecificMemberByEmailAndStatus
 };
 

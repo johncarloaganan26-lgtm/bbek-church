@@ -19,8 +19,28 @@
       :label-width="labelWidth"
       :label-position="labelPosition"
     >
-      <!-- Personal Information Section -->
-      <el-divider content-position="left">Personal Information</el-divider>
+       <!-- Member Selection (Admin/Staff only) -->
+       <el-form-item label="Member Name" prop="selected_member_id" v-if="!isEditMode">
+         <el-select
+           v-model="formData.selected_member_id"
+           placeholder="Select existing member (optional)"
+           size="large"
+           style="width: 100%"
+           clearable
+           :disabled="loading"
+           @change="onMemberSelect"
+         >
+           <el-option
+             v-for="member in membersWithoutBaptism"
+             :key="member.id"
+             :label="member.name"
+             :value="member.id"
+           />
+         </el-select>
+       </el-form-item>
+
+       <!-- Personal Information Section -->
+       <el-divider content-position="left">Personal Information</el-divider>
 
       <!-- First Name -->
       <el-form-item label="First Name" prop="firstname">
@@ -125,13 +145,21 @@
 
       <!-- Desire Ministry -->
       <el-form-item label="Desire Ministry">
-        <el-input
+        <el-select
           v-model="formData.desire_ministry"
-          placeholder="Enter desired ministry"
+          placeholder="Select desired ministry"
           size="large"
           style="width: 100%"
+          clearable
           :disabled="loading"
-        />
+        >
+          <el-option
+            v-for="ministry in ministryOptions"
+            :key="ministry.ministry_id"
+            :label="ministry.ministry_name"
+            :value="ministry.ministry_name"
+          />
+        </el-select>
       </el-form-item>
 
       <!-- Spouse Name (shown only if married) -->
@@ -463,9 +491,43 @@ const labelPosition = computed(() => {
 // Pastor options - will be fetched from API
 const pastorOptions = computed(() => waterBaptismStore.pastorOptions || [])
 
-// Fetch pastor options when component mounts
+// Ministry options - will be fetched from API
+const ministryOptions = ref([])
+
+// Members without baptism records
+const membersWithoutBaptism = ref([])
+
+// Fetch members without baptism records
+const fetchMembersWithoutBaptism = async () => {
+  try {
+    const response = await axios.get('/church-records/members/getMembersWithoutBaptism')
+    if (response.data.success && response.data.data) {
+      membersWithoutBaptism.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching members without baptism:', error)
+  }
+}
+
+// Fetch ministry options
+const fetchMinistryOptions = async () => {
+  try {
+    const response = await axios.get('/church-records/ministries/getAllMinistriesForSelect')
+    if (response.data.success && response.data.data) {
+      ministryOptions.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching ministry options:', error)
+  }
+}
+
+// Fetch options when component mounts
 onMounted(async () => {
-  await waterBaptismStore.fetchPastorOptions()
+  await Promise.all([
+    waterBaptismStore.fetchPastorOptions(),
+    fetchMembersWithoutBaptism(),
+    fetchMinistryOptions()
+  ])
 })
 
 // Check if in edit mode
@@ -483,6 +545,7 @@ const statusOptions = [
 // Form data
 const formData = reactive({
   baptism_id: '',
+  selected_member_id: null, // For member selection
   baptism_date: null,
   baptism_time: null,
   location: '',
@@ -621,6 +684,84 @@ const updateStatusFromBaptismDate = () => {
   }
 }
 
+// Handle member selection - auto-fill form
+const onMemberSelect = async (memberId) => {
+  if (!memberId) {
+    // Clear form when no member selected
+    clearMemberData()
+    return
+  }
+
+  try {
+    console.log('Fetching member details for ID:', memberId)
+    // Fetch member details
+    const response = await axios.get(`/church-records/members/getMemberById/${memberId}`)
+    console.log('Member API response:', response.data)
+
+    if (response.data.data) {
+      const member = response.data.data
+      console.log('Member data received:', member)
+
+      // Auto-fill form with member data
+      formData.firstname = member.firstname || ''
+      formData.middle_name = member.middle_name || ''
+      formData.lastname = member.lastname || ''
+      formData.birthdate = member.birthdate || ''
+      formData.age = member.age || ''
+      formData.gender = member.gender || ''
+      formData.civil_status = member.civil_status || ''
+      formData.profession = member.profession || ''
+      formData.spouse_name = member.spouse_name || ''
+      formData.marriage_date = member.marriage_date || null
+      formData.children = member.children ? (typeof member.children === 'string' ? JSON.parse(member.children) : member.children) : []
+      formData.desire_ministry = member.desire_ministry || ''
+      formData.address = member.address || ''
+      formData.email = member.email || ''
+      formData.phone_number = member.phone_number || ''
+
+      console.log('Form data after auto-fill:', {
+        firstname: formData.firstname,
+        lastname: formData.lastname,
+        email: formData.email,
+        birthdate: formData.birthdate
+      })
+
+      // Calculate age if birthdate exists but age is missing
+      if (formData.birthdate && !formData.age) {
+        calculateAge()
+      }
+
+      ElMessage.success('Member information loaded successfully')
+    } else {
+      console.error('API response has no data:', response.data)
+      ElMessage.error('Failed to load member details - no data received')
+    }
+  } catch (error) {
+    console.error('Error fetching member details:', error)
+    console.error('Error response:', error.response?.data)
+    ElMessage.error('Failed to load member details: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+// Clear member data when selection is cleared
+const clearMemberData = () => {
+  formData.firstname = ''
+  formData.middle_name = ''
+  formData.lastname = ''
+  formData.birthdate = ''
+  formData.age = ''
+  formData.gender = ''
+  formData.civil_status = ''
+  formData.profession = ''
+  formData.spouse_name = ''
+  formData.marriage_date = null
+  formData.children = []
+  formData.desire_ministry = ''
+  formData.address = ''
+  formData.email = ''
+  formData.phone_number = ''
+}
+
 // Calculate age based on birthdate
 const calculateAge = () => {
   if (!formData.birthdate) {
@@ -748,6 +889,7 @@ watch(() => props.modelValue, async (isOpen) => {
 // Reset form
 const resetForm = () => {
   formData.baptism_id = ''
+  formData.selected_member_id = null
   formData.baptism_date = null
   formData.baptism_time = null
   formData.location = ''

@@ -1,4 +1,4 @@
-<template>
+ hre<template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -18,11 +18,12 @@
       :rules="rules"
       :label-width="labelWidth"
       :label-position="labelPosition"
+      :hide-required-asterisk="isMemberUser"
     >
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
       <el-form-item v-if="!isMemberUser" prop="requested_by">
         <template #label>
-          <span>Requested By (Member) <span class="required-text">Required</span></span>
+          <span>Requested By (Member)</span>
         </template>
         <el-select
           v-model="formData.requested_by"
@@ -129,7 +130,7 @@
       <!-- Gender -->
       <el-form-item prop="gender">
         <template #label>
-          <span>Gender <span class="required-text">Required</span></span>
+          <span>Gender</span>
         </template>
         <el-radio-group v-model="formData.gender" size="large" :disabled="loading">
           <el-radio label="M">Male</el-radio>
@@ -140,7 +141,7 @@
       <!-- Relationship to Child -->
       <el-form-item prop="requester_relationship">
         <template #label>
-          <span>Your Relationship to the Child <span class="required-text">Required</span></span>
+          <span>Your Relationship to the Child</span>
         </template>
         <el-select
           v-model="formData.requester_relationship"
@@ -162,7 +163,7 @@
       <!-- Preferred Dedication Date and Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_date">
         <template #label>
-          <span>Preferred Dedication Date <span class="required-text">Required</span></span>
+          <span>Preferred Dedication Date</span>
         </template>
         <el-date-picker
           v-model="formData.preferred_dedication_date"
@@ -182,7 +183,7 @@
       <!-- Preferred Dedication Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_time">
         <template #label>
-          <span>Preferred Dedication Time <span class="required-text">Required</span></span>
+          <span>Preferred Dedication Time</span>
         </template>
         <el-time-picker
           v-model="formData.preferred_dedication_time"
@@ -505,7 +506,7 @@
       <!-- Pastor (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="pastor">
         <template #label>
-          <span>Pastor <span class="required-text">Required</span></span>
+          <span>Pastor</span>
         </template>
         <el-select
           v-model="formData.pastor"
@@ -529,7 +530,7 @@
       <!-- Location (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="location">
         <template #label>
-          <span>Location <span class="required-text">Required</span></span>
+          <span>Location</span>
         </template>
         <el-input
           v-model="formData.location"
@@ -1664,7 +1665,7 @@ defineExpose({
 
 .required-text {
   color: #ef4444;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   font-weight: 500;
   margin-left: 4px;
 }

@@ -235,6 +235,64 @@ export const useApprovalsStore = defineStore('approvals', {
       } else {
         console.warn(`Page size ${pageSize} is not in allowed options: ${this.pageSizeOptions.join(', ')}`)
       }
+    },
+    async exportApprovalsToExcel(options = {}) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        // Build query parameters
+        const params = new URLSearchParams()
+        if (options.search) params.append('search', options.search)
+        if (options.status && options.status !== 'All Statuses') {
+          params.append('status', options.status)
+        }
+        if (options.type && options.type !== 'All Types') {
+          params.append('type', options.type)
+        }
+        if (options.sortBy) {
+          params.append('sortBy', options.sortBy)
+        }
+        
+        // Make request with responseType: 'blob' to handle binary data
+        const response = await axios.get(`/church-records/approvals/exportExcel?${params}`, {
+          responseType: 'blob',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        // Extract filename from content-disposition header or use default
+        const contentDisposition = response.headers['content-disposition']
+        let filename = 'approvals_export.xlsx'
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/)
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1]
+          }
+        }
+        
+        // Create download link and trigger download
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', filename)
+        document.body.appendChild(link)
+        link.click()
+        
+        // Cleanup
+        link.parentNode.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        return { success: true, message: 'Excel file downloaded successfully' }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to export approvals to Excel'
+        console.error('Error exporting approvals to Excel:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

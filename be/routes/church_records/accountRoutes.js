@@ -378,7 +378,7 @@ router.post('/exportExcel', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -386,9 +386,9 @@ router.post('/login', async (req, res) => {
         error: 'Email and password are required'
       });
     }
-    
+
     const result = await getSpecificMemberByEmailAndPassword(email, password);
-    
+
     // Check if result is null (invalid credentials)
     if (!result) {
       return res.status(401).json({
@@ -397,7 +397,7 @@ router.post('/login', async (req, res) => {
         error: 'Invalid email or password'
       });
     }
-    
+
     // Check if result has success property
     if (result.success) {
       res.status(200).json({
@@ -472,9 +472,6 @@ router.post('/logout', async (req, res) => {
     const userEmail = req.user?.email || null;
     const userId = req.user?.acc_id || null;
     const logoutReason = req.body?.logout_reason || 'User initiated logout';
-
-    // Log the logout action (this will be captured by audit middleware)
-    console.log(`User logout: ${userEmail || 'Unknown user'} - ${logoutReason}`);
 
     res.status(200).json({
       success: true,

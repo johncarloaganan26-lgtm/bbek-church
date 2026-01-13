@@ -189,6 +189,7 @@
                     :rules="rules"
                     label-width="0"
                     label-position="top"
+                    :hide-required-asterisk="true"
                     class="registration-form"
                   >
                     <div class="form-row">
@@ -1690,7 +1691,7 @@ const resetForm = () => {
 
 .required-text {
   color: #ef4444;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   font-weight: 500;
   margin-left: 4px;
 }

@@ -162,9 +162,31 @@ router.get('/getArchiveSummary', requireAdmin, async (req, res) => {
 router.delete('/deleteArchive/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
+    // Get archive details first for audit trail
+    const { getArchiveById } = require('../dbHelpers/archiveRecords');
+    const archiveResult = await getArchiveById(parseInt(id));
+
+    if (archiveResult.success) {
+      // Add archive details to request for audit trail middleware
+      req.archive_data = {
+        original_table: archiveResult.data.original_table,
+        original_id: archiveResult.data.original_id,
+        archived_data: archiveResult.data.archived_data
+      };
+    }
+
+    // Don't proceed with deletion if archive not found
+    if (!archiveResult.success) {
+      return res.status(404).json({
+        success: false,
+        message: 'Archive record not found',
+        error: 'Archive record not found'
+      });
+    }
+
     const result = await deleteArchivePermanently(parseInt(id));
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,

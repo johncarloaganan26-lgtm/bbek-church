@@ -7,7 +7,9 @@ const {
   getMinistriesByMemberId,
   updateMinistry,
   deleteMinistry,
-  getPublicMinistries
+  getPublicMinistries,
+  getAllMinistriesForSelect,
+  exportMinistriesToExcel
 } = require('../../dbHelpers/church_records/ministryRecords');
 
 const router = express.Router();
@@ -377,6 +379,70 @@ router.post('/getMinistriesByMemberId/:memberId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch ministries by member ID'
+    });
+  }
+});
+
+/**
+ * GET ALL FOR SELECT - Get all ministries for select dropdown
+ * GET /api/church-records/ministries/getAllMinistriesForSelect
+ */
+router.get('/getAllMinistriesForSelect', async (req, res) => {
+  try {
+    const result = await getAllMinistriesForSelect();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching ministries for select:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch ministries for select'
+    });
+  }
+});
+
+/**
+ * EXPORT - Export ministries to Excel
+ * GET /api/church-records/ministries/exportExcel (query params)
+ * Parameters: search, status, sortBy, department_name_pattern
+ */
+router.get('/exportExcel', async (req, res) => {
+  try {
+    // Get parameters from query string
+    const options = req.query;
+    const result = await exportMinistriesToExcel(options);
+
+    if (result.success) {
+      // Set headers for file download
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="ministries_export.xlsx"`);
+
+      // Send the Excel file as binary data
+      res.status(200).send(result.fileBuffer);
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error exporting ministries to Excel:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to export ministries to Excel'
     });
   }
 });

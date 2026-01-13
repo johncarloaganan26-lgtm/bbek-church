@@ -1,209 +1,228 @@
 const express = require('express');
-const {
-  createSystemLog,
-  getAllSystemLogs,
-  getSystemLogById,
-  deleteSystemLogsBefore,
-  getSystemLogsStats
-} = require('../dbHelpers/systemLogsRecords');
-
 const router = express.Router();
+const systemLogsRecords = require('../dbHelpers/systemLogsRecords');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
-/**
- * CREATE - Create system log entry (for manual logging)
- * POST /api/system-logs/create
- */
-router.post('/create', async (req, res) => {
+// All system logs routes require authentication
+router.use(authenticateToken);
+
+// TEMPORARILY DISABLED ADMIN REQUIREMENT FOR TESTING
+// Middleware to check if user is admin
+// const requireAdmin = (req, res, next) => {
+//   if (!req.user || (req.user.account?.position !== 'admin' && req.user.position !== 'admin')) {
+//     return res.status(403).json({
+//       success: false,
+//       error: 'Access Denied',
+//       message: 'Administrator access required'
+//     });
+//   }
+//   next();
+// };
+
+// router.use(requireAdmin);
+
+// GET /api/system-logs/logs - Fetch system logs with pagination and filters
+router.get('/logs', async (req, res) => {
   try {
-    const result = await createSystemLog(req.body);
-    
-    if (result.success) {
-      res.status(201).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.error
-      });
+    const {
+      page = 1,
+      pageSize = 20,
+      action,
+      userId,
+      role,
+      page: pageFilter,
+      dateRange,
+      search
+    } = req.query;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
     }
+
+    const filters = {
+      action: action,
+      user_id: userId,
+      role: role,
+      page: pageFilter,
+      start_date: startDate,
+      end_date: endDate,
+      search: search
+    };
+
+    const result = await systemLogsRecords.getLogs(
+      parseInt(page),
+      parseInt(pageSize),
+      filters
+    );
+
+    res.json({
+      success: true,
+      data: {
+        logs: result.logs,
+        pagination: result.pagination,
+        filters: result.filters
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching system logs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database Error',
+      message: 'Failed to fetch system logs'
+    });
+  }
+});
+
+// POST /api/system-logs/log - Create a new system log entry
+router.post('/log', async (req, res) => {
+  try {
+    const logData = req.body;
+
+    // Validate required fields
+    const requiredFields = ['user_name', 'role', 'action', 'page', 'description'];
+    for (const field of requiredFields) {
+      if (!logData[field]) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation Error',
+          message: `Missing required field: ${field}`
+        });
+      }
+    }
+
+    // Add IP address if not provided
+    if (!logData.ip_address) {
+      logData.ip_address = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+    }
+
+    // Add device info if not provided
+    if (!logData.device_info) {
+      logData.device_info = req.get('User-Agent') || 'unknown';
+    }
+
+    const result = await systemLogsRecords.createLog(logData);
+
+    res.json({
+      success: true,
+      data: { logId: result.insertId },
+      message: 'System log created successfully'
+    });
   } catch (error) {
     console.error('Error creating system log:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to create system log'
+      error: 'Database Error',
+      message: 'Failed to create system log'
     });
   }
 });
 
-/**
- * READ ALL - Get all system logs with pagination and filters
- * GET /api/system-logs/getAll
- * POST /api/system-logs/getAll
- */
-router.get('/getAll', async (req, res) => {
+// GET /api/system-logs/export - Export system logs as CSV
+router.get('/export', async (req, res) => {
   try {
-    const options = req.query;
-    const result = await getAllSystemLogs(options);
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data,
-        count: result.count,
-        totalCount: result.totalCount,
-        pagination: result.pagination
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message
-      });
+    const {
+      action,
+      userId,
+      role,
+      page: pageFilter,
+      dateRange,
+      search
+    } = req.query;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
     }
+
+    const filters = {
+      action: action,
+      user_id: userId,
+      role: role,
+      page: pageFilter,
+      start_date: startDate,
+      end_date: endDate,
+      search: search
+    };
+
+    const csvData = await systemLogsRecords.exportLogs(filters);
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="system_logs_${new Date().toISOString().split('T')[0]}.csv"`);
+
+    res.send(csvData);
   } catch (error) {
-    console.error('Error fetching system logs:', error);
+    console.error('Error exporting system logs:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch system logs'
+      error: 'Export Error',
+      message: 'Failed to export system logs'
     });
   }
 });
 
-router.post('/getAll', async (req, res) => {
+// DELETE /api/system-logs/cleanup - Delete old logs (admin maintenance)
+router.delete('/cleanup', async (req, res) => {
   try {
-    const options = req.body;
-    const result = await getAllSystemLogs(options);
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data,
-        count: result.count,
-        totalCount: result.totalCount,
-        pagination: result.pagination
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message
-      });
-    }
-  } catch (error) {
-    console.error('Error fetching system logs:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch system logs'
-    });
-  }
-});
+    const { daysToKeep = 365 } = req.body;
 
-/**
- * READ ONE - Get single system log by ID
- * GET /api/system-logs/getById/:id
- */
-router.get('/getById/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const logId = parseInt(id);
-
-    if (isNaN(logId)) {
+    if (daysToKeep < 30) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid log ID'
+        error: 'Validation Error',
+        message: 'Minimum retention period is 30 days'
       });
     }
 
-    const result = await getSystemLogById(logId);
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.message
-      });
-    }
+    const deletedCount = await systemLogsRecords.deleteOldLogs(daysToKeep);
+
+    res.json({
+      success: true,
+      data: { deletedCount },
+      message: `Successfully deleted ${deletedCount} old log entries`
+    });
   } catch (error) {
-    console.error('Error fetching system log:', error);
+    console.error('Error cleaning up system logs:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch system log'
+      error: 'Database Error',
+      message: 'Failed to cleanup system logs'
     });
   }
 });
 
-/**
- * GET STATS - Get system logs statistics
- * GET /api/system-logs/stats
- */
+// GET /api/system-logs/stats - Get system logs statistics
 router.get('/stats', async (req, res) => {
   try {
-    const result = await getSystemLogsStats();
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message
-      });
-    }
+    const stats = await systemLogsRecords.getStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
   } catch (error) {
     console.error('Error fetching system logs stats:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch system logs stats'
-    });
-  }
-});
-
-/**
- * DELETE - Delete old system logs
- * DELETE /api/system-logs/deleteOld
- */
-router.delete('/deleteOld', async (req, res) => {
-  try {
-    const { date_before } = req.body;
-    
-    if (!date_before) {
-      return res.status(400).json({
-        success: false,
-        error: 'Date is required (format: YYYY-MM-DD)'
-      });
-    }
-
-    const result = await deleteSystemLogsBefore(date_before);
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message
-      });
-    }
-  } catch (error) {
-    console.error('Error deleting system logs:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete system logs'
+      error: 'Database Error',
+      message: 'Failed to fetch system logs statistics'
     });
   }
 });

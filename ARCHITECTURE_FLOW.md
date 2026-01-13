@@ -67,7 +67,6 @@ This document describes the architecture, data flow, and connections between the
 │  │  │  - CORS                                          │   │  │
 │  │  │  - Body Parser (500MB limit)                     │   │  │
 │  │  │  - JWT Authentication                            │   │  │
-│  │  │  - Audit Trail                                   │   │  │
 │  │  └──────────────┬───────────────────────────────────┘   │  │
 │  │                 │                                        │  │
 │  │  ┌──────────────▼───────────────────────────────────┐   │  │
@@ -78,7 +77,6 @@ This document describes the architecture, data flow, and connections between the
 │  │  │  - /api/cms                                      │   │  │
 │  │  │  - /api/dashboard                                │   │  │
 │  │  │  - /api/announcements                            │   │  │
-│  │  │  - /api/audit-trail                              │   │  │
 │  │  │  - /api/archives                                 │   │  │
 │  │  │  - /api/forms                                    │   │  │
 │  │  │  - /api/member-registration                      │   │  │
@@ -113,6 +111,7 @@ This document describes the architecture, data flow, and connections between the
 ## Frontend (church-fe)
 
 ### Technology Stack
+
 - **Framework**: Vue 3 (Composition API)
 - **Build Tool**: Vite
 - **Routing**: Vue Router 4
@@ -164,6 +163,7 @@ church-fe/
 ### API Connection Configuration
 
 #### Development Mode
+
 - **Base URL**: `/api` (proxied by Vite dev server)
 - **Backend URL**: `http://localhost:5000` (default, or from `VITE_API_URL` env var)
 - **Proxy Configuration**: Defined in `vite.config.js`
@@ -180,6 +180,7 @@ proxy: {
 ```
 
 #### Production Mode
+
 - **Base URL**: `${VITE_API_URL}/api`
 - **Environment Variable**: `VITE_API_URL` must be set (e.g., `https://your-backend.vercel.app`)
 - **No Proxy**: Direct API calls to backend URL
@@ -187,18 +188,20 @@ proxy: {
 ```javascript
 // src/api/axios.js
 const API_URL = import.meta.env.PROD
-  ? (`${import.meta.env.VITE_API_URL}/api` || '')
-  : '/api'
+  ? `${import.meta.env.VITE_API_URL}/api` || ""
+  : "/api";
 ```
 
 ### Authentication Flow
 
 1. **Login Request**
+
    - Frontend sends POST to `/api/church-records/accounts/login`
    - Backend validates credentials and returns JWT token
    - Frontend stores token in `localStorage` as `accessToken`
 
 2. **Authenticated Requests**
+
    - Axios interceptor adds `Authorization: Bearer <token>` header to all requests
    - Token is validated before each request
    - Expired/invalid tokens are cleared and user is redirected
@@ -217,13 +220,13 @@ instance.interceptors.request.use((config) => {
   if (!tokenValidation.success) {
     localStorage.removeItem('accessToken')
   }
-  
+
   // Add Bearer token to header
   const token = localStorage.getItem('accessToken') || ...
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  
+
   return config
 })
 ```
@@ -246,6 +249,7 @@ instance.interceptors.request.use((config) => {
 ## Backend (church-be)
 
 ### Technology Stack
+
 - **Runtime**: Node.js
 - **Framework**: Express.js 5
 - **Database**: MySQL (mysql2/promise)
@@ -261,8 +265,7 @@ church-be/
 ├── database/
 │   └── db.js                          # Database connection pool
 ├── middleware/
-│   ├── authMiddleware.js              # JWT authentication
-│   └── auditTrailMiddleware.js        # Audit logging
+│   └── authMiddleware.js              # JWT authentication
 ├── routes/                            # API route handlers
 │   ├── church_records/                # Church record routes
 │   │   ├── memberRoutes.js
@@ -278,7 +281,6 @@ church-be/
 │   ├── cmsRoutes.js
 │   ├── dashboardRoutes.js
 │   ├── announcementRoutes.js
-│   ├── auditTrailRoutes.js
 │   └── ...
 ├── dbHelpers/                         # Database query helpers
 │   ├── church_records/
@@ -303,9 +305,8 @@ church-be/
 3. **Configure Body Parser** (500MB limit)
 4. **Apply Security Headers**
 5. **Apply JWT Authentication Middleware** (except public routes)
-6. **Apply Audit Trail Middleware**
-7. **Register Routes**
-8. **Start Server** (binds to `0.0.0.0:PORT`)
+6. **Register Routes**
+7. **Start Server** (binds to `0.0.0.0:PORT`)
 
 ### Database Connection
 
@@ -320,15 +321,15 @@ church-be/
 ```javascript
 // database/db.js
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'RootPassword123!',
-  database: process.env.DB_NAME || 'bbekdb',
+  host: process.env.DB_HOST || "localhost",
+  port: parseInt(process.env.DB_PORT || "3306", 10),
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "RootPassword123!",
+  database: process.env.DB_NAME || "bbekdb",
   connectionLimit: IS_PRODUCTION ? 2 : 10,
   enableKeepAlive: true,
-  ssl: process.env.DB_SSL === 'true' ? {} : false
-}
+  ssl: process.env.DB_SSL === "true" ? {} : false,
+};
 ```
 
 ### Authentication Middleware
@@ -344,16 +345,6 @@ const dbConfig = {
 - **Protected Routes**: Require `Authorization: Bearer <token>` header
 - **Token Verification**: Uses `jsonwebtoken` with `JWT_SECRET` from env
 - **User Info**: Attached to `req.user` after successful authentication
-
-### Audit Trail Middleware
-
-**File**: `middleware/auditTrailMiddleware.js`
-
-- **Automatic Logging**: Logs all authenticated requests
-- **Entity Detection**: Extracts entity type and ID from request path
-- **Action Detection**: Determines action type (CREATE, UPDATE, DELETE, VIEW, etc.) from HTTP method and path
-- **Non-Blocking**: Logs asynchronously after response is sent
-- **Status Tracking**: Logs success/failure based on HTTP status code
 
 ### API Routes Structure
 
@@ -379,7 +370,6 @@ All routes are prefixed with `/api`:
 │   └── /marriage-services              # Marriage services
 ├── /transactions                       # Transaction management
 ├── /member-registration                # Public member registration
-├── /audit-trail                        # Audit trail queries
 ├── /archives                           # Archive management
 ├── /announcements                      # Announcements
 ├── /forms                              # Form submissions
@@ -401,21 +391,17 @@ All routes are prefixed with `/api`:
 5. Request logging (development only)
    ↓
 6. JWT Authentication middleware
-   ├─ Public route? → Skip auth
-   └─ Protected route? → Verify token → Attach req.user
-   ↓
-7. Audit Trail middleware (attach to response)
-   ↓
-8. Route handler
-   ├─ Extract request data
-   ├─ Call DB helper functions
-   ├─ Execute database queries
-   ├─ Transform/format response
-   └─ Return JSON response
-   ↓
-9. Audit Trail logs action (async, non-blocking)
-   ↓
-10. Response sent to client
+    ├─ Public route? → Skip auth
+    └─ Protected route? → Verify token → Attach req.user
+    ↓
+7. Route handler
+    ├─ Extract request data
+    ├─ Call DB helper functions
+    ├─ Execute database queries
+    ├─ Transform/format response
+    └─ Return JSON response
+    ↓
+8. Response sent to client
 ```
 
 ---
@@ -625,6 +611,7 @@ Routes accessible without authentication:
 - `/change-password/**` - Password reset
 
 Protected routes (require authentication):
+
 - `/admin/**` - Admin dashboard (requires `admin` or `staff` position)
 
 ---
@@ -634,6 +621,7 @@ Protected routes (require authentication):
 ### Frontend Error Handling
 
 **Axios Response Interceptor** (`src/api/axios.js`):
+
 - **401 Unauthorized**: Clears tokens, redirects to landing (except public routes)
 - **400 Bad Request**: Shows error message from response
 - **403 Forbidden**: Shows "Access Forbidden" message
@@ -647,6 +635,7 @@ Protected routes (require authentication):
 ### Backend Error Handling
 
 **Error Middleware** (`index.js`):
+
 - **CORS Errors**: Returns 403 with "Origin not allowed" message
 - **Payload Too Large**: Returns 413 with max size information
 - **JWT Errors**: Returns 401 with "Invalid or expired token"
@@ -654,6 +643,7 @@ Protected routes (require authentication):
 - **Generic Errors**: Returns 500 with sanitized message (detailed in development)
 
 **Error Responses Format**:
+
 ```json
 {
   "success": false,
@@ -698,34 +688,37 @@ Each store manages state for a specific domain:
 
 ```javascript
 // Example: memberRecordStore.js
-export const useMemberRecordStore = defineStore('memberRecord', {
+export const useMemberRecordStore = defineStore("memberRecord", {
   state: () => ({
     members: [],
     currentMember: null,
     pagination: { page: 1, pageSize: 20, total: 0 },
     loading: false,
-    filters: {}
+    filters: {},
   }),
-  
+
   actions: {
     async fetchMembers(params) {
-      this.loading = true
+      this.loading = true;
       try {
-        const response = await axios.get('/api/church-records/members/getAllMembers', { params })
-        this.members = response.data.data.members
-        this.pagination = response.data.data.pagination
+        const response = await axios.get(
+          "/api/church-records/members/getAllMembers",
+          { params }
+        );
+        this.members = response.data.data.members;
+        this.pagination = response.data.data.pagination;
       } catch (error) {
         // Error handled by axios interceptor
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
-    
+
     async createMember(data) {
       // ... create logic
-    }
-  }
-})
+    },
+  },
+});
 ```
 
 ### Store Organization
@@ -739,24 +732,29 @@ export const useMemberRecordStore = defineStore('memberRecord', {
 ## Security Considerations
 
 ### Authentication & Authorization
+
 - JWT tokens expire (expiration set in token generation)
 - Tokens validated on every request
 - Admin routes require `position === 'admin'` or `position === 'staff'`
 
 ### CORS
+
 - Whitelist of allowed origins
 - Credentials enabled (`credentials: true`)
 - Configurable for development vs production
 
 ### SQL Injection Prevention
+
 - All queries use parameterized statements (`query('SELECT * FROM table WHERE id = ?', [id])`)
 - No direct string concatenation in SQL queries
 
 ### XSS Protection
+
 - Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`
 - Input sanitization in database helpers
 
 ### Payload Limits
+
 - Body parser limit: 10MB (for large image/video uploads in CMS)
 - Configured specifically for CMS routes
 
@@ -814,6 +812,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
 ## API Response Format
 
 ### Success Response
+
 ```json
 {
   "success": true,
@@ -825,6 +824,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
 ```
 
 ### Error Response
+
 ```json
 {
   "success": false,
@@ -835,6 +835,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
 ```
 
 ### Paginated Response
+
 ```json
 {
   "success": true,
@@ -863,4 +864,3 @@ export const useMemberRecordStore = defineStore('memberRecord', {
 ## Last Updated
 
 This document was generated based on the codebase structure as of the current date. For the most up-to-date information, refer to the actual code files.
-

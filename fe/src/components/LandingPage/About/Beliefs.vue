@@ -337,6 +337,28 @@ onMounted(async () => {
   min-height: 100vh;
   background: white;
   margin-top: 64px;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+}
+
+/* Apply Georgia serif italic to all text content */
+.beliefs-page :deep(.v-card-text),
+.beliefs-page :deep(.text-h3),
+.beliefs-page :deep(.text-h4),
+.beliefs-page :deep(.text-h5),
+.beliefs-page :deep(.text-h6),
+.beliefs-page :deep(.text-body-1),
+.beliefs-page :deep(.text-body-2),
+.beliefs-page :deep(p),
+.beliefs-page :deep(h1),
+.beliefs-page :deep(h2),
+.beliefs-page :deep(h3),
+.beliefs-page :deep(h4),
+.beliefs-page :deep(h5),
+.beliefs-page :deep(h6) {
+  font-family: 'Georgia', serif !important;
+  font-style: italic !important;
+  text-shadow: none !important;
 }
 
 .hero-section {
@@ -360,7 +382,7 @@ onMounted(async () => {
 .hero-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.4), rgba(20, 184, 166, 0.2));
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
 }
 
 .floating-elements {
@@ -401,14 +423,12 @@ onMounted(async () => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 @media (max-width: 960px) {

@@ -1,128 +1,175 @@
 const express = require('express');
-const {
-  getAllAuditLogs,
-  getAuditLogById,
-  getAuditTrailSummary
-} = require('../dbHelpers/auditTrailRecords');
-
 const router = express.Router();
+const auditTrailRecords = require('../dbHelpers/auditTrailRecords');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
-/**
- * READ ALL - Get all audit trail records with pagination and filters
- * GET /api/audit-trail/getAllAuditLogs
- * Query params: search, limit, offset, page, pageSize, user_id, action_type, entity_type, status, date_from, date_to, sortBy
- */
-router.get('/getAllAuditLogs', async (req, res) => {
+// All audit trail routes require authentication
+router.use(authenticateToken);
+
+// GET /api/audit-trail/logs - Fetch audit logs with pagination and filters
+router.get('/logs', async (req, res) => {
   try {
-    const options = req.query;
-    
-    // Ensure pagination is always provided to prevent "Out of sort memory" errors
-    // If no pagination is specified, default to page 1 with 50 records
-    if (!options.page && !options.pageSize && !options.limit) {
-      options.page = options.page || '1';
-      options.pageSize = options.pageSize || '50';
+    const {
+      page = 1,
+      pageSize = 20,
+      actionType,
+      userId,
+      dateRange,
+      status,
+      module
+    } = req.query;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
     }
-    
-    // Note: Date range defaults to last 30 days (1 month) if not specified
-    // This prevents sorting the entire audit trail table
-    
-    const result = await getAllAuditLogs(options);
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data,
-        count: result.count,
-        totalCount: result.totalCount,
-        pagination: result.pagination
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+
+    const filters = {
+      action_type: actionType,
+      user_id: userId,
+      status: status,
+      module: module,
+      start_date: startDate,
+      end_date: endDate
+    };
+
+    const result = await auditTrailRecords.getAuditLogs(
+      parseInt(page),
+      parseInt(pageSize),
+      filters
+    );
+
+    res.json({
+      success: true,
+      data: {
+        logs: result.logs,
+        pagination: result.pagination,
+        uniqueUsers: result.uniqueUsers
+      }
+    });
   } catch (error) {
     console.error('Error fetching audit logs:', error);
-    
-    // Handle specific MySQL sort memory error
-    if (error.code === 'ER_OUT_OF_SORTMEMORY') {
-      res.status(500).json({
-        success: false,
-        error: 'Query too large. Please use pagination (page and pageSize parameters) to fetch results in smaller chunks.',
-        message: 'Please specify pagination parameters (page and pageSize) to reduce the query size.'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to fetch audit logs'
-      });
-    }
-  }
-});
-
-/**
- * READ ONE - Get a single audit log by ID
- * GET /api/audit-trail/getAuditLogById/:id
- */
-router.get('/getAuditLogById/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await getAuditLogById(parseInt(id));
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-        data: null
-      });
-    }
-  } catch (error) {
-    console.error('Error fetching audit log:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch audit log'
+      error: 'Database Error',
+      message: 'Failed to fetch audit logs'
     });
   }
 });
 
-/**
- * GET SUMMARY - Get audit trail summary statistics
- * GET /api/audit-trail/getAuditTrailSummary
- */
-router.get('/getAuditTrailSummary', async (req, res) => {
+// POST /api/audit-trail/log - Create a new audit log entry
+router.post('/log', async (req, res) => {
   try {
-    const result = await getAuditTrailSummary();
-    
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
+    const logData = req.body;
+
+    // Validate required fields
+    const requiredFields = ['user_id', 'user_email', 'user_name', 'user_position', 'action_type', 'module', 'description'];
+    for (const field of requiredFields) {
+      if (!logData[field]) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation Error',
+          message: `Missing required field: ${field}`
+        });
+      }
     }
+
+    // Add timestamp and IP address
+    logData.date_created = new Date().toISOString();
+    logData.ip_address = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+
+    const result = await auditTrailRecords.createAuditLog(logData);
+
+    res.json({
+      success: true,
+      data: { logId: result.insertId },
+      message: 'Audit log created successfully'
+    });
   } catch (error) {
-    console.error('Error fetching audit trail summary:', error);
+    console.error('Error creating audit log:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch audit trail summary'
+      error: 'Database Error',
+      message: 'Failed to create audit log'
+    });
+  }
+});
+
+// GET /api/audit-trail/export - Export audit logs as CSV
+router.get('/export', async (req, res) => {
+  try {
+    const {
+      actionType,
+      userId,
+      dateRange,
+      status,
+      module
+    } = req.query;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const filters = {
+      action_type: actionType,
+      user_id: userId,
+      status: status,
+      module: module,
+      start_date: startDate,
+      end_date: endDate
+    };
+
+    const csvData = await auditTrailRecords.exportAuditLogs(filters);
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="audit_trail_${new Date().toISOString().split('T')[0]}.csv"`);
+
+    res.send(csvData);
+  } catch (error) {
+    console.error('Error exporting audit logs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Export Error',
+      message: 'Failed to export audit logs'
+    });
+  }
+});
+
+// GET /api/audit-trail/stats - Get audit trail statistics
+router.get('/stats', async (req, res) => {
+  try {
+    const stats = await auditTrailRecords.getAuditStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching audit stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database Error',
+      message: 'Failed to fetch audit statistics'
     });
   }
 });
 
 module.exports = router;
-

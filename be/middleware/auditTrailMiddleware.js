@@ -1,507 +1,623 @@
-/**
- * Safely convert Buffer or any value to plain text string
- * @param {*} value - Value to convert
- * @param {String} defaultValue - Default value if conversion fails
- * @returns {String} Plain text string representation
- */
-function safeToString(value, defaultValue = null) {
-  if (value === null || value === undefined) {
-    return defaultValue;
+const auditTrailRecords = require('../dbHelpers/auditTrailRecords');
+
+// Helper function to determine module from path
+function determineModule(path) {
+  if (path.includes('/members') || path.includes('/church-records/members')) {
+    return 'Members';
+  } else if (path.includes('/accounts') || path.includes('/church-records/accounts')) {
+    return 'Accounts';
+  } else if (path.includes('/events') || path.includes('/church-records/events')) {
+    return 'Events';
+  } else if (path.includes('/ministries') || path.includes('/church-records/ministries')) {
+    return 'Ministries';
+  } else if (path.includes('/departments') || path.includes('/church-records/departments')) {
+    return 'Departments';
+  } else if (path.includes('/department-officers') || path.includes('/church-records/department-officers')) {
+    return 'Department Officers';
+  } else if (path.includes('/church-leaders') || path.includes('/church-records/church-leaders')) {
+    return 'Church Leaders';
+  } else if (path.includes('/tithes') || path.includes('/church-records/tithes')) {
+    return 'Tithes & Offerings';
+  } else if (path.includes('/transactions')) {
+    return 'Transactions';
+  } else if (path.includes('/water-baptisms') || path.includes('/services/water-baptisms')) {
+    return 'Water Baptism';
+  } else if (path.includes('/burial-services') || path.includes('/church-records/burial-services')) {
+    return 'Burial Service';
+  } else if (path.includes('/child-dedications') || path.includes('/church-records/child-dedications')) {
+    return 'Child Dedication';
+  } else if (path.includes('/marriage-services') || path.includes('/services/marriage-services')) {
+    return 'Marriage Service';
+  } else if (path.includes('/approvals') || path.includes('/church-records/approvals')) {
+    return 'Approvals';
+  } else if (path.includes('/archives')) {
+    return 'Archives';
   }
-  
-  if (Buffer.isBuffer(value)) {
-    return value.toString('utf8');
-  }
-  
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch (e) {
-      return defaultValue;
-    }
-  }
-  
-  return String(value);
+  return 'Unknown Module';
 }
 
-/**
- * Convert any value to plain text (no IDs, no Buffers, just text)
- * @param {*} value - Value to convert
- * @param {String} defaultValue - Default value if conversion fails
- * @returns {String} Plain text string
- */
-function toPlainText(value, defaultValue = '') {
-  if (value === null || value === undefined) {
-    return defaultValue;
-  }
-  
-  // Handle Buffer - convert to UTF-8 string
-  if (Buffer.isBuffer(value)) {
-    return value.toString('utf8').trim();
-  }
-  
-  // Handle objects - convert to readable text
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch (e) {
-      return defaultValue;
-    }
-  }
-  
-  // Handle numbers - convert to string
-  if (typeof value === 'number') {
-    return String(value);
-  }
-  
-  // Handle booleans - convert to string
-  if (typeof value === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-  
-  // Handle strings - trim and return
-  return String(value).trim();
-}
-
-const { createAuditLog } = require('../dbHelpers/auditTrailRecords');
-const { query } = require('../database/db');
-
-/**
- * Audit Trail Middleware
- * Automatically logs user actions to the audit trail
- */
-
-/**
- * Get user information from database based on user_id (acc_id)
- * @param {String} userId - User/Account ID
- * @returns {Promise<Object>} User information
- */
-async function getUserInfo(userId) {
-  try {
-    if (!userId) return null;
-
-    // Get account info - only email needed
-    const sql = `
-      SELECT 
-        a.acc_id,
-        a.email
-      FROM tbl_accounts a
-      WHERE a.acc_id = ?
-    `;
-    const [rows] = await query(sql, [userId]);
-    
-    if (rows.length > 0) {
-      return {
-        user_id: rows[0].acc_id,
-        user_email: rows[0].email || null
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error('Error fetching user info for audit trail:', error);
-    return null;
-  }
-}
-
-/**
- * Extract entity type and ID from request path
- * Returns plain text descriptions instead of IDs
- * @param {String} path - Request path
- * @param {String} method - HTTP method
- * @returns {Object} Entity type and description (text, not IDs)
- */
-function extractEntityInfo(path, method) {
-  // Map API paths to entity types based on actual routes in index.js
-  // Order matters - more specific paths should come first
-  const pathMappings = {
-    '/api/church-records/members': 'member',
-    '/api/church-records/accounts': 'account',
-    '/api/church-records/departments': 'department',
-    '/api/church-records/ministries': 'ministry',
-    '/api/church-records/events': 'event',
-    '/api/church-records/approvals': 'approval',
-    '/api/church-records/tithes': 'tithe',
-    '/api/church-records/church-leaders': 'church_leader',
-    '/api/church-records/department-officers': 'department_officer',
-    '/api/church-records/child-dedications': 'child_dedication',
-    '/api/church-records/burial-services': 'burial_service',
-    '/api/services/water-baptisms': 'water_baptism',
-    '/api/services/marriage-services': 'marriage_service',
-    '/api/transactions': 'transaction',
-    '/api/member-registration': 'member_registration',
-    '/api/audit-trail': 'audit_trail',
-    '/api/archives': 'archive',
-    '/api/announcements': 'announcement',
-    '/api/forms': 'form',
-    '/api/cms': 'cms_page',
-    '/api/dashboard': 'dashboard'
+// Helper function to get primary key field for a table
+function getPrimaryKeyField(tableName) {
+  const primaryKeys = {
+    'tbl_members': 'member_id',
+    'tbl_accounts': 'acc_id',
+    'tbl_events': 'event_id',
+    'tbl_ministry': 'ministry_id',
+    'tbl_departments': 'department_id',
+    'tbl_departmentofficers': 'officer_id',
+    'tbl_churchleaders': 'leader_id',
+    'tbl_tithes': 'tithes_id',
+    'tbl_waterbaptism': 'baptism_id',
+    'tbl_burialservice': 'burial_id',
+    'tbl_marriageservice': 'marriage_id',
+    'tbl_childdedications': 'child_id',
+    'tbl_transactions': 'transaction_id',
+    'tbl_approval': 'approval_id',
+    'tbl_announcements': 'announcement_id',
+    'tbl_cms_images': 'image_id'
   };
-
-  let entityType = 'unknown';
-  let entityDescription = 'Unknown entity';
-
-  // Find matching path prefix (check longest matches first)
-  const sortedPrefixes = Object.entries(pathMappings).sort((a, b) => b[0].length - a[0].length);
-  for (const [prefix, type] of sortedPrefixes) {
-    if (path.startsWith(prefix)) {
-      entityType = type;
-      // Create a readable description from the path
-      entityDescription = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      break;
-    }
-  }
-
-  // If still unknown, try to infer from path segments
-  if (entityType === 'unknown') {
-    const pathSegments = path.split('/').filter(seg => seg && !seg.includes('?'));
-    
-    // Try to extract entity type from path segments
-    // e.g., /api/something/action -> 'something'
-    if (pathSegments.length >= 2 && pathSegments[0] === 'api') {
-      const potentialEntity = pathSegments[1];
-      // Convert kebab-case or snake_case to readable text
-      const normalizedEntity = potentialEntity
-        .replace(/-/g, '_')
-        .toLowerCase();
-      
-      // Only use if it looks like a valid entity name (alphanumeric and underscores)
-      if (/^[a-z][a-z0-9_]*$/.test(normalizedEntity)) {
-        entityType = normalizedEntity;
-        entityDescription = normalizedEntity.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      }
-    }
-  }
-
-  return { entityType, entityDescription };
+  return primaryKeys[tableName] || 'id';
 }
 
-/**
- * Convert request data to plain text description
- * No IDs, no Buffers - just readable text of what the data is
- * @param {Object} req - Express request object
- * @param {String} entityType - Type of entity
- * @returns {Object} Plain text data description
- */
-function getDataAsText(req, entityType) {
-  const result = {
-    action_description: '',
-    data_summary: '',
-    data_details: []
-  };
-
-  // Build action description
-  const method = req.method.toUpperCase();
-  const path = req.path;
-  result.action_description = `${method} ${path}`;
-
-  // If there's a body, summarize it as plain text
-  if (req.body && Object.keys(req.body).length > 0) {
-    const textParts = [];
-    
-    for (const [key, value] of Object.entries(req.body)) {
-      // Skip sensitive fields
-      if (['password', 'token', 'secret', 'key'].includes(key.toLowerCase())) {
-        textParts.push(`${key}: [REDACTED]`);
-      } else {
-        const textValue = toPlainText(value, 'null');
-        textParts.push(`${key}: ${textValue}`);
-      }
-    }
-    
-    result.data_summary = textParts.join(', ');
-    result.data_details = textParts;
+// Middleware to automatically log user actions
+const auditTrailMiddleware = async (req, res, next) => {
+  // Only log authenticated requests
+  if (!req.user) {
+    return next();
   }
 
-  return result;
-}
+  // For DELETE operations, try to capture the record data before it's deleted
+  if (req.method === 'DELETE') {
+    // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123
+    const pathParts = req.path.split('/');
+    const lastPart = pathParts[pathParts.length - 1];
 
-/**
- * Create audit log entry with plain text data (no IDs, no Buffers)
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {String} actionType - Action type override (optional)
- * @param {String} entityType - Entity type override (optional)
- * @param {String} description - Description override (optional)
- * @param {Object} oldValues - Old values for UPDATE actions (optional) - will be converted to text
- * @param {Object} newValues - New values for CREATE/UPDATE actions (optional) - will be converted to text
- * @param {String} status - Status (success, failed, error) - default: 'success'
- * @param {String} errorMessage - Error message if status is not success (optional)
- */
-async function logAuditAction(req, res, options = {}) {
-  try {
-    // Don't log audit trail routes themselves to avoid recursion
-    if (req.path.startsWith('/api/audit-trail')) {
-      return;
-    }
-    
-    // Don't log if user is not authenticated (unless it's a login action)
-    if (!req.user && !req.path.includes('/login')) {
-      return;
-    }
+    // Check if last part looks like an ID (numeric)
+    const id = req.params.id || (lastPart && /^\d+$/.test(lastPart) ? lastPart : null);
 
-    const {
-      actionType: overrideActionType,
-      entityType: overrideEntityType,
-      description: overrideDescription,
-      oldValues,
-      newValues,
-      status: overrideStatus = 'success',
-      errorMessage
-    } = options;
-
-    // Get user info - only store email (user_id and user_email only)
-    let userInfo = {
-      user_id: toPlainText(req.user?.acc_id || req.user?.user_id || 'anonymous'),
-      user_email: toPlainText(req.user?.email || null)
-    };
-
-    // Fetch full user info if we have user_id
-    if (userInfo.user_id && userInfo.user_id !== 'anonymous') {
-      const fullUserInfo = await getUserInfo(userInfo.user_id);
-      if (fullUserInfo) {
-        userInfo = {
-          user_id: toPlainText(fullUserInfo.user_id),
-          user_email: toPlainText(fullUserInfo.user_email)
-        };
-      }
-    }
-
-    // Extract entity info - get plain text description instead of ID
-    const { entityType: extractedEntityType, entityDescription } = extractEntityInfo(req.path, req.method);
-    const finalEntityType = overrideEntityType || extractedEntityType;
-    
-    // Log warning if entity type is still unknown (for debugging)
-    if (finalEntityType === 'unknown' && !overrideEntityType) {
-      console.warn(`[Audit Trail] Unknown entity type for path: ${req.method} ${req.path}`);
-    }
-
-    // Don't log VIEW actions - only log CREATE, UPDATE, DELETE, LOGIN, LOGOUT, EXPORT, VIEW_LIST
-    const finalActionType = overrideActionType || getActionType(req.method, req.path);
-    if (!finalActionType) {
-      return; // Skip logging VIEW actions (single record views)
-    }
-
-    // Get the route that was accessed as plain text
-    const routeAccessed = toPlainText(req.originalUrl || req.path);
-    
-    // Use route as description (or override if provided)
-    const description = overrideDescription || routeAccessed;
-
-    // Get IP address and user agent as plain text
-    const ipAddress = toPlainText(req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']);
-    const userAgent = toPlainText(req.headers['user-agent']);
-
-    // Process values to plain text - no Buffers, no IDs, just text
-    let processedOldValues = null;
-    let processedNewValues = null;
-
-    if (oldValues) {
-      processedOldValues = convertToPlainTextObject(oldValues);
-    }
-
-    if (newValues) {
-      processedNewValues = convertToPlainTextObject(newValues);
-    } else if (req.method !== 'GET' && req.body) {
-      processedNewValues = convertToPlainTextObject(req.body);
-    }
-
-    // Prepare audit data with plain text only
-    const auditData = {
-      ...userInfo,
-      action_type: toPlainText(finalActionType),
-      entity_type: toPlainText(finalEntityType),
-      entity_id: toPlainText(entityDescription), // Store description instead of ID
-      description: toPlainText(description),
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      old_values: processedOldValues,
-      new_values: processedNewValues,
-      status: toPlainText(overrideStatus),
-      error_message: toPlainText(errorMessage)
-    };
-
-    // Create audit log (non-blocking - don't fail the request if logging fails)
-    createAuditLog(auditData).catch(error => {
-      console.error('Error creating audit log (non-blocking):', error);
-    });
-  } catch (error) {
-    // Don't throw error - audit logging should never break the main request
-    console.error('Error in audit trail middleware:', error);
-  }
-}
-
-/**
- * Convert an object to plain text values (no Buffers, no IDs)
- * @param {Object} obj - Object to convert
- * @returns {Object} Object with plain text values
- */
-function convertToPlainTextObject(obj) {
-  if (!obj || typeof obj !== 'object') {
-    return toPlainText(obj);
-  }
-
-  const result = {};
-  for (const [key, value] of Object.entries(obj)) {
-    // Skip sensitive fields
-    if (['password', 'token', 'secret', 'key', 'acc_password'].includes(key.toLowerCase())) {
-      result[key] = '[REDACTED]';
-    } else {
-      result[key] = toPlainText(value);
-    }
-  }
-  return result;
-}
-
-/**
- * Determine action type from HTTP method and path
- * Based on actual route patterns in the codebase
- * @param {String} method - HTTP method
- * @param {String} path - Request path
- * @returns {String} Action type
- */
-function getActionType(method, path) {
-  const upperMethod = method.toUpperCase();
-  const lowerPath = path.toLowerCase();
-  
-  // Check for specific action patterns in path (order matters - check specific first)
-  
-  // Authentication actions
-  if (lowerPath.includes('/login')) return 'LOGIN';
-  if (lowerPath.includes('/logout')) return 'LOGOUT';
-  if (lowerPath.includes('/forgotpassword')) return 'FORGOT_PASSWORD';
-  if (lowerPath.includes('/verifycredentials')) return 'VERIFY_CREDENTIALS';
-  
-  // Certificate actions
-  if (lowerPath.includes('/getcertificatedata')) return 'VIEW_CERTIFICATE';
-  
-  // Export actions
-  if (lowerPath.includes('/exportexcel') || lowerPath.includes('/export')) return 'EXPORT';
-  
-  // Check actions
-  if (lowerPath.includes('/check')) return 'CHECK';
-  
-  // CRUD actions based on route patterns
-  if (lowerPath.includes('/create')) return 'CREATE';
-  if (lowerPath.includes('/register')) return 'CREATE'; // member registration
-  if (lowerPath.includes('/update')) return 'UPDATE';
-  if (lowerPath.includes('/delete')) return 'DELETE';
-  
-  // GET requests - don't log VIEW actions for single records
-  // Only log VIEW_LIST for list views
-  if (upperMethod === 'GET') {
-    // Patterns that indicate viewing a list:
-    // - /getAllX
-    // - /getAllXForSelect
-    // - /getTotalsByServiceType (summary/statistics)
-    if (lowerPath.includes('/getall') || 
-        lowerPath.includes('/gettotals') ||
-        lowerPath.includes('/getaudittrailsummary')) {
-      return 'VIEW_LIST';
-    }
-    
-    // Don't log VIEW actions for single records - return null to skip
-    return null;
-  }
-  
-  // Map HTTP methods to action types (fallback)
-  switch (upperMethod) {
-    case 'POST':
-      return 'CREATE';
-    case 'PUT':
-    case 'PATCH':
-      return 'UPDATE';
-    case 'DELETE':
-      return 'DELETE';
-    default:
-      return 'UNKNOWN';
-  }
-}
-
-/**
- * Middleware to log actions after response is sent
- * This ensures we can log the status of the action
- */
-const auditTrailMiddleware = (req, res, next) => {
-  // Store original end function
-  const originalEnd = res.end;
-  const originalJson = res.json;
-
-  // Override res.json to capture response
-  res.json = function(body) {
-    res.locals.responseBody = body;
-    return originalJson.call(this, body);
-  };
-
-  // Override res.end to log after response is sent
-  res.end = function(chunk, encoding) {
-    // Log audit action after response is sent (non-blocking)
-    setImmediate(async () => {
+    if (id) {
+      console.log('DEBUG: Capturing data for DELETE', req.path, 'ID:', id);
       try {
-        // Determine status based on status code and response body
-        let status = 'success'; // Default to success
-        let errorMessage = null;
+        const { query } = require('../database/db');
+        const module = determineModule(req.path);
+        console.log('DEBUG: Determined module:', module);
 
-        // Check status code first
-        if (res.statusCode) {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            status = 'success';
-          } else if (res.statusCode >= 400 && res.statusCode < 500) {
-            status = 'failed';
-          } else if (res.statusCode >= 500) {
-            status = 'error';
+        if (module !== 'Archives') {
+          const tableMap = {
+            'Members': 'tbl_members',
+            'Accounts': 'tbl_accounts',
+            'Events': 'tbl_events',
+            'Ministries': 'tbl_ministry',
+            'Departments': 'tbl_departments',
+            'Department Officers': 'tbl_departmentofficers',
+            'Church Leaders': 'tbl_churchleaders',
+            'Tithes & Offerings': 'tbl_tithes',
+            'Water Baptism': 'tbl_waterbaptism',
+            'Burial Service': 'tbl_burialservice',
+            'Marriage Service': 'tbl_marriageservice',
+            'Child Dedication': 'tbl_childdedications',
+            'Transactions': 'tbl_transactions',
+            'Approvals': 'tbl_approval',
+            'Announcements': 'tbl_announcements',
+            'Content Management': 'tbl_cms_images'
+          };
+
+          const tableName = tableMap[module];
+          console.log('DEBUG: Table name:', tableName);
+          if (tableName) {
+            const primaryKey = getPrimaryKeyField(tableName);
+            console.log('DEBUG: Primary key:', primaryKey);
+            const recordSql = `SELECT * FROM \`${tableName}\` WHERE ${primaryKey} = ?`;
+            console.log('DEBUG: Executing query:', recordSql, 'with param:', id);
+            const [recordRows] = await query(recordSql, [id]);
+            console.log('DEBUG: Query returned', recordRows.length, 'rows');
+
+            if (recordRows.length > 0) {
+              // Store the record data for later use in logging
+              req.record_to_delete = recordRows[0];
+              console.log('DEBUG: Stored complete record data for deletion logging:', JSON.stringify(recordRows[0]).substring(0, 200) + '...');
+            } else {
+              console.log('DEBUG: No record found with ID:', id);
+            }
+          } else {
+            console.log('DEBUG: No table mapping found for module:', module);
           }
+        } else {
+          console.log('DEBUG: Skipping data capture for Archives module');
         }
-
-        // Also check response body for success/failure indicators
-        if (res.locals.responseBody) {
-          const responseBody = res.locals.responseBody;
-          
-          // If response has explicit success: false, mark as failed
-          if (responseBody.success === false) {
-            status = 'failed';
-            errorMessage = responseBody.error || responseBody.message || null;
-          }
-          // If response has explicit success: true, ensure status is success
-          else if (responseBody.success === true) {
-            status = 'success';
-          }
-          // If response has error field, mark as failed/error
-          else if (responseBody.error) {
-            status = res.statusCode >= 500 ? 'error' : 'failed';
-            errorMessage = responseBody.error || responseBody.message || null;
-          }
-        }
-
-        await logAuditAction(req, res, {
-          status,
-          errorMessage: status !== 'success' ? errorMessage : null
-        });
       } catch (error) {
-        console.error('Error in audit trail middleware callback:', error);
+        // Silently fail if we can't capture the data
+        console.error('Error capturing record data for audit:', error);
       }
-    });
+    } else {
+      console.log('DEBUG: No ID found in DELETE request path:', req.path);
+    }
+  }
 
-    // Call original end
-    return originalEnd.call(this, chunk, encoding);
+  // Store original response methods to intercept them
+  const originalJson = res.json;
+  const originalSend = res.send;
+  const originalEnd = res.end;
+
+  // Flag to track if we've already logged this request
+  let logged = false;
+
+  // Function to log the action
+  const logAction = async (actionData) => {
+    if (logged) return; // Prevent duplicate logging
+    logged = true;
+
+    try {
+      const userInfo = req.user;
+      const memberInfo = req.user.member || {};
+
+      // Get current time in Philippine timezone (UTC+8)
+      const now = new Date();
+      const phTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // Add 8 hours for PH time
+      const phTimestamp = phTime.toISOString().replace('Z', '+08:00');
+
+      // For deletions, try to get the actual record data before it's deleted
+      let enhancedDescription = actionData.description;
+      if (actionData.action_type === 'DELETE' && actionData.entity_id) {
+        try {
+          const { query } = require('../database/db');
+
+          if (actionData.module === 'Archives') {
+            // Check if archive data was provided by the route handler
+            if (req.archive_data) {
+              const archive = req.archive_data;
+              const tableName = archive.original_table.replace('tbl_', '');
+
+              // Parse and format the archived data
+              let archivedData = archive.archived_data;
+              if (typeof archivedData === 'string') {
+                try {
+                  archivedData = JSON.parse(archivedData);
+                } catch (e) {
+                  // Keep as string if not valid JSON
+                }
+              }
+
+              // Convert Buffer fields in archived data
+              const cleanArchivedData = {};
+              for (const [key, value] of Object.entries(archivedData)) {
+                if (Buffer.isBuffer(value)) {
+                  cleanArchivedData[key] = value.toString('utf8');
+                } else if (typeof value === 'object' && value !== null) {
+                  cleanArchivedData[key] = JSON.stringify(value);
+                } else {
+                  cleanArchivedData[key] = value;
+                }
+              }
+
+              enhancedDescription = `Deleted archived ${tableName} record: ${JSON.stringify(cleanArchivedData)}`;
+            } else {
+              // Fallback: try to query the database (though archive might be deleted)
+              try {
+                const archiveSql = `
+                  SELECT original_table, original_id, archived_data
+                  FROM tbl_archives
+                  WHERE archive_id = ?
+                `;
+                const [archiveRows] = await query(archiveSql, [actionData.entity_id]);
+                if (archiveRows.length > 0) {
+                  const archive = archiveRows[0];
+                  const tableName = archive.original_table.replace('tbl_', '');
+                  enhancedDescription = `Deleted archived ${tableName} record (ID: ${archive.original_id}, from Archives)`;
+                }
+              } catch (dbError) {
+                // Keep original description if database query fails
+              }
+            }
+          } else {
+            // For regular deletions, use the captured record data
+            if (req.record_to_delete) {
+              const recordData = req.record_to_delete;
+              // Convert Buffer fields and format as readable JSON
+              const cleanData = {};
+              for (const [key, value] of Object.entries(recordData)) {
+                if (Buffer.isBuffer(value)) {
+                  cleanData[key] = value.toString('utf8');
+                } else if (typeof value === 'object' && value !== null) {
+                  cleanData[key] = JSON.stringify(value);
+                } else {
+                  cleanData[key] = value;
+                }
+              }
+              enhancedDescription = `Deleted ${actionData.entity_type}: ${JSON.stringify(cleanData)}`;
+            } else {
+              // Fallback: try to query the database (though record might be deleted)
+              try {
+                const tableMap = {
+                  'Members': 'tbl_members',
+                  'Accounts': 'tbl_accounts',
+                  'Events': 'tbl_events',
+                  'Ministries': 'tbl_ministry',
+                  'Departments': 'tbl_departments',
+                  'Department Officers': 'tbl_departmentofficers',
+                  'Church Leaders': 'tbl_churchleaders',
+                  'Tithes & Offerings': 'tbl_tithes',
+                  'Water Baptism': 'tbl_waterbaptism',
+                  'Burial Service': 'tbl_burialservice',
+                  'Marriage Service': 'tbl_marriageservice',
+                  'Child Dedication': 'tbl_childdedications',
+                  'Transactions': 'tbl_transactions',
+                  'Approvals': 'tbl_approval',
+                  'Announcements': 'tbl_announcements',
+                  'Content Management': 'tbl_cms_images'
+                };
+
+                const tableName = tableMap[actionData.module];
+                if (tableName) {
+                  const recordSql = `SELECT * FROM \`${tableName}\` WHERE ${getPrimaryKeyField(tableName)} = ?`;
+                  const [recordRows] = await query(recordSql, [actionData.entity_id]);
+                  if (recordRows.length > 0) {
+                    const recordData = recordRows[0];
+                    const cleanData = {};
+                    for (const [key, value] of Object.entries(recordData)) {
+                      if (Buffer.isBuffer(value)) {
+                        cleanData[key] = value.toString('utf8');
+                      } else if (typeof value === 'object' && value !== null) {
+                        cleanData[key] = JSON.stringify(value);
+                      } else {
+                        cleanData[key] = value;
+                      }
+                    }
+                    enhancedDescription = `Deleted ${actionData.entity_type}: ${JSON.stringify(cleanData)}`;
+                  }
+                }
+              } catch (dbError) {
+                // Keep original description if database query fails
+              }
+            }
+          }
+        } catch (dbError) {
+          console.error('Error fetching record details for audit log:', dbError);
+          // Continue with original description if database query fails
+        }
+      }
+
+
+      const logData = {
+        user_id: userInfo.account?.acc_id || userInfo.acc_id,
+        user_email: userInfo.account?.email || userInfo.email,
+        user_name: `${memberInfo.firstname || ''} ${memberInfo.lastname || ''}`.trim() || userInfo.email,
+        user_position: userInfo.account?.position || userInfo.position || 'member',
+        action_type: actionData.action_type,
+        module: actionData.module,
+        description: enhancedDescription,
+        entity_type: actionData.entity_type,
+        entity_id: actionData.entity_id,
+        ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+        user_agent: req.get('User-Agent') || 'unknown',
+        status: res.statusCode >= 400 ? 'failed' : 'success',
+        error_message: res.statusCode >= 400 ? `HTTP ${res.statusCode}` : null,
+        date_created: phTimestamp
+      };
+
+      await auditTrailRecords.createAuditLog(logData);
+    } catch (error) {
+      console.error('Audit trail logging error:', error);
+      // Don't fail the request if audit logging fails
+    }
+  };
+
+  // Determine action type and details from request
+  const determineActionDetails = () => {
+    const method = req.method;
+    const path = req.path;
+    const baseUrl = req.baseUrl || '';
+    const fullPath = baseUrl + path;
+    const query = req.query || {};
+    const body = req.body || {};
+
+    // Extract entity ID from path (usually at the end)
+    const pathParts = path.split('/').filter(p => p);
+    const lastPart = pathParts[pathParts.length - 1];
+
+    // Check if last part looks like an ID (numeric or UUID-like)
+    const isId = /^\d+$/.test(lastPart) || /^[a-f0-9-]{8,}$/i.test(lastPart);
+
+    let actionType = 'VIEW';
+    let module = 'Unknown Module';
+    let entityType = null;
+    let entityId = isId ? lastPart : null;
+    let description = '';
+
+    // Determine module from full path
+    if (fullPath.includes('/members') || fullPath.includes('/church-records/members')) {
+      module = 'Members';
+      entityType = 'member';
+    } else if (fullPath.includes('/accounts') || fullPath.includes('/church-records/accounts')) {
+      module = 'Accounts';
+      entityType = 'account';
+    } else if (fullPath.includes('/events') || fullPath.includes('/church-records/events')) {
+      module = 'Events';
+      entityType = 'event';
+    } else if (fullPath.includes('/ministries') || fullPath.includes('/church-records/ministries')) {
+      module = 'Ministries';
+      entityType = 'ministry';
+    } else if (fullPath.includes('/departments') || fullPath.includes('/church-records/departments')) {
+      module = 'Departments';
+      entityType = 'department';
+    } else if (fullPath.includes('/department-officers') || fullPath.includes('/church-records/department-officers')) {
+      module = 'Department Officers';
+      entityType = 'department_officer';
+    } else if (fullPath.includes('/church-leaders') || fullPath.includes('/church-records/church-leaders')) {
+      module = 'Church Leaders';
+      entityType = 'church_leader';
+    } else if (fullPath.includes('/tithes') || fullPath.includes('/church-records/tithes')) {
+      module = 'Tithes & Offerings';
+      entityType = 'tithe';
+    } else if (fullPath.includes('/transactions')) {
+      module = 'Transactions';
+      entityType = 'transaction';
+    } else if (fullPath.includes('/water-baptisms') || fullPath.includes('/services/water-baptisms')) {
+      module = 'Water Baptism';
+      entityType = 'water_baptism';
+    } else if (fullPath.includes('/burial-services') || fullPath.includes('/church-records/burial-services')) {
+      module = 'Burial Service';
+      entityType = 'burial_service';
+    } else if (fullPath.includes('/child-dedications') || fullPath.includes('/church-records/child-dedications')) {
+      module = 'Child Dedication';
+      entityType = 'child_dedication';
+    } else if (fullPath.includes('/marriage-services') || fullPath.includes('/services/marriage-services')) {
+      module = 'Marriage Service';
+      entityType = 'marriage_service';
+    } else if (fullPath.includes('/approvals') || fullPath.includes('/church-records/approvals')) {
+      module = 'Approvals';
+      entityType = 'approval';
+    } else if (fullPath.includes('/dashboard')) {
+      module = 'Dashboard';
+    } else if (fullPath.includes('/cms')) {
+      module = 'Content Management';
+    } else if (fullPath.includes('/archives')) {
+      module = 'Archives';
+    } else if (fullPath.includes('/announcements')) {
+      module = 'Announcements';
+    } else if (fullPath.includes('/forms')) {
+      module = 'Forms';
+    } else if (fullPath.includes('/audit-trail')) {
+      module = 'Audit Trail';
+    } else if (fullPath.includes('/system-logs')) {
+      module = 'System Logs';
+    } else if (fullPath.includes('/member-registration')) {
+      module = 'Member Registration';
+    } else if (fullPath.includes('/archives')) {
+      module = 'Archives';
+    }
+
+    // Helper function to generate informative descriptions
+    const generateDescription = (action, entityType, entityId, module, data = {}) => {
+      const entityName = entityType ? entityType.replace(/_/g, ' ') : 'record';
+
+      switch (action) {
+        case 'CREATE':
+          // Try to get meaningful name from request body
+          const createName = data.name || data.title || data.firstname || data.email ||
+                            (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+                            (entityId ? `#${entityId}` : '');
+
+          // Add more context based on module
+          let createContext = '';
+          if (module === 'Members') {
+            createContext = data.email ? ` (Email: ${data.email})` : '';
+          } else if (module === 'Events') {
+            createContext = data.event_date ? ` (Date: ${data.event_date})` : '';
+          } else if (module === 'Water Baptism') {
+            createContext = data.baptism_date ? ` (Date: ${data.baptism_date})` : '';
+          }
+
+          return `Created new ${entityName}${createName ? `: ${createName}` : ''}${createContext}`;
+
+        case 'UPDATE':
+          // Try to get meaningful name from request body or use ID
+          const updateName = data.name || data.title || data.firstname || data.email ||
+                            (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+                            (entityId ? `#${entityId}` : '');
+
+          // Add more context based on module
+          let updateContext = '';
+          if (module === 'Members') {
+            updateContext = data.email ? ` (Email: ${data.email})` : '';
+          } else if (module === 'Events') {
+            updateContext = data.event_date ? ` (Date: ${data.event_date})` : '';
+          }
+
+          return `Updated ${entityName}${updateName ? `: ${updateName}` : (entityId ? ` #${entityId}` : '')}${updateContext}`;
+
+        case 'DELETE':
+          // For delete, show complete record data like archives do
+          let deleteDescription = `Deleted ${entityName}`;
+
+          // Add identifying information
+          const identifiers = [];
+          if (data.name) identifiers.push(`"${data.name}"`);
+          else if (data.title) identifiers.push(`"${data.title}"`);
+          else if (data.firstname && data.lastname) identifiers.push(`${data.firstname} ${data.lastname}`);
+          else if (data.firstname) identifiers.push(data.firstname);
+          else if (data.email) identifiers.push(data.email);
+          else if (entityId) identifiers.push(`ID: ${entityId}`);
+
+          if (identifiers.length > 0) {
+            deleteDescription += ` (${identifiers[0]})`;
+          }
+
+          // Add module context
+          if (module && module !== 'Unknown Module') {
+            deleteDescription += ` from ${module}`;
+          }
+
+          // Add complete record data if available (like archives)
+          if (Object.keys(data).length > 0) {
+            // Format the complete data as JSON, excluding null/undefined values
+            const cleanData = {};
+            for (const [key, value] of Object.entries(data)) {
+              if (value !== null && value !== undefined && value !== '') {
+                if (Buffer.isBuffer(value)) {
+                  cleanData[key] = value.toString('utf8');
+                } else if (typeof value === 'object') {
+                  cleanData[key] = JSON.stringify(value);
+                } else {
+                  cleanData[key] = value;
+                }
+              }
+            }
+
+            if (Object.keys(cleanData).length > 0) {
+              deleteDescription += ` - Complete Data: ${JSON.stringify(cleanData)}`;
+            }
+          }
+
+          return deleteDescription;
+
+        case 'RESTORE':
+          const restoreDetails = [];
+          if (data.name) restoreDetails.push(`"${data.name}"`);
+          else if (entityId) restoreDetails.push(`ID: ${entityId}`);
+          if (module && module !== 'Unknown Module') restoreDetails.push(`to ${module}`);
+
+          return `Restored ${entityName}${restoreDetails.length ? ` (${restoreDetails.join(', ')})` : ''}`;
+
+        case 'EXPORT':
+          // Include export details from query params
+          const exportDetails = [];
+          if (query.start_date || query.end_date) {
+            exportDetails.push(`date range: ${query.start_date || 'start'} to ${query.end_date || 'end'}`);
+          }
+          if (query.format) exportDetails.push(`format: ${query.format}`);
+          if (query.type) exportDetails.push(`type: ${query.type}`);
+          if (query.search) exportDetails.push(`search: "${query.search}"`);
+          if (query.ageRange && query.ageRange !== 'All Ages') exportDetails.push(`age: ${query.ageRange}`);
+          if (query.gender && query.gender !== 'All Genders') exportDetails.push(`gender: ${query.gender}`);
+
+          return `Exported ${module} data${exportDetails.length ? ` (${exportDetails.join(', ')})` : ''}`;
+
+        case 'PRINT':
+          // Include print details from query params
+          const printDetails = [];
+          if (query.start_date || query.end_date) {
+            printDetails.push(`date range: ${query.start_date || 'start'} to ${query.end_date || 'end'}`);
+          }
+          if (query.type) printDetails.push(`type: ${query.type}`);
+          if (query.search) printDetails.push(`search: "${query.search}"`);
+          if (query.ageRange && query.ageRange !== 'All Ages') printDetails.push(`age: ${query.ageRange}`);
+          if (query.gender && query.gender !== 'All Genders') printDetails.push(`gender: ${query.gender}`);
+
+          return `Printed ${module} data${printDetails.length ? ` (${printDetails.join(', ')})` : ''}`;
+
+        case 'VIEW':
+          // More detailed view descriptions
+          let viewDetails = [];
+          if (entityId) {
+            viewDetails.push(`specific ${entityName} (ID: ${entityId})`);
+          } else if (query.search) {
+            viewDetails.push(`search results for "${query.search}"`);
+          } else if (query.page && query.pageSize) {
+            viewDetails.push(`page ${query.page} (${query.pageSize} items per page)`);
+          } else {
+            viewDetails.push('list/overview');
+          }
+
+          // Add filters
+          const filters = [];
+          if (query.ageRange && query.ageRange !== 'All Ages') filters.push(`age: ${query.ageRange}`);
+          if (query.gender && query.gender !== 'All Genders') filters.push(`gender: ${query.gender}`);
+          if (query.joinMonth && query.joinMonth !== 'All Months') filters.push(`joined: ${query.joinMonth}`);
+          if (query.start_date || query.end_date) filters.push(`date range: ${query.start_date || 'start'} to ${query.end_date || 'end'}`);
+
+          if (filters.length > 0) {
+            viewDetails.push(`with filters: ${filters.join(', ')}`);
+          }
+
+          return `Viewed ${module} ${viewDetails.join(' - ')}`;
+
+        case 'LOGIN':
+          return `User logged in successfully`;
+
+        case 'LOGOUT':
+          return `User logged out`;
+
+        default:
+          return `${action} ${entityName}${entityId ? ` #${entityId}` : ''}`;
+      }
+    };
+
+    // Determine action type from method and full path
+    if (method === 'POST') {
+      if (fullPath.includes('/login')) {
+        actionType = 'LOGIN';
+        module = 'Authentication';
+        description = 'User logged in';
+        entityType = null;
+        entityId = null;
+      } else if (fullPath.includes('/restore')) {
+        actionType = 'RESTORE';
+        description = generateDescription('RESTORE', entityType, entityId, module, body);
+      } else if (fullPath.includes('/create') || !isId) {
+        actionType = 'CREATE';
+        description = generateDescription('CREATE', entityType, entityId, module, body);
+      } else {
+        actionType = 'UPDATE';
+        description = generateDescription('UPDATE', entityType, entityId, module, body);
+      }
+    } else if (method === 'PUT') {
+      actionType = 'UPDATE';
+      description = generateDescription('UPDATE', entityType, entityId, module, body);
+    } else if (method === 'DELETE') {
+      actionType = 'DELETE';
+      description = generateDescription('DELETE', entityType, entityId, module, body);
+    } else if (method === 'GET') {
+      if (fullPath.includes('/export') || fullPath.includes('/download')) {
+        actionType = 'EXPORT';
+        description = generateDescription('EXPORT', entityType, entityId, module, body);
+      } else if (fullPath.includes('/print')) {
+        actionType = 'PRINT';
+        description = generateDescription('PRINT', entityType, entityId, module, body);
+      } else {
+        actionType = 'VIEW';
+        description = generateDescription('VIEW', entityType, entityId, module, body);
+      }
+    }
+
+    // Special handling for logout
+    if (fullPath.includes('/logout')) {
+      actionType = 'LOGOUT';
+      module = 'Authentication';
+      description = 'User logged out';
+      entityType = null;
+      entityId = null;
+    }
+
+    return {
+      action_type: actionType,
+      module: module,
+      description: description,
+      entity_type: entityType,
+      entity_id: entityId
+    };
+  };
+
+  // Intercept response methods to log after response is sent
+  res.json = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalJson.call(this, data);
+  };
+
+  res.send = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalSend.call(this, data);
+  };
+
+  res.end = function(data) {
+    const actionDetails = determineActionDetails();
+    logAction(actionDetails);
+    return originalEnd.call(this, data);
   };
 
   next();
 };
 
-/**
- * Helper function to manually log an action (for use in route handlers)
- * @param {Object} req - Express request object
- * @param {Object} options - Audit log options
- */
-async function manualLogAction(req, options = {}) {
-  await logAuditAction(req, null, options);
-}
-
-module.exports = {
-  auditTrailMiddleware,
-  logAuditAction,
-  manualLogAction,
-  getActionType,
-  extractEntityInfo
-};
-
+module.exports = auditTrailMiddleware;

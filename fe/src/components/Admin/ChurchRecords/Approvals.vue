@@ -113,9 +113,20 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="3" class="d-flex align-center gap-2">
+            <v-tooltip text="Export Excel" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-download"
+                  variant="outlined"
+                  v-bind="props"
+                  :disabled="loading"
+                  @click="handleExportExcel"
+                ></v-btn>
+              </template>
+            </v-tooltip>
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-printer"
                   variant="outlined"
                   v-bind="props"
@@ -346,6 +357,20 @@ const handlePageChange = (page) => {
 const handlePageSizeChange = (pageSize) => {
   ElMessage.info(`Showing ${pageSize} items per page`)
   approvalsStore.setPageSize(pageSize)
+}
+
+const handleExportExcel = async () => {
+  try {
+    const result = await approvalsStore.exportApprovalsToExcel()
+    if (result.success) {
+      ElMessage.success(result.message || 'Excel file downloaded successfully')
+    } else {
+      ElMessage.error(result.error || 'Failed to export Excel file')
+    }
+  } catch (error) {
+    console.error('Error exporting to Excel:', error)
+    ElMessage.error('An error occurred while exporting to Excel')
+  }
 }
 
 const getStatusColor = (status) => {

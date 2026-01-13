@@ -1052,6 +1052,124 @@ async function deleteMinistry(ministryId, archivedBy = null) {
   }
 }
 
+/**
+ * GET ALL FOR SELECT - Get all ministries for select dropdown (simplified)
+ * @returns {Promise<Object>} Object with simplified ministry records
+ */
+async function getAllMinistriesForSelect() {
+  try {
+    const sql = `SELECT
+      m.ministry_id,
+      m.ministry_name,
+      m.status
+    FROM tbl_ministry m
+    WHERE m.status = 'active'
+    ORDER BY m.ministry_name ASC`;
+
+    const [rows] = await query(sql);
+
+    return {
+      success: true,
+      message: 'Ministries for select retrieved successfully',
+      data: rows
+    };
+  } catch (error) {
+    console.error('Error fetching ministries for select:', error);
+    throw error;
+  }
+}
+
+/**
+ * EXPORT - Export ministries to Excel
+ * @param {Object} options - Optional query parameters (search, status, sortBy, department_name_pattern)
+ * @returns {Promise<Object>} Object with Excel file buffer
+ */
+async function exportMinistriesToExcel(options = {}) {
+  try {
+    // Get all ministries data (without pagination) using existing function
+    const ministriesResult = await getAllMinistries({
+      ...options,
+      pageSize: 999999, // Large number to get all records
+      page: 1
+    });
+
+    if (!ministriesResult.success) {
+      return {
+        success: false,
+        message: ministriesResult.message || 'Failed to fetch ministries for export',
+        error: ministriesResult.error || ministriesResult.message
+      };
+    }
+
+    const ministries = ministriesResult.data || [];
+
+    // Create Excel file using ExcelJS
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Ministries');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Ministry ID', key: 'ministry_id', width: 15 },
+      { header: 'Ministry Name', key: 'ministry_name', width: 30 },
+      { header: 'Schedule', key: 'schedule', width: 25 },
+      { header: 'Leader', key: 'leader_fullname', width: 30 },
+      { header: 'Department', key: 'department_name', width: 25 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Members Count', key: 'members_count', width: 15 },
+      { header: 'Date Created', key: 'date_created', width: 25 },
+      { header: 'Description', key: 'description', width: 40 }
+    ];
+
+    // Add rows
+    ministries.forEach(ministry => {
+      // Parse members JSON to get count
+      let membersCount = 0;
+      if (ministry.members) {
+        try {
+          const membersArray = JSON.parse(ministry.members);
+          membersCount = Array.isArray(membersArray) ? membersArray.length : 0;
+        } catch (e) {
+          membersCount = 0;
+        }
+      }
+
+      // Format date
+      const formattedDate = ministry.date_created
+        ? moment(ministry.date_created).format('YYYY-MM-DD HH:mm:ss')
+        : '';
+
+      worksheet.addRow({
+        ministry_id: ministry.ministry_id || '',
+        ministry_name: ministry.ministry_name || '',
+        schedule: ministry.schedule || '',
+        leader_fullname: ministry.leader_fullname || '',
+        department_name: ministry.department_name || '',
+        status: ministry.status || '',
+        members_count: membersCount,
+        date_created: formattedDate,
+        description: ministry.description || ''
+      });
+    });
+
+    // Generate Excel file buffer
+    const fileBuffer = await workbook.xlsx.writeBuffer();
+
+    return {
+      success: true,
+      message: 'Ministries exported to Excel successfully',
+      fileBuffer: fileBuffer
+    };
+  } catch (error) {
+    console.error('Error exporting ministries to Excel:', error);
+    return {
+      success: false,
+      message: 'Failed to export ministries to Excel',
+      error: error.message || 'Failed to export ministries to Excel'
+    };
+  }
+}
+
 module.exports = {
   createMinistry,
   getAllMinistries,
@@ -1059,6 +1177,8 @@ module.exports = {
   getMinistriesByMemberId,
   updateMinistry,
   deleteMinistry,
-  getPublicMinistries
+  getPublicMinistries,
+  getAllMinistriesForSelect,
+  exportMinistriesToExcel
 };
 

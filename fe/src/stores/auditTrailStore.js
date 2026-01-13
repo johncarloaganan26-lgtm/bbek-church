@@ -3,159 +3,175 @@ import axios from '@/api/axios'
 
 export const useAuditTrailStore = defineStore('auditTrail', {
   state: () => ({
-    auditLogs: [],
+    logs: [],
     loading: false,
-    error: null,
-    searchQuery: '',
-    filters: {
-      user_id: null,
-      action_type: 'All Actions',
-      entity_type: 'All Entities',
-      status: 'All Statuses',
-      date_from: null,
-      date_to: null,
-      sortBy: 'Date (Newest)'
+    pagination: {
+      page: 1,
+      pageSize: 20,
+      total: 0
     },
-    currentPage: 1,
-    totalPages: 1,
-    totalCount: 0,
-    itemsPerPage: 10,
-    pageSizeOptions: [10, 25, 50, 100],
-    summaryStats: null
+    filters: {
+      actionType: '',
+      userId: '',
+      dateRange: [],
+      status: ''
+    }
   }),
 
-  getters: {
-    filteredAuditLogs: (state) => {
-      return state.auditLogs
-    },
-
-    paginatedAuditLogs: (state) => {
-      return state.auditLogs
-    }
-  },
-
   actions: {
-    async fetchAuditLogs() {
+    async fetchLogs(params = {}) {
       this.loading = true
-      this.error = null
-
       try {
-        const token = localStorage.getItem('token')
-        const params = {
-          page: this.currentPage,
-          pageSize: this.itemsPerPage,
-          search: this.searchQuery || undefined,
-          user_id: this.filters.user_id || undefined,
-          action_type: this.filters.action_type && this.filters.action_type !== 'All Actions' ? this.filters.action_type : undefined,
-          entity_type: this.filters.entity_type && this.filters.entity_type !== 'All Entities' ? this.filters.entity_type : undefined,
-          status: this.filters.status && this.filters.status !== 'All Statuses' ? this.filters.status : undefined,
-          date_from: this.filters.date_from || undefined,
-          date_to: this.filters.date_to || undefined,
-          sortBy: this.filters.sortBy || 'Date (Newest)'
-        }
-
-        // Remove undefined values
-        Object.keys(params).forEach(key => params[key] === undefined && delete params[key])
-
-        const accessToken = localStorage.getItem('accessToken')
-        const response = await axios.get('/audit-trail/getAllAuditLogs', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          },
-          params
-        })
-
-        if (response.data.success) {
-          this.auditLogs = response.data.data || []
-          this.totalCount = response.data.totalCount || 0
-          this.totalPages = response.data.pagination?.totalPages || 1
-        } else {
-          throw new Error(response.data.message || 'Failed to fetch audit logs')
-        }
+        const response = await axios.get('/audit-trail/logs', { params })
+        this.logs = response.data.data.logs || []
+        this.pagination = response.data.data.pagination || this.pagination
+        return response.data
       } catch (error) {
         console.error('Error fetching audit logs:', error)
-        this.error = error.response?.data?.error || error.message || 'Failed to fetch audit logs'
-        this.auditLogs = []
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchAuditLogById(id) {
-      this.loading = true
-      this.error = null
-
-      try {
-        const accessToken = localStorage.getItem('accessToken')
-        const response = await axios.get(`/audit-trail/getAuditLogById/${id}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        })
-
-        if (response.data.success) {
-          return response.data.data
-        } else {
-          throw new Error(response.data.message || 'Failed to fetch audit log')
-        }
-      } catch (error) {
-        console.error('Error fetching audit log:', error)
-        this.error = error.response?.data?.error || error.message || 'Failed to fetch audit log'
         throw error
       } finally {
         this.loading = false
       }
     },
 
-    async fetchSummaryStats() {
+    async exportLogs(params = {}) {
       try {
-        const accessToken = localStorage.getItem('accessToken')
-        const response = await axios.get('/audit-trail/getAuditTrailSummary', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
+        const response = await axios.get('/audit-trail/export', {
+          params,
+          responseType: 'blob'
         })
-
-        if (response.data.success) {
-          this.summaryStats = response.data.data
-        }
+        return response
       } catch (error) {
-        console.error('Error fetching summary stats:', error)
+        console.error('Error exporting audit logs:', error)
+        throw error
       }
     },
 
-    setSearchQuery(query) {
-      this.searchQuery = query
-      this.currentPage = 1
-    },
+    async logAction(actionData) {
+      try {
+        // Get user info from localStorage
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        const token = localStorage.getItem('accessToken')
 
-    setFilters(filters) {
-      this.filters = { ...this.filters, ...filters }
-      this.currentPage = 1
-    },
+        if (!userInfo.account || !token) {
+          console.warn('No user info or token available for audit logging')
+          return
+        }
 
-    setCurrentPage(page) {
-      this.currentPage = page
-    },
+        const logData = {
+          user_id: userInfo.account.acc_id,
+          user_email: userInfo.account.email,
+          user_name: `${userInfo.member?.firstname || ''} ${userInfo.member?.lastname || ''}`.trim() || userInfo.account.email,
+          user_position: userInfo.account.position,
+          action_type: actionData.action_type,
+          module: actionData.module,
+          description: actionData.description,
+          entity_type: actionData.entity_type || null,
+          entity_id: actionData.entity_id || null,
+          ip_address: actionData.ip_address || null,
+          user_agent: navigator.userAgent,
+          old_values: actionData.old_values || null,
+          new_values: actionData.new_values || null,
+          status: actionData.status || 'success',
+          error_message: actionData.error_message || null
+        }
 
-    setPageSize(size) {
-      this.itemsPerPage = size
-      this.currentPage = 1
-    },
-
-    resetFilters() {
-      this.searchQuery = ''
-      this.filters = {
-        user_id: null,
-        action_type: 'All Actions',
-        entity_type: 'All Entities',
-        status: 'All Statuses',
-        date_from: null,
-        date_to: null,
-        sortBy: 'Date (Newest)'
+        await axios.post('/audit-trail/log', logData)
+      } catch (error) {
+        console.error('Error logging audit action:', error)
+        // Don't throw error to avoid breaking the main functionality
       }
-      this.currentPage = 1
+    },
+
+    // Helper methods for common actions
+    async logLogin(userInfo) {
+      await this.logAction({
+        action_type: 'LOGIN',
+        module: 'Authentication',
+        description: `User logged in: ${userInfo.account.email}`,
+        status: 'success'
+      })
+    },
+
+    async logLogout(userInfo) {
+      await this.logAction({
+        action_type: 'LOGOUT',
+        module: 'Authentication',
+        description: `User logged out: ${userInfo.account.email}`,
+        status: 'success'
+      })
+    },
+
+    async logView(module, description) {
+      await this.logAction({
+        action_type: 'VIEW',
+        module: module,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logCreate(module, entityType, entityId, description) {
+      await this.logAction({
+        action_type: 'CREATE',
+        module: module,
+        entity_type: entityType,
+        entity_id: entityId,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logUpdate(module, entityType, entityId, description, oldValues = null, newValues = null) {
+      await this.logAction({
+        action_type: 'UPDATE',
+        module: module,
+        entity_type: entityType,
+        entity_id: entityId,
+        description: description,
+        old_values: oldValues,
+        new_values: newValues,
+        status: 'success'
+      })
+    },
+
+    async logDelete(module, entityType, entityId, description) {
+      await this.logAction({
+        action_type: 'DELETE',
+        module: module,
+        entity_type: entityType,
+        entity_id: entityId,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logPrint(module, description) {
+      await this.logAction({
+        action_type: 'PRINT',
+        module: module,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logExport(module, description) {
+      await this.logAction({
+        action_type: 'EXPORT',
+        module: module,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logError(module, actionType, description, errorMessage) {
+      await this.logAction({
+        action_type: actionType,
+        module: module,
+        description: description,
+        status: 'failed',
+        error_message: errorMessage
+      })
     }
   }
 })
-

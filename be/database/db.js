@@ -23,18 +23,17 @@ const IS_PRODUCTION = NODE_ENV === 'production';
 
 // Determine connection limit based on environment
 // Cloud databases typically have 5 connection limit (both max_connections and max_user_connections)
-// We use 2-3 to stay well under the limit and account for multiple instances/processes
-// Local databases can handle more connections
+// We use 1 connection to stay well under the limit and account for multiple instances/processes
+// This prevents max_user_connections errors that block audit trail logging
 const getConnectionLimit = () => {
   // Allow explicit override via environment variable
   if (process.env.DB_CONNECTION_LIMIT) {
     return parseInt(process.env.DB_CONNECTION_LIMIT, 10);
   }
-  
-  // Default: 1 for production (cloud - very conservative to avoid max_user_connections),
-  // 10 for development (local)
-  // Using 1 to be extra safe with max_user_connections limit of 5
-  return IS_PRODUCTION ? 1 : 10;
+
+  // Default: 1 connection for both production and development
+  // This ensures we never hit max_user_connections limits and audit trails work properly
+  return 1;
 };
 
 const dbConfig = {
@@ -62,16 +61,16 @@ const dbConfig = {
   ssl: process.env.DB_SSL === 'true' ? {} : false,
   
   // Ensure binary data (BLOB) is handled correctly and text fields are converted to strings
-  // This fixes issues where VARCHAR/TEXT fields are returned as Buffer objects
+  // This fixes issues where VARCHAR/TEXT/DATETIME fields are returned as Buffer objects
   typeCast: function (field, next) {
     if (field.type === 'BLOB' || field.type === 'LONGBLOB') {
       return field.buffer();
     }
-    
+
     // Check if the field is a string type but was returned as Buffer
-    if (field.type === 'VAR_STRING' || field.type === 'STRING' || 
-        field.type === 'VARCHAR' || field.type === 'TEXT' || 
-        field.type === 'LONGTEXT' || field.type === 'MEDIUMTEXT' || 
+    if (field.type === 'VAR_STRING' || field.type === 'STRING' ||
+        field.type === 'VARCHAR' || field.type === 'TEXT' ||
+        field.type === 'LONGTEXT' || field.type === 'MEDIUMTEXT' ||
         field.type === 'TINYTEXT') {
       const buffer = field.buffer();
       // If it's a Buffer, convert it to string
@@ -80,7 +79,18 @@ const dbConfig = {
       }
       return buffer;
     }
-    
+
+    // Handle DATETIME and TIMESTAMP fields that might be returned as Buffer
+    if (field.type === 'DATETIME' || field.type === 'TIMESTAMP' ||
+        field.type === 'DATE' || field.type === 'TIME') {
+      const buffer = field.buffer();
+      // If it's a Buffer, convert it to string
+      if (Buffer.isBuffer(buffer)) {
+        return buffer.toString('utf8');
+      }
+      return buffer;
+    }
+
     return next();
   }
 };
@@ -266,8 +276,8 @@ const query = async (sql, params, retryCount = 0) => {
     // This can throw max_connection errors
     connection = await pool.getConnection();
     
-    // Execute the query
-    const result = await connection.execute(sql, params || []);
+    // Execute the query using query() for regular queries, execute() for prepared statements
+    const result = await connection.query(sql, params || []);
     
     // Return the result
     return result;

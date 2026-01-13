@@ -231,13 +231,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSystemLogsStore } from '@/stores/Admin/systemLogsStore'
+import { useAuditTrailStore } from '@/stores/auditTrailStore'
 import axios from '@/api/axios'
 import MemberRecordDialog from '@/components/Dialogs/MemberDialog.vue'
 import TithesOfferingsDialog from '@/components/Dialogs/TithesOfferingsDialog.vue'
 
 const router = useRouter()
-const systemLogsStore = useSystemLogsStore()
+const auditTrailStore = useAuditTrailStore()
 
 // Check if user is admin
 const isAdmin = computed(() => {
@@ -412,10 +412,9 @@ const getStatusColor = (status) => {
 const fetchRecentActivities = async () => {
   try {
     // Fetch recent activities (limit to 3 most recent) with timeout
-    await withTimeout(systemLogsStore.fetchLogs({
+    await withTimeout(auditTrailStore.fetchLogs({
       page: 1,
-      pageSize: 3,
-      sortBy: 'Date (Newest)'
+      pageSize: 3
     }), 15000)
   } catch (error) {
     console.error('Error fetching recent activities:', error)
@@ -426,10 +425,10 @@ const fetchRecentActivities = async () => {
  * Transform audit logs to activity format for display
  */
 const recentActivities = computed(() => {
-  return systemLogsStore.logs
+  return auditTrailStore.logs
     .slice(0, 3) // Limit to 3 most recent
     .map(log => ({
-      id: log.audit_id || log.id,
+      id: log.id,
       action: formatAction(log),
       user: log.user_name || log.user_email || 'Unknown User',
       status: log.status?.toUpperCase() || 'UNKNOWN',

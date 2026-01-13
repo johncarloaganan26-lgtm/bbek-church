@@ -148,22 +148,23 @@
           <template v-slot:activator="{ props }">
             <v-list-item v-bind="props" title="MAINTENANCE"></v-list-item>
           </template>
-          <v-list-item 
+          <v-list-item
             v-if="isAdmin"
-            prepend-icon="mdi-file-document" 
-            title="Audit Trail" 
-            :to="{ name: 'AuditTrail' }"
-            :active="$route.name === 'AuditTrail'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            v-if="isAdmin"
-            prepend-icon="mdi-folder" 
-            title="Archives" 
+            prepend-icon="mdi-folder"
+            title="Archives"
             :to="{ name: 'Archive' }"
             :active="$route.name === 'Archive'"
             @click="closeDrawerOnMobile"
           ></v-list-item>
+          <v-list-item
+            v-if="isAdmin"
+            prepend-icon="mdi-file-document"
+            title="Audit Trail"
+            :to="{ name: 'AuditTrail' }"
+            :active="$route.name === 'AuditTrail'"
+            @click="closeDrawerOnMobile"
+          ></v-list-item>
+          
           <v-list-item
             prepend-icon="mdi-cog"
             title="Settings"

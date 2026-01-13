@@ -136,6 +136,18 @@
                 ></v-btn>
               </template>
             </v-tooltip>
+            <v-tooltip text="Print" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-printer"
+                  variant="outlined"
+                  v-bind="props"
+                  :loading="loading"
+                  :disabled="loading"
+                  @click="handlePrint"
+                ></v-btn>
+              </template>
+            </v-tooltip>
           </v-col>
         </v-row>
         <v-row>

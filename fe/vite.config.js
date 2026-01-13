@@ -8,12 +8,12 @@ import { loadEnv } from 'vite'
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory
   const env = loadEnv(mode, process.cwd(), '')
-  const appURL = env.VITE_API_URL || 'http://localhost:5000'
-  
+  const backendURL = 'http://localhost:5000' // Fixed backend URL without /api
+
   console.log('🔧 Vite Configuration:')
   console.log('   Frontend URL: http://localhost:5174')
-  console.log('   Backend API URL:', appURL)
-  console.log('   Proxy: /api →', appURL)
+  console.log('   Backend API URL:', backendURL)
+  console.log('   Proxy: /api →', backendURL)
   
   return {
   plugins: [
@@ -30,20 +30,20 @@ export default defineConfig(({ mode }) => {
       port: 5174, // You can specify a port if needed
       proxy: {
         '/api': {
-          target: appURL,
+          target: backendURL,
           changeOrigin: true,
           secure: false,
           configure: (proxy, _options) => {
             // Advanced proxy configuration
             proxy.on('error', (err, req, res) => {
               console.error('❌ Proxy Error:', err.message)
-              console.error('   Target URL:', appURL)
+              console.error('   Target URL:', backendURL)
               console.error('   Request URL:', req.url)
-              
+
               // Handle ECONNREFUSED specifically
               if (err.code === 'ECONNREFUSED') {
                 console.error('   ⚠️  Connection Refused - Backend server is not running!')
-                console.error('   💡 Make sure the backend is running on:', appURL)
+                console.error('   💡 Make sure the backend is running on:', backendURL)
                 console.error('   💡 Start backend with: cd church-be && npm run dev')
               }
               
@@ -53,15 +53,15 @@ export default defineConfig(({ mode }) => {
                 })
                 res.end(JSON.stringify({
                   error: 'Proxy Error',
-                  message: err.code === 'ECONNREFUSED' 
+                  message: err.code === 'ECONNREFUSED'
                     ? 'Backend server is not running. Please start the backend server.'
                     : err.message,
-                  target: appURL
+                  target: backendURL
                 }))
               }
             })
             proxy.on('proxyReq', (proxyReq, req, _res) => {
-              console.log('📤 Sending Request to:', req.method, req.url, '→', appURL + req.url)
+              console.log('📤 Sending Request to:', req.method, req.url, '→', backendURL + req.url)
             })
             proxy.on('proxyRes', (proxyRes, req, _res) => {
               console.log('📥 Received Response:', req.method, req.url, 'Status:', proxyRes.statusCode)
