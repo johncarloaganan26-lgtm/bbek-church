@@ -335,23 +335,21 @@ const getActivityIcon = (actionType, entityType) => {
 /**
  * Format time as relative (e.g., "2 hours ago", "1 day ago")
  */
-const formatRelativeTime = (dateString) => {
-  if (!dateString) return 'Unknown'
-  
-  const now = new Date()
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
   const date = new Date(dateString)
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
   
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`
-  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
-  if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+  // Convert to Philippine time (UTC+8)
+  const phTime = new Date(date.getTime() + (8 * 60 * 60 * 1000))
   
-  // For older dates, show the actual date
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+  return phTime.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
 /**
@@ -433,7 +431,7 @@ const recentActivities = computed(() => {
       user: log.user_name || log.user_email || 'Unknown User',
       status: log.status?.toUpperCase() || 'UNKNOWN',
       statusColor: getStatusColor(log.status),
-      time: formatRelativeTime(log.date_created),
+      time: formatDateTime(log.date_created),
       icon: getActivityIcon(log.action_type, log.entity_type),
       entityId: log.entity_id || null
     }))

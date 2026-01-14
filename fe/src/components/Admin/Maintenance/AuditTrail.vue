@@ -271,9 +271,6 @@
           <el-descriptions-item label="IP Address">
             {{ selectedLog.ip_address }}
           </el-descriptions-item>
-          <el-descriptions-item label="User Agent">
-            <span class="text-break">{{ selectedLog.user_agent }}</span>
-          </el-descriptions-item>
           <el-descriptions-item label="Status">
             {{ selectedLog.status }}
           </el-descriptions-item>
@@ -325,6 +322,7 @@ const actionTypes = [
   { label: 'Create', value: 'CREATE' },
   { label: 'Update', value: 'UPDATE' },
   { label: 'Delete', value: 'DELETE' },
+  { label: 'Restore', value: 'RESTORE' },
   { label: 'Print', value: 'PRINT' },
   { label: 'Export', value: 'EXPORT' }
 ]
@@ -445,6 +443,7 @@ const getActionTagType = (actionType) => {
     'CREATE': 'success',
     'UPDATE': 'warning',
     'DELETE': 'danger',
+    'RESTORE': 'success',
     'PRINT': 'primary',
     'EXPORT': 'primary'
   }

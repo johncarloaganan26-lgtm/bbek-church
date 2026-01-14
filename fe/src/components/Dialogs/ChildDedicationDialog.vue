@@ -23,7 +23,7 @@
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
       <el-form-item v-if="!isMemberUser" prop="requested_by">
         <template #label>
-          <span>Requested By (Member)</span>
+          <span>Requested By (Member) <span class="required-text">*</span></span>
         </template>
         <el-select
           v-model="formData.requested_by"
@@ -58,7 +58,7 @@
       <!-- Child First Name -->
       <el-form-item prop="child_firstname">
         <template #label>
-          <span>Child's First Name <span class="required-text">Required</span></span>
+          <span>Child's First Name <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.child_firstname"
@@ -72,7 +72,7 @@
       <!-- Child Last Name -->
       <el-form-item prop="child_lastname">
         <template #label>
-          <span>Child's Last Name <span class="required-text">Required</span></span>
+          <span>Child's Last Name <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.child_lastname"
@@ -97,7 +97,7 @@
       <!-- Date of Birth -->
       <el-form-item prop="date_of_birth">
         <template #label>
-          <span>Date of Birth <span class="required-text">Required</span></span>
+          <span>Date of Birth <span class="required-text">*</span></span>
         </template>
         <el-date-picker
           v-model="formData.date_of_birth"
@@ -116,7 +116,7 @@
       <!-- Place of Birth -->
       <el-form-item prop="place_of_birth">
         <template #label>
-          <span>Place of Birth <span class="required-text">Required</span></span>
+          <span>Place of Birth <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.place_of_birth"
@@ -130,7 +130,7 @@
       <!-- Gender -->
       <el-form-item prop="gender">
         <template #label>
-          <span>Gender</span>
+          <span>Gender <span class="required-text">*</span></span>
         </template>
         <el-radio-group v-model="formData.gender" size="large" :disabled="loading">
           <el-radio label="M">Male</el-radio>
@@ -163,7 +163,7 @@
       <!-- Preferred Dedication Date and Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_date">
         <template #label>
-          <span>Preferred Dedication Date</span>
+          <span>Preferred Dedication Date <span class="required-text">*</span></span>
         </template>
         <el-date-picker
           v-model="formData.preferred_dedication_date"
@@ -175,7 +175,6 @@
           style="width: 100%"
           :disabled="loading"
           :disabled-date="isDateDisabled"
-          :default-time="() => new Date(0, 0, 0, 12, 0, 0)"
           @change="onDateChange"
         />
       </el-form-item>
@@ -183,7 +182,7 @@
       <!-- Preferred Dedication Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_time">
         <template #label>
-          <span>Preferred Dedication Time</span>
+          <span>Preferred Dedication Time <span class="required-text">*</span></span>
         </template>
         <el-time-picker
           v-model="formData.preferred_dedication_time"
@@ -506,7 +505,7 @@
       <!-- Pastor (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="pastor">
         <template #label>
-          <span>Pastor</span>
+          <span>Pastor <span class="required-text">*</span></span>
         </template>
         <el-select
           v-model="formData.pastor"
@@ -530,7 +529,7 @@
       <!-- Location (Admin/Staff only) -->
       <el-form-item v-if="!isMemberUser" prop="location">
         <template #label>
-          <span>Location</span>
+          <span>Location <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.location"
@@ -542,7 +541,10 @@
       </el-form-item>
 
       <!-- Status (Admin/Staff only) -->
-      <el-form-item v-if="!isMemberUser" label="Status" prop="status">
+      <el-form-item v-if="!isMemberUser" prop="status">
+        <template #label>
+          <span>Status <span class="required-text">*</span></span>
+        </template>
         <el-select
           v-model="formData.status"
           placeholder="Select status"
@@ -1070,8 +1072,17 @@ const rules = {
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           preferredDate.setHours(0, 0, 0, 0)
+          
           if (preferredDate < today) {
             callback(new Error('Preferred dedication date cannot be in the past'))
+            return
+          }
+          
+          // Check if date is too far in the future (more than 1 year)
+          const maxDate = new Date()
+          maxDate.setFullYear(today.getFullYear() + 1)
+          if (preferredDate > maxDate) {
+            callback(new Error('Preferred dedication date cannot be more than 1 year in the future'))
             return
           }
         }

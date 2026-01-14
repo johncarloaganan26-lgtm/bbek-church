@@ -19,6 +19,73 @@ const router = express.Router();
 router.use(dateFormattingMiddleware);
 
 /**
+ * CHECK TIME SLOT - Check if a time slot is already booked for burial service
+ * GET /api/church-records/burial-services/check-time-slot?service_date=YYYY-MM-DD&service_time=HH:mm:ss&exclude_id=xxx
+ * This prevents double-booking of burial service time slots (same day allowed, same time blocked)
+ */
+router.get('/check-time-slot', async (req, res) => {
+  try {
+    const { service_date, service_time, exclude_id } = req.query;
+
+    if (!service_date || !service_time) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service date and time are required'
+      });
+    }
+
+    // Query to check for existing approved burial services at the same date and time
+    let sql = `
+      SELECT burial_id, requester_name, deceased_name, service_date, status
+      FROM tbl_burialservice
+      WHERE DATE(service_date) = ?
+      AND TIME(service_date) = ?
+      AND status = 'approved'
+    `;
+
+    const params = [service_date, service_time];
+
+    // Exclude current burial if editing
+    if (exclude_id) {
+      sql += ' AND burial_id != ?';
+      params.push(exclude_id);
+    }
+
+    const db = require('../../database/db');
+    const [rows] = await db.query(sql, params);
+
+    if (rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Time slot is already booked',
+        data: {
+          isBooked: true,
+          conflictingBurial: {
+            burial_id: rows[0].burial_id,
+            requester_name: rows[0].requester_name,
+            deceased_name: rows[0].deceased_name,
+            service_date: rows[0].service_date,
+            status: rows[0].status
+          }
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Time slot is available',
+      data: { isBooked: false }
+    });
+  } catch (error) {
+    console.error('Error checking time slot:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to check time slot'
+    });
+  }
+});
+
+/**
  * CHECK DUPLICATE - Check if burial service already exists
  * GET /api/church-records/burial-services/check-duplicate
  * Query params: member_id, deceased_name, deceased_birthdate, exclude_burial_id (optional)
@@ -26,14 +93,14 @@ router.use(dateFormattingMiddleware);
 router.get('/check-duplicate', async (req, res) => {
   try {
     const { member_id, deceased_name, deceased_birthdate, exclude_burial_id } = req.query;
-    
+
     if (!member_id || !deceased_name || !deceased_birthdate) {
       return res.status(400).json({
         success: false,
         message: 'member_id, deceased_name, and deceased_birthdate are required'
       });
     }
-    
+
     const db = require('../../database/db');
     const query = `
       SELECT burial_id, member_id, deceased_name, deceased_birthdate, date_death, status
@@ -44,13 +111,13 @@ router.get('/check-duplicate', async (req, res) => {
         AND status != 'Deleted'
         ${exclude_burial_id ? 'AND burial_id != ?' : ''}
     `;
-    
-    const params = exclude_burial_id 
+
+    const params = exclude_burial_id
       ? [member_id, deceased_name, deceased_birthdate, exclude_burial_id]
       : [member_id, deceased_name, deceased_birthdate];
-    
+
     const [rows] = await db.query(query, params);
-    
+
     if (rows.length > 0) {
       return res.status(400).json({
         success: false,
@@ -58,7 +125,7 @@ router.get('/check-duplicate', async (req, res) => {
         data: { exists: true, burial: rows[0] }
       });
     }
-    
+
     return res.status(200).json({
       success: true,
       message: 'No duplicate found',

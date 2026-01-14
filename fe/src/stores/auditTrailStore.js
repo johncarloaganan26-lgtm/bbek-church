@@ -69,7 +69,7 @@ export const useAuditTrailStore = defineStore('auditTrail', {
           entity_type: actionData.entity_type || null,
           entity_id: actionData.entity_id || null,
           ip_address: actionData.ip_address || null,
-          user_agent: navigator.userAgent,
+          user_agent: null, // Hidden for privacy
           old_values: actionData.old_values || null,
           new_values: actionData.new_values || null,
           status: actionData.status || 'success',
@@ -138,6 +138,17 @@ export const useAuditTrailStore = defineStore('auditTrail', {
     async logDelete(module, entityType, entityId, description) {
       await this.logAction({
         action_type: 'DELETE',
+        module: module,
+        entity_type: entityType,
+        entity_id: entityId,
+        description: description,
+        status: 'success'
+      })
+    },
+
+    async logRestore(module, entityType, entityId, description) {
+      await this.logAction({
+        action_type: 'RESTORE',
         module: module,
         entity_type: entityType,
         entity_id: entityId,

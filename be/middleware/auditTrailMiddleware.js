@@ -2,35 +2,38 @@ const auditTrailRecords = require('../dbHelpers/auditTrailRecords');
 
 // Helper function to determine module from path
 function determineModule(path) {
-  if (path.includes('/members') || path.includes('/church-records/members')) {
+  // Check the full path including baseUrl for mounted routes
+  const fullPath = (req.baseUrl || '') + path;
+
+  if (fullPath.includes('/members') || fullPath.includes('/church-records/members')) {
     return 'Members';
-  } else if (path.includes('/accounts') || path.includes('/church-records/accounts')) {
+  } else if (fullPath.includes('/accounts') || fullPath.includes('/church-records/accounts')) {
     return 'Accounts';
-  } else if (path.includes('/events') || path.includes('/church-records/events')) {
+  } else if (fullPath.includes('/events') || fullPath.includes('/church-records/events')) {
     return 'Events';
-  } else if (path.includes('/ministries') || path.includes('/church-records/ministries')) {
+  } else if (fullPath.includes('/ministries') || fullPath.includes('/church-records/ministries')) {
     return 'Ministries';
-  } else if (path.includes('/departments') || path.includes('/church-records/departments')) {
+  } else if (fullPath.includes('/departments') || fullPath.includes('/church-records/departments')) {
     return 'Departments';
-  } else if (path.includes('/department-officers') || path.includes('/church-records/department-officers')) {
+  } else if (fullPath.includes('/department-officers') || fullPath.includes('/church-records/department-officers')) {
     return 'Department Officers';
-  } else if (path.includes('/church-leaders') || path.includes('/church-records/church-leaders')) {
+  } else if (fullPath.includes('/church-leaders') || fullPath.includes('/church-records/church-leaders')) {
     return 'Church Leaders';
-  } else if (path.includes('/tithes') || path.includes('/church-records/tithes')) {
+  } else if (fullPath.includes('/tithes') || fullPath.includes('/church-records/tithes')) {
     return 'Tithes & Offerings';
-  } else if (path.includes('/transactions')) {
+  } else if (fullPath.includes('/transactions')) {
     return 'Transactions';
-  } else if (path.includes('/water-baptisms') || path.includes('/services/water-baptisms')) {
+  } else if (fullPath.includes('/water-baptisms') || fullPath.includes('/services/water-baptisms')) {
     return 'Water Baptism';
-  } else if (path.includes('/burial-services') || path.includes('/church-records/burial-services')) {
+  } else if (fullPath.includes('/burial-services') || fullPath.includes('/church-records/burial-services')) {
     return 'Burial Service';
-  } else if (path.includes('/child-dedications') || path.includes('/church-records/child-dedications')) {
+  } else if (fullPath.includes('/child-dedications') || fullPath.includes('/church-records/child-dedications')) {
     return 'Child Dedication';
-  } else if (path.includes('/marriage-services') || path.includes('/services/marriage-services')) {
+  } else if (fullPath.includes('/marriage-services') || fullPath.includes('/services/marriage-services')) {
     return 'Marriage Service';
-  } else if (path.includes('/approvals') || path.includes('/church-records/approvals')) {
+  } else if (fullPath.includes('/approvals') || fullPath.includes('/church-records/approvals')) {
     return 'Approvals';
-  } else if (path.includes('/archives')) {
+  } else if (fullPath.includes('/archives')) {
     return 'Archives';
   }
   return 'Unknown Module';
@@ -66,9 +69,9 @@ const auditTrailMiddleware = async (req, res, next) => {
     return next();
   }
 
-  // For DELETE operations, try to capture the record data before it's deleted
-  if (req.method === 'DELETE') {
-    // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123
+  // For DELETE and UPDATE operations, try to capture the record data before it's modified/deleted
+  if (req.method === 'DELETE' || req.method === 'PUT') {
+    // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123 or /updateMember/123
     const pathParts = req.path.split('/');
     const lastPart = pathParts[pathParts.length - 1];
 
@@ -76,7 +79,7 @@ const auditTrailMiddleware = async (req, res, next) => {
     const id = req.params.id || (lastPart && /^\d+$/.test(lastPart) ? lastPart : null);
 
     if (id) {
-      console.log('DEBUG: Capturing data for DELETE', req.path, 'ID:', id);
+      console.log('DEBUG: Capturing data for', req.method, req.path, 'ID:', id);
       try {
         const { query } = require('../database/db');
         const module = determineModule(req.path);
@@ -114,8 +117,13 @@ const auditTrailMiddleware = async (req, res, next) => {
 
             if (recordRows.length > 0) {
               // Store the record data for later use in logging
-              req.record_to_delete = recordRows[0];
-              console.log('DEBUG: Stored complete record data for deletion logging:', JSON.stringify(recordRows[0]).substring(0, 200) + '...');
+              if (req.method === 'DELETE') {
+                req.record_to_delete = recordRows[0];
+                console.log('DEBUG: Stored complete record data for deletion logging');
+              } else if (req.method === 'PUT') {
+                req.record_before_update = recordRows[0];
+                console.log('DEBUG: Stored complete record data for update logging');
+              }
             } else {
               console.log('DEBUG: No record found with ID:', id);
             }
@@ -130,7 +138,7 @@ const auditTrailMiddleware = async (req, res, next) => {
         console.error('Error capturing record data for audit:', error);
       }
     } else {
-      console.log('DEBUG: No ID found in DELETE request path:', req.path);
+      console.log('DEBUG: No ID found in', req.method, 'request path:', req.path);
     }
   }
 
@@ -289,7 +297,7 @@ const auditTrailMiddleware = async (req, res, next) => {
         entity_type: actionData.entity_type,
         entity_id: actionData.entity_id,
         ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
-        user_agent: req.get('User-Agent') || 'unknown',
+        user_agent: null, // Hidden for privacy
         status: res.statusCode >= 400 ? 'failed' : 'success',
         error_message: res.statusCode >= 400 ? `HTTP ${res.statusCode}` : null,
         date_created: phTimestamp
@@ -395,8 +403,8 @@ const auditTrailMiddleware = async (req, res, next) => {
         case 'CREATE':
           // Try to get meaningful name from request body
           const createName = data.name || data.title || data.firstname || data.email ||
-                            (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-                            (entityId ? `#${entityId}` : '');
+                    (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+                    (entityId ? `#${entityId}` : '');
 
           // Add more context based on module
           let createContext = '';
@@ -408,23 +416,130 @@ const auditTrailMiddleware = async (req, res, next) => {
             createContext = data.baptism_date ? ` (Date: ${data.baptism_date})` : '';
           }
 
-          return `Created new ${entityName}${createName ? `: ${createName}` : ''}${createContext}`;
+          let createDescription = `Created new ${entityName}${createName ? `: ${createName}` : ''}${createContext}`;
+
+          // Add complete record data like DELETE does, but only for modules with create forms
+          const modulesWithCreateForms = [
+            'Members', 'Accounts', 'Events', 'Ministries', 'Departments',
+            'Department Officers', 'Church Leaders', 'Tithes & Offerings',
+            'Water Baptism', 'Burial Service', 'Child Dedication', 'Marriage Service',
+            'Approvals', 'Forms', 'Content Management'
+          ];
+
+          if (modulesWithCreateForms.includes(module) && Object.keys(data).length > 0) {
+            // Format the complete data as JSON, excluding null/undefined values
+            const cleanData = {};
+            for (const [key, value] of Object.entries(data)) {
+              if (value !== null && value !== undefined && value !== '') {
+                if (Buffer.isBuffer(value)) {
+                  cleanData[key] = value.toString('utf8');
+                } else if (typeof value === 'object') {
+                  cleanData[key] = JSON.stringify(value);
+                } else {
+                  cleanData[key] = value;
+                }
+              }
+            }
+
+            if (Object.keys(cleanData).length > 0) {
+              createDescription += ` - Complete Data: ${JSON.stringify(cleanData)}`;
+            }
+          }
+
+          return createDescription;
 
         case 'UPDATE':
           // Try to get meaningful name from request body or use ID
-          const updateName = data.name || data.title || data.firstname || data.email ||
-                            (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-                            (entityId ? `#${entityId}` : '');
+          let updateName = '';
+          if (module === 'Ministries') {
+            updateName = data.ministry_name || (entityId ? `#${entityId}` : '');
+          } else if (module === 'Events') {
+            updateName = data.title || (entityId ? `#${entityId}` : '');
+          } else {
+            updateName = data.name || data.title || data.firstname || data.email ||
+                      (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+                      (entityId ? `#${entityId}` : '');
+          }
 
           // Add more context based on module
           let updateContext = '';
           if (module === 'Members') {
             updateContext = data.email ? ` (Email: ${data.email})` : '';
           } else if (module === 'Events') {
-            updateContext = data.event_date ? ` (Date: ${data.event_date})` : '';
+            updateContext = data.start_date ? ` (Date: ${data.start_date})` : '';
+          } else if (module === 'Ministries') {
+            updateContext = data.schedule ? ` (Schedule: ${data.schedule})` : '';
           }
 
-          return `Updated ${entityName}${updateName ? `: ${updateName}` : (entityId ? ` #${entityId}` : '')}${updateContext}`;
+          let updateDescription = `Updated ${entityName}${updateName ? `: ${updateName}` : (entityId ? ` #${entityId}` : '')}${updateContext}`;
+
+          // Add before/after data for modules with edit forms
+          const modulesWithEditForms = [
+            'Members', 'Accounts', 'Events', 'Ministries', 'Departments',
+            'Department Officers', 'Church Leaders', 'Tithes & Offerings',
+            'Water Baptism', 'Burial Service', 'Child Dedication', 'Marriage Service',
+            'Approvals', 'Forms', 'Content Management'
+          ];
+
+          if (modulesWithEditForms.includes(module)) {
+            // Get old data if available
+            const oldData = req.record_before_update;
+            const newData = data;
+
+            if (oldData && Object.keys(newData).length > 0) {
+              // Format old data
+              const cleanOldData = {};
+              for (const [key, value] of Object.entries(oldData)) {
+                if (value !== null && value !== undefined && value !== '') {
+                  if (Buffer.isBuffer(value)) {
+                    cleanOldData[key] = value.toString('utf8');
+                  } else if (typeof value === 'object') {
+                    cleanOldData[key] = JSON.stringify(value);
+                  } else {
+                    cleanOldData[key] = value;
+                  }
+                }
+              }
+
+              // Format new data
+              const cleanNewData = {};
+              for (const [key, value] of Object.entries(newData)) {
+                if (value !== null && value !== undefined && value !== '') {
+                  if (Buffer.isBuffer(value)) {
+                    cleanNewData[key] = value.toString('utf8');
+                  } else if (typeof value === 'object') {
+                    cleanNewData[key] = JSON.stringify(value);
+                  } else {
+                    cleanNewData[key] = value;
+                  }
+                }
+              }
+
+              if (Object.keys(cleanOldData).length > 0 || Object.keys(cleanNewData).length > 0) {
+                updateDescription += ` - Before: ${JSON.stringify(cleanOldData)} | After: ${JSON.stringify(cleanNewData)}`;
+              }
+            } else if (Object.keys(newData).length > 0) {
+              // Fallback: just show new data if old data not available
+              const cleanData = {};
+              for (const [key, value] of Object.entries(newData)) {
+                if (value !== null && value !== undefined && value !== '') {
+                  if (Buffer.isBuffer(value)) {
+                    cleanData[key] = value.toString('utf8');
+                  } else if (typeof value === 'object') {
+                    cleanData[key] = JSON.stringify(value);
+                  } else {
+                    cleanData[key] = value;
+                  }
+                }
+              }
+
+              if (Object.keys(cleanData).length > 0) {
+                updateDescription += ` - Updated Data: ${JSON.stringify(cleanData)}`;
+              }
+            }
+          }
+
+          return updateDescription;
 
         case 'DELETE':
           // For delete, show complete record data like archives do
@@ -548,7 +663,7 @@ const auditTrailMiddleware = async (req, res, next) => {
       if (fullPath.includes('/login')) {
         actionType = 'LOGIN';
         module = 'Authentication';
-        description = 'User logged in';
+        description = 'User login attempt';
         entityType = null;
         entityId = null;
       } else if (fullPath.includes('/restore')) {
@@ -575,8 +690,31 @@ const auditTrailMiddleware = async (req, res, next) => {
         actionType = 'PRINT';
         description = generateDescription('PRINT', entityType, entityId, module, body);
       } else {
-        actionType = 'VIEW';
-        description = generateDescription('VIEW', entityType, entityId, module, body);
+        // Enhanced view logging for specific modules
+        if (fullPath.includes('/ministries/getAllMinistries') ||
+            fullPath.includes('/ministries/getMinistryById') ||
+            fullPath.includes('/ministries/getMinistriesByMemberId')) {
+          actionType = 'VIEW_MINISTRY';
+          module = 'Ministries';
+          description = generateDescription('VIEW', entityType, entityId, 'Ministries', body);
+        } else if (fullPath.includes('/accounts/getAllAccounts') ||
+                   fullPath.includes('/accounts/getAccountById') ||
+                   fullPath.includes('/accounts/me')) {
+          actionType = 'VIEW_ACCOUNT';
+          module = 'Accounts';
+          description = generateDescription('VIEW', entityType, entityId, 'Accounts', body);
+        } else if (fullPath.includes('/events/getAllEvents') ||
+                   fullPath.includes('/events/getEventById') ||
+                   fullPath.includes('/events/getEventsByMemberId') ||
+                   fullPath.includes('/events/getSermonEvents') ||
+                   fullPath.includes('/events/getCompletedSermonEvents')) {
+          actionType = 'VIEW_EVENT';
+          module = 'Events';
+          description = generateDescription('VIEW', entityType, entityId, 'Events', body);
+        } else {
+          actionType = 'VIEW';
+          description = generateDescription('VIEW', entityType, entityId, module, body);
+        }
       }
     }
 
@@ -621,3 +759,5 @@ const auditTrailMiddleware = async (req, res, next) => {
 };
 
 module.exports = auditTrailMiddleware;
+
+

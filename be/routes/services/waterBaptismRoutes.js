@@ -877,18 +877,18 @@ router.post('/register-non-member', async (req, res) => {
 router.get('/check-email-exists', async (req, res) => {
   try {
     const { email } = req.query;
-    
+
     if (!email) {
       return res.status(400).json({
         success: false,
         message: 'Email is required'
       });
     }
-    
+
     // Direct query to avoid circular dependency
     const sql = 'SELECT acc_id, email FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))';
     const [rows] = await query(sql, [email]);
-    
+
     if (rows.length > 0) {
       return res.status(400).json({
         success: false,
@@ -896,7 +896,7 @@ router.get('/check-email-exists', async (req, res) => {
         data: { exists: true, account: rows[0] }
       });
     }
-    
+
     return res.status(200).json({
       success: true,
       message: 'Email is available',
@@ -907,6 +907,71 @@ router.get('/check-email-exists', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to check email'
+    });
+  }
+});
+
+/**
+ * CHECK TIME SLOT - Check if a time slot is already booked for water baptism
+ * GET /api/services/water-baptisms/check-time-slot?baptism_date=YYYY-MM-DD&baptism_time=HH:mm:ss&exclude_id=xxx
+ * This prevents double-booking of baptism time slots
+ */
+router.get('/check-time-slot', async (req, res) => {
+  try {
+    const { baptism_date, baptism_time, exclude_id } = req.query;
+
+    if (!baptism_date || !baptism_time) {
+      return res.status(400).json({
+        success: false,
+        message: 'Baptism date and time are required'
+      });
+    }
+
+    // Query to check for existing approved baptisms at the same date and time
+    let sql = `
+      SELECT baptism_id, firstname, lastname, baptism_date, preferred_baptism_time as baptism_time
+      FROM tbl_waterbaptism
+      WHERE baptism_date = ?
+      AND preferred_baptism_time = ?
+      AND status = 'approved'
+    `;
+
+    const params = [baptism_date, baptism_time];
+
+    // Exclude current baptism if editing
+    if (exclude_id) {
+      sql += ' AND baptism_id != ?';
+      params.push(exclude_id);
+    }
+
+    const [rows] = await query(sql, params);
+
+    if (rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Time slot is already booked',
+        data: {
+          isBooked: true,
+          conflictingBaptism: {
+            baptism_id: rows[0].baptism_id,
+            name: `${rows[0].firstname} ${rows[0].lastname}`,
+            baptism_date: rows[0].baptism_date,
+            baptism_time: rows[0].baptism_time
+          }
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Time slot is available',
+      data: { isBooked: false }
+    });
+  } catch (error) {
+    console.error('Error checking time slot:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to check time slot'
     });
   }
 });

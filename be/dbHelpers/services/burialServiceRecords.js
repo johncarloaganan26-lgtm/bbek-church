@@ -471,6 +471,8 @@ async function updateBurialService(burialId, burialData) {
 
     const {
       member_id,
+      requester_name,
+      requester_email,
       relationship,
       location,
       pastor_name,

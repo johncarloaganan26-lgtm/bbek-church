@@ -43,10 +43,10 @@ us<template>
         </el-select>
       </el-form-item>
 
-      <!-- Requester Name (Required for Admin/Staff) -->
+      <!-- Requester Name (Required for Admin/Staff when no member selected) -->
       <el-form-item label="Requester Name" prop="requester_name" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
         <template #label>
-          <span>{{ formData.member_id ? 'Member' : 'Requester Name' }}</span>
+          <span>{{ isMemberSelected ? 'Member' : 'Requester Name' }}<span v-if="!isMemberSelected" class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.requester_name"
@@ -57,10 +57,10 @@ us<template>
         />
       </el-form-item>
 
-      <!-- Requester Email (Required for Admin/Staff) -->
+      <!-- Requester Email (Required for Admin/Staff when no member selected) -->
       <el-form-item label="Requester Email" prop="requester_email" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
         <template #label>
-          <span>{{ formData.member_id ? 'Member Email' : 'Requester Email' }}</span>
+          <span>{{ isMemberSelected ? 'Member Email' : 'Requester Email' }}<span v-if="!isMemberSelected" class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.requester_email"
@@ -75,7 +75,7 @@ us<template>
       <!-- Requester Name (For Non-Member Users) -->
       <el-form-item prop="requester_name" v-else-if="!userInfo?.account?.member_id">
         <template #label>
-          <span>Requester Name <span class="required-text">Required</span></span>
+          <span>Requester Name <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.requester_name"
@@ -89,7 +89,7 @@ us<template>
       <!-- Requester Email (For Non-Member Users) -->
       <el-form-item prop="requester_email" v-else-if="!userInfo?.account?.member_id">
         <template #label>
-          <span>Requester Email <span class="required-text">Required</span></span>
+          <span>Requester Email <span class="required-text">*</span></span>
         </template>
         <el-input
           v-model="formData.requester_email"
@@ -104,7 +104,7 @@ us<template>
      <!-- Deceased Name -->
      <el-form-item prop="deceased_name">
        <template #label>
-         <span>Deceased Name <span v-if="isMember" class="required-text">Required</span></span>
+         <span>Deceased Name <span v-if="isMember" class="required-text">*</span></span>
        </template>
        <el-input
          v-model="formData.deceased_name"
@@ -118,7 +118,7 @@ us<template>
      <!-- Deceased Birthdate -->
      <el-form-item prop="deceased_birthdate">
        <template #label>
-         <span>Deceased Birthdate <span v-if="isMember" class="required-text">Required</span></span>
+         <span>Deceased Birthdate <span v-if="isMember" class="required-text">*</span></span>
        </template>
        <el-date-picker
          v-model="formData.deceased_birthdate"
@@ -134,7 +134,7 @@ us<template>
      <!-- Date of Death -->
      <el-form-item prop="date_death">
        <template #label>
-         <span>Date of Death <span v-if="isMember" class="required-text">Required</span></span>
+         <span>Date of Death <span v-if="isMember" class="required-text">*</span></span>
        </template>
        <el-date-picker
          v-model="formData.date_death"
@@ -150,7 +150,7 @@ us<template>
      <!-- Relationship -->
      <el-form-item prop="relationship">
        <template #label>
-         <span>Relationship <span v-if="isMember" class="required-text">Required</span></span>
+         <span>Relationship <span v-if="isMember" class="required-text">*</span></span>
        </template>
        <el-select
          v-model="formData.relationship"
@@ -172,7 +172,7 @@ us<template>
      <!-- Location -->
      <el-form-item prop="location">
        <template #label>
-         <span>Location <span v-if="isMember" class="required-text">Required</span></span>
+         <span>Location <span v-if="isMember" class="required-text">*</span></span>
        </template>
        <el-input
          v-model="formData.location"
@@ -218,7 +218,8 @@ us<template>
          format="YYYY-MM-DD HH:mm"
          style="width: 100%"
          :disabled="loading"
-         @change="updateStatusFromServiceDate"
+         :disabled-date="(date) => date < new Date()"
+         @change="onServiceDateChange"
        />
      </el-form-item>
 
@@ -304,7 +305,8 @@ const pastorOptions = computed(() => burialServiceStore.pastorOptions)
 onMounted(async () => {
   await Promise.all([
     burialServiceStore.fetchMemberOptions(),
-    burialServiceStore.fetchPastorOptions()
+    burialServiceStore.fetchPastorOptions(),
+    fetchUnavailableTimeSlots()
   ])
 })
 // Emits
@@ -345,10 +347,82 @@ const isEditMode = computed(() => !!props.burialServiceData)
 
 // Check if current user is a member (not admin/staff)
 const isMember = computed(() => {
-  return userInfo.value && userInfo.value.account && 
-         userInfo.value.account.position !== 'admin' && 
+  return userInfo.value && userInfo.value.account &&
+         userInfo.value.account.position !== 'admin' &&
          userInfo.value.account.position !== 'staff'
 })
+
+// Check if a member is selected (for conditional validation)
+const isMemberSelected = computed(() => {
+  return !!(formData.member_id && formData.member_id !== '')
+})
+
+// Unavailable time slots for scheduling
+const unavailableTimeSlots = ref([])
+
+// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
+const fetchUnavailableTimeSlots = async () => {
+  try {
+    // Get all burial services with approved status to block time slots
+    const response = await axios.get('/church-records/burial-services/getAllBurialServices', {
+      params: {
+        status: 'approved', // Only get approved burial services to block time slots
+        limit: 1000 // Get enough records to cover scheduling
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      // Extract time slots that are already approved/scheduled
+      const scheduledTimeSlots = []
+
+      response.data.data.forEach(burial => {
+        if (burial.service_date && burial.status === 'approved') {
+          // Add time slot for blocking (same day allowed, same time blocked)
+          scheduledTimeSlots.push({
+            date: burial.service_date.split(' ')[0], // Extract date part only
+            id: burial.burial_id // For edit mode exception
+          })
+        }
+      })
+
+      // Store time slots for blocking logic
+      unavailableTimeSlots.value = scheduledTimeSlots
+    }
+  } catch (error) {
+    console.error('Error fetching unavailable time slots:', error)
+    // Don't show error to user, just allow all slots if fetch fails
+  }
+}
+
+// Validate time slot availability
+const validateTimeSlot = async (dateTime, excludeId = null) => {
+  if (!dateTime) return true
+
+  try {
+    // Extract date and time from datetime value
+    const date = new Date(dateTime)
+    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD
+    const timeStr = date.toTimeString().split(' ')[0] // HH:MM:SS
+
+    const response = await axios.get('/church-records/burial-services/check-time-slot', {
+      params: {
+        service_date: dateStr,
+        service_time: timeStr,
+        exclude_id: excludeId
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      return !response.data.data.isBooked
+    }
+  } catch (error) {
+    console.error('Error validating time slot:', error)
+    // If validation fails, allow the time slot
+    return true
+  }
+
+  return true
+}
 
 // Relationship options
 const relationshipOptions = [
@@ -412,7 +486,25 @@ const rules = computed(() => {
       { min: 3, max: 150, message: 'Location must be between 3 and 150 characters', trigger: 'blur' }
     ],
     service_date: [
-      { required: true, message: 'Service date is required', trigger: 'change' }
+      { required: true, message: 'Service date is required', trigger: 'change' },
+      {
+        validator: async (rule, value, callback) => {
+          // Only validate if date is provided
+          if (value) {
+            const isValid = await validateTimeSlot(
+              value,
+              isEditMode.value ? props.burialServiceData?.burial_id : null
+            )
+
+            if (!isValid) {
+              callback(new Error('This date is already booked. Please choose a different date.'))
+              return
+            }
+          }
+          callback()
+        },
+        trigger: ['change', 'blur']
+      }
     ],
     status: [
       { required: true, message: 'Status is required', trigger: 'change' },
@@ -422,12 +514,21 @@ const rules = computed(() => {
 
   // Add requester validation rules based on user type
   if (userInfo.value?.account?.position === 'admin' || userInfo.value?.account?.position === 'staff') {
+    // For admin/staff: required only when no member is selected
     baseRules.requester_name = [
-      { required: true, message: 'Requester name is required', trigger: 'blur' },
+      {
+        required: !isMemberSelected.value,
+        message: 'Requester name is required when no member is selected',
+        trigger: 'blur'
+      },
       { min: 2, max: 100, message: 'Requester name must be between 2 and 100 characters', trigger: 'blur' }
     ];
     baseRules.requester_email = [
-      { required: true, message: 'Requester email is required', trigger: 'blur' },
+      {
+        required: !isMemberSelected.value,
+        message: 'Requester email is required when no member is selected',
+        trigger: 'blur'
+      },
       { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
     ];
   } else if (!userInfo.value?.account?.member_id) {
@@ -444,6 +545,35 @@ const rules = computed(() => {
 
   return baseRules;
 });
+
+// Handle service date change - show immediate toast notification for conflicts and update status
+const onServiceDateChange = async (date) => {
+  // First update status based on date change
+  updateStatusFromServiceDate()
+
+  // Then check for time slot conflicts if date is selected
+  if (date) {
+    try {
+      const isValid = await validateTimeSlot(
+        date,
+        isEditMode.value ? props.burialServiceData?.burial_id : null
+      )
+
+      if (!isValid) {
+        // Show immediate toast notification
+        ElMessage.error({
+          message: `Service date conflict: ${date.split('T')[0]} is already booked. Please choose a different date.`,
+          duration: 5000, // Show for 5 seconds
+          showClose: true,
+          dangerouslyUseHTMLString: false
+        })
+      }
+    } catch (error) {
+      console.error('Error validating service date:', error)
+      // Don't show error to user for validation failures, just log
+    }
+  }
+}
 
 // Update status based on service date
 const updateStatusFromServiceDate = () => {
@@ -504,7 +634,8 @@ watch(
     } else {
       await Promise.all([
         burialServiceStore.fetchMemberOptions(),
-        burialServiceStore.fetchPastorOptions()
+        burialServiceStore.fetchPastorOptions(),
+        fetchUnavailableTimeSlots()
       ])
       
       if (props.burialServiceData) {
@@ -695,10 +826,10 @@ const handleSubmit = async () => {
     
     // Only include member_id if it's provided (optional for admin/staff)
     if (formData.member_id) submitData.member_id = String(formData.member_id).trim()
-    
-    // Include requester info for non-member requests
-    if (formData.requester_name) submitData.requester_name = formData.requester_name.trim()
-    if (formData.requester_email) submitData.requester_email = formData.requester_email.trim()
+
+    // Always include requester info (required for backend processing)
+    submitData.requester_name = formData.requester_name ? formData.requester_name.trim() : null
+    submitData.requester_email = formData.requester_email ? formData.requester_email.trim() : null
     
     if (formData.deceased_name) submitData.deceased_name = formData.deceased_name.trim()
     if (formData.deceased_birthdate) {

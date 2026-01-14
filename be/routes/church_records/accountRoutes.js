@@ -1,5 +1,6 @@
 const express = require('express');
 const moment = require('moment');
+const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const {
   createAccount,
   getAllAccounts,
@@ -371,11 +372,11 @@ router.post('/exportExcel', async (req, res) => {
 
 
 /**
- *  Login - Login to the system
- *  POST /api/church-records/accounts/login
- *  Body: { email, password } return access token
- */
-router.post('/login', async (req, res) => {
+  *  Login - Login to the system
+  *  POST /api/church-records/accounts/login
+  *  Body: { email, password } return access token
+  */
+ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -391,6 +392,27 @@ router.post('/login', async (req, res) => {
 
     // Check if result is null (invalid credentials)
     if (!result) {
+      // Log failed login attempt
+      try {
+        await auditTrailRecords.createAuditLog({
+          user_id: null,
+          user_email: email,
+          user_name: 'Unknown User',
+          user_position: 'unknown',
+          action_type: 'LOGIN_FAILED',
+          module: 'Authentication',
+          description: `Failed login attempt for email: ${email}`,
+          entity_type: null,
+          entity_id: null,
+          ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+          user_agent: null, // Hidden for privacy
+          status: 'failed',
+          error_message: 'Invalid credentials'
+        });
+      } catch (auditError) {
+        console.error('Error logging failed login:', auditError);
+      }
+
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -400,12 +422,60 @@ router.post('/login', async (req, res) => {
 
     // Check if result has success property
     if (result.success) {
+      // Log successful login
+      try {
+        const userData = result.data?.user || result.data;
+        // Ensure we have a valid user_id, fallback to a temporary ID if needed
+        const userId = userData?.acc_id || userData?.id || userData?.account?.acc_id;
+        if (!userId) {
+          console.warn('No valid user_id found for login logging, skipping audit log');
+        } else {
+          await auditTrailRecords.createAuditLog({
+            user_id: userId,
+            user_email: userData?.email || email,
+            user_name: userData?.name || userData?.firstname ? `${userData.firstname} ${userData.lastname || ''}`.trim() : email,
+            user_position: userData?.position || userData?.account?.position || 'member',
+            action_type: 'LOGIN_SUCCESS',
+            module: 'Authentication',
+            description: `Successful login for user: ${email}`,
+            entity_type: null,
+            entity_id: null,
+            ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+            user_agent: null, // Hidden for privacy
+            status: 'success'
+          });
+        }
+      } catch (auditError) {
+        console.error('Error logging successful login:', auditError);
+      }
+
       res.status(200).json({
         success: true,
         message: result.message,
         data: result.data
       });
     } else {
+      // Log failed login attempt
+      try {
+        await auditTrailRecords.createAuditLog({
+          user_id: null,
+          user_email: email,
+          user_name: 'Unknown User',
+          user_position: 'unknown',
+          action_type: 'LOGIN_FAILED',
+          module: 'Authentication',
+          description: `Failed login attempt for email: ${email} - ${result.message || 'Unknown error'}`,
+          entity_type: null,
+          entity_id: null,
+          ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+          user_agent: null, // Hidden for privacy
+          status: 'failed',
+          error_message: result.message || 'Login failed'
+        });
+      } catch (auditError) {
+        console.error('Error logging failed login:', auditError);
+      }
+
       res.status(401).json({
         success: false,
         message: result.message || 'Login failed',
@@ -414,12 +484,35 @@ router.post('/login', async (req, res) => {
     }
   } catch (error) {
     console.error('Error logging in:', error);
+
+    // Log system error during login
+    try {
+      const { email } = req.body;
+      await auditTrailRecords.createAuditLog({
+        user_id: null,
+        user_email: email || 'unknown',
+        user_name: 'Unknown User',
+        user_position: 'unknown',
+        action_type: 'LOGIN_ERROR',
+        module: 'Authentication',
+        description: `System error during login attempt for email: ${email || 'unknown'}`,
+        entity_type: null,
+        entity_id: null,
+        ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+        user_agent: null, // Hidden for privacy
+        status: 'failed',
+        error_message: error.message || 'System error'
+      });
+    } catch (auditError) {
+      console.error('Error logging login system error:', auditError);
+    }
+
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to login'
     });
   }
-});
+ });
 
 /**
  * FORGOT PASSWORD - Send password reset email

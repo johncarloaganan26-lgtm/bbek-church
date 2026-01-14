@@ -20,9 +20,6 @@ const publicRoutes = [
   '/api/church-records/accounts/login',
   '/api/church-records/accounts/verifyCredentials',
   '/api/church-records/accounts/forgotPassword',
-  '/api/church-records/accounts/getAccountById',
-  '/api/church-records/accounts/updateAccount',
-  '/api/church-records/accounts/getAllAccounts',
   // Member registration routes
   '/api/church-records/ministries/getPublicMinistries',
   '/api/church-records/members/getAllMembersForSelect',
@@ -34,8 +31,6 @@ const publicRoutes = [
   '/api/church-records/members/getAllPastorsForSelect',
   '/api/church-records/members/getMemberById',
   '/api/church-records/members/exportCSV',
-  '/api/church-records/events/getAllEvents',
-  '/api/church-records/ministries/getAllMinistries',
   '/api/member-registration/register/water-baptism',
   '/api/member-registration/register/burial-service',
   // Water baptism non-member registration (public - no auth required)

@@ -313,7 +313,8 @@
             value-format="YYYY-MM-DD"
             style="width: 100%"
             :disabled="loading"
-            @change="updateStatusFromBaptismDate"
+            :disabled-date="(date) => date < new Date()"
+            @change="onDateTimeChange"
           />
         </el-form-item>
 
@@ -327,6 +328,7 @@
             style="width: 100%"
             :disabled="loading"
             clearable
+            @change="onDateTimeChange"
           />
         </el-form-item>
       </div>
@@ -497,6 +499,9 @@ const ministryOptions = ref([])
 // Members without baptism records
 const membersWithoutBaptism = ref([])
 
+// Unavailable time slots for scheduling
+const unavailableTimeSlots = ref([])
+
 // Fetch members without baptism records
 const fetchMembersWithoutBaptism = async () => {
   try {
@@ -507,6 +512,66 @@ const fetchMembersWithoutBaptism = async () => {
   } catch (error) {
     console.error('Error fetching members without baptism:', error)
   }
+}
+
+// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
+const fetchUnavailableTimeSlots = async () => {
+  try {
+    // Get all water baptisms with approved status to block time slots
+    const response = await axios.get('/services/water-baptisms/getAllWaterBaptisms', {
+      params: {
+        status: 'approved', // Only get approved baptisms to block time slots
+        limit: 1000 // Get enough records to cover scheduling
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      // Extract time slots that are already approved/scheduled
+      const scheduledTimeSlots = []
+
+      response.data.data.forEach(baptism => {
+        if (baptism.baptism_date && baptism.baptism_time && baptism.status === 'approved') {
+          // Add time slot for blocking (same day allowed, same time blocked)
+          scheduledTimeSlots.push({
+            date: baptism.baptism_date,
+            time: baptism.baptism_time,
+            id: baptism.baptism_id // For edit mode exception
+          })
+        }
+      })
+
+      // Store time slots for blocking logic
+      unavailableTimeSlots.value = scheduledTimeSlots
+    }
+  } catch (error) {
+    console.error('Error fetching unavailable time slots:', error)
+    // Don't show error to user, just allow all slots if fetch fails
+  }
+}
+
+// Enhanced time slot validation function
+const validateTimeSlot = async (date, time, excludeId = null) => {
+  if (!date || !time) return true
+
+  try {
+    const response = await axios.get('/services/water-baptisms/check-time-slot', {
+      params: {
+        baptism_date: date,
+        baptism_time: time,
+        exclude_id: excludeId
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      return !response.data.data.isBooked
+    }
+  } catch (error) {
+    console.error('Error validating time slot:', error)
+    // If validation fails, allow the time slot
+    return true
+  }
+
+  return true
 }
 
 // Fetch ministry options
@@ -526,7 +591,8 @@ onMounted(async () => {
   await Promise.all([
     waterBaptismStore.fetchPastorOptions(),
     fetchMembersWithoutBaptism(),
-    fetchMinistryOptions()
+    fetchMinistryOptions(),
+    fetchUnavailableTimeSlots()
   ])
 })
 
@@ -626,12 +692,23 @@ const rules = {
         }
         const selectedDate = new Date(value)
         const today = new Date()
-        const minDate = new Date()
-        minDate.setFullYear(today.getFullYear() - 100)
-        if (selectedDate < minDate) {
-          callback(new Error('Baptism date is too far in the past'))
+        today.setHours(0, 0, 0, 0)
+        selectedDate.setHours(0, 0, 0, 0)
+        
+        // Check if date is in the past
+        if (selectedDate < today) {
+          callback(new Error('Baptism date cannot be in the past'))
           return
         }
+        
+        // Check if date is too far in the future (more than 5 years)
+        const maxDate = new Date()
+        maxDate.setFullYear(today.getFullYear() + 5)
+        if (selectedDate > maxDate) {
+          callback(new Error('Baptism date cannot be more than 5 years in the future'))
+          return
+        }
+        
         callback()
       },
       trigger: 'change'
@@ -642,6 +719,27 @@ const rules = {
   ],
   pastor_name: [
     { required: true, message: 'Pastor is required', trigger: 'change' }
+  ],
+  baptism_time: [
+    {
+      validator: async (rule, value, callback) => {
+        // Only validate if both date and time are provided
+        if (formData.baptism_date && value) {
+          const isValid = await validateTimeSlot(
+            formData.baptism_date,
+            value,
+            isEditMode.value ? props.baptismData?.baptism_id : null
+          )
+
+          if (!isValid) {
+            callback(new Error('This time slot is already booked. Please choose a different time.'))
+            return
+          }
+        }
+        callback()
+      },
+      trigger: ['change', 'blur']
+    }
   ],
   status: [
     { required: true, message: 'Status is required', trigger: 'change' },
@@ -681,6 +779,32 @@ const updateStatusFromBaptismDate = () => {
     formData.status = 'approved'  // Ongoing = approved
   } else {
     formData.status = 'completed'  // Past date = completed
+  }
+}
+
+// Handle date/time change - show immediate toast notification for conflicts and update status
+const onDateTimeChange = async (value) => {
+  // First update status based on date change
+  updateStatusFromBaptismDate()
+
+  // Then check for time slot conflicts if both date and time are selected
+  if (formData.baptism_date && formData.baptism_time) {
+    try {
+      const isValid = await validateTimeSlot(formData.baptism_date, formData.baptism_time, isEditMode.value ? props.baptismData?.baptism_id : null)
+
+      if (!isValid) {
+        // Show immediate toast notification
+        ElMessage.error({
+          message: `Time slot conflict: ${formData.baptism_date} at ${formData.baptism_time} is already booked. Please choose a different time.`,
+          duration: 5000, // Show for 5 seconds
+          showClose: true,
+          dangerouslyUseHTMLString: false
+        })
+      }
+    } catch (error) {
+      console.error('Error validating time slot on change:', error)
+      // Don't show error to user for validation failures, just log
+    }
   }
 }
 
@@ -846,43 +970,53 @@ watch(() => props.modelValue, async (isOpen) => {
     // Reset form when dialog closes
     resetForm()
     resetLoading() // Reset loading when dialog closes
-  } else if (props.baptismData) {
-    // Populate form when dialog opens in edit mode
-    const data = props.baptismData
-    formData.baptism_id = data.baptism_id || ''
-    formData.baptism_date = data.baptism_date || null
-    formData.baptism_time = data.baptism_time || null
-    formData.location = data.location || ''
-    formData.pastor_name = data.pastor_name || ''
-    formData.status = data.status || 'pending'
-    formData.guardian_name = data.guardian_name || ''
-    formData.guardian_contact = data.guardian_contact || ''
-    formData.guardian_relationship = data.guardian_relationship || ''
-
-    // Populate personal info from the joined data (works for both member and non-member)
-    formData.firstname = data.firstname || ''
-    formData.middle_name = data.middle_name || ''
-    formData.lastname = data.lastname || ''
-    formData.birthdate = data.birthdate || ''
-    formData.age = data.age || ''
-    formData.gender = data.gender || ''
-    formData.civil_status = data.civil_status || ''
-    formData.profession = data.profession || ''
-    formData.spouse_name = data.spouse_name || ''
-    formData.marriage_date = data.marriage_date || null
-    formData.children = data.children ? (typeof data.children === 'string' ? JSON.parse(data.children) : data.children) : []
-    formData.desire_ministry = data.desire_ministry || ''
-    formData.address = data.address || ''
-    formData.email = data.email || ''
-    formData.phone_number = data.phone_number || ''
-
-    // Update status based on baptism date if not explicitly set
-    if (!data.status && formData.baptism_date) {
-      updateStatusFromBaptismDate()
-    }
   } else {
-    // Reset form for add mode
-    resetForm()
+    // Refresh options when dialog opens
+    await Promise.all([
+      waterBaptismStore.fetchPastorOptions(),
+      fetchMembersWithoutBaptism(),
+      fetchMinistryOptions(),
+      fetchUnavailableTimeSlots()
+    ])
+
+    if (props.baptismData) {
+      // Populate form when dialog opens in edit mode
+      const data = props.baptismData
+      formData.baptism_id = data.baptism_id || ''
+      formData.baptism_date = data.baptism_date || null
+      formData.baptism_time = data.baptism_time || null
+      formData.location = data.location || ''
+      formData.pastor_name = data.pastor_name || ''
+      formData.status = data.status || 'pending'
+      formData.guardian_name = data.guardian_name || ''
+      formData.guardian_contact = data.guardian_contact || ''
+      formData.guardian_relationship = data.guardian_relationship || ''
+
+      // Populate personal info from the joined data (works for both member and non-member)
+      formData.firstname = data.firstname || ''
+      formData.middle_name = data.middle_name || ''
+      formData.lastname = data.lastname || ''
+      formData.birthdate = data.birthdate || ''
+      formData.age = data.age || ''
+      formData.gender = data.gender || ''
+      formData.civil_status = data.civil_status || ''
+      formData.profession = data.profession || ''
+      formData.spouse_name = data.spouse_name || ''
+      formData.marriage_date = data.marriage_date || null
+      formData.children = data.children ? (typeof data.children === 'string' ? JSON.parse(data.children) : data.children) : []
+      formData.desire_ministry = data.desire_ministry || ''
+      formData.address = data.address || ''
+      formData.email = data.email || ''
+      formData.phone_number = data.phone_number || ''
+
+      // Update status based on baptism date if not explicitly set
+      if (!data.status && formData.baptism_date) {
+        updateStatusFromBaptismDate()
+      }
+    } else {
+      // Reset form for add mode
+      resetForm()
+    }
   }
 })
 
