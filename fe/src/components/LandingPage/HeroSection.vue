@@ -53,7 +53,7 @@ u<template>
       ></div>
 
       <!-- Overlay -->
-      <div class="hero-overlay"></div>
+      <div class="hero-overlay" :class="{ 'dark-overlay': homeData.backgroundType === 'image' }"></div>
 
       <!-- Video Controls -->
       <div
@@ -497,6 +497,10 @@ onUnmounted(() => {
   background: linear-gradient(to bottom, rgba(55, 65, 81, 0.4), rgba(75, 85, 99, 0.3), rgba(156, 163, 175, 0.2));
   z-index: 2;
   pointer-events: none;
+}
+
+.hero-overlay.dark-overlay {
+  background: rgba(0, 0, 0, 0.6) !important;
 }
 
 .hero-content {
