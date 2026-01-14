@@ -73,7 +73,7 @@
         </el-radio-group>
         <div class="visibility-hint">
           <el-text size="small" type="info">
-            When visible, all users (members, staff, and visitors) can see this announcement.
+            When visible, all users (admin, members, staff, and visitors) can see this announcement.
           </el-text>
         </div>
       </el-form-item>
