@@ -462,38 +462,41 @@ async function deleteAnnouncement(announcementId, archivedBy = null) {
  */
 async function getActiveAnnouncementsForUser(userId) {
   try {
-    const now = moment().format('YYYY-MM-DD HH:mm:ss');
+    // Get current date in Philippine time (UTC+8)
+    const now = moment().utcOffset('+08:00'); // Philippine time
+    const currentDate = now.format('YYYY-MM-DD');
+    const currentDateTime = now.format('YYYY-MM-DD HH:mm:ss');
 
-    // Simplified query - all active announcements are visible to everyone
+    // Simplified query - show announcements only on their start date (Philippine time)
     let sql, params;
 
     if (userId) {
-      // Authenticated user - show all active announcements (including viewed ones)
+      // Authenticated user - show announcements starting today
       sql = `
         SELECT a.*
         FROM tbl_announcements a
         WHERE a.is_active = 1
-          AND (a.start_date IS NULL OR a.start_date <= ?)
+          AND DATE(CONVERT_TZ(a.start_date, '+00:00', '+08:00')) = ?
           AND (a.end_date IS NULL OR a.end_date >= ?)
         ORDER BY
           FIELD(a.priority, 'urgent', 'high', 'normal', 'low'),
           a.created_at DESC
       `;
-      params = [now, now];
+      params = [currentDate, currentDateTime];
     } else {
-      // Non-authenticated user - show only announcements not hidden from visitors
+      // Non-authenticated user - show only announcements not hidden from visitors, starting today
       sql = `
         SELECT a.*
         FROM tbl_announcements a
         WHERE a.is_active = 1
           AND a.members_only = 0
-          AND (a.start_date IS NULL OR a.start_date <= ?)
+          AND DATE(CONVERT_TZ(a.start_date, '+00:00', '+08:00')) = ?
           AND (a.end_date IS NULL OR a.end_date >= ?)
         ORDER BY
           FIELD(a.priority, 'urgent', 'high', 'normal', 'low'),
           a.created_at DESC
       `;
-      params = [now, now];
+      params = [currentDate, currentDateTime];
     }
 
     const [rows] = await query(sql, params);
