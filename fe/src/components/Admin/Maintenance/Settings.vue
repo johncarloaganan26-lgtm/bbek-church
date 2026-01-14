@@ -130,22 +130,17 @@
           </el-select>
         </el-form-item>
         <el-form-item label="Target Audience">
-          <el-select
-            v-model="filters.target_audience"
-            placeholder="Select audience"
-            @change="handleFilterChange"
-            :disabled="loading"
-            clearable
-            style="width: 180px"
-          >
-            <el-option label="All Audiences" value="All Audiences" />
-            <el-option label="All" value="all" />
-            <el-option label="Admin" value="admin" />
-            <el-option label="Pastor" value="pastor" />
-            <el-option label="Member" value="member" />
-            <el-option label="Non Member" value="non_member" />
-          </el-select>
-        </el-form-item>
+           <el-select
+             v-model="filters.target_audience"
+             placeholder="All Users"
+             @change="handleFilterChange"
+             :disabled="loading"
+             clearable
+             style="width: 180px"
+           >
+             <el-option label="All Users" value="all" />
+           </el-select>
+         </el-form-item>
         <el-form-item label="Status">
           <el-select
             v-model="filters.is_active"

@@ -21,6 +21,13 @@
         >
           Export CSV
         </el-button>
+        <el-button
+          type="info"
+          @click="printLogs"
+          icon="Printer"
+        >
+          Print
+        </el-button>
       </div>
     </div>
 
@@ -286,7 +293,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Refresh, Download, View } from '@element-plus/icons-vue'
+import { Filter, Refresh, Download, View, Printer } from '@element-plus/icons-vue'
 import { useAuditTrailStore } from '@/stores/auditTrailStore'
 
 // Store
@@ -406,6 +413,126 @@ const exportLogs = async () => {
     console.error('Error exporting logs:', error)
     ElMessage.error('Failed to export audit logs')
   }
+}
+
+const printLogs = () => {
+  const printWindow = window.open('', '_blank')
+  const tableHeaders = ['User', 'Action', 'Module/Page', 'Description', 'Date & Time', 'IP Address', 'Status']
+
+  // Get current filter information for the header
+  const filterInfo = []
+  if (filters.value.actionType) filterInfo.push(`Action: ${filters.value.actionType}`)
+  if (filters.value.userId) {
+    const user = uniqueUsers.value.find(u => u.user_id === filters.value.userId)
+    if (user) filterInfo.push(`User: ${user.user_name}`)
+  }
+  if (filters.value.dateRange && filters.value.dateRange.length === 2) {
+    filterInfo.push(`Date Range: ${filters.value.dateRange[0]} to ${filters.value.dateRange[1]}`)
+  }
+  if (filters.value.status) filterInfo.push(`Status: ${filters.value.status}`)
+
+  const filterText = filterInfo.length > 0 ? `Filters Applied: ${filterInfo.join(', ')}` : 'No filters applied'
+
+  // Get current user info for print footer
+  const currentUser = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const printedBy = currentUser?.account?.email || currentUser?.account?.name || 'Admin'
+
+  const rows = logs.value.map(log => `
+    <tr>
+      <td>
+        <div><strong>${log.user_name}</strong></div>
+        <div style="font-size: 11px; color: #666;">${log.user_email}</div>
+        <div style="font-size: 10px; color: #999;">${log.user_position}</div>
+      </td>
+      <td>${log.action_type}</td>
+      <td>${log.module || ''}</td>
+      <td>${log.description || ''}</td>
+      <td>${formatDateTime(log.date_created)}</td>
+      <td>${log.ip_address || ''}</td>
+      <td>${log.status}</td>
+    </tr>
+  `).join('')
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Audit Trail - Print</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            position: relative;
+          }
+          .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            opacity: 0.08;
+            z-index: -1;
+            pointer-events: none;
+          }
+          .watermark img {
+            width: 100%;
+            height: auto;
+          }
+          .header-logo {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: 80px;
+          }
+          h1 { color: #1a365d; text-align: center; margin: 5px 0; }
+          .subtitle { text-align: center; color: #666; margin-bottom: 15px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 11px; }
+          th { background-color: #1a365d; color: white; }
+          .print-info {
+            text-align: right;
+            color: #666;
+            font-size: 10px;
+            margin-bottom: 10px;
+          }
+          .org-name { text-align: center; color: #1a365d; font-weight: bold; margin-bottom: 5px; }
+          .filters {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            font-size: 12px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="watermark">
+          <img src="/logo.png" alt="Watermark" />
+        </div>
+        <img src="/logo.png" alt="Logo" class="header-logo" />
+        <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
+        <h1>Audit Trail</h1>
+        <p class="subtitle">Activity Logs Report</p>
+        <div class="print-info">
+          Printed on: ${new Date().toLocaleString()}<br/>
+          Printed by: ${printedBy}<br/>
+          Total Records: ${pagination.value.total}
+        </div>
+        <div class="filters">
+          <strong>Applied Filters:</strong> ${filterText}
+        </div>
+        <table>
+          <thead>
+            <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="7" style="text-align:center">No records found</td></tr>'}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+  printWindow.focus()
+  setTimeout(() => printWindow.print(), 500)
 }
 
 const showLogDetails = (log) => {
