@@ -50,14 +50,10 @@
       </div>
 
       <div v-if="events.length > 0">
-        <!-- 4-Column Grid with Auto-Scroll for 4+ events -->
+        <!-- Infinite Auto-Scroll Container -->
         <div
           ref="eventsScrollContainer"
-          class="events-grid-container"
-          :class="[
-            { 'auto-scroll': events.length >= 4 },
-            `events-count-${events.length}`
-          ]"
+          class="events-grid-container auto-scroll"
           @mouseenter="pauseAutoScroll"
           @mouseleave="resumeAutoScroll"
         >
@@ -147,27 +143,19 @@ const loading = ref(false);
 const eventsScrollContainer = ref(null);
 const autoScrollInterval = ref(null);
 const isAutoScrolling = ref(true);
-const focusedCardIndex = ref(0); // Track which card is in focus
-const scrollListenerActive = ref(false); // Track if scroll listener is attached
 
 // Loading state for CMS data
 const isLoadingHome = computed(() => cmsStore.isPageLoading("home"));
 
-// Duplicated events for infinite scroll
-const duplicatedEvents = computed(() => {
-  if (events.value.length >= 4) {
-    return [...events.value, ...events.value];
-  }
-  return events.value;
-});
+// Events are always duplicated in displayedEvents for infinite scrolling
 
-// Displayed events (for 4-column grid)
+// Displayed events (always duplicated for infinite auto-scroll)
 const displayedEvents = computed(() => {
-  if (events.value.length >= 4) {
-    // For auto-scroll: duplicate events for seamless looping
+  if (events.value.length > 0) {
+    // Always duplicate events for seamless infinite scrolling
     return [...events.value, ...events.value, ...events.value];
   }
-  return events.value;
+  return [];
 });
 
 const floatingElements = ref([
@@ -346,53 +334,25 @@ const fetchEvents = async () => {
   }
 };
 
-const updateCinemaFocus = () => {
-  if (!eventsScrollContainer.value || events.value.length < 3) return;
-  
-  const container = eventsScrollContainer.value;
-  const cardWidth = 324; // card width + gap (300px + 24px gap)
-  const containerCenter = container.clientWidth / 2;
-  const scrollOffset = container.scrollLeft;
-  
-  // Calculate which card is in the center
-  const centerPosition = scrollOffset + containerCenter;
-  const focusIndex = Math.round(centerPosition / cardWidth) % (displayedEvents.value.length);
-  
-  focusedCardIndex.value = focusIndex;
-  
-  // Update all cards with focus state
-  const cards = container.querySelectorAll('.event-card');
-  cards.forEach((card, idx) => {
-    if (idx === focusIndex) {
-      card.classList.add('cinema-focused');
-      card.classList.remove('cinema-dimmed');
-    } else {
-      card.classList.add('cinema-dimmed');
-      card.classList.remove('cinema-focused');
-    }
-  });
-};
+// Cinema focus functionality removed - using simple infinite scroll
 
 const startAutoScroll = () => {
   if (autoScrollInterval.value) return;
 
   autoScrollInterval.value = setInterval(() => {
-    if (isAutoScrolling.value && eventsScrollContainer.value) {
+    if (isAutoScrolling.value && eventsScrollContainer.value && events.value.length > 0) {
       const container = eventsScrollContainer.value;
       const scrollAmount = 2; // pixels per frame
-      
-      // Since we have 3 copies of events, scroll to 1/3 of total width for seamless loop
+
+      // For infinite scrolling with 3 copies of events
       const oneSetWidth = container.scrollWidth / 3;
 
-      // Smoothly scroll and reset when reaching the second set
+      // Continuous left-to-right scroll with seamless loop
       if (container.scrollLeft >= oneSetWidth * 2) {
-        container.scrollLeft = oneSetWidth; // Reset to middle set
+        container.scrollLeft = oneSetWidth; // Reset to middle set for seamless loop
       } else {
-        container.scrollLeft += scrollAmount; // Continuous scroll
+        container.scrollLeft += scrollAmount; // Continuous left-to-right scroll
       }
-      
-      // Update cinema focus
-      updateCinemaFocus();
     }
   }, 30); // 30ms interval for smoother scrolling
 };
@@ -446,29 +406,19 @@ onMounted(async () => {
   await fetchHomeData();
   await fetchEvents();
 
-  // Start auto-scroll if there are 4+ events
-  if (events.value.length >= 4) {
+  // Start infinite auto-scroll if there are any events
+  if (events.value.length > 0) {
     await nextTick();
+    // Position container for left-to-right scrolling
+    if (eventsScrollContainer.value) {
+      eventsScrollContainer.value.scrollLeft = eventsScrollContainer.value.scrollWidth / 3;
+    }
     startAutoScroll();
-  }
-  
-  // Add scroll listener for cinema effect if 3+ events
-  if (events.value.length >= 3 && eventsScrollContainer.value) {
-    eventsScrollContainer.value.addEventListener('scroll', updateCinemaFocus);
-    scrollListenerActive.value = true;
-    // Initial focus
-    await nextTick();
-    updateCinemaFocus();
   }
 });
 
 onBeforeUnmount(() => {
   stopAutoScroll();
-  // Remove scroll listener
-  if (scrollListenerActive.value && eventsScrollContainer.value) {
-    eventsScrollContainer.value.removeEventListener('scroll', updateCinemaFocus);
-    scrollListenerActive.value = false;
-  }
 });
 </script>
 
@@ -639,20 +589,7 @@ onBeforeUnmount(() => {
   height: 340px;
 }
 
-/* Cinema Effect Styles - for 3+ events */
-.event-card.cinema-dimmed {
-  opacity: 1;
-  filter: brightness(1);
-  transform: scale(1);
-  transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.event-card.cinema-focused {
-  opacity: 1;
-  filter: brightness(1);
-  transform: scale(1);
-  transition: all 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
-}
+/* Cinema focus effects removed - using simple infinite scroll */
 
 .event-card-1 {
   animation-delay: 200ms;

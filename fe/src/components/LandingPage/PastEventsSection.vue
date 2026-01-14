@@ -49,13 +49,13 @@
       </div>
 
       <div v-if="events.length > 0">
-        <!-- 4-Column Grid with RTL Auto-Scroll for 3+ events -->
+        <!-- Responsive Grid Layout with Auto-scroll for 4+ events -->
         <div
           ref="eventsScrollContainer"
           class="events-grid-container"
           :class="[
-            { 'auto-scroll': events.length >= 4 },
-            `events-count-${events.length}`
+            events.length >= 4 ? 'auto-scroll' : '',
+            `events-count-${Math.min(events.length, 4)}`
           ]"
           @mouseenter="pauseAutoScroll"
           @mouseleave="resumeAutoScroll"
@@ -63,8 +63,7 @@
           <v-card
             v-for="(event, index) in displayedEvents"
             :key="`${event.id}-${index}`"
-            :class="`event-card event-card-${(index % events.length) + 1}`"
-            height="384"
+            :class="`event-card event-card-${((index % events.length) + 1)}`"
             elevation="4"
             hover
             @mouseenter="pauseAutoScroll"
@@ -146,27 +145,15 @@ const loading = ref(false);
 const eventsScrollContainer = ref(null);
 const autoScrollInterval = ref(null);
 const isAutoScrolling = ref(true);
-const focusedCardIndex = ref(0); // Track which card is in focus
-const scrollListenerActive = ref(false); // Track if scroll listener is attached
 
 // Loading state for CMS data
 const isLoadingHome = computed(() => cmsStore.isPageLoading("home"));
 
-// Duplicated events for infinite scroll
-const duplicatedEvents = computed(() => {
-  if (events.value.length >= 3) {
-    return [...events.value, ...events.value];
-  }
-  return events.value;
-});
-
-// Displayed events (for 4-column grid with RTL scroll - reversed order)
+// Displayed events (for auto-scroll when 4+ events)
 const displayedEvents = computed(() => {
-  if (events.value.length >= 3) {
-    // Reverse the order for RTL scrolling effect (right to left)
-    const reversed = [...events.value].reverse();
-    // Duplicate for seamless looping
-    return [...reversed, ...reversed, ...reversed];
+  if (events.value.length >= 4) {
+    // For auto-scroll, duplicate events for seamless looping
+    return [...events.value, ...events.value, ...events.value];
   }
   return events.value;
 });
@@ -348,6 +335,7 @@ const fetchEvents = async () => {
 };
 
 
+// Auto-scroll functionality for 4+ events
 const pauseAutoScroll = () => {
   isAutoScrolling.value = false;
 };
@@ -356,53 +344,23 @@ const resumeAutoScroll = () => {
   isAutoScrolling.value = true;
 };
 
-const updateCinemaFocus = () => {
-  if (!eventsScrollContainer.value || events.value.length < 3) return;
-  
-  const container = eventsScrollContainer.value;
-  const cardWidth = 324; // card width + gap (300px + 24px gap)
-  const containerCenter = container.clientWidth / 2;
-  const scrollOffset = container.scrollLeft;
-  
-  // Calculate which card is in the center
-  const centerPosition = scrollOffset + containerCenter;
-  const focusIndex = Math.round(centerPosition / cardWidth) % (displayedEvents.value.length);
-  
-  focusedCardIndex.value = focusIndex;
-  
-  // Update all cards with focus state
-  const cards = container.querySelectorAll('.event-card');
-  cards.forEach((card, idx) => {
-    if (idx === focusIndex) {
-      card.classList.add('cinema-focused');
-      card.classList.remove('cinema-dimmed');
-    } else {
-      card.classList.add('cinema-dimmed');
-      card.classList.remove('cinema-focused');
-    }
-  });
-};
-
 const startAutoScroll = () => {
   if (autoScrollInterval.value) return;
 
   autoScrollInterval.value = setInterval(() => {
-    if (isAutoScrolling.value && eventsScrollContainer.value) {
+    if (isAutoScrolling.value && eventsScrollContainer.value && events.value.length >= 4) {
       const container = eventsScrollContainer.value;
       const scrollAmount = 2; // pixels per frame
 
-      // Since we have 3 copies of reversed events, scroll to 1/3 of total width for seamless loop
+      // For seamless looping with 3 copies of events
       const oneSetWidth = container.scrollWidth / 3;
 
-      // Smoothly scroll RTL and reset when reaching the beginning
-      if (container.scrollLeft <= oneSetWidth) {
-        container.scrollLeft = oneSetWidth * 2; // Reset to end set
+      // Smoothly scroll left to right and reset when reaching the end
+      if (container.scrollLeft >= oneSetWidth * 2) {
+        container.scrollLeft = oneSetWidth; // Reset to middle set
       } else {
-        container.scrollLeft -= scrollAmount; // Continuous RTL scroll
+        container.scrollLeft += scrollAmount; // Continuous left-to-right scroll
       }
-
-      // Update cinema focus
-      updateCinemaFocus();
     }
   }, 30); // 30ms interval for smoother scrolling
 };
@@ -448,34 +406,19 @@ onMounted(async () => {
   await fetchPastEventsData();
   await fetchEvents();
 
-  // Start auto-scroll if there are 3+ events
-  if (events.value.length >= 3) {
+  // Start auto-scroll if there are 4+ events
+  if (events.value.length >= 4) {
     await nextTick();
-    // Position container for RTL scrolling
+    // Position container for left-to-right scrolling
     if (eventsScrollContainer.value) {
-      eventsScrollContainer.value.scrollLeft = eventsScrollContainer.value.scrollWidth / 3 * 2;
+      eventsScrollContainer.value.scrollLeft = eventsScrollContainer.value.scrollWidth / 3;
     }
     startAutoScroll();
-  }
-
-  // Add scroll listener for cinema effect if 3+ events
-  if (events.value.length >= 3 && eventsScrollContainer.value) {
-    eventsScrollContainer.value.addEventListener('scroll', updateCinemaFocus);
-    scrollListenerActive.value = true;
-    // Initial focus
-    await nextTick();
-    updateCinemaFocus();
   }
 });
 
 onBeforeUnmount(() => {
   stopAutoScroll();
-  
-  // Cleanup scroll listener
-  if (scrollListenerActive.value && eventsScrollContainer.value) {
-    eventsScrollContainer.value.removeEventListener('scroll', updateCinemaFocus);
-    scrollListenerActive.value = false;
-  }
 });
 </script>
 
@@ -512,71 +455,7 @@ onBeforeUnmount(() => {
   }
 }
 
-.events-scroll {
-  display: flex;
-  gap: 24px;
-  overflow-x: auto;
-  padding-bottom: 16px;
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
-  -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
-  scroll-behavior: smooth;
-}
-
-.events-scroll::-webkit-scrollbar {
-  display: none; /* Hide scrollbar for Chrome/Safari */
-}
-
-/* 4-Column Grid Container with RTL Auto-Scroll */
-.events-grid-container {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1.5rem;
-  width: 100%;
-  place-items: center;
-}
-
-/* 1 Event - Centered and larger */
-.events-grid-container.events-count-1 {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.events-grid-container.events-count-1 .event-card {
-  width: 100%;
-  max-width: 500px;
-  height: 450px;
-}
-
-/* 2 Events - Centered with space between */
-.events-grid-container.events-count-2 {
-  grid-template-columns: repeat(2, 1fr);
-  justify-items: center;
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.events-grid-container.events-count-2 .event-card {
-  width: 100%;
-  max-width: 420px;
-  height: 400px;
-}
-
-/* 3 Events - Centered in grid */
-.events-grid-container.events-count-3 {
-  grid-template-columns: repeat(3, 1fr);
-  justify-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.events-grid-container.events-count-3 .event-card {
-  width: 100%;
-  max-width: 380px;
-  height: 380px;
-}
-
-/* Auto-scroll layout - flex for horizontal scroll (RTL) */
+/* Auto-scroll layout for 4+ events */
 .events-grid-container.auto-scroll {
   display: flex;
   flex-wrap: nowrap;
@@ -592,51 +471,79 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.events-grid {
+.events-grid-container.auto-scroll .event-card {
+  min-width: 300px;
+  width: 300px;
+  height: 340px;
+  flex-shrink: 0;
+}
+
+/* Responsive Grid Container */
+.events-grid-container {
   display: grid;
   gap: 1.5rem;
-  justify-content: center;
-  align-items: start;
+  width: 100%;
+  place-items: center;
+  margin: 0 auto;
 }
 
-.events-grid.grid-1 {
+/* 1 Event - Single large centered card */
+.events-grid-container.events-count-1 {
   grid-template-columns: 1fr;
-  max-width: 400px;
-  margin: 0 auto;
+  max-width: 600px;
 }
 
-.events-grid.grid-2 {
+.events-grid-container.events-count-1 .event-card {
+  width: 100%;
+  max-width: 600px;
+  height: 500px;
+}
+
+/* 2 Events - Two large cards side by side */
+.events-grid-container.events-count-2 {
   grid-template-columns: repeat(2, 1fr);
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 1000px;
 }
 
-.events-grid.grid-3 {
-  grid-template-columns: repeat(3, 1fr);
-  max-width: 1200px;
-  margin: 0 auto;
+.events-grid-container.events-count-2 .event-card {
+  width: 100%;
+  max-width: 480px;
+  height: 450px;
 }
+
+/* 3 Events - Three large cards in a row */
+.events-grid-container.events-count-3 {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 1400px;
+}
+
+.events-grid-container.events-count-3 .event-card {
+  width: 100%;
+  max-width: 440px;
+  height: 420px;
+}
+
+/* 4 Events - Four cards in a row */
+.events-grid-container.events-count-4 {
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 1600px;
+}
+
+.events-grid-container.events-count-4 .event-card {
+  width: 100%;
+  max-width: 380px;
+  height: 384px;
+}
+
+/* Removed auto-scroll and cinema focus styles - now using static responsive grid */
 
 .event-card {
   position: relative;
-  height: 384px;
   overflow: hidden;
   border-radius: 1rem;
   animation: fadeInUp 0.6s ease-out both;
   transition: all 0.3s ease;
   width: 100%;
-  min-width: 300px;
-  flex-shrink: 0;
-}
-
-.events-grid-container:not(.auto-scroll) .event-card {
-  max-width: 100%;
-}
-
-.events-grid-container.auto-scroll .event-card {
-  min-width: 300px;
-  width: 300px;
-  height: 340px;
 }
 
 .event-card-1 {
@@ -664,20 +571,7 @@ onBeforeUnmount(() => {
   transform: scale(1.1);
 }
 
-/* Cinema focus effect */
-.event-card.cinema-focused {
-  opacity: 1;
-  filter: brightness(1);
-  transform: scale(1);
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.event-card.cinema-dimmed {
-  opacity: 1;
-  filter: brightness(1);
-  transform: scale(1);
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
+/* Removed cinema focus effects - now using static grid layout */
 
 .event-card:hover .event-background {
   transform: scale(1.05);
@@ -786,96 +680,51 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 1024px) {
-  .events-grid-container {
+/* Responsive breakpoints for different screen sizes */
+@media (max-width: 1200px) {
+  .events-grid-container.events-count-4:not(.auto-scroll) {
     grid-template-columns: repeat(3, 1fr);
+    max-width: 1200px;
   }
 
-  .events-grid-container.auto-scroll {
-    display: flex;
-  }
-
-  .events-grid.grid-2,
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-    max-width: 400px;
-  }
-
-  .events-grid.grid-3 {
-    grid-template-columns: repeat(2, 1fr);
-    max-width: 800px;
+  .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
+    max-width: 380px;
+    height: 360px;
   }
 }
 
-@media (max-width: 768px) {
-  .events-grid-container {
+@media (max-width: 900px) {
+  .events-grid-container.events-count-3:not(.auto-scroll),
+  .events-grid-container.events-count-4:not(.auto-scroll) {
     grid-template-columns: repeat(2, 1fr);
+    max-width: 900px;
   }
 
-  .events-grid-container.auto-scroll {
-    display: flex;
+  .events-grid-container.events-count-3:not(.auto-scroll) .event-card,
+  .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
+    max-width: 430px;
+    height: 400px;
+  }
+}
+
+@media (max-width: 600px) {
+  .events-grid-container.events-count-2:not(.auto-scroll),
+  .events-grid-container.events-count-3:not(.auto-scroll),
+  .events-grid-container.events-count-4:not(.auto-scroll) {
+    grid-template-columns: 1fr;
+    max-width: 500px;
   }
 
-  .event-card {
-    height: 300px;
+  .events-grid-container:not(.auto-scroll) .event-card {
+    max-width: 500px;
+    height: 450px;
   }
 
+  /* Auto-scroll cards on mobile */
   .events-grid-container.auto-scroll .event-card {
-    height: 280px;
-    width: 280px;
     min-width: 280px;
-  }
-}
-
-@media (max-width: 640px) {
-  .event-card {
-    height: 280px;
-  }
-
-  .events-grid-container {
-    grid-template-columns: 1fr;
-  }
-
-  .events-grid-container.auto-scroll {
-    display: flex;
-  }
-
-  .events-grid-container.auto-scroll .event-card {
-    height: 250px;
-    width: 250px;
-    min-width: 250px;
-  }
-
-  .events-grid {
-    gap: 1rem;
-  }
-
-  .events-grid.grid-1,
-  .events-grid.grid-2,
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-    max-width: 100%;
-  }
-
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .event-card {
+    width: 280px;
     height: 320px;
-  }
-
-  .events-grid {
-    gap: 1rem;
-  }
-
-  .events-grid.grid-1,
-  .events-grid.grid-2,
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-    max-width: 100%;
   }
 }
 
