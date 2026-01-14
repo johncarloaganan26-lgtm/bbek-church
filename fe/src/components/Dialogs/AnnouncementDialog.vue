@@ -263,8 +263,47 @@ const handleSubmit = async () => {
   } catch (error) {
     if (error !== false) { // Validation error returns false
       console.error('Error saving announcement:', error)
-      const errorMessage = error.message || error.response?.data?.error || error.response?.data?.message || 'Failed to save announcement'
-      ElMessage.error(errorMessage)
+
+      let errorMessage = 'Failed to save announcement'
+
+      // Handle different error types
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status
+        const data = error.response.data
+
+        if (status === 400) {
+          errorMessage = data?.message || data?.error || 'Invalid announcement data. Please check your input.'
+        } else if (status === 401) {
+          errorMessage = 'Authentication failed. Please log in again.'
+        } else if (status === 403) {
+          errorMessage = 'You do not have permission to perform this action.'
+        } else if (status === 404) {
+          errorMessage = 'Announcement not found or service unavailable.'
+        } else if (status === 409) {
+          errorMessage = 'Announcement with this title already exists.'
+        } else if (status === 413) {
+          errorMessage = 'Announcement content is too large. Please reduce the content size.'
+        } else if (status === 422) {
+          errorMessage = 'Validation failed. Please check all required fields.'
+        } else if (status >= 500) {
+          errorMessage = 'Server error. Please try again later or contact support.'
+        } else {
+          errorMessage = data?.message || data?.error || `Server error (${status}). Please try again.`
+        }
+      } else if (error.request) {
+        // Network error
+        errorMessage = 'Network error. Please check your internet connection and try again.'
+      } else {
+        // Other error
+        errorMessage = error.message || 'An unexpected error occurred. Please try again.'
+      }
+
+      ElMessage.error({
+        message: errorMessage,
+        duration: 5000,
+        showClose: true
+      })
     }
   } finally {
     loading.value = false
