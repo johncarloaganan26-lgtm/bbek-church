@@ -149,11 +149,11 @@ const isLoadingHome = computed(() => cmsStore.isPageLoading("home"));
 
 // Events are always duplicated in displayedEvents for infinite scrolling
 
-// Displayed events (always duplicated for infinite auto-scroll)
+// Displayed events (duplicated for seamless carousel scrolling)
 const displayedEvents = computed(() => {
   if (events.value.length > 0) {
-    // Always duplicate events for seamless infinite scrolling
-    return [...events.value, ...events.value, ...events.value];
+    // Duplicate events multiple times for seamless scrolling
+    return [...events.value, ...events.value, ...events.value, ...events.value];
   }
   return [];
 });
@@ -342,19 +342,21 @@ const startAutoScroll = () => {
   autoScrollInterval.value = setInterval(() => {
     if (isAutoScrolling.value && eventsScrollContainer.value && events.value.length > 0) {
       const container = eventsScrollContainer.value;
-      const scrollAmount = 2; // pixels per frame
+      const scrollAmount = 344; // Move by one card width + gap (320px + 24px = 344px)
 
-      // For infinite scrolling with 3 copies of events
-      const oneSetWidth = container.scrollWidth / 3;
+      // For carousel with 4 copies of events, move one card at a time
+      const totalScrollWidth = container.scrollWidth;
+      const oneCardWidth = 344; // card width + gap
 
-      // Continuous left-to-right scroll with seamless loop
-      if (container.scrollLeft >= oneSetWidth * 2) {
-        container.scrollLeft = oneSetWidth; // Reset to middle set for seamless loop
-      } else {
-        container.scrollLeft += scrollAmount; // Continuous left-to-right scroll
+      // Move right to left (decrease scrollLeft)
+      container.scrollLeft -= scrollAmount;
+
+      // Reset to beginning when reaching the end of first set
+      if (container.scrollLeft <= 0) {
+        container.scrollLeft = totalScrollWidth - (oneCardWidth * 3); // Position to show last 3 cards of the duplicated set
       }
     }
-  }, 30); // 30ms interval for smoother scrolling
+  }, 3000); // Change cards every 3 seconds
 };
 
 const pauseAutoScroll = () => {
@@ -409,9 +411,9 @@ onMounted(async () => {
   // Start infinite auto-scroll if there are any events
   if (events.value.length > 0) {
     await nextTick();
-    // Position container for left-to-right scrolling
+    // Position container to show first 3 cards
     if (eventsScrollContainer.value) {
-      eventsScrollContainer.value.scrollLeft = eventsScrollContainer.value.scrollWidth / 3;
+      eventsScrollContainer.value.scrollLeft = 0;
     }
     startAutoScroll();
   }
@@ -519,20 +521,17 @@ onBeforeUnmount(() => {
   height: 380px;
 }
 
-/* Auto-scroll layout - flex for horizontal scroll */
+/* Auto-scroll carousel - shows 3 cards at a time */
 .events-grid-container.auto-scroll {
   display: flex;
   flex-wrap: nowrap;
   gap: 24px;
-  overflow-x: auto;
+  overflow: hidden; /* Hide overflow to show only 3 cards */
   padding-bottom: 16px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-behavior: smooth;
-}
-
-.events-grid-container.auto-scroll::-webkit-scrollbar {
-  display: none;
+  position: relative;
+  width: 100%;
+  max-width: 1008px; /* 3 cards (320px each) + 2 gaps (24px each) = 960px + 48px = 1008px */
+  margin: 0 auto;
 }
 
 .events-grid {
@@ -584,9 +583,10 @@ onBeforeUnmount(() => {
 }
 
 .events-grid-container.auto-scroll .event-card {
-  min-width: 300px;
-  width: 300px;
-  height: 340px;
+  min-width: 320px;
+  width: 320px;
+  height: 360px;
+  flex-shrink: 0;
 }
 
 /* Cinema focus effects removed - using simple infinite scroll */
