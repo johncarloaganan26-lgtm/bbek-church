@@ -59,9 +59,7 @@ const formRouter = require('./routes/formRoutes');
 const cmsRouter = require('./routes/cmsRoutes');
 const dashboardRouter = require('./routes/dashboardRoutes');
 const auditTrailRouter = require('./routes/auditTrailRoutes');
-const systemLogsRouter = require('./routes/systemLogsRoutes');
 const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
-const systemLogsMiddleware = require('./middleware/systemLogsMiddleware');
 const authRouter = require('./routes/authRoutes');
 
 const app = express();
@@ -225,9 +223,7 @@ app.use(authenticateToken);
 // Apply audit trail middleware to log user actions
 app.use(auditTrailMiddleware);
 
-// TEMPORARILY DISABLE system logs middleware to reduce database load
-// TODO: Create system_logs table or fix system logs implementation
-// app.use(systemLogsMiddleware);
+// System logs middleware removed - functionality no longer used
 
 
 
@@ -269,9 +265,6 @@ app.use('/api/dashboard', dashboardRouter);
 
 // Audit trail routes
 app.use('/api/audit-trail', auditTrailRouter);
-
-// System logs routes
-app.use('/api/system-logs', systemLogsRouter);
 
 
 // Fallback for unknown routes

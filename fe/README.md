@@ -94,7 +94,6 @@ church-fe/
 │   │   │   │   └── Messages.vue
 │   │   │   └── Maintenance/           # Maintenance & settings
 │   │   │       ├── ContentManagementPage.vue
-│   │   │       ├── SystemLogs.vue
 │   │   │       ├── Archive.vue
 │   │   │       ├── Settings.vue
 │   │   │       └── ListItems/         # CMS list item components

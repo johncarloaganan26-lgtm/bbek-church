@@ -25,7 +25,6 @@ import ContentManagement from '../components/Admin/Maintenance/ContentManagement
 import Archive from '../components/Admin/Maintenance/Archive.vue'
 import Settings from '../components/Admin/Maintenance/Settings.vue'
 import AuditTrail from '../components/Admin/Maintenance/AuditTrail.vue'
-import SystemLogs from '../components/Admin/Maintenance/SystemLogs.vue'
 
 
 // Landing Page Components
@@ -350,11 +349,6 @@ const routes = [
         path: 'audit-trail',
         name: 'AuditTrail',
         component: AuditTrail
-      },
-      {
-        path: 'system-logs',
-        name: 'SystemLogs',
-        component: SystemLogs
       },
       {
         path: 'accounts',
