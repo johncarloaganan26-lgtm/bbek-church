@@ -18,12 +18,12 @@
       :rules="rules"
       :label-width="labelWidth"
       :label-position="labelPosition"
-      :hide-required-asterisk="isMemberUser"
+      :hide-required-asterisk="true"
     >
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
       <el-form-item v-if="!isMemberUser" prop="requested_by">
         <template #label>
-          <span>Requested By (Member) <span class="required-text">*</span></span>
+          <span><span class="required-text"></span> Requested By (Member)</span>
         </template>
         <el-select
           v-model="formData.requested_by"
@@ -58,7 +58,7 @@
       <!-- Child First Name -->
       <el-form-item prop="child_firstname">
         <template #label>
-          <span>Child's First Name <span class="required-text">*</span></span>
+          <span>Child's First Name <span class="required-text">{{ !isMemberUser ? '*' : 'required' }}</span></span>
         </template>
         <el-input
           v-model="formData.child_firstname"
@@ -72,7 +72,7 @@
       <!-- Child Last Name -->
       <el-form-item prop="child_lastname">
         <template #label>
-          <span>Child's Last Name <span class="required-text">*</span></span>
+          <span>Child's Last Name <span class="required-text">{{ !isMemberUser ? '*' : 'required' }}</span></span>
         </template>
         <el-input
           v-model="formData.child_lastname"
@@ -97,7 +97,7 @@
       <!-- Date of Birth -->
       <el-form-item prop="date_of_birth">
         <template #label>
-          <span>Date of Birth <span class="required-text">*</span></span>
+          <span>Date of Birth <span class="required-text">{{ !isMemberUser ? '*' : 'required' }}</span></span>
         </template>
         <el-date-picker
           v-model="formData.date_of_birth"
@@ -116,7 +116,7 @@
       <!-- Place of Birth -->
       <el-form-item prop="place_of_birth">
         <template #label>
-          <span>Place of Birth <span class="required-text">*</span></span>
+          <span>Place of Birth <span class="required-text">{{ !isMemberUser ? '*' : 'required' }}</span></span>
         </template>
         <el-input
           v-model="formData.place_of_birth"
@@ -130,7 +130,7 @@
       <!-- Gender -->
       <el-form-item prop="gender">
         <template #label>
-          <span>Gender <span class="required-text">*</span></span>
+          <span>Gender <span class="required-text">{{ !isMemberUser ? '*' : 'required' }}</span></span>
         </template>
         <el-radio-group v-model="formData.gender" size="large" :disabled="loading">
           <el-radio label="M">Male</el-radio>
@@ -163,7 +163,7 @@
       <!-- Preferred Dedication Date and Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_date">
         <template #label>
-          <span>Preferred Dedication Date <span class="required-text">*</span></span>
+          <span> Preferred Dedication Date<span class="required-text">*</span></span>
         </template>
         <el-date-picker
           v-model="formData.preferred_dedication_date"
@@ -182,7 +182,7 @@
       <!-- Preferred Dedication Time - Only for Admin/Staff users -->
       <el-form-item v-if="!isMemberUser" prop="preferred_dedication_time">
         <template #label>
-          <span>Preferred Dedication Time <span class="required-text">*</span></span>
+          <span>Preferred Dedication Time<span class="required-text">*</span></span>
         </template>
         <el-time-picker
           v-model="formData.preferred_dedication_time"
@@ -541,10 +541,7 @@
       </el-form-item>
 
       <!-- Status (Admin/Staff only) -->
-      <el-form-item v-if="!isMemberUser" prop="status">
-        <template #label>
-          <span>Status <span class="required-text">*</span></span>
-        </template>
+      <el-form-item v-if="!isMemberUser" prop="status" label="Status">
         <el-select
           v-model="formData.status"
           placeholder="Select status"
@@ -1678,7 +1675,7 @@ defineExpose({
   color: #ef4444;
   font-size: 0.6rem;
   font-weight: 500;
-  margin-left: 4px;
+  margin-left: 0px;
 }
 
 .child-dedication-dialog :deep(.el-input__wrapper) {

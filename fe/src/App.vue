@@ -6,7 +6,7 @@
     <Footer v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <SocialMediaIcons v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <!-- Announcement Display for all users -->
-    <AnnouncementDisplayDialog v-if="userInfo!='{}' && userInfo!=null"
+    <AnnouncementDisplayDialog
       v-for="announcement in activeAnnouncements"
       :key="announcement.announcement_id"
       v-model="announcementDialogs[announcement.announcement_id]"
@@ -76,14 +76,10 @@ onMounted(async () => {
       router.push({ name: 'LandingPage' })
     }
     
-    // Fetch announcements when app loads every hour
-    if(userInfo.value!=null && userInfo.value!='{}'){
-      await fetchActiveAnnouncements()
-    }
-  }, 1000 * 60 * 60)
-  // Fetch announcements when app loads
-  if(userInfo.value!=null && userInfo.value!='{}'){
+    // Fetch announcements for all users (logged-in and visitors)
     await fetchActiveAnnouncements()
-  }
+  }, 1000 * 60 * 60)
+  // Fetch announcements when app loads for all users
+  await fetchActiveAnnouncements()
 })
 </script>

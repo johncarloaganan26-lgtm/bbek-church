@@ -1,4 +1,4 @@
-<template>
+i<template>
   <div class="settings-page">
     <div class="page-header">
       <h1>Settings</h1>
@@ -129,18 +129,6 @@
             <el-option label="Urgent" value="urgent" />
           </el-select>
         </el-form-item>
-        <el-form-item label="Target Audience">
-           <el-select
-             v-model="filters.target_audience"
-             placeholder="All Users"
-             @change="handleFilterChange"
-             :disabled="loading"
-             clearable
-             style="width: 180px"
-           >
-             <el-option label="All Users" value="all" />
-           </el-select>
-         </el-form-item>
         <el-form-item label="Status">
           <el-select
             v-model="filters.is_active"
@@ -238,17 +226,17 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="target_audience" label="Audience" width="120">
-            <template #default="{ row }">
-              <el-tag type="info" size="small">
-                {{ formatAudience(row.target_audience) }}
-              </el-tag>
-            </template>
-          </el-table-column>
           <el-table-column prop="is_active" label="Status" width="100">
             <template #default="{ row }">
               <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
                 {{ row.is_active ? 'Active' : 'Inactive' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="members_only" label="Audience" width="120">
+            <template #default="{ row }">
+              <el-tag :type="row.members_only ? 'warning' : 'success'" size="small">
+                {{ row.members_only ? 'Members Only' : 'All Users' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -345,14 +333,14 @@
               {{ selectedAnnouncement.priority }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="Target Audience">
-            <el-tag type="info" size="small">
-              {{ formatAudience(selectedAnnouncement.target_audience) }}
-            </el-tag>
-          </el-descriptions-item>
           <el-descriptions-item label="Status">
             <el-tag :type="selectedAnnouncement.is_active ? 'success' : 'info'" size="small">
               {{ selectedAnnouncement.is_active ? 'Active' : 'Inactive' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="Audience">
+            <el-tag :type="selectedAnnouncement.members_only ? 'warning' : 'success'" size="small">
+              {{ selectedAnnouncement.members_only ? 'Members Only' : 'All Users' }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="Start Date" v-if="selectedAnnouncement.start_date">
@@ -517,10 +505,28 @@ const formatDateTime = (dateString) => {
 }
 
 const formatAudience = (audience) => {
-  return audience
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+  try {
+    // Handle JSON array format
+    if (typeof audience === 'string' && audience.startsWith('[')) {
+      const audienceArray = JSON.parse(audience);
+      if (Array.isArray(audienceArray)) {
+        return audienceArray
+          .map(item => {
+            if (item === 'staff') return 'Staff';
+            return item.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          })
+          .join(', ');
+      }
+    }
+    // Fallback for old string format
+    if (audience === 'staff') return 'Staff';
+    return audience
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  } catch (error) {
+    return audience || 'All Users';
+  }
 }
 
 const getPriorityColor = (priority) => {
@@ -534,13 +540,13 @@ const getPriorityColor = (priority) => {
 }
 
 const exportToCSV = () => {
-  const headers = ['Title', 'Type', 'Priority', 'Audience', 'Status', 'Created Date', 'Created By']
+  const headers = ['Title', 'Type', 'Priority', 'Status', 'Audience', 'Created Date', 'Created By']
   const rows = announcements.value.map(announcement => [
     announcement.title,
     announcement.type,
     announcement.priority,
-    formatAudience(announcement.target_audience),
     announcement.is_active ? 'Active' : 'Inactive',
+    announcement.members_only ? 'Members Only' : 'All Users',
     formatDateTime(announcement.created_at),
     announcement.created_by_name || announcement.created_by_email || 'System'
   ])
@@ -561,19 +567,19 @@ const exportToCSV = () => {
 
 const printData = () => {
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['Title', 'Type', 'Priority', 'Audience', 'Status', 'Created Date']
-  
+  const tableHeaders = ['Title', 'Type', 'Priority', 'Status', 'Audience', 'Created Date']
+
   // Get current user info for print footer
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
   const printedBy = currentUser.email || currentUser.name || 'Admin'
-  
+
   const rows = announcements.value.map(announcement => `
     <tr>
       <td>${announcement.title}</td>
       <td>${announcement.type}</td>
       <td>${announcement.priority}</td>
-      <td>${formatAudience(announcement.target_audience)}</td>
       <td>${announcement.is_active ? 'Active' : 'Inactive'}</td>
+      <td>${announcement.members_only ? 'Members Only' : 'All Users'}</td>
       <td>${formatDateTime(announcement.created_at)}</td>
     </tr>
   `).join('')
@@ -638,7 +644,7 @@ const printData = () => {
             <tr>${tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="6" style="text-align:center">No records found</td></tr>'}
+            ${rows || '<tr><td colspan="7" style="text-align:center">No records found</td></tr>'}
           </tbody>
         </table>
       </body>

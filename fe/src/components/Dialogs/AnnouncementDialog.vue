@@ -66,19 +66,27 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="Target Audience" prop="target_audience">
-        <el-select
-          v-model="formData.target_audience"
-          placeholder="Select target audience"
-          size="large"
-          style="width: 100%"
-        >
-          <el-option label="All Users" value="all" />
-          <el-option label="Admin" value="admin" />
-          <el-option label="Pastor" value="pastor" />
-          <el-option label="Member" value="member" />
-          <el-option label="Non-Member" value="non_member" />
-        </el-select>
+      <el-form-item label="Visibility" prop="is_active">
+        <el-radio-group v-model="formData.is_active">
+          <el-radio :label="true">Visible to All Users</el-radio>
+          <el-radio :label="false">Hidden</el-radio>
+        </el-radio-group>
+        <div class="visibility-hint">
+          <el-text size="small" type="info">
+            When visible, all users (members, staff, and visitors) can see this announcement.
+          </el-text>
+        </div>
+      </el-form-item>
+
+      <el-form-item label="Target Audience">
+        <el-checkbox v-model="formData.members_only">
+          Hide from visitors (members only)
+        </el-checkbox>
+        <div class="audience-hint">
+          <el-text size="small" type="info">
+            Check this to hide the announcement from website visitors who aren't logged in.
+          </el-text>
+        </div>
       </el-form-item>
 
       <el-form-item label="Start Date" prop="start_date">
@@ -162,10 +170,10 @@ const formData = reactive({
   content: '',
   type: 'info',
   priority: 'normal',
-  target_audience: 'all',
   start_date: null,
   end_date: null,
-  is_active: true
+  is_active: true,
+  members_only: false
 })
 
 // Validation rules
@@ -183,9 +191,6 @@ const rules = {
   ],
   priority: [
     { required: true, message: 'Please select priority', trigger: 'change' }
-  ],
-  target_audience: [
-    { required: true, message: 'Please select target audience', trigger: 'change' }
   ]
 }
 
@@ -196,10 +201,10 @@ watch(() => props.announcementData, (newData) => {
     formData.content = newData.content || ''
     formData.type = newData.type || 'info'
     formData.priority = newData.priority || 'normal'
-    formData.target_audience = newData.target_audience || 'all'
     formData.start_date = newData.start_date || null
     formData.end_date = newData.end_date || null
     formData.is_active = newData.is_active !== undefined ? Boolean(newData.is_active) : true
+    formData.members_only = newData.members_only !== undefined ? Boolean(newData.members_only) : false
   }
 }, { immediate: true })
 
@@ -209,11 +214,11 @@ const resetForm = () => {
   formData.content = ''
   formData.type = 'info'
   formData.priority = 'normal'
-  formData.target_audience = 'all'
   formData.start_date = null
   formData.end_date = null
   formData.is_active = true
-  
+  formData.members_only = false
+
   if (formRef.value) {
     formRef.value.resetFields()
   }
@@ -239,10 +244,10 @@ const handleSubmit = async () => {
       content: formData.content.trim(),
       type: formData.type,
       priority: formData.priority,
-      target_audience: formData.target_audience,
       start_date: formData.start_date || null,
       end_date: formData.end_date || null,
-      is_active: Boolean(formData.is_active)
+      is_active: Boolean(formData.is_active),
+      members_only: Boolean(formData.members_only)
     }
 
     if (isEditMode.value) {
@@ -272,6 +277,13 @@ const handleSubmit = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.visibility-hint {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
 </style>
 

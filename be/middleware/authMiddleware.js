@@ -49,6 +49,8 @@ const publicRoutes = [
   '/api/announcements/markAsViewed',
   '/api/church-records/events/getSermonEvents',
   '/api/church-records/events/getCompletedSermonEvents',
+  '/api/church-records/events/getAllEvents',
+  '/api/church-records/events/getEventById',
   // Form routes (public for submission)
   '/api/forms/createForm',
   // Add more public routes as needed
@@ -121,15 +123,32 @@ const isPublicRoute = (path, originalUrl) => {
  */
 const authenticateToken = (req, res, next) => {
   // Check if route is public (check both path and originalUrl for reliability)
-  if (isPublicRoute(req.path, req.originalUrl)) {
-    return next();
-  }
+  const isPublic = isPublicRoute(req.path, req.originalUrl);
 
   // Get token from Authorization header
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-  // If no token provided
+  // For public routes, validate token if provided but don't require it
+  if (isPublic) {
+    if (token) {
+      // Token provided - validate it and attach user info if valid
+      jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (!err) {
+          // Token is valid - attach decoded user info to request
+          req.user = decoded; // Contains: { email, position, acc_id, iat, exp }
+        }
+        // If token is invalid, continue without setting req.user
+        return next();
+      });
+    } else {
+      // No token provided for public route - continue without authentication
+      return next();
+    }
+    return; // Exit here for public routes
+  }
+
+  // For protected routes - require authentication
   if (!token) {
     return res.status(401).json({
       success: false,
@@ -143,7 +162,7 @@ const authenticateToken = (req, res, next) => {
     if (err) {
       // Token expired or invalid
       let errorMessage = 'Invalid or expired token';
-      
+
       if (err.name === 'TokenExpiredError') {
         errorMessage = 'Token has expired. Please login again.';
       } else if (err.name === 'JsonWebTokenError') {

@@ -180,9 +180,8 @@ router.delete('/deleteAnnouncement/:id', async (req, res) => {
 router.get('/getActiveAnnouncementsForUser', async (req, res) => {
   try {
     const userId = req.user?.acc_id || null;
-    const userPosition = req.user?.position || 'non_member'; // Default to non_member if not authenticated
-    
-    const result = await getActiveAnnouncementsForUser(userId, userPosition);
+
+    const result = await getActiveAnnouncementsForUser(userId);
     
     if (result.success) {
       res.status(200).json({

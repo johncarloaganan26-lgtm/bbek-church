@@ -13,17 +13,28 @@ async function createAnnouncement(announcementData) {
       content,
       type = 'info',
       priority = 'normal',
-      target_audience = 'all',
+      target_audience = ['all'],
       start_date = null,
       end_date = null,
       is_active = 1,
+      members_only = 0,
       created_by = null
     } = announcementData;
 
+    // Ensure target_audience is an array and convert to JSON string
+    let targetAudienceJson = target_audience;
+    if (!Array.isArray(targetAudienceJson)) {
+      targetAudienceJson = [targetAudienceJson];
+    }
+    if (!targetAudienceJson.length) {
+      targetAudienceJson = ['all'];
+    }
+    const targetAudienceString = JSON.stringify(targetAudienceJson);
+
     const sql = `
-      INSERT INTO tbl_announcements 
-      (title, content, type, priority, target_audience, start_date, end_date, is_active, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbl_announcements
+      (title, content, type, priority, target_audience, start_date, end_date, is_active, members_only, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Validate required fields
@@ -50,15 +61,22 @@ async function createAnnouncement(announcementData) {
       isActiveValue = (is_active === true || is_active === 1 || is_active === '1' || is_active === 'true') ? 1 : 0;
     }
 
+    // Handle members_only conversion (boolean to int)
+    let membersOnlyValue = 0;
+    if (members_only !== undefined && members_only !== null) {
+      membersOnlyValue = (members_only === true || members_only === 1 || members_only === '1' || members_only === 'true') ? 1 : 0;
+    }
+
     const params = [
       title,
       contentString,
       type,
       priority,
-      target_audience,
+      targetAudienceString,
       start_date ? moment(start_date).format('YYYY-MM-DD HH:mm:ss') : null,
       end_date ? moment(end_date).format('YYYY-MM-DD HH:mm:ss') : null,
       isActiveValue,
+      membersOnlyValue,
       created_by
     ];
 
@@ -158,9 +176,9 @@ async function getAllAnnouncements(options = {}) {
       hasWhere = true;
     }
 
-    // Add target_audience filter
+    // Add target_audience filter (JSON array search)
     if (target_audience && target_audience !== 'All Audiences') {
-      whereConditions.push('a.target_audience = ?');
+      whereConditions.push('JSON_CONTAINS(a.target_audience, JSON_QUOTE(?))');
       countParams.push(target_audience);
       params.push(target_audience);
       hasWhere = true;
@@ -243,11 +261,19 @@ async function getAllAnnouncements(options = {}) {
     const currentPageSize = finalLimit || rows.length;
     const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
 
+    // Ensure content fields are strings, not Buffers
+    const processedRows = rows.map(row => ({
+      ...row,
+      content: row.content && Buffer.isBuffer(row.content)
+        ? row.content.toString('utf8')
+        : row.content
+    }));
+
     return {
       success: true,
       message: 'Announcements retrieved successfully',
-      data: rows,
-      count: rows.length,
+      data: processedRows,
+      count: processedRows.length,
       totalCount: totalCount,
       pagination: {
         page: currentPage,
@@ -296,10 +322,18 @@ async function getAnnouncementById(announcementId) {
       };
     }
 
+    // Ensure content field is a string, not Buffer
+    const announcement = rows[0];
+    if (announcement) {
+      announcement.content = announcement.content && Buffer.isBuffer(announcement.content)
+        ? announcement.content.toString('utf8')
+        : announcement.content;
+    }
+
     return {
       success: true,
       message: 'Announcement retrieved successfully',
-      data: rows[0]
+      data: announcement
     };
   } catch (error) {
     console.error('Error fetching announcement:', error);
@@ -323,8 +357,19 @@ async function updateAnnouncement(announcementId, announcementData) {
       target_audience,
       start_date,
       end_date,
-      is_active
+      is_active,
+      members_only
     } = announcementData;
+
+    // Ensure target_audience is an array and convert to JSON string
+    let targetAudienceJson = target_audience;
+    if (!Array.isArray(targetAudienceJson)) {
+      targetAudienceJson = [targetAudienceJson];
+    }
+    if (!targetAudienceJson.length) {
+      targetAudienceJson = ['all'];
+    }
+    const targetAudienceString = JSON.stringify(targetAudienceJson);
 
     // Ensure content is a string (convert object to JSON string if needed)
     let contentString = content;
@@ -339,8 +384,8 @@ async function updateAnnouncement(announcementId, announcementData) {
     }
 
     const sql = `
-      UPDATE tbl_announcements 
-      SET 
+      UPDATE tbl_announcements
+      SET
         title = ?,
         content = ?,
         type = ?,
@@ -349,32 +394,22 @@ async function updateAnnouncement(announcementId, announcementData) {
         start_date = ?,
         end_date = ?,
         is_active = ?,
+        members_only = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE announcement_id = ?
     `;
 
-    const params = [
-      title,
-      contentString,
-      type,
-      priority,
-      target_audience,
-      start_date ? moment(start_date).format('YYYY-MM-DD HH:mm:ss') : null,
-      end_date ? moment(end_date).format('YYYY-MM-DD HH:mm:ss') : null,
-      is_active !== undefined ? (is_active ? 1 : 0) : undefined,
-      announcementId
-    ];
-
     // Build params array properly
-    const finalParams = [
+    const params = [
       title,
       ...(contentString !== undefined ? [contentString] : []),
       type,
       priority,
-      target_audience,
+      targetAudienceString,
       start_date ? moment(start_date).format('YYYY-MM-DD HH:mm:ss') : null,
       end_date ? moment(end_date).format('YYYY-MM-DD HH:mm:ss') : null,
       is_active !== undefined ? (is_active ? 1 : 0) : undefined,
+      members_only !== undefined ? (members_only ? 1 : 0) : undefined,
       announcementId
     ];
 
@@ -421,45 +456,40 @@ async function deleteAnnouncement(announcementId, archivedBy = null) {
 }
 
 /**
- * Get active announcements for a user (not yet viewed)
- * @param {String} userId - User ID
- * @param {String} userPosition - User position/role
- * @returns {Promise<Array>} Array of active announcements for the user
+ * Get active announcements for all users (simplified - no audience filtering)
+ * @param {String} userId - User ID (for view tracking)
+ * @returns {Promise<Array>} Array of active announcements
  */
-async function getActiveAnnouncementsForUser(userId, userPosition = 'non_member') {
+async function getActiveAnnouncementsForUser(userId) {
   try {
     const now = moment().format('YYYY-MM-DD HH:mm:ss');
-    
-    // Build query based on whether user is authenticated
+
+    // Simplified query - all active announcements are visible to everyone
     let sql, params;
-    
+
     if (userId) {
-      // Authenticated user - check if they've viewed the announcement
+      // Authenticated user - show all active announcements (including viewed ones)
       sql = `
         SELECT a.*
         FROM tbl_announcements a
-        LEFT JOIN tbl_user_announcements ua ON a.announcement_id = ua.announcement_id AND ua.user_id = ?
         WHERE a.is_active = 1
           AND (a.start_date IS NULL OR a.start_date <= ?)
           AND (a.end_date IS NULL OR a.end_date >= ?)
-          AND (a.target_audience = 'all' OR a.target_audience = ?)
-          AND ua.tracking_id IS NULL
-        ORDER BY 
+        ORDER BY
           FIELD(a.priority, 'urgent', 'high', 'normal', 'low'),
           a.created_at DESC
       `;
-      params = [userId, now, now, userPosition];
+      params = [now, now];
     } else {
-      // Non-authenticated user - only show announcements for 'all' or 'non_member' audience
-      // Note: We can't track views for non-authenticated users, so they'll see all active announcements
+      // Non-authenticated user - show only announcements not hidden from visitors
       sql = `
         SELECT a.*
         FROM tbl_announcements a
         WHERE a.is_active = 1
+          AND a.members_only = 0
           AND (a.start_date IS NULL OR a.start_date <= ?)
           AND (a.end_date IS NULL OR a.end_date >= ?)
-          AND (a.target_audience = 'all' OR a.target_audience = 'non_member')
-        ORDER BY 
+        ORDER BY
           FIELD(a.priority, 'urgent', 'high', 'normal', 'low'),
           a.created_at DESC
       `;
@@ -468,10 +498,18 @@ async function getActiveAnnouncementsForUser(userId, userPosition = 'non_member'
 
     const [rows] = await query(sql, params);
 
+    // Ensure content fields are strings, not Buffers
+    const processedRows = rows.map(row => ({
+      ...row,
+      content: row.content && Buffer.isBuffer(row.content)
+        ? row.content.toString('utf8')
+        : row.content
+    }));
+
     return {
       success: true,
       message: 'Active announcements retrieved successfully',
-      data: rows
+      data: processedRows
     };
   } catch (error) {
     console.error('Error fetching active announcements for user:', error);
@@ -512,13 +550,13 @@ async function markAnnouncementAsViewed(announcementId, userId) {
 async function getAnnouncementSummary() {
   try {
     const sql = `
-      SELECT 
+      SELECT
         COUNT(*) as total_count,
         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count,
         SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as inactive_count,
         SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent_count,
         SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_count,
-        SUM(CASE WHEN target_audience = 'all' THEN 1 ELSE 0 END) as all_audience_count
+        SUM(CASE WHEN JSON_CONTAINS(target_audience, '"all"') THEN 1 ELSE 0 END) as all_audience_count
       FROM tbl_announcements
     `;
 

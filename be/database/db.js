@@ -63,32 +63,35 @@ const dbConfig = {
   // Ensure binary data (BLOB) is handled correctly and text fields are converted to strings
   // This fixes issues where VARCHAR/TEXT/DATETIME fields are returned as Buffer objects
   typeCast: function (field, next) {
+    // Handle BLOB fields (binary data)
     if (field.type === 'BLOB' || field.type === 'LONGBLOB') {
       return field.buffer();
     }
 
-    // Check if the field is a string type but was returned as Buffer
-    if (field.type === 'VAR_STRING' || field.type === 'STRING' ||
-        field.type === 'VARCHAR' || field.type === 'TEXT' ||
-        field.type === 'LONGTEXT' || field.type === 'MEDIUMTEXT' ||
-        field.type === 'TINYTEXT') {
-      const buffer = field.buffer();
-      // If it's a Buffer, convert it to string
-      if (Buffer.isBuffer(buffer)) {
-        return buffer.toString('utf8');
+    // For TEXT fields, ensure they are returned as strings, not Buffers
+    if (field.type === 'TEXT' || field.type === 'LONGTEXT' ||
+        field.type === 'MEDIUMTEXT' || field.type === 'TINYTEXT') {
+      // TEXT fields should be returned as strings by mysql2, but if they're Buffer, convert
+      const value = field.string();
+      if (Buffer.isBuffer(value)) {
+        return value.toString('utf8');
       }
-      return buffer;
+      return value;
     }
 
-    // Handle DATETIME and TIMESTAMP fields that might be returned as Buffer
+    // For VARCHAR and other string fields, ensure proper string conversion
+    if (field.type === 'VAR_STRING' || field.type === 'STRING' || field.type === 'VARCHAR') {
+      const value = field.string();
+      if (Buffer.isBuffer(value)) {
+        return value.toString('utf8');
+      }
+      return value;
+    }
+
+    // Handle DATETIME and TIMESTAMP fields
     if (field.type === 'DATETIME' || field.type === 'TIMESTAMP' ||
         field.type === 'DATE' || field.type === 'TIME') {
-      const buffer = field.buffer();
-      // If it's a Buffer, convert it to string
-      if (Buffer.isBuffer(buffer)) {
-        return buffer.toString('utf8');
-      }
-      return buffer;
+      return field.string();
     }
 
     return next();

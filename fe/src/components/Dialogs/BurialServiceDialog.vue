@@ -1,4 +1,4 @@
-us<template>
+<template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -46,7 +46,7 @@ us<template>
       <!-- Requester Name (Required for Admin/Staff when no member selected) -->
       <el-form-item label="Requester Name" prop="requester_name" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
         <template #label>
-          <span>{{ isMemberSelected ? 'Member' : 'Requester Name' }}<span v-if="!isMemberSelected" class="required-text">*</span></span>
+          <span>{{ isMemberSelected ? 'Member' : 'Requester Name' }}<span v-if="!isMemberSelected" class="required-text"></span></span>
         </template>
         <el-input
           v-model="formData.requester_name"
@@ -60,7 +60,7 @@ us<template>
       <!-- Requester Email (Required for Admin/Staff when no member selected) -->
       <el-form-item label="Requester Email" prop="requester_email" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
         <template #label>
-          <span>{{ isMemberSelected ? 'Member Email' : 'Requester Email' }}<span v-if="!isMemberSelected" class="required-text">*</span></span>
+          <span>{{ isMemberSelected ? 'Member Email' : 'Requester Email' }}<span v-if="!isMemberSelected" class="required-text"></span></span>
         </template>
         <el-input
           v-model="formData.requester_email"
@@ -72,10 +72,37 @@ us<template>
         />
       </el-form-item>
 
+      <!-- Requester Name (For Member Users) -->
+      <el-form-item prop="requester_name" v-else-if="isMember">
+        <template #label>
+          <span>Requester Name <span class="required-text">required</span></span>
+        </template>
+        <el-input
+          v-model="formData.requester_name"
+          placeholder="Your full name"
+          size="large"
+          :disabled="true"
+        />
+      </el-form-item>
+
+      <!-- Requester Email (For Member Users) -->
+      <el-form-item prop="requester_email" v-else-if="isMember">
+        <template #label>
+          <span>Requester Email <span class="required-text">required</span></span>
+        </template>
+        <el-input
+          v-model="formData.requester_email"
+          type="email"
+          placeholder="Your email address"
+          size="large"
+          :disabled="true"
+        />
+      </el-form-item>
+
       <!-- Requester Name (For Non-Member Users) -->
       <el-form-item prop="requester_name" v-else-if="!userInfo?.account?.member_id">
         <template #label>
-          <span>Requester Name <span class="required-text">*</span></span>
+          <span>Requester Name <span class="required-text">required</span></span>
         </template>
         <el-input
           v-model="formData.requester_name"
@@ -89,7 +116,7 @@ us<template>
       <!-- Requester Email (For Non-Member Users) -->
       <el-form-item prop="requester_email" v-else-if="!userInfo?.account?.member_id">
         <template #label>
-          <span>Requester Email <span class="required-text">*</span></span>
+          <span>Requester Email <span class="required-text">required</span></span>
         </template>
         <el-input
           v-model="formData.requester_email"
@@ -104,7 +131,7 @@ us<template>
      <!-- Deceased Name -->
      <el-form-item prop="deceased_name">
        <template #label>
-         <span>Deceased Name <span v-if="isMember" class="required-text">*</span></span>
+         <span>Deceased Name <span v-if="isMember" class="required-text">required</span></span>
        </template>
        <el-input
          v-model="formData.deceased_name"
@@ -118,7 +145,7 @@ us<template>
      <!-- Deceased Birthdate -->
      <el-form-item prop="deceased_birthdate">
        <template #label>
-         <span>Deceased Birthdate <span v-if="isMember" class="required-text">*</span></span>
+         <span>Deceased Birthdate <span v-if="isMember" class="required-text">required</span></span>
        </template>
        <el-date-picker
          v-model="formData.deceased_birthdate"
@@ -134,7 +161,7 @@ us<template>
      <!-- Date of Death -->
      <el-form-item prop="date_death">
        <template #label>
-         <span>Date of Death <span v-if="isMember" class="required-text">*</span></span>
+         <span>Date of Death <span v-if="isMember" class="required-text">required</span></span>
        </template>
        <el-date-picker
          v-model="formData.date_death"
@@ -150,7 +177,7 @@ us<template>
      <!-- Relationship -->
      <el-form-item prop="relationship">
        <template #label>
-         <span>Relationship <span v-if="isMember" class="required-text">*</span></span>
+         <span>Relationship <span v-if="isMember" class="required-text">required</span></span>
        </template>
        <el-select
          v-model="formData.relationship"
@@ -172,7 +199,7 @@ us<template>
      <!-- Location -->
      <el-form-item prop="location">
        <template #label>
-         <span>Location <span v-if="isMember" class="required-text">*</span></span>
+         <span>Location <span v-if="isMember" class="required-text">required</span></span>
        </template>
        <el-input
          v-model="formData.location"
@@ -285,6 +312,18 @@ const getUserFromStorage = () => {
 }
 
 const userInfo = ref(getUserFromStorage())
+const fetchMemberInfo = async () => {
+  if (userInfo.value?.account?.member_id && !userInfo.value.member) {
+    try {
+      const response = await axios.get(`/church-records/members/getMemberById/${userInfo.value.account.member_id}`)
+      if (response.data.data) {
+        userInfo.value.member = response.data.data
+      }
+    } catch (error) {
+      console.error('Error fetching member info:', error)
+    }
+  }
+}
 // Props
 const props = defineProps({
   modelValue: {
@@ -541,6 +580,16 @@ const rules = computed(() => {
       { required: true, message: 'Requester email is required', trigger: 'blur' },
       { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
     ];
+  } else {
+    // For member users
+    baseRules.requester_name = [
+      { required: true, message: 'Requester name is required', trigger: 'blur' },
+      { min: 2, max: 100, message: 'Requester name must be between 2 and 100 characters', trigger: 'blur' }
+    ];
+    baseRules.requester_email = [
+      { required: true, message: 'Requester email is required', trigger: 'blur' },
+      { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
+    ];
   }
 
   return baseRules;
@@ -637,6 +686,7 @@ watch(
         burialServiceStore.fetchPastorOptions(),
         fetchUnavailableTimeSlots()
       ])
+      await fetchMemberInfo()
       
       if (props.burialServiceData) {
         const data = props.burialServiceData
@@ -655,6 +705,17 @@ watch(
         formData.pastor_name = data.pastor_name ?? null
         formData.service_date = data.service_date && data.service_date.includes(' ') ? new Date(data.service_date.replace(' ', 'T')) : (data.service_date ? new Date(data.service_date) : null)
         formData.status = data.status || 'pending'
+        if (isMember.value) {
+          const memberInfo = userInfo.value.member
+          if (memberInfo) {
+            formData.requester_name = `${memberInfo.firstname || ''} ${memberInfo.middle_name || ''} ${memberInfo.lastname || ''}`.trim()
+            formData.requester_email = memberInfo.email || ''
+          } else {
+            const accountName = `${userInfo.value.account.firstname || ''} ${userInfo.value.account.lastname || ''}`.trim()
+            formData.requester_name = accountName || userInfo.value.account.email || ''
+            formData.requester_email = userInfo.value.account.email || ''
+          }
+        }
       } else {
         resetForm()
         if (userInfo.value && userInfo.value.account && (userInfo.value.account.position === 'admin' || userInfo.value.account.position === 'staff')) {
@@ -668,14 +729,14 @@ watch(
             formData.requester_name = `${memberInfo.firstname || ''} ${memberInfo.middle_name || ''} ${memberInfo.lastname || ''}`.trim()
             formData.requester_email = memberInfo.email || ''
           } else {
-            // Fallback to account email if member info is not available
-            formData.requester_name = userInfo.value.account.email || ''
+            // Fallback to account name if member info is not available
+            formData.requester_name = `${userInfo.value.account.firstname || ''} ${userInfo.value.account.lastname || ''}`.trim() || userInfo.value.account.email || ''
             formData.requester_email = userInfo.value.account.email || ''
           }
         } else {
-          // For non-member users, keep requester fields empty for them to fill
-          formData.requester_name = ''
-          formData.requester_email = ''
+          // For non-member users, auto-populate with account info
+          formData.requester_name = `${userInfo.value.account.firstname || ''} ${userInfo.value.account.lastname || ''}`.trim() || userInfo.value.account.email || ''
+          formData.requester_email = userInfo.value.account.email || ''
         }
       }
     }

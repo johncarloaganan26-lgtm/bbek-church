@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
 .events-grid-container.events-count-1 .event-card {
   width: 100%;
   max-width: 600px;
-  height: 500px;
+  height: 384px;
 }
 
 /* 2 Events - Two large cards side by side */
@@ -508,7 +508,7 @@ onBeforeUnmount(() => {
 .events-grid-container.events-count-2 .event-card {
   width: 100%;
   max-width: 480px;
-  height: 450px;
+  height: 384px;
 }
 
 /* 3 Events - Three large cards in a row */
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
 .events-grid-container.events-count-3 .event-card {
   width: 100%;
   max-width: 440px;
-  height: 420px;
+  height: 384px;
 }
 
 /* 4 Events - Four cards in a row */
@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
 
   .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
     max-width: 380px;
-    height: 360px;
+    height: 384px;
   }
 }
 
@@ -703,7 +703,7 @@ onBeforeUnmount(() => {
   .events-grid-container.events-count-3:not(.auto-scroll) .event-card,
   .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
     max-width: 430px;
-    height: 400px;
+    height: 384px;
   }
 }
 
@@ -717,14 +717,14 @@ onBeforeUnmount(() => {
 
   .events-grid-container:not(.auto-scroll) .event-card {
     max-width: 500px;
-    height: 450px;
+    height: 384px;
   }
 
   /* Auto-scroll cards on mobile */
   .events-grid-container.auto-scroll .event-card {
     min-width: 280px;
     width: 280px;
-    height: 320px;
+    height: 280px;
   }
 }
 

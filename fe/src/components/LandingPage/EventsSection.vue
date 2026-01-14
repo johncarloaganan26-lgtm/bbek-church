@@ -53,7 +53,11 @@
         <!-- Infinite Auto-Scroll Container -->
         <div
           ref="eventsScrollContainer"
-          class="events-grid-container auto-scroll"
+          class="events-grid-container"
+          :class="[
+            events.length > 3 ? 'auto-scroll' : '',
+            `events-count-${Math.min(events.length, 4)}`
+          ]"
           @mouseenter="pauseAutoScroll"
           @mouseleave="resumeAutoScroll"
         >
@@ -147,15 +151,13 @@ const isAutoScrolling = ref(true);
 // Loading state for CMS data
 const isLoadingHome = computed(() => cmsStore.isPageLoading("home"));
 
-// Events are always duplicated in displayedEvents for infinite scrolling
-
-// Displayed events (duplicated for seamless carousel scrolling)
+// Displayed events (duplicated for auto-scroll when 4+ events)
 const displayedEvents = computed(() => {
-  if (events.value.length > 0) {
-    // Duplicate events multiple times for seamless scrolling
-    return [...events.value, ...events.value, ...events.value, ...events.value];
+  if (events.value.length > 3) {
+    // For auto-scroll, duplicate events for seamless looping
+    return [...events.value, ...events.value, ...events.value];
   }
-  return [];
+  return events.value;
 });
 
 const floatingElements = ref([
@@ -340,23 +342,21 @@ const startAutoScroll = () => {
   if (autoScrollInterval.value) return;
 
   autoScrollInterval.value = setInterval(() => {
-    if (isAutoScrolling.value && eventsScrollContainer.value && events.value.length > 0) {
+    if (isAutoScrolling.value && eventsScrollContainer.value && events.value.length > 3) {
       const container = eventsScrollContainer.value;
-      const scrollAmount = 344; // Move by one card width + gap (320px + 24px = 344px)
+      const scrollAmount = 2; // pixels per frame
 
-      // For carousel with 4 copies of events, move one card at a time
-      const totalScrollWidth = container.scrollWidth;
-      const oneCardWidth = 344; // card width + gap
+      // For seamless looping with 3 copies of events
+      const oneSetWidth = container.scrollWidth / 3;
 
-      // Move right to left (decrease scrollLeft)
-      container.scrollLeft -= scrollAmount;
-
-      // Reset to beginning when reaching the end of first set
+      // Smoothly scroll right to left and reset when reaching the end
       if (container.scrollLeft <= 0) {
-        container.scrollLeft = totalScrollWidth - (oneCardWidth * 3); // Position to show last 3 cards of the duplicated set
+        container.scrollLeft = oneSetWidth * 2; // Reset to end of middle set
+      } else {
+        container.scrollLeft -= scrollAmount; // Continuous right-to-left scroll
       }
     }
-  }, 3000); // Change cards every 3 seconds
+  }, 30); // 30ms interval for smoother scrolling
 };
 
 const pauseAutoScroll = () => {
@@ -408,12 +408,12 @@ onMounted(async () => {
   await fetchHomeData();
   await fetchEvents();
 
-  // Start infinite auto-scroll if there are any events
-  if (events.value.length > 0) {
+  // Start auto-scroll if there are 4+ events
+  if (events.value.length > 3) {
     await nextTick();
-    // Position container to show first 3 cards
+    // Position container for right-to-left scrolling
     if (eventsScrollContainer.value) {
-      eventsScrollContainer.value.scrollLeft = 0;
+      eventsScrollContainer.value.scrollLeft = (eventsScrollContainer.value.scrollWidth / 3) * 2;
     }
     startAutoScroll();
   }
@@ -471,16 +471,15 @@ onBeforeUnmount(() => {
   display: none; /* Hide scrollbar for Chrome/Safari */
 }
 
-/* 4-Column Grid Container with Auto-Scroll */
+/* Grid Container with responsive columns */
 .events-grid-container {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 1.5rem;
   width: 100%;
   place-items: center;
 }
 
-/* 1 Event - Centered and larger */
+/* 1 Event - Centered */
 .events-grid-container.events-count-1 {
   display: flex;
   justify-content: center;
@@ -489,39 +488,53 @@ onBeforeUnmount(() => {
 
 .events-grid-container.events-count-1 .event-card {
   width: 100%;
-  max-width: 500px;
-  height: 450px;
+  max-width: 440px;
+  height: 384px;
 }
 
-/* 2 Events - Centered with space between */
+/* 2 Events - 2 columns */
 .events-grid-container.events-count-2 {
   grid-template-columns: repeat(2, 1fr);
   justify-items: center;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 .events-grid-container.events-count-2 .event-card {
   width: 100%;
-  max-width: 420px;
-  height: 400px;
+  max-width: 440px;
+  height: 384px;
 }
 
 /* 3 Events - Centered in grid */
 .events-grid-container.events-count-3 {
   grid-template-columns: repeat(3, 1fr);
   justify-items: center;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
 .events-grid-container.events-count-3 .event-card {
   width: 100%;
-  max-width: 380px;
-  height: 380px;
+  max-width: 440px;
+  height: 384px;
 }
 
-/* Auto-scroll carousel - shows 3 cards at a time */
+/* 4 Events - 2x2 grid */
+.events-grid-container.events-count-4 {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.events-grid-container.events-count-4 .event-card {
+  width: 100%;
+  max-width: 440px;
+  height: 384px;
+}
+
+/* Auto-scroll carousel for 4+ events - shows 3 cards at a time */
 .events-grid-container.auto-scroll {
   display: flex;
   flex-wrap: nowrap;
@@ -530,7 +543,7 @@ onBeforeUnmount(() => {
   padding-bottom: 16px;
   position: relative;
   width: 100%;
-  max-width: 1008px; /* 3 cards (320px each) + 2 gaps (24px each) = 960px + 48px = 1008px */
+  max-width: 1368px; /* 3 cards (440px each) + 2 gaps (24px each) = 1320px + 48px = 1368px */
   margin: 0 auto;
 }
 
@@ -583,9 +596,9 @@ onBeforeUnmount(() => {
 }
 
 .events-grid-container.auto-scroll .event-card {
-  min-width: 320px;
-  width: 320px;
-  height: 360px;
+  min-width: 440px;
+  width: 440px;
+  height: 384px;
   flex-shrink: 0;
 }
 
@@ -723,78 +736,51 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 1024px) {
-  .events-grid-container {
+/* Responsive breakpoints for different screen sizes */
+@media (max-width: 1200px) {
+  .events-grid-container.events-count-4:not(.auto-scroll) {
     grid-template-columns: repeat(3, 1fr);
+    max-width: 1400px;
   }
 
-  .events-grid-container.auto-scroll {
-    display: flex;
-  }
-
-  .events-grid.grid-2,
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-    max-width: 400px;
-  }
-
-  .events-grid.grid-3 .event-card:nth-child(3) {
-    grid-column: auto;
+  .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
+    max-width: 440px;
+    height: 384px;
   }
 }
 
-@media (max-width: 768px) {
-  .events-grid-container {
+@media (max-width: 900px) {
+  .events-grid-container.events-count-3:not(.auto-scroll),
+  .events-grid-container.events-count-4:not(.auto-scroll) {
     grid-template-columns: repeat(2, 1fr);
+    max-width: 1000px;
   }
 
-  .events-grid-container.auto-scroll {
-    display: flex;
-  }
-
-  .event-card {
-    height: 300px;
-  }
-
-  .events-grid-container.auto-scroll .event-card {
-    height: 280px;
-    width: 280px;
-    min-width: 280px;
+  .events-grid-container.events-count-3:not(.auto-scroll) .event-card,
+  .events-grid-container.events-count-4:not(.auto-scroll) .event-card {
+    max-width: 440px;
+    height: 384px;
   }
 }
 
-@media (max-width: 640px) {
-  .event-card {
-    height: 280px;
-  }
-
-  .events-grid-container {
+@media (max-width: 600px) {
+  .events-grid-container.events-count-2:not(.auto-scroll),
+  .events-grid-container.events-count-3:not(.auto-scroll),
+  .events-grid-container.events-count-4:not(.auto-scroll) {
     grid-template-columns: 1fr;
+    max-width: 500px;
   }
 
-  .events-grid-container.auto-scroll {
-    display: flex;
+  .events-grid-container:not(.auto-scroll) .event-card {
+    max-width: 500px;
+    height: 384px;
   }
 
+  /* Auto-scroll cards on mobile */
   .events-grid-container.auto-scroll .event-card {
-    height: 250px;
-    width: 250px;
-    min-width: 250px;
-  }
-
-  .events-grid {
-    gap: 1rem;
-  }
-
-  .events-grid.grid-1,
-  .events-grid.grid-2,
-  .events-grid.grid-3 {
-    grid-template-columns: 1fr;
-    max-width: 100%;
-  }
-
-  .events-grid.grid-3 .event-card:nth-child(3) {
-    grid-column: auto;
+    min-width: 440px;
+    width: 440px;
+    height: 384px;
   }
 }
 
