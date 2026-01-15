@@ -187,10 +187,10 @@
         />
       </el-form-item>
 
-      <!-- Children Section (shown only if married) -->
-      <template v-if="formData.civil_status === 'married'">
-        <el-divider>Children Information</el-divider>
-        <div class="children-section">
+      <!-- Children Section -->
+      <el-divider>Children Information</el-divider>
+      <div class="children-section">
+        <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">You can add information about your children at any time (optional)</p>
           <div v-for="(child, index) in formData.children" :key="index" class="child-item">
             <div class="child-header">
               <span class="child-number">Child {{ index + 1 }}</span>
@@ -261,7 +261,6 @@
             Add Child
           </el-button>
         </div>
-      </template>
 
       <!-- Address -->
       <el-form-item label="Address" prop="address">

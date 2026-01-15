@@ -381,85 +381,85 @@
                           :disabled="memberRegistrationStore.loading"
                         />
                       </el-form-item>
+                    </template>
 
-                      <!-- Children Section -->
-                      <div class="children-section">
-                        <h4 class="children-title" style="font-family: 'Georgia', serif; font-style: italic;">Children Information</h4>
-                        <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">Add information about your children (optional)</p>
+                    <!-- Children Section -->
+                    <div class="children-section">
+                      <h4 class="children-title" style="font-family: 'Georgia', serif; font-style: italic;">Children Information</h4>
+                      <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">You can add information about your children at any time (optional)</p>
 
-                        <div v-for="(child, index) in formData.children" :key="index" class="child-item">
-                          <div class="child-header">
-                            <span class="child-number">Child {{ index + 1 }}</span>
-                            <el-button
-                              type="danger"
-                              size="small"
-                              @click="removeChild(index)"
-                              :disabled="memberRegistrationStore.loading"
-                            >
-                              Remove
-                            </el-button>
-                          </div>
-
-                          <div class="form-row">
-                            <el-form-item :label="`Child ${index + 1} Name`" :prop="`children.${index}.name`" class="form-group">
-                              <el-input
-                                v-model="child.name"
-                                :placeholder="`Enter child ${index + 1} name`"
-                                size="large"
-                                :disabled="memberRegistrationStore.loading"
-                              />
-                            </el-form-item>
-                            <el-form-item :label="`Child ${index + 1} Age`" :prop="`children.${index}.age`" class="form-group">
-                              <el-input
-                                v-model.number="child.age"
-                                type="number"
-                                :placeholder="`Enter child ${index + 1} age`"
-                                size="large"
-                                :disabled="memberRegistrationStore.loading"
-                              />
-                            </el-form-item>
-                          </div>
-
-                          <div class="form-row">
-                            <el-form-item :label="`Child ${index + 1} Gender`" :prop="`children.${index}.gender`" class="form-group">
-                              <el-select
-                                v-model="child.gender"
-                                :placeholder="`Select child ${index + 1} gender`"
-                                size="large"
-                                style="width: 100%"
-                                :disabled="memberRegistrationStore.loading"
-                              >
-                                <el-option label="Male" value="M" />
-                                <el-option label="Female" value="F" />
-                              </el-select>
-                            </el-form-item>
-                            <el-form-item :label="`Child ${index + 1} Birthday`" :prop="`children.${index}.birthday`" class="form-group">
-                              <el-date-picker
-                                v-model="child.birthday"
-                                type="date"
-                                :placeholder="`Select child ${index + 1} birthday`"
-                                size="large"
-                                format="YYYY-MM-DD"
-                                value-format="YYYY-MM-DD"
-                                style="width: 100%"
-                                :disabled="memberRegistrationStore.loading"
-                              />
-                            </el-form-item>
-                          </div>
+                      <div v-for="(child, index) in formData.children" :key="index" class="child-item">
+                        <div class="child-header">
+                          <span class="child-number">Child {{ index + 1 }}</span>
+                          <el-button
+                            type="danger"
+                            size="small"
+                            @click="removeChild(index)"
+                            :disabled="memberRegistrationStore.loading"
+                          >
+                            Remove
+                          </el-button>
                         </div>
 
-                        <el-button
-                          type="primary"
-                          size="large"
-                          @click="addChild"
-                          :disabled="memberRegistrationStore.loading"
-                          class="add-child-btn"
-                        >
-                          <v-icon start>add</v-icon>
-                          Add Child
-                        </el-button>
+                        <div class="form-row">
+                          <el-form-item :label="`Child ${index + 1} Name`" :prop="`children.${index}.name`" class="form-group">
+                            <el-input
+                              v-model="child.name"
+                              :placeholder="`Enter child ${index + 1} name`"
+                              size="large"
+                              :disabled="memberRegistrationStore.loading"
+                            />
+                          </el-form-item>
+                          <el-form-item :label="`Child ${index + 1} Age`" :prop="`children.${index}.age`" class="form-group">
+                            <el-input
+                              v-model.number="child.age"
+                              type="number"
+                              :placeholder="`Enter child ${index + 1} age`"
+                              size="large"
+                              :disabled="memberRegistrationStore.loading"
+                            />
+                          </el-form-item>
+                        </div>
+
+                        <div class="form-row">
+                          <el-form-item :label="`Child ${index + 1} Gender`" :prop="`children.${index}.gender`" class="form-group">
+                            <el-select
+                              v-model="child.gender"
+                              :placeholder="`Select child ${index + 1} gender`"
+                              size="large"
+                              style="width: 100%"
+                              :disabled="memberRegistrationStore.loading"
+                            >
+                              <el-option label="Male" value="M" />
+                              <el-option label="Female" value="F" />
+                            </el-select>
+                          </el-form-item>
+                          <el-form-item :label="`Child ${index + 1} Birthday`" :prop="`children.${index}.birthday`" class="form-group">
+                            <el-date-picker
+                              v-model="child.birthday"
+                              type="date"
+                              :placeholder="`Select child ${index + 1} birthday`"
+                              size="large"
+                              format="YYYY-MM-DD"
+                              value-format="YYYY-MM-DD"
+                              style="width: 100%"
+                              :disabled="memberRegistrationStore.loading"
+                            />
+                          </el-form-item>
+                        </div>
                       </div>
-                    </template>
+
+                      <el-button
+                        type="primary"
+                        size="large"
+                        @click="addChild"
+                        :disabled="memberRegistrationStore.loading"
+                        class="add-child-btn"
+                      >
+                        <v-icon start>add</v-icon>
+                        Add Child
+                      </el-button>
+                    </div>
 
                     <el-form-item label="Guardian Name" prop="guardianName" class="form-group">
                       <template #label>

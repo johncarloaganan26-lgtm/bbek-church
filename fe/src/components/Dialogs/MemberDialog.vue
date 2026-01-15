@@ -194,8 +194,8 @@
         />
       </el-form-item>
 
-      <!-- Children (only show if married) -->
-      <el-form-item v-if="formData.civil_status === 'married'" label="Children">
+      <!-- Children -->
+      <el-form-item label="Children">
         <div class="children-section">
           <div class="children-header">
             <span class="children-count">{{ formData.children.length }} Child(ren)</span>
@@ -208,6 +208,7 @@
               + Add Child
             </el-button>
           </div>
+          <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic; margin-bottom: 16px; color: #6b7280; font-size: 0.875rem;">You can add information about your children at any time (optional)</p>
           
           <div v-for="(child, index) in formData.children" :key="index" class="child-item">
             <el-divider content-position="left">
