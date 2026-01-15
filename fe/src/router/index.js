@@ -4,6 +4,7 @@ import AdminDashboard from '../views/AdminDashboard.vue'
 import DashboardView from '../components/Admin/DashboardView.vue'
 // Church Records
 import MemberRecord from '../components/Admin/ChurchRecords/MemberRecord.vue'
+import ImportMembers from '../components/Admin/ChurchRecords/ImportMembers.vue'
 import ChurchLeaders from '../components/Admin/ChurchRecords/ChurchLeaders.vue'
 import DepartmentOfficersAdmin from '../components/Admin/ChurchRecords/DepartmentOfficers.vue'
 import EventsRecords from '../components/Admin/ChurchRecords/EventsRecords.vue'
@@ -274,6 +275,11 @@ const routes = [
         path: 'members',
         name: 'MemberRecord',
         component: MemberRecord
+      },
+      {
+        path: 'members/import',
+        name: 'ImportMembers',
+        component: ImportMembers
       },
       {
         path: 'leaders',

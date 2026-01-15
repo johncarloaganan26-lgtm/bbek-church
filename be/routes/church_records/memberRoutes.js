@@ -1,5 +1,10 @@
 const express = require('express');
 const moment = require('moment');
+const multer = require('multer');
+const csv = require('csv-parser');
+const XLSX = require('xlsx');
+const fs = require('fs');
+const path = require('path');
 const {
   createMember,
   getAllMembers,
@@ -8,6 +13,7 @@ const {
   deleteMember,
   exportMembersToExcel,
   exportMembersToCSV,
+  importMembers,
   getAllMembersForSelect,
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
@@ -16,6 +22,45 @@ const {
 } = require('../../dbHelpers/church_records/memberRecords');
 
 const router = express.Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'import-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'text/csv',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ];
+    const allowedExtensions = ['.csv', '.xlsx'];
+
+    const isValidType = allowedTypes.includes(file.mimetype);
+    const isValidExtension = allowedExtensions.includes(path.extname(file.originalname).toLowerCase());
+
+    if (isValidType || isValidExtension) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'), false);
+    }
+  }
+});
 
 
 /**
@@ -46,6 +91,89 @@ router.post('/createMember', async (req, res) => {
 });
 
 
+/**
+ * IMPORT - Import member records from CSV/Excel file
+ * POST /api/church-records/members/import
+ */
+router.post('/import', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const filePath = req.file.path;
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+
+    let memberDataArray = [];
+
+    // Parse file based on type
+    if (fileExtension === '.csv') {
+      memberDataArray = await parseCSVFile(filePath);
+    } else if (fileExtension === '.xlsx') {
+      memberDataArray = await parseExcelFile(filePath);
+    } else {
+      // Clean up uploaded file
+      fs.unlinkSync(filePath);
+      return res.status(400).json({
+        success: false,
+        message: 'Unsupported file type'
+      });
+    }
+
+    // Validate that we have data
+    if (!memberDataArray || memberDataArray.length === 0) {
+      fs.unlinkSync(filePath);
+      return res.status(400).json({
+        success: false,
+        message: 'No data found in file'
+      });
+    }
+
+    // Get user info for logging
+    const userInfo = {
+      acc_id: req.user?.acc_id || 'system',
+      email: req.user?.email || 'system@church.com',
+      name: req.user?.name || 'System Admin',
+      position: req.user?.position || 'admin'
+    };
+
+    // Import members
+    const result = await importMembers(memberDataArray, userInfo);
+
+    // Clean up uploaded file
+    try {
+      fs.unlinkSync(filePath);
+    } catch (cleanupError) {
+      console.error('Error cleaning up file:', cleanupError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.data
+    });
+
+  } catch (error) {
+    console.error('Error importing members:', error);
+
+    // Clean up uploaded file if it exists
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file after error:', cleanupError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to import members'
+    });
+  }
+});
 
 /**
  * GET ALL FOR SELECT - Get all members for select/dropdown elements
@@ -539,6 +667,72 @@ router.delete('/deleteMember/:id', async (req, res) => {
     });
   }
 });
+
+// Helper function to parse CSV file
+async function parseCSVFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let rowIndex = 1; // Start from 1 (header is 0)
+    let isFirstRow = true;
+
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => {
+        // Skip header row
+        if (isFirstRow) {
+          isFirstRow = false;
+          return;
+        }
+        // Add row index for error reporting
+        data._rowIndex = rowIndex++;
+        results.push(data);
+      })
+      .on('end', () => {
+        resolve(results);
+      })
+      .on('error', (error) => {
+        reject(error);
+      });
+  });
+}
+
+// Helper function to parse Excel file
+async function parseExcelFile(filePath) {
+  try {
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Convert to JSON with header row
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (jsonData.length === 0) {
+      return [];
+    }
+
+    // First row is headers
+    const headers = jsonData[0];
+    const results = [];
+
+    // Process data rows
+    for (let i = 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      const rowData = {};
+
+      headers.forEach((header, index) => {
+        rowData[header] = row[index] || '';
+      });
+
+      // Add row index for error reporting
+      rowData._rowIndex = i;
+      results.push(rowData);
+    }
+
+    return results;
+  } catch (error) {
+    throw new Error('Failed to parse Excel file: ' + error.message);
+  }
+}
 
 module.exports = router;
 

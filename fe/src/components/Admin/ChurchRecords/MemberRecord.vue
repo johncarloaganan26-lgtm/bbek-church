@@ -70,7 +70,7 @@
           <v-col cols="12" md="3" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-printer"
                   variant="outlined"
                   v-bind="props"
@@ -81,13 +81,23 @@
             </v-tooltip>
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-download"
                   variant="outlined"
                   v-bind="props"
                   :loading="memberStore.loading"
                   :disabled="memberStore.loading"
                   @click="handleExportExcel"
+                ></v-btn>
+              </template>
+            </v-tooltip>
+            <v-tooltip text="Import Members" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-upload"
+                  variant="outlined"
+                  v-bind="props"
+                  @click="goToImport"
                 ></v-btn>
               </template>
             </v-tooltip>
@@ -197,10 +207,13 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
 import MemberDialog from '../../Dialogs/MemberDialog.vue'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const router = useRouter()
 
 // Pinia Store
 const memberStore = useMemberRecordStore()
@@ -260,6 +273,10 @@ const handleFilterChange = (filterName, value) => {
 const openMemberDialog = () => {
   memberData.value = null
   memberDialog.value = true
+}
+
+const goToImport = () => {
+  router.push('/admin/members/import')
 }
 
 const editMember = (member) => {

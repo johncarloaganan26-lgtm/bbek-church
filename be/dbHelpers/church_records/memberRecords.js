@@ -976,26 +976,26 @@ async function exportMembersToCSV(options = {}) {
 
     const members = result.data;
 
-    // CSV headers
+    // CSV headers - Use lowercase field names to match import expectations
     const headers = [
-      'Member ID',
-      'First Name',
-      'Last Name',
-      'Middle Name',
-      'Birthdate',
-      'Age',
-      'Gender',
-      'Address',
-      'Email',
-      'Phone Number',
-      'Civil Status',
-      'Position',
-      'Profession',
-      'Spouse Name',
-      'Marriage Date',
-      'Children',
-      'Desire Ministry',
-      'Date Created'
+      'member_id',
+      'firstname',
+      'lastname',
+      'middle_name',
+      'birthdate',
+      'age',
+      'gender',
+      'address',
+      'email',
+      'phone_number',
+      'civil_status',
+      'position',
+      'profession',
+      'spouse_name',
+      'marriage_date',
+      'children',
+      'desire_ministry',
+      'date_created'
     ];
 
     // Create CSV content
@@ -1383,6 +1383,142 @@ async function getMembersWithoutBaptism() {
   }
 }
 
+/**
+ * IMPORT - Import member records from CSV/Excel file
+ * @param {Array} memberDataArray - Array of member data objects
+ * @param {Object} userInfo - User information for logging
+ * @returns {Promise<Object>} Result object with import statistics
+ */
+async function importMembers(memberDataArray, userInfo) {
+  try {
+    let imported = 0
+    let updated = 0
+    let errors = 0
+    const errorDetails = []
+
+    // Process each member record
+    for (const memberData of memberDataArray) {
+      try {
+        // Validate required fields
+        const requiredFields = ['firstname', 'lastname', 'birthdate', 'gender', 'email', 'position']
+        const missingFields = requiredFields.filter(field => !memberData[field] || memberData[field].toString().trim() === '')
+
+        // Additional validation for birthdate format
+        if (memberData.birthdate && !moment(memberData.birthdate).isValid()) {
+          missingFields.push('birthdate (invalid format)')
+        }
+
+        if (missingFields.length > 0) {
+          errors++
+          errorDetails.push(`Row ${memberData._rowIndex || 'unknown'}: Missing or invalid required fields: ${missingFields.join(', ')}`)
+          continue
+        }
+
+        // Check if member exists
+        const existingMember = await checkExistingMember(memberData)
+
+        if (existingMember.exists) {
+          // Update existing member
+          const updateResult = await updateMember(existingMember.member_id, memberData)
+          if (updateResult.success) {
+            updated++
+          } else {
+            errors++
+            errorDetails.push(`Row ${memberData._rowIndex || 'unknown'}: Failed to update member: ${updateResult.message}`)
+          }
+        } else {
+          // Create new member
+          const createResult = await createMember(memberData)
+          if (createResult.success) {
+            imported++
+          } else {
+            errors++
+            errorDetails.push(`Row ${memberData._rowIndex || 'unknown'}: Failed to create member: ${createResult.message}`)
+          }
+        }
+      } catch (rowError) {
+        errors++
+        errorDetails.push(`Row ${memberData._rowIndex || 'unknown'}: ${rowError.message}`)
+      }
+    }
+
+    // Log the import action
+    try {
+      const auditTrailRecords = require('../auditTrailRecords')
+      await auditTrailRecords.createAuditLog({
+        user_id: userInfo?.acc_id || 'system',
+        user_email: userInfo?.email || 'system@church.com',
+        user_name: userInfo?.name || 'System Admin',
+        user_position: userInfo?.position || 'admin',
+        action_type: 'IMPORT',
+        module: 'Member Records',
+        description: `Admin imported ${imported} new member records, updated ${updated} records`,
+        entity_type: 'member',
+        status: 'success'
+      })
+    } catch (logError) {
+      console.error('Failed to log import action:', logError)
+      // Don't fail the import if logging fails
+    }
+
+    return {
+      success: true,
+      message: `Import completed: ${imported} new records added, ${updated} records updated`,
+      data: {
+        imported,
+        updated,
+        errors,
+        errorDetails: errorDetails.length > 0 ? errorDetails : null
+      }
+    }
+  } catch (error) {
+    console.error('Error importing members:', error)
+    throw error
+  }
+}
+
+/**
+ * Check if a member exists based on email or name+birthdate combination
+ * @param {Object} memberData - Member data to check
+ * @returns {Promise<Object>} Object with exists flag and member_id if found
+ */
+async function checkExistingMember(memberData) {
+  try {
+    const { email, firstname, lastname, birthdate } = memberData
+
+    // First check by email
+    if (email) {
+      const sql = 'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))'
+      const [rows] = await query(sql, [email])
+      if (rows.length > 0) {
+        return { exists: true, member_id: rows[0].member_id }
+      }
+    }
+
+    // Then check by name + birthdate combination
+    if (firstname && lastname && birthdate) {
+      try {
+        const formattedBirthdate = moment(birthdate).format('YYYY-MM-DD')
+        if (formattedBirthdate !== 'Invalid date') {
+          const sql = 'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND birthdate = ?'
+          const [rows] = await query(sql, [firstname, lastname, formattedBirthdate])
+          if (rows.length > 0) {
+            return { exists: true, member_id: rows[0].member_id }
+          }
+        }
+      } catch (dateError) {
+        // Skip birthdate check if date is invalid
+        console.warn('Invalid birthdate in checkExistingMember:', birthdate)
+      }
+    }
+
+    return { exists: false }
+  } catch (error) {
+    console.error('Error checking existing member:', error)
+    throw error
+  }
+}
+
 module.exports = {
   createMember,
   getAllMembers,
@@ -1392,6 +1528,7 @@ module.exports = {
   getNextMemberId,
   exportMembersToExcel,
   exportMembersToCSV,
+  importMembers,
   getAllMembersForSelect,
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
