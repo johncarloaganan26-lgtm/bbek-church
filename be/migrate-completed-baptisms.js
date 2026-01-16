@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { createMember } = require('./dbHelpers/church_records/memberRecords');
 const { createAccount, getAccountByEmail } = require('./dbHelpers/church_records/accountRecords');
 const { updateWaterBaptism } = require('./dbHelpers/services/waterBaptismRecords');
-const { sendAccountDetails } = require('./dbHelpers/emailHelperSMTP');
+const { sendAccountDetails } = require('./dbHelpers/emailHelperSendGrid');
 
 async function migrateCompletedBaptisms() {
   console.log('=== Starting Migration: Completed Water Baptisms to Members ===\n');

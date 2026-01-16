@@ -1,5 +1,5 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { sendAccountDetails } = require('./dbHelpers/emailHelperSMTP');
+const { sendAccountDetails } = require('./dbHelpers/emailHelperSendGrid');
 
 async function testBaptismCompletionEmail() {
   console.log('Testing Baptism Completion Email...');

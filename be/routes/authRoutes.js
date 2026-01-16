@@ -2,7 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { query } = require('../database/db');
-const { sendAccountDetails } = require('../dbHelpers/emailHelperSMTP');
+const { sendAccountDetails } = require('../dbHelpers/emailHelperSendGrid');
 
 const router = express.Router();
 

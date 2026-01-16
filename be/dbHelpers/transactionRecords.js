@@ -1,7 +1,7 @@
 const { query } = require('../database/db');
 const moment = require('moment');
 const crypto = require('crypto');
-const { sendTransactionCompletionNotification } = require('./emailHelperSMTP');
+const { sendTransactionCompletionNotification } = require('./emailHelperSendGrid');
 const { archiveBeforeDelete } = require('./archiveHelper');
 
 /**
