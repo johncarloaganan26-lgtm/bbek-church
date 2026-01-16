@@ -251,7 +251,28 @@ const downloadTemplate = () => {
     ['John', 'Doe', '', '1990-01-15', '34', 'M', '123 Main St, City', 'john.doe@example.com', '+639123456789', 'member', 'single', 'Engineer', '', '', '', ''],
     ['Jane', 'Smith', 'Marie', '1985-05-20', '39', 'F', '456 Oak Ave, Town', 'jane.smith@example.com', '+639987654321', 'member', 'married', 'Teacher', '["Anna (12)", "Mark (8)"]', '', '', ''],
     ['Bob', 'Johnson', '', '2000-12-10', '23', 'M', '789 Pine Rd, Village', 'bob.johnson@example.com', '+639555123456', 'member', 'single', 'Student', '', '', '', ''],
-    ['Alice', 'Brown', 'Lee', '1975-03-08', '49', 'F', '321 Elm St, Suburb', 'alice.brown@example.com', '+639444567890', 'pastor', 'married', 'Pastor', '["Sarah (15)", "David (10)"]', '', '', '']
+    ['Alice', 'Brown', 'Lee', '1975-03-08', '49', 'F', '321 Elm St, Suburb', 'alice.brown@example.com', '+639444567890', 'pastor', 'married', 'Pastor', '["Sarah (15)", "David (10)"]', '', '', ''],
+    ['Michael', 'Garcia', 'Antonio', '1982-07-22', '41', 'M', '567 Maple Dr, Metro', 'michael.garcia@example.com', '+639876543210', 'elder', 'married', 'Doctor', '["Luis (18)", "Maria (16)"]', '', '', ''],
+    ['Sofia', 'Rodriguez', 'Isabella', '1995-11-30', '28', 'F', '890 Cedar Ln, Province', 'sofia.rodriguez@example.com', '+639112233445', 'member', 'single', 'Nurse', '', '', '', ''],
+    ['Carlos', 'Martinez', '', '1978-04-12', '46', 'M', '234 Birch St, Capital', 'carlos.martinez@example.com', '+639556677889', 'deacon', 'married', 'Teacher', '["Pedro (20)", "Rosa (17)", "Juan (14)"]', '', '', ''],
+    ['Elena', 'Lopez', 'Victoria', '1992-09-05', '31', 'F', '678 Willow Ave, City', 'elena.lopez@example.com', '+639998877665', 'member', 'married', 'Accountant', '["Miguel (5)", "Sofia (3)"]', '', '', ''],
+    ['David', 'Hernandez', '', '1988-12-18', '35', 'M', '345 Pine St, Town', 'david.hernandez@example.com', '+639334455667', 'member', 'single', 'Software Developer', '', '', '', ''],
+    ['Maria', 'Gonzalez', 'Carmen', '1970-06-14', '53', 'F', '789 Oak Rd, Village', 'maria.gonzalez@example.com', '+639778899001', 'pastor', 'widowed', 'Retired Teacher', '["Antonio (25)", "Carmen (22)"]', '', '', ''],
+    ['Jose', 'Perez', '', '1998-03-27', '26', 'M', '456 Elm Dr, Suburb', 'jose.perez@example.com', '+639223344556', 'member', 'single', 'Graphic Designer', '', '', '', ''],
+    ['Ana', 'Santos', 'Maria', '1983-08-09', '40', 'F', '123 Cedar St, Metro', 'ana.santos@example.com', '+639667788990', 'elder', 'married', 'Lawyer', '["Lucas (12)", "Isabella (9)"]', '', '', ''],
+    ['Luis', 'Torres', '', '1993-01-03', '31', 'M', '567 Birch Ln, Province', 'luis.torres@example.com', '+639445566778', 'member', 'married', 'Chef', '["Diego (7)", "Luna (4)"]', '', '', ''],
+    ['Carmen', 'Ramirez', 'Rosa', '1976-10-25', '47', 'F', '890 Willow Dr, Capital', 'carmen.ramirez@example.com', '+639889900112', 'deacon', 'divorced', 'Business Owner', '["Pablo (19)"]', '', '', ''],
+    ['Antonio', 'Flores', '', '2001-05-16', '23', 'M', '234 Maple Ave, City', 'antonio.flores@example.com', '+639112244668', 'member', 'single', 'College Student', '', 'Maria Flores', '+639887766554', 'Mother'],
+    ['Isabella', 'Morales', 'Sofia', '1987-11-11', '36', 'F', '678 Pine Rd, Town', 'isabella.morales@example.com', '+639334466880', 'member', 'married', 'Pharmacist', '["Mateo (8)", "Valentina (6)"]', '', '', ''],
+    ['Diego', 'Ortiz', '', '1996-07-08', '27', 'M', '345 Oak Ln, Village', 'diego.ortiz@example.com', '+639556688992', 'member', 'single', 'Mechanic', '', '', '', ''],
+    ['Valentina', 'Gutierrez', 'Luna', '1974-02-28', '50', 'F', '789 Elm Ave, Suburb', 'valentina.gutierrez@example.com', '+639778800224', 'pastor', 'married', 'Counselor', '["Sebastian (24)", "Camila (21)"]', '', '', ''],
+    ['Sebastian', 'Ruiz', '', '1999-12-05', '24', 'M', '456 Cedar Dr, Metro', 'sebastian.ruiz@example.com', '+639990011336', 'member', 'single', 'Marketing Specialist', '', '', '', ''],
+    ['Camila', 'Diaz', 'Victoria', '1981-04-17', '43', 'F', '123 Birch St, Province', 'camila.diaz@example.com', '+639223366770', 'elder', 'married', 'Architect', '["Nicolas (15)", "Gabriela (13)"]', '', '', ''],
+    ['Nicolas', 'Vargas', '', '2008-09-22', '15', 'M', '567 Willow Ln, Capital', 'nicolas.vargas@example.com', '+639445588992', 'member', 'single', 'High School Student', '', 'Carlos Vargas', '+639667700448', 'Father'],
+    ['Gabriela', 'Castillo', 'Rosa', '1994-06-30', '29', 'F', '890 Maple Dr, City', 'gabriela.castillo@example.com', '+639889922336', 'member', 'single', 'Journalist', '', '', '', ''],
+    ['Mateo', 'Aguilar', '', '2005-03-14', '19', 'M', '234 Pine Ave, Town', 'mateo.aguilar@example.com', '+639001133668', 'member', 'single', 'University Student', '', 'Elena Aguilar', '+639223355880', 'Mother'],
+    ['Luna', 'Mendoza', 'Isabella', '1979-08-07', '44', 'F', '678 Oak Rd, Village', 'luna.mendoza@example.com', '+639445577992', 'deacon', 'married', 'Social Worker', '["Adrian (16)", "Natalia (14)"]', '', '', ''],
+    ['Adrian', 'Delgado', '', '2007-11-19', '16', 'M', '345 Elm Ln, Suburb', 'adrian.delgado@example.com', '+639667799224', 'member', 'single', 'High School Student', '', 'Roberto Delgado', '+639889911448', 'Father']
   ]
 
   // Create CSV content

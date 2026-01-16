@@ -1,12 +1,12 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { sendAccountDetails } = require('./dbHelpers/emailHelperSendGrid');
+const { sendAccountDetails } = require('./dbHelpers/emailHelperSMTP');
 
 async function testBaptismCompletionEmail() {
   console.log('Testing Baptism Completion Email...');
   console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? 'Set' : 'Not set');
   console.log('SENDGRID_FROM_EMAIL:', process.env.SENDGRID_FROM_EMAIL);
   
-  try {
+  try { 
     // Test with a real email address
     const result = await sendAccountDetails({
       acc_id: 'test_baptism_001',

@@ -65,6 +65,35 @@ const getStatusBadge = (status, statusColors, statusMessages) => {
   `;
 };
 
+// Helper function to format time with AM/PM
+const formatTimeWithAMPM = (timeString) => {
+  if (!timeString) return '';
+  
+  try {
+    // Handle different time formats
+    let time;
+    if (timeString.includes(':')) {
+      // Already has time format (HH:MM:SS or HH:MM)
+      const [hours, minutes] = timeString.split(':').map(Number);
+      time = new Date();
+      time.setHours(hours, minutes, 0, 0);
+    } else {
+      // Assume it's hours only
+      time = new Date();
+      time.setHours(parseInt(timeString), 0, 0, 0);
+    }
+    
+    return time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return timeString; // Return original if formatting fails
+  }
+};
+
 // Simple CTA Button
 const getCTAButton = (text, url) => `
   <div style="margin: 20px 0;">
@@ -272,7 +301,9 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
         ${getInfoBox('Baptism Details', [
           { label: 'Name', value: baptismDetails.memberName || 'N/A' },
           { label: 'Baptism Date', value: baptismDetails.baptismDate || 'To be determined' },
-          { label: 'Location', value: baptismDetails.location || 'To be determined' }
+          { label: 'Baptism Time', value: baptismDetails.baptismTime ? formatTimeWithAMPM(baptismDetails.baptismTime) : '' },
+          { label: 'Location', value: baptismDetails.location || '' },
+          { label: 'Pastor', value: baptismDetails.pastorName || '' }
         ])}
         ${status === 'approved' ? getNextSteps([
           'Prepare for your baptism ceremony',

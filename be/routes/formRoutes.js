@@ -8,6 +8,7 @@ const {
   deleteForm,
   getMemberServices
 } = require('../dbHelpers/formRecords');
+const { sendFormSubmissionNotification, sendFormStatusUpdate } = require('../dbHelpers/emailHelperSMTP');
 
 const router = express.Router();
 
@@ -34,8 +35,29 @@ router.post('/createForm', async (req, res) => {
     }
 
     const result = await createForm(formData);
-    
+
     if (result.success) {
+      // Send form submission notification email
+      if (formData.email) {
+        const recipientName = formData.name || 'Valued Contact';
+        try {
+          const emailResult = await sendFormSubmissionNotification({
+            email: formData.email,
+            recipientName: recipientName,
+            formType: formData.form_type,
+            formData: formData.form_data || formData
+          });
+
+          if (emailResult.success) {
+            console.log(`✅ Form submission notification sent to ${formData.email}`);
+          } else {
+            console.error(`❌ Failed to send form submission email: ${emailResult.message}`);
+          }
+        } catch (emailError) {
+          console.error('Error sending form submission email:', emailError);
+        }
+      }
+
       res.status(201).json({
         success: true,
         message: result.message,
@@ -174,9 +196,36 @@ router.put('/updateForm/:id', async (req, res) => {
       reviewed_by: req.user?.acc_id || null
     };
 
+    // Get current form to check if status is changing
+    const currentForm = await getFormById(parseInt(id));
+    const oldStatus = currentForm.success ? currentForm.data.status : null;
+    const newStatus = updateData.status || oldStatus;
+    const isStatusChanging = oldStatus && newStatus && oldStatus !== newStatus;
+
     const result = await updateForm(parseInt(id), updateData);
-    
+
     if (result.success) {
+      // Send form status update email if status changed
+      if (isStatusChanging && result.data && result.data.email) {
+        try {
+          const emailResult = await sendFormStatusUpdate({
+            email: result.data.email,
+            recipientName: result.data.name || 'Valued Contact',
+            formType: result.data.form_type,
+            status: newStatus,
+            adminNotes: updateData.admin_notes || null
+          });
+
+          if (emailResult.success) {
+            console.log(`✅ Form status update email sent to ${result.data.email} (${newStatus})`);
+          } else {
+            console.error(`❌ Failed to send form status update email: ${emailResult.message}`);
+          }
+        } catch (emailError) {
+          console.error('Error sending form status update email:', emailError);
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: result.message,
