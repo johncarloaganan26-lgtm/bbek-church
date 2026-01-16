@@ -50,32 +50,32 @@ let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRout
 let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
 
 try {
-  const authMiddleware = require('./middleware/authMiddleware');
+  const authMiddleware = require('../middleware/authMiddleware');
   authenticateToken = authMiddleware.authenticateToken;
 
-  memberRouter = require('./routes/church_records/memberRoutes');
-  accountRouter = require('./routes/church_records/accountRoutes');
-  departmentOfficerRouter = require('./routes/church_records/departmentOfficerRoutes');
-  departmentRouter = require('./routes/church_records/departmentRoutes');
-  tithesRouter = require('./routes/church_records/tithesRoutes');
-  ministryRouter = require('./routes/church_records/ministryRoutes');
-  eventRouter = require('./routes/church_records/eventRoutes');
-  churchLeaderRouter = require('./routes/church_records/churchLeaderRoutes');
-  approvalRoutes = require('./routes/church_records/approvalRoutes');
-  childDedicationRouter = require('./routes/services/childDedicationRoutes');
-  burialServiceRouter = require('./routes/services/burialServiceRoutes');
-  waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
-  marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
-  transactionRouter = require('./routes/transactionRoutes');
-  memberRegistrationRouter = require('./routes/memberRegistrationRoute');
-  archiveRouter = require('./routes/archiveRoutes');
-  announcementRouter = require('./routes/announcementRoutes');
-  formRouter = require('./routes/formRoutes');
-  cmsRouter = require('./routes/cmsRoutes');
-  dashboardRouter = require('./routes/dashboardRoutes');
-  auditTrailRouter = require('./routes/auditTrailRoutes');
-  auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
-  authRouter = require('./routes/authRoutes');
+  memberRouter = require('../routes/church_records/memberRoutes');
+  accountRouter = require('../routes/church_records/accountRoutes');
+  departmentOfficerRouter = require('../routes/church_records/departmentOfficerRoutes');
+  departmentRouter = require('../routes/church_records/departmentRoutes');
+  tithesRouter = require('../routes/church_records/tithesRoutes');
+  ministryRouter = require('../routes/church_records/ministryRoutes');
+  eventRouter = require('../routes/church_records/eventRoutes');
+  churchLeaderRouter = require('../routes/church_records/churchLeaderRoutes');
+  approvalRoutes = require('../routes/church_records/approvalRoutes');
+  childDedicationRouter = require('../routes/services/childDedicationRoutes');
+  burialServiceRouter = require('../routes/services/burialServiceRoutes');
+  waterBaptismRouter = require('../routes/services/waterBaptismRoutes');
+  marriageServiceRouter = require('../routes/services/marriageServiceRoutes');
+  transactionRouter = require('../routes/transactionRoutes');
+  memberRegistrationRouter = require('../routes/memberRegistrationRoute');
+  archiveRouter = require('../routes/archiveRoutes');
+  announcementRouter = require('../routes/announcementRoutes');
+  formRouter = require('../routes/formRoutes');
+  cmsRouter = require('../routes/cmsRoutes');
+  dashboardRouter = require('../routes/dashboardRoutes');
+  auditTrailRouter = require('../routes/auditTrailRoutes');
+  auditTrailMiddleware = require('../middleware/auditTrailMiddleware');
+  authRouter = require('../routes/authRoutes');
 } catch (error) {
   console.error('❌ Error loading route modules:', error.message);
   // Continue with app creation even if some routes fail to load
@@ -212,7 +212,7 @@ app.get('/api/health', (req, res) => {
 // Database pool status endpoint (for debugging - requires auth in production)
 app.get('/api/db-status', (req, res) => {
   try {
-    const { getPoolStats } = require('./database/db');
+    const { getPoolStats } = require('../database/db');
     const stats = getPoolStats();
     res.status(200).json({
       status: 'ok',
@@ -405,7 +405,7 @@ if (require.main === module) {
       console.log('HTTP server closed.');
 
       // Close database connections
-      const { pool } = require('./database/db');
+      const { pool } = require('../database/db');
       pool.end((err) => {
         if (err) {
           console.error('Error closing database pool:', err);
