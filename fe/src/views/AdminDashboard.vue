@@ -15,7 +15,6 @@
           <span class="text-h6 font-weight-bold">{{ headerData.acronym || 'BBEK' }} Church</span>
         </div>
         <div class="text-uppercase text-caption grey--text mb-6">{{ isAdmin ? 'ADMIN PANEL' : 'STAFF PANEL' }}</div>
-        <div class="text-h6 font-weight-bold mb-4">Church Admin Dashboard</div>
       </div>
 
       <v-list nav density="compact" class="pa-0">

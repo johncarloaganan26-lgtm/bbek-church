@@ -54,7 +54,7 @@ const publicRoutes = [
   // Form routes (public for submission)
   '/api/forms/createForm',
   // Add more public routes as needed
-  // add cms table routes here 
+  // add cms table routes here
   '/api/cms/header',
   '/api/cms/home',
   '/api/cms/about',
@@ -85,6 +85,32 @@ const publicRoutes = [
   '/api/cms/info',
   '/api/cms/info/full',
   '/api/cms/upload-image',
+  // CMS save routes (temporarily public for testing)
+  '/api/cms/header/save',
+  '/api/cms/home/save',
+  '/api/cms/about/save',
+  '/api/cms/imnew/save',
+  '/api/cms/services/save',
+  '/api/cms/events/save',
+  '/api/cms/give/save',
+  '/api/cms/footer/save',
+  '/api/cms/planvisit/save',
+  '/api/cms/waterbaptism/save',
+  '/api/cms/burialservice/save',
+  '/api/cms/sermons/save',
+  '/api/cms/youngpeople/save',
+  '/api/cms/adultmen/save',
+  '/api/cms/adultladies/save',
+  '/api/cms/learnmoreministry/save',
+  '/api/cms/learnmoreevents/save',
+  '/api/cms/acceptjesus/save',
+  '/api/cms/belief/save',
+  '/api/cms/churchleader/save',
+  '/api/cms/departmentofficer/save',
+  '/api/cms/ourstory/save',
+  '/api/cms/childdedication/save',
+  '/api/cms/marriageservice/save',
+  '/api/cms/info/save',
   // forgot password routes
   '/api/church-records/accounts/forgotPassword',
   // Child dedication routes (public for member creation)

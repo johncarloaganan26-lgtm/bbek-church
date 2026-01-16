@@ -67,11 +67,11 @@
           </h4>
           <div class="mb-3">
             <p class="text-body-2 text-white mb-1">Sunday Worship</p>
-            <p class="text-body-2 text-white mb-1">{{ sundayService || '9:30 AM - 12:00 PM' }}</p>
+            <p class="text-body-2 text-white mb-1">{{ footerData.sundayService || '9:30 AM - 12:00 PM' }}</p>
           </div>
           <div>
             <p class="text-body-2 text-white mb-1">Wednesday Service</p>
-            <p class="text-body-2 text-white mb-1">{{ wednesdayService || '7:00 PM - 9:00 PM' }}</p>
+            <p class="text-body-2 text-white mb-1">{{ footerData.wednesdayService || '7:00 PM - 9:00 PM' }}</p>
           </div>
         </v-col>
 
@@ -316,7 +316,6 @@ onMounted(async () => {
 .footer-container {
   position: relative;
   padding-bottom: 80px !important;
-  background-color: #14b8a6 !important;
   overflow: hidden;
 }
 
