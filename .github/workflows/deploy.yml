@@ -1,28 +1,18 @@
-name: Deploy to Vercel
+name: Deploy Backend to Vercel
 
 on:
   push:
     branches: [main]
+    paths:
+      - "be/**"
+      - ".github/workflows/deploy.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "be/**"
 
 jobs:
   deploy-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./be
-          vercel-args: --prod
-
-  deploy-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,23 +23,18 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: fe/package-lock.json
+          cache-dependency-path: be/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Install backend dependencies
         run: |
-          cd fe
+          cd be
           npm ci
 
-      - name: Build frontend
-        run: |
-          cd fe
-          npm run build
-
-      - name: Deploy frontend to Vercel
+      - name: Deploy backend to Vercel
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
-          working-directory: ./fe
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./be
           vercel-args: --prod
