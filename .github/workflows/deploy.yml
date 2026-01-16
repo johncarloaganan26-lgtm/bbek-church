@@ -38,3 +38,4 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: ./be
           vercel-args: --prod
+        continue-on-error: false
