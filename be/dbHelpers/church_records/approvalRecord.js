@@ -1,6 +1,6 @@
 const { query } = require('../../database/db');
 const moment = require('moment');
-const { sendApprovalRequestNotification, sendApprovalStatusUpdate } = require('../emailHelperBrevo');
+const { sendApprovalRequestNotification, sendApprovalStatusUpdate } = require('../emailHelperSMTP');
 const { archiveBeforeDelete } = require('../archiveHelper');
 
 /**

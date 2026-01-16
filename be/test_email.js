@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sendAccountDetails } = require('./dbHelpers/emailHelperBrevo');
+const { sendAccountDetails } = require('./dbHelpers/emailHelperSMTP');
 
 async function testGmail() {
   console.log('Testing Gmail...');

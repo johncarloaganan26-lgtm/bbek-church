@@ -2,7 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
-const { sendChildDedicationDetails } = require('../emailHelperBrevo');
+const { sendChildDedicationDetails } = require('../emailHelperSMTP');
 
 /**
  * Child Dedication Records CRUD Operations

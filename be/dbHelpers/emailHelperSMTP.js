@@ -794,6 +794,76 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
   }
 };
 
+/**
+ * Send transaction completion notification email
+ */
+const sendTransactionCompletionNotification = async (transactionDetails) => {
+  try {
+    if (!transactionDetails || !transactionDetails.email || !transactionDetails.type_of_service) {
+      return {
+        success: false,
+        message: 'Email and service type are required',
+      };
+    }
+
+    const recipientName = transactionDetails.recipientName || 'Brother/Sister';
+    const totalAmount = transactionDetails.total || 0;
+    const serviceType = transactionDetails.type_of_service.toLowerCase();
+
+    const serviceTypeLabels = {
+      'marriage': 'Marriage Service',
+      'burial': 'Burial Service',
+      'child_dedication': 'Child Dedication Service',
+      'water_baptism': 'Water Baptism Service'
+    };
+
+    const serviceTypeLabel = serviceTypeLabels[serviceType] || 'Service';
+    const serviceName = transactionDetails.serviceName || serviceTypeLabel;
+    const formattedAmount = new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2
+    }).format(totalAmount);
+
+    const htmlContent = getEmailHeader('Transaction Completed') + `
+      <p style="font-size: 16px; color: #555;">Dear ${recipientName},</p>
+      <p style="font-size: 15px; color: #555;">Thank you for your payment. Your transaction for <strong>${serviceName}</strong> has been completed successfully.</p>
+      ${getStatusBadge('completed', {}, { completed: 'Transaction Status: Completed' })}
+      ${getInfoBox('Transaction Details', [
+        { label: 'Transaction ID', value: transactionDetails.transaction_id || 'N/A' },
+        { label: 'Service Type', value: serviceTypeLabel },
+        { label: 'Service ID', value: transactionDetails.service_id || 'N/A' },
+        { label: 'Amount Paid', value: formattedAmount }
+      ])}
+      ${getNextSteps([
+        'Your service has been confirmed',
+        'You can request a certificate if needed',
+        'Please keep your transaction ID for reference'
+      ])}
+      <p style="font-size: 14px; color: #555; margin-top: 20px; text-align: center;">
+        Thank you for your generous contribution to ${CHURCH_NAME}!
+      </p>
+    ` + getEmailFooter();
+
+    const mailOptions = {
+      from: `"${process.env.BREVO_FROM_NAME}" <${process.env.BREVO_FROM_EMAIL}>`,
+      to: transactionDetails.email,
+      subject: `Transaction Completed - ${serviceTypeLabel} - ${CHURCH_NAME}`,
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      success: true,
+      message: 'Transaction completion notification email sent successfully',
+    };
+  } catch (error) {
+    console.error('Error sending transaction completion notification email:', error);
+    return buildErrorResult('Failed to send transaction completion notification email', error);
+  }
+};
+
 module.exports = {
   sendAccountDetails,
   sendWaterBaptismDetails,
@@ -805,5 +875,6 @@ module.exports = {
   sendFormStatusUpdate,
   sendApprovalRequestNotification,
   sendApprovalStatusUpdate,
+  sendTransactionCompletionNotification,
   formatTimeWithAMPM,
 };
