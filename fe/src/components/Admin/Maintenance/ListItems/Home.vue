@@ -13,8 +13,8 @@
           size="small"
           style="width: 200px;"
         >
-          <el-option label="Background Image" value="image" />
-          <el-option label="Video" value="video" />
+          <el-option label="Image Carousel" value="carousel" />
+          <el-option label="Single Image" value="image" />
           <el-option label="None (Gradient)" value="none" />
         </el-select>
       </div>
