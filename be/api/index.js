@@ -41,30 +41,46 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-const { authenticateToken } = require('./middleware/authMiddleware');
-const memberRouter = require('./routes/church_records/memberRoutes');
-const accountRouter = require('./routes/church_records/accountRoutes');
-const departmentOfficerRouter = require('./routes/church_records/departmentOfficerRoutes');
-const departmentRouter = require('./routes/church_records/departmentRoutes');
-const tithesRouter = require('./routes/church_records/tithesRoutes');
-const ministryRouter = require('./routes/church_records/ministryRoutes');
-const eventRouter = require('./routes/church_records/eventRoutes');
-const churchLeaderRouter = require('./routes/church_records/churchLeaderRoutes');
-const approvalRoutes = require('./routes/church_records/approvalRoutes');
-const childDedicationRouter = require('./routes/services/childDedicationRoutes');
-const burialServiceRouter = require('./routes/services/burialServiceRoutes');
-const waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
-const marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
-const transactionRouter = require('./routes/transactionRoutes');
-const memberRegistrationRouter = require('./routes/memberRegistrationRoute');
-const archiveRouter = require('./routes/archiveRoutes');
-const announcementRouter = require('./routes/announcementRoutes');
-const formRouter = require('./routes/formRoutes');
-const cmsRouter = require('./routes/cmsRoutes');
-const dashboardRouter = require('./routes/dashboardRoutes');
-const auditTrailRouter = require('./routes/auditTrailRoutes');
-const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
-const authRouter = require('./routes/authRoutes');
+
+// Wrap route imports in try-catch to prevent serverless function crashes
+let authenticateToken, memberRouter, accountRouter, departmentOfficerRouter, departmentRouter;
+let tithesRouter, ministryRouter, eventRouter, churchLeaderRouter, approvalRoutes;
+let childDedicationRouter, burialServiceRouter, waterBaptismRouter, marriageServiceRouter;
+let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRouter;
+let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
+
+try {
+  const authMiddleware = require('./middleware/authMiddleware');
+  authenticateToken = authMiddleware.authenticateToken;
+
+  memberRouter = require('./routes/church_records/memberRoutes');
+  accountRouter = require('./routes/church_records/accountRoutes');
+  departmentOfficerRouter = require('./routes/church_records/departmentOfficerRoutes');
+  departmentRouter = require('./routes/church_records/departmentRoutes');
+  tithesRouter = require('./routes/church_records/tithesRoutes');
+  ministryRouter = require('./routes/church_records/ministryRoutes');
+  eventRouter = require('./routes/church_records/eventRoutes');
+  churchLeaderRouter = require('./routes/church_records/churchLeaderRoutes');
+  approvalRoutes = require('./routes/church_records/approvalRoutes');
+  childDedicationRouter = require('./routes/services/childDedicationRoutes');
+  burialServiceRouter = require('./routes/services/burialServiceRoutes');
+  waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
+  marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
+  transactionRouter = require('./routes/transactionRoutes');
+  memberRegistrationRouter = require('./routes/memberRegistrationRoute');
+  archiveRouter = require('./routes/archiveRoutes');
+  announcementRouter = require('./routes/announcementRoutes');
+  formRouter = require('./routes/formRoutes');
+  cmsRouter = require('./routes/cmsRoutes');
+  dashboardRouter = require('./routes/dashboardRoutes');
+  auditTrailRouter = require('./routes/auditTrailRoutes');
+  auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
+  authRouter = require('./routes/authRoutes');
+} catch (error) {
+  console.error('❌ Error loading route modules:', error.message);
+  // Continue with app creation even if some routes fail to load
+  // This prevents serverless function crashes
+}
 
 const app = express();
 
@@ -229,57 +245,63 @@ app.post('/api/example', (req, res) => {
 });
 
 // Authentication routes (public - no auth required)
-app.use('/api/auth', authRouter);
+if (authRouter) {
+  app.use('/api/auth', authRouter);
+}
 
 // Apply JWT authentication middleware to all routes
 // Public routes are handled within the middleware itself
-app.use(authenticateToken);
+if (authenticateToken) {
+  app.use(authenticateToken);
+}
 
 // Apply audit trail middleware to log user actions
-app.use(auditTrailMiddleware);
+if (auditTrailMiddleware) {
+  app.use(auditTrailMiddleware);
+}
 
 // System logs middleware removed - functionality no longer used
 
 
 
-// Church records routes
-app.use('/api/church-records/members', memberRouter);
-app.use('/api/church-records/accounts', accountRouter);
-app.use('/api/church-records/department-officers', departmentOfficerRouter);
-app.use('/api/church-records/departments', departmentRouter);
-app.use('/api/church-records/tithes', tithesRouter);
-app.use('/api/church-records/ministries', ministryRouter);
-app.use('/api/church-records/events', eventRouter);
-app.use('/api/church-records/church-leaders', churchLeaderRouter);
-app.use('/api/church-records/approvals', approvalRoutes);
-app.use('/api/church-records/child-dedications', childDedicationRouter);
-app.use('/api/church-records/burial-services', burialServiceRouter);
-app.use('/api/services/water-baptisms', waterBaptismRouter);
-app.use('/api/services/marriage-services', marriageServiceRouter);
-app.use('/api/transactions', transactionRouter);
+// Church records routes - with error handling
+if (memberRouter) app.use('/api/church-records/members', memberRouter);
+if (accountRouter) app.use('/api/church-records/accounts', accountRouter);
+if (departmentOfficerRouter) app.use('/api/church-records/department-officers', departmentOfficerRouter);
+if (departmentRouter) app.use('/api/church-records/departments', departmentRouter);
+if (tithesRouter) app.use('/api/church-records/tithes', tithesRouter);
+if (ministryRouter) app.use('/api/church-records/ministries', ministryRouter);
+if (eventRouter) app.use('/api/church-records/events', eventRouter);
+if (churchLeaderRouter) app.use('/api/church-records/church-leaders', churchLeaderRouter);
+if (approvalRoutes) app.use('/api/church-records/approvals', approvalRoutes);
+if (childDedicationRouter) app.use('/api/church-records/child-dedications', childDedicationRouter);
+if (burialServiceRouter) app.use('/api/church-records/burial-services', burialServiceRouter);
+if (waterBaptismRouter) app.use('/api/services/water-baptisms', waterBaptismRouter);
+if (marriageServiceRouter) app.use('/api/services/marriage-services', marriageServiceRouter);
+if (transactionRouter) app.use('/api/transactions', transactionRouter);
 
 // Member registration routes
-app.use('/api/member-registration', memberRegistrationRouter);
+if (memberRegistrationRouter) app.use('/api/member-registration', memberRegistrationRouter);
 
 
 
 // Archive routes
-app.use('/api/archives', archiveRouter);
+if (archiveRouter) app.use('/api/archives', archiveRouter);
 
 // Announcement routes
-app.use('/api/announcements', announcementRouter);
+if (announcementRouter) app.use('/api/announcements', announcementRouter);
 
 // Form routes
-app.use('/api/forms', formRouter);
+if (formRouter) app.use('/api/forms', formRouter);
 
 // CMS routes (Landing Page Content Management)
-app.use('/api/cms', cmsRouter);
+if (cmsRouter) app.use('/api/cms', cmsRouter);
 
 // Dashboard routes
-app.use('/api/dashboard', dashboardRouter);
+if (dashboardRouter) app.use('/api/dashboard', dashboardRouter);
 
 // Audit trail routes
-app.use('/api/audit-trail', auditTrailRouter);
+if (auditTrailRouter) app.use('/api/audit-trail', auditTrailRouter);
 
 
 // Fallback for unknown routes
