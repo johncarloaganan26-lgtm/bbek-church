@@ -170,41 +170,12 @@ app.use((req, res, next) => {
 // Health check endpoint (public route - no auth required)
 // Used by cloud platforms for health monitoring
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
+  res.status(200).json({ 
+    status: 'ok', 
     message: 'Church backend is running',
     environment: NODE_ENV,
     timestamp: new Date().toISOString()
   });
-});
-
-// Test email endpoint (public route - no auth required)
-// Used to test email functionality in production
-app.get('/api/test-email', async (req, res) => {
-  try {
-    const { sendAccountDetails } = require('./dbHelpers/emailHelperSendGrid');
-    const result = await sendAccountDetails({
-      acc_id: 'test123',
-      email: 'johncarloaganan26@gmail.com', // Your email for testing
-      name: 'Test User',
-      type: 'new_account',
-      temporaryPassword: 'testpass123'
-    });
-    res.status(200).json({
-      status: 'ok',
-      message: 'Test email sent successfully',
-      result: result,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Test email error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Test email failed',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
 });
 
 // Database pool status endpoint (for debugging - requires auth in production)

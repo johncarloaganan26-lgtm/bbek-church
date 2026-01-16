@@ -1,7 +1,7 @@
 const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
-const { sendBurialDetails } = require('../emailHelperSMTP');
+const { sendBurialDetails } = require('../emailHelperSendGrid');
 const { archiveBeforeDelete } = require('../archiveHelper');
 
 async function getAllBurialServices(options = {}) {

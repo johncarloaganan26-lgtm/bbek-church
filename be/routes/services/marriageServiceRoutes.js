@@ -10,7 +10,6 @@ const {
   deleteMarriageService,
   exportMarriageServicesToExcel
 } = require('../../dbHelpers/services/marriageServiceRecords');
-const { sendMarriageDetails } = require('../../dbHelpers/emailHelperSMTP');
 
 const router = express.Router();
 
@@ -246,38 +245,9 @@ router.put('/updateMarriageService/:id', async (req, res) => {
       });
     }
 
-    // Get current marriage service to check if status is changing
-    const currentMarriage = await getMarriageServiceById(id);
-    const oldStatus = currentMarriage.success ? currentMarriage.data.status : null;
-    const newStatus = req.body.status || oldStatus;
-    const isStatusChanging = oldStatus && newStatus && oldStatus !== newStatus;
-
     const result = await updateMarriageService(id, req.body);
-
+    
     if (result.success) {
-      // Send marriage service status update email if status changed
-      if (isStatusChanging && result.data) {
-        try {
-          const emailResult = await sendMarriageDetails({
-            email: result.data.groom_email || result.data.bride_email,
-            recipientName: result.data.groom_name || result.data.bride_name || 'Valued Couple',
-            status: newStatus,
-            groomName: result.data.groom_name,
-            brideName: result.data.bride_name,
-            marriageDate: result.data.marriage_date,
-            location: result.data.location
-          });
-
-          if (emailResult.success) {
-            console.log(`✅ Marriage service status update email sent (${newStatus})`);
-          } else {
-            console.error(`❌ Failed to send marriage service status update email: ${emailResult.message}`);
-          }
-        } catch (emailError) {
-          console.error('Error sending marriage service status update email:', emailError);
-        }
-      }
-
       res.status(200).json({
         success: true,
         message: result.message,

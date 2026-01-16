@@ -11,7 +11,6 @@ const {
   checkDuplicateChildDedication,
   checkTimeSlotAvailability
 } = require('../../dbHelpers/services/childDedicationRecords');
-const { sendChildDedicationDetails } = require('../../dbHelpers/emailHelperSMTP');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -344,40 +343,9 @@ router.put('/updateChildDedication/:id', async (req, res) => {
       });
     }
 
-    // Get current child dedication to check if status is changing
-    const currentDedication = await getChildDedicationById(id);
-    const oldStatus = currentDedication.success ? currentDedication.data.status : null;
-    const newStatus = req.body.status || oldStatus;
-    const isStatusChanging = oldStatus && newStatus && oldStatus !== newStatus;
-
     const result = await updateChildDedication(id, req.body);
-
+    
     if (result.success) {
-      // Send child dedication status update email if status changed
-      if (isStatusChanging && result.data) {
-        try {
-          const emailResult = await sendChildDedicationDetails({
-            email: result.data.contact_email,
-            recipientName: result.data.contact_name || 'Valued Contact',
-            status: newStatus,
-            childName: result.data.child_firstname + ' ' + (result.data.child_lastname || ''),
-            parentName: result.data.contact_name,
-            dedicationDate: result.data.preferred_dedication_date,
-            dedicationTime: result.data.preferred_dedication_time,
-            location: result.data.location || 'To be determined',
-            pastor: result.data.pastor_name || 'To be determined'
-          });
-
-          if (emailResult.success) {
-            console.log(`✅ Child dedication status update email sent (${newStatus})`);
-          } else {
-            console.error(`❌ Failed to send child dedication status update email: ${emailResult.message}`);
-          }
-        } catch (emailError) {
-          console.error('Error sending child dedication status update email:', emailError);
-        }
-      }
-
       res.status(200).json({
         success: true,
         message: result.message,

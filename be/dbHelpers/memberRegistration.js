@@ -5,7 +5,7 @@ const {
   checkDuplicateAccount,
   getAccountByEmail
 } = require('./church_records/accountRecords');
-const { sendBurialServiceRequestNotification, sendWaterBaptismDetails, sendAccountDetails } = require('./emailHelperSMTP');
+const { sendBurialServiceRequestNotification, sendWaterBaptismDetails, sendAccountDetails } = require('./emailHelperSendGrid');
 const moment = require('moment');
 const {
   createWaterBaptism,

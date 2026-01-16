@@ -2,7 +2,7 @@
   <section class="department-slideshow-section py-16">
     <v-container>
       <!-- Section Header -->
-      <div class="mb-16">
+      <div class="text-center mb-16">
         <h1
           class="text-h3 text-md-h4 font-weight-bold text-black mb-4 fade-in-up"
           style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"
@@ -10,7 +10,7 @@
           {{ cmsData.sectionTitle || 'Our Departments' }}
         </h1>
         <p
-          class="text-h6 text-grey-darken-1 fade-in-up-delay"
+          class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay"
           style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
         >
           {{ cmsData.sectionSubtitle || 'Discover our various ministries designed to help you grow in faith and serve our community.' }}
@@ -100,15 +100,15 @@ const { loadPageData } = useCms('departmentcategories')
 const cmsData = ref({
   sectionTitle: 'Our Departments',
   sectionSubtitle: 'Discover our various ministries designed to help you grow in faith and serve our community.',
-  adultLabel: 'ADULT',
-  adultName: 'John + Jane Doe',
+  adultTitle: 'Adult Ministry',
   adultDescription: 'Helping adults grow in spiritual maturity, strengthen families, and live out faith through community and service.',
-  ladiesLabel: 'LADIES',
-  ladiesName: 'Jane Smith',
+  adultLinkText: 'Learn More',
+  ladiesTitle: 'Ladies Ministry',
   ladiesDescription: 'Encouraging women to live with grace and faith through prayer, service, and fellowship centered on God\'s Word.',
-  youthLabel: 'YOUTH',
-  youthName: 'Mike Johnson',
+  ladiesLinkText: 'Learn More',
+  youthTitle: 'Youth Ministry',
   youthDescription: 'Guiding the next generation to follow Christ with purpose, energy, and joy through youth activities and Bible study.',
+  youthLinkText: 'Learn More',
   buttonColor: '#14b8a6',
   adultBackgroundImage: '/img/events.jpg',
   ladiesBackgroundImage: '/img/beliefs.jpg',

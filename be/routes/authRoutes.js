@@ -2,7 +2,6 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { query } = require('../database/db');
-const { sendAccountDetails } = require('../dbHelpers/emailHelperSendGrid');
 
 const router = express.Router();
 
@@ -85,69 +84,6 @@ router.post('/logout', (req, res) => {
     success: true,
     message: 'Logout successful'
   });
-});
-
-// Forgot password route
-router.post('/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    // Find user by email
-    const [users] = await query('SELECT * FROM tbl_accounts WHERE email = ?', [email]);
-
-    if (users.length === 0) {
-      // Don't reveal if email exists or not for security
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with this email exists, a password reset link has been sent.'
-      });
-    }
-
-    const user = users[0];
-
-    // Get member info for name
-    const [members] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [user.member_id]);
-    const memberInfo = members.length > 0 ? members[0] : {};
-
-    const name = memberInfo.firstname && memberInfo.lastname
-      ? `${memberInfo.firstname} ${memberInfo.lastname}`
-      : user.email;
-
-    // Send password reset email
-    const emailResult = await sendAccountDetails({
-      acc_id: user.acc_id,
-      email: user.email,
-      name: name,
-      type: 'forgot_password'
-    });
-
-    if (emailResult.success) {
-      res.json({
-        success: true,
-        message: 'Password reset link has been sent to your email.'
-      });
-    } else {
-      console.error('Failed to send password reset email:', emailResult.error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send password reset email. Please try again.'
-      });
-    }
-
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
 });
 
 // Verify token route (optional)

@@ -11,7 +11,6 @@ const {
   searchBurialServicesFulltext,
   analyzeBurialServiceAvailability
 } = require('../../dbHelpers/services/burialServiceRecords');
-const { sendBurialDetails } = require('../../dbHelpers/emailHelperSMTP');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -373,38 +372,9 @@ router.put('/updateBurialService/:id', async (req, res) => {
       });
     }
 
-    // Get current burial service to check if status is changing
-    const currentBurial = await getBurialServiceById(id);
-    const oldStatus = currentBurial.success ? currentBurial.data.status : null;
-    const newStatus = req.body.status || oldStatus;
-    const isStatusChanging = oldStatus && newStatus && oldStatus !== newStatus;
-
     const result = await updateBurialService(id, req.body);
-
+    
     if (result.success) {
-      // Send burial service status update email if status changed
-      if (isStatusChanging && result.data) {
-        try {
-          const emailResult = await sendBurialDetails({
-            email: result.data.email || result.data.requester_email,
-            recipientName: result.data.requester_name || 'Valued Contact',
-            status: newStatus,
-            deceasedName: result.data.deceased_name,
-            familyContact: result.data.requester_name,
-            burialDate: result.data.service_date,
-            location: result.data.location
-          });
-
-          if (emailResult.success) {
-            console.log(`✅ Burial service status update email sent (${newStatus})`);
-          } else {
-            console.error(`❌ Failed to send burial service status update email: ${emailResult.message}`);
-          }
-        } catch (emailError) {
-          console.error('Error sending burial service status update email:', emailError);
-        }
-      }
-
       res.status(200).json({
         success: true,
         message: result.message,

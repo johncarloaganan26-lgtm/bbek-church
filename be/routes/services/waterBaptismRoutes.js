@@ -12,7 +12,7 @@ const {
 const { getMemberById, createMember, getSpecificMemberByEmailAndStatus } = require('../../dbHelpers/church_records/memberRecords');
 const { checkDuplicateAccount } = require('../../dbHelpers/church_records/accountRecords');
 const { getAccountByEmail, createAccount } = require('../../dbHelpers/church_records/accountRecords');
-const { sendAccountDetails, sendWaterBaptismDetails } = require('../../dbHelpers/emailHelperSMTP');
+const { sendAccountDetails, sendWaterBaptismDetails } = require('../../dbHelpers/emailHelperSendGrid');
 const { query } = require('../../database/db');
 
 const router = express.Router();
@@ -399,75 +399,25 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
       });
     }
 
-    // Get current baptism record to check if status is changing
+    // Get current baptism record to check if status is changing to "completed"
     const currentBaptism = await getWaterBaptismById(id);
-    
-    const newStatus = req.body.status?.toLowerCase();
-    const oldStatus = currentBaptism.data?.status?.toLowerCase();
-    const isStatusChanging = newStatus && newStatus !== oldStatus;
-    const isStatusChangingToCompleted = newStatus === 'completed' && oldStatus !== 'completed';
-    
     console.log(`=== WATER BAPTISM STATUS UPDATE ===`);
     console.log(`Baptism ID: ${id}`);
-    console.log(`Old status: ${oldStatus}`);
-    console.log(`New status: ${newStatus}`);
-    console.log(`Status changing: ${isStatusChanging}`);
-    console.log(`Status changing to completed: ${isStatusChangingToCompleted}`);
+    console.log(`Request body status: ${req.body.status}`);
+    console.log(`Current baptism status: ${currentBaptism.data?.status}`);
+    
+    const isStatusChangingToCompleted = 
+      req.body.status && 
+      req.body.status.toLowerCase() === 'completed' && 
+      currentBaptism.success && 
+      currentBaptism.data && 
+      currentBaptism.data.status?.toLowerCase() !== 'completed';
       
+    console.log(`Is status changing to completed: ${isStatusChangingToCompleted}`);
+
     const result = await updateWaterBaptism(id, req.body);
     
     if (result.success) {
-      // If status changed, send email notification
-      if (isStatusChanging) {
-        const baptism = currentBaptism.data;
-        let recipientEmail = null;
-        let recipientName = null;
-        
-        // Get recipient email and name based on member/non-member status
-        if (baptism.is_member === 1 && baptism.member_id) {
-          // Existing member
-          try {
-            const memberResult = await getMemberById(baptism.member_id);
-            if (memberResult.success && memberResult.data) {
-              const member = memberResult.data;
-              recipientEmail = member.email;
-              recipientName = `${member.firstname} ${member.middle_name ? member.middle_name + ' ' : ''}${member.lastname}`.trim();
-            }
-          } catch (error) {
-            console.error('Error getting member details for email:', error);
-          }
-        } else {
-          // Non-member
-          recipientEmail = baptism.email;
-          recipientName = `${baptism.firstname} ${baptism.middle_name ? baptism.middle_name + ' ' : ''}${baptism.lastname}`.trim();
-        }
-        
-        // Send email if we have a valid email address
-        if (recipientEmail) {
-          console.log(`Sending water baptism status update email to ${recipientEmail} (${newStatus})...`);
-          try {
-            const emailResult = await sendWaterBaptismDetails({
-              email: recipientEmail,
-              status: newStatus,
-              recipientName: recipientName,
-              memberName: recipientName,
-              baptismDate: baptism.baptism_date || 'To be determined',
-              location: baptism.location || 'Bible Baptist Ekklesia of Kawit'
-            });
-            
-            if (emailResult.success) {
-              console.log(`✅ Water baptism status update email sent to ${recipientEmail}`);
-            } else {
-              console.error(`❌ Failed to send water baptism status update email: ${emailResult.message}`);
-            }
-          } catch (emailError) {
-            console.error('Error sending water baptism status update email:', emailError);
-          }
-        } else {
-          console.log('❌ No valid email address found for sending status update');
-        }
-      }
-      
       // If status changed to "completed" and this is a non-member, create member record
       if (isStatusChangingToCompleted) {
         const baptism = currentBaptism.data;
