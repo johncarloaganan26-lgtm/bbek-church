@@ -739,7 +739,7 @@ const handleVideoChange = async (file) => {
   
   const fileObj = file.raw
   const fileSize = fileObj.size
-  const maxSize = 10 * 1024 * 1024 // 10MB limit for production
+  const maxSize = 50 * 1024 * 1024 // 50MB limit for better video support
   
   // Check file size
   if (fileSize > maxSize) {
