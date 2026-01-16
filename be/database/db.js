@@ -2,16 +2,16 @@ const mysql = require('mysql2/promise');
 
 /**
  * Database Configuration for Local and Cloud
- * 
+ *
  * Connection Pool Sizing:
  * - Local Development: Default 10 connections (higher limit for local MySQL)
  * - Cloud Databases: Default 2 connections (to stay well under typical 5 max_user_connections limit)
  * - Can be overridden with DB_CONNECTION_LIMIT environment variable
- * 
+ *
  * Cloud databases (especially free/shared tiers) often have strict connection limits:
  * - max_connections: Server-wide limit (typically 5-10 for free tiers)
  * - max_user_connections: Per-user limit (typically 5 for free tiers)
- * 
+ *
  * Using 2 connections ensures we stay well under the limit and account for:
  * - Multiple application instances/processes
  * - Other applications using the same database user
@@ -20,6 +20,7 @@ const mysql = require('mysql2/promise');
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
+const IS_VERCEL = process.env.VERCEL || process.env.VERCEL_ENV;
 
 // Determine connection limit based on environment
 // Cloud databases typically have 5 connection limit (both max_connections and max_user_connections)
@@ -29,6 +30,11 @@ const getConnectionLimit = () => {
   // Allow explicit override via environment variable
   if (process.env.DB_CONNECTION_LIMIT) {
     return parseInt(process.env.DB_CONNECTION_LIMIT, 10);
+  }
+
+  // For Vercel/serverless: use 1 connection per function
+  if (IS_VERCEL) {
+    return 1;
   }
 
   // Default: 1 connection for both production and development
@@ -42,24 +48,24 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'root',
   database: process.env.DB_NAME || 'bbekdb',
-  
+
   // Connection pool configuration
   waitForConnections: true,
   connectionLimit: getConnectionLimit(),
   queueLimit: 0,
-  
+
   // Connection timeout settings (important for cloud databases)
   connectTimeout: 10000, // 10 seconds
   // acquireTimeout: 10000, // 10 seconds to acquire connection from pool
   // timeout: 60000, // 60 seconds query timeout
-  
+
   // Enable keep-alive for cloud databases (prevents connection drops)
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
-  
+
   // SSL configuration (many cloud databases require SSL)
   ssl: process.env.DB_SSL === 'true' ? {} : false,
-  
+
   // Ensure binary data (BLOB) is handled correctly and text fields are converted to strings
   // This fixes issues where VARCHAR/TEXT/DATETIME fields are returned as Buffer objects
   typeCast: function (field, next) {

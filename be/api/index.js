@@ -1,34 +1,38 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+// Load environment variables only in non-Vercel environments
+const IS_VERCEL = process.env.VERCEL || process.env.VERCEL_ENV;
+if (!IS_VERCEL) {
+  require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+}
 
 // System Logs Module Integration - Trigger nodemon restart
 
 /**
  * Church Management System Backend API
- * 
+ *
  * Environment Configuration:
  * ===========================
- * 
+ *
  * LOCAL DEVELOPMENT:
  *   - Set NODE_ENV=development (or leave unset)
  *   - CORS allows: localhost:5173, localhost:5174, localhost:5175
  *   - Verbose logging enabled
  *   - Detailed error messages with stack traces
- * 
+ *
  * CLOUD PRODUCTION:
  *   Required Environment Variables:
  *   - NODE_ENV=production
  *   - PORT (usually set by cloud platform)
  *   - DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
  *   - FRONTEND_URL or CLIENT_ORIGIN (for CORS)
- *   
+ *
  *   CORS Configuration:
  *   - Option 1: FRONTEND_URL=https://your-frontend.com (single URL)
  *   - Option 2: CLIENT_ORIGIN=https://app1.com,https://app2.com (comma-separated)
- *   
+ *
  *   Optional:
  *   - JWT_SECRET (for authentication)
  *   - Other service-specific secrets
- * 
+ *
  * The server binds to 0.0.0.0 to accept connections from all network interfaces,
  * which is required for cloud deployments while still working locally.
  */
@@ -80,7 +84,18 @@ const getAllowedOrigins = () => {
   if (process.env.FRONTEND_URL1 || process.env.FRONTEND_URL2 ) {
     return [process.env.FRONTEND_URL1.trim(), process.env.FRONTEND_URL2.trim()];
   }
-  
+
+  // For Vercel, allow the deployment URLs
+  if (IS_VERCEL) {
+    return [
+      'https://bbek-church-app.vercel.app',
+      'https://bbek-church-app-git-main-ulacdev.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175'
+    ];
+  }
+
   // Default: localhost for development
   return ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
 };
