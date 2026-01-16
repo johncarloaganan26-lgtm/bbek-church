@@ -739,7 +739,7 @@ const handleVideoChange = async (file) => {
   
   const fileObj = file.raw
   const fileSize = fileObj.size
-  const maxSize = 15 * 1024 * 1024 // 15MB limit
+  const maxSize = 10 * 1024 * 1024 // 10MB limit for production
   
   // Check file size
   if (fileSize > maxSize) {
@@ -761,9 +761,25 @@ const handleVideoChange = async (file) => {
       }
     }
     
+    // Add timeout for video processing
+    const processingTimeout = setTimeout(() => {
+      console.error('Video processing timeout')
+      ElMessage.error('Video processing took too long. Please try a smaller file.')
+      uploadingVideo.value = false
+      videoUploadProgress.value = 0
+    }, 60000) // 60 second timeout
+
     reader.onload = (ev) => {
+      clearTimeout(processingTimeout)
       const result = ev.target?.result
       if (result) {
+        // Check if result is reasonable size (base64 is ~4/3 of original)
+        const expectedMaxSize = (fileSize * 4 / 3) * 1.1 // 10% buffer
+        if (result.length > expectedMaxSize) {
+          console.warn('Video base64 size seems too large:', result.length)
+          ElMessage.warning('Video file may be too large for processing. Try a smaller file.')
+        }
+
         homeData.homeVideo = result
         console.log('Video converted to base64, length:', result.length)
         console.log('Video MIME type:', result.substring(0, 30))
@@ -777,6 +793,7 @@ const handleVideoChange = async (file) => {
     }
     
     reader.onerror = (error) => {
+      clearTimeout(processingTimeout)
       console.error('Error reading video file:', error)
       ElMessage.error('Error processing video file. Please try again.')
       uploadingVideo.value = false
