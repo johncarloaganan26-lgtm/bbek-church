@@ -550,12 +550,34 @@ router.get('/:pageName/full', async (req, res) => {
   try {
     const { pageName } = req.params;
     const { _t } = req.query; // Cache busting parameter
-    
+
     // Get page content
-    const pageResult = await getCmsPage(pageName);
-    
+    let pageResult;
+    try {
+      pageResult = await getCmsPage(pageName);
+    } catch (dbError) {
+      console.error(`Database error getting page ${pageName}:`, dbError.message);
+      // Return default/empty data instead of crashing
+      pageResult = {
+        success: true,
+        message: 'Page not found or database unavailable',
+        data: null
+      };
+    }
+
     // Get all images
-    const imagesResult = await getAllCmsImages(pageName);
+    let imagesResult;
+    try {
+      imagesResult = await getAllCmsImages(pageName);
+    } catch (dbError) {
+      console.error(`Database error getting images for ${pageName}:`, dbError.message);
+      // Return empty images array instead of crashing
+      imagesResult = {
+        success: true,
+        message: 'Images not available',
+        data: []
+      };
+    }
     
     // Convert images to base64
     const imagesData = {};
