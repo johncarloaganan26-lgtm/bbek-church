@@ -728,7 +728,7 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.expires_at > UTC_TIMESTAMP() AND a.status = 'active'
+      WHERE t.expires_at > CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00') AND a.status = 'active'
     `;
     const [rows] = await query(sql, []);
 
