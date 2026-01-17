@@ -827,11 +827,12 @@ async function forgotPasswordByEmail(email) {
     await query(deleteSql, [accountData.acc_id]);
 
     const sql = `
-      INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)
-      VALUES (?, ?, DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY))
+      INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at, created_at)
+      VALUES (?, ?, DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY), CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'))
       ON DUPLICATE KEY UPDATE
         token = VALUES(token),
         expires_at = DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY),
+        created_at = CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'),
         used_at = NULL
     `;
     await query(sql, [accountData.acc_id, tokenHash]);

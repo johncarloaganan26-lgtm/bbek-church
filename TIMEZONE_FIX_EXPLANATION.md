@@ -6,12 +6,12 @@ Your intuition was **SPOT ON**! There was a **timezone mismatch** causing passwo
 
 ### The Problem Timeline:
 
-| Step | Function | Timezone Used | Status |
-|------|----------|---------------|--------|
-| 1. Token created | `DATE_ADD(UTC_TIMESTAMP(), ...)` | ✅ **UTC** | Correct |
-| 2. Token verified | `WHERE ... > UTC_TIMESTAMP()` | ✅ **UTC** | Correct |
-| 3. Token marked used | `SET used_at = NOW()` | ❌ **SERVER TIMEZONE** | **BROKEN!** |
-| 4. Cleanup jobs | `WHERE expires_at <= NOW()` | ❌ **SERVER TIMEZONE** | **BROKEN!** |
+| Step                 | Function                         | Timezone Used          | Status      |
+| -------------------- | -------------------------------- | ---------------------- | ----------- |
+| 1. Token created     | `DATE_ADD(UTC_TIMESTAMP(), ...)` | ✅ **UTC**             | Correct     |
+| 2. Token verified    | `WHERE ... > UTC_TIMESTAMP()`    | ✅ **UTC**             | Correct     |
+| 3. Token marked used | `SET used_at = NOW()`            | ❌ **SERVER TIMEZONE** | **BROKEN!** |
+| 4. Cleanup jobs      | `WHERE expires_at <= NOW()`      | ❌ **SERVER TIMEZONE** | **BROKEN!** |
 
 **Result**: Token verified as valid (UTC), but marked as used with wrong timezone → Confusing mismatch!
 
@@ -22,18 +22,23 @@ Your intuition was **SPOT ON**! There was a **timezone mismatch** causing passwo
 ### **File 1**: `be/routes/church_records/accountRoutes.js`
 
 **Line 771** (Before):
+
 ```javascript
-const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = NOW() WHERE token = ?';
+const markUsedSql =
+  "UPDATE tbl_password_reset_tokens SET used_at = NOW() WHERE token = ?";
 await query(markUsedSql, [token]);
 ```
 
 **Line 771** (After):
+
 ```javascript
-const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE acc_id = ?';
+const markUsedSql =
+  "UPDATE tbl_password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE acc_id = ?";
 await query(markUsedSql, [tokenData.acc_id]);
 ```
 
 **Changes**:
+
 1. ✅ `NOW()` → `UTC_TIMESTAMP()` (consistent timezone)
 2. ✅ `WHERE token = ?` → `WHERE acc_id = ?` (more reliable, no token in plaintext)
 3. ✅ Pass `acc_id` instead of plaintext token
@@ -43,11 +48,13 @@ await query(markUsedSql, [tokenData.acc_id]);
 ### **File 2**: `be/index.js`
 
 **Line 403** (Before):
+
 ```javascript
 WHERE expires_at <= NOW()
 ```
 
 **Line 403** (After):
+
 ```javascript
 WHERE expires_at <= UTC_TIMESTAMP()
 ```
@@ -55,11 +62,13 @@ WHERE expires_at <= UTC_TIMESTAMP()
 ---
 
 **Lines 425-427** (Before):
+
 ```javascript
 WHERE expires_at <= NOW() OR (used_at IS NOT NULL AND used_at < DATE_SUB(NOW(), INTERVAL 7 DAY))
 ```
 
 **Lines 425-427** (After):
+
 ```javascript
 WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY))
 ```
@@ -67,11 +76,13 @@ WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_S
 ---
 
 **Lines 442-444** (Before):
+
 ```javascript
 WHERE expires_at <= NOW() OR (used_at IS NOT NULL AND used_at < DATE_SUB(NOW(), INTERVAL 7 DAY))
 ```
 
 **Lines 442-444** (After):
+
 ```javascript
 WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY))
 ```
@@ -83,6 +94,7 @@ WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_S
 **PH Timezone** is UTC+8 (8 hours ahead of UTC)
 
 ### Scenario:
+
 ```
 Current Time (PH): 17:35 (5:35 PM)
 Current Time (UTC): 09:35 (9:35 AM)
@@ -102,7 +114,7 @@ Mark as Used:
 - Comparison is now BROKEN because mixing timezones!
 
 Cleanup Job (6 hours later):
-- WHERE expires_at <= NOW() 
+- WHERE expires_at <= NOW()
 - Now comparing UTC value against local timezone value
 - Tokens might be wrongly deleted or kept!
 ```
@@ -112,6 +124,7 @@ Cleanup Job (6 hours later):
 ## 📊 Why Timezone Consistency Matters
 
 **In MySQL**:
+
 - `UTC_TIMESTAMP()` = Always UTC, regardless of server timezone
 - `NOW()` = Server's local timezone
 
@@ -145,6 +158,7 @@ SELECT * FROM tbl_password_reset_tokens WHERE acc_id = YOUR_ACC_ID;
 ## 📝 Database Schema Note
 
 The `tbl_password_reset_tokens` table itself should be using:
+
 ```sql
 expires_at DATETIME NOT NULL
 used_at DATETIME NULL
@@ -224,6 +238,7 @@ git push origin main
 Your observation about `created_at` showing `2026-01-17 09:35:53` (UTC time) vs PH time was the **key insight**!
 
 This revealed that:
+
 1. Database stores UTC timestamps
 2. But some code was using `NOW()` (local timezone)
 3. Mixing UTC and local timezone = bugs
@@ -236,6 +251,6 @@ Now password reset tokens will work correctly regardless of server timezone or c
 
 ---
 
-*Generated: January 17, 2026*
-*Root Cause: Mixed UTC and Local Timezone Functions*
-*Severity: Critical (Silent Failures)*
+_Generated: January 17, 2026_
+_Root Cause: Mixed UTC and Local Timezone Functions_
+_Severity: Critical (Silent Failures)_

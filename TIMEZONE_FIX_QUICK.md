@@ -19,6 +19,7 @@ This created a mismatch that broke password reset validation
 ## What I Fixed
 
 ### **File 1: accountRoutes.js (Line 772)**
+
 ```javascript
 // BEFORE (Wrong timezone):
 SET used_at = NOW()
@@ -28,6 +29,7 @@ SET used_at = UTC_TIMESTAMP()
 ```
 
 ### **File 2: index.js (3 locations)**
+
 ```javascript
 // BEFORE (Mixed NOW() - local timezone):
 WHERE expires_at <= NOW()
@@ -40,12 +42,12 @@ WHERE expires_at <= UTC_TIMESTAMP()
 
 ## Why This Matters
 
-| When | Function | Before | After |
-|------|----------|--------|-------|
-| Token Created | `DATE_ADD(UTC_TIMESTAMP(), ...)` | ✅ UTC | ✅ UTC |
-| Token Verified | `> UTC_TIMESTAMP()` | ✅ UTC | ✅ UTC |
-| Token Marked Used | `SET used_at = NOW()` | ❌ Local | ✅ UTC |
-| Cleanup Job | `WHERE <= NOW()` | ❌ Local | ✅ UTC |
+| When              | Function                         | Before   | After  |
+| ----------------- | -------------------------------- | -------- | ------ |
+| Token Created     | `DATE_ADD(UTC_TIMESTAMP(), ...)` | ✅ UTC   | ✅ UTC |
+| Token Verified    | `> UTC_TIMESTAMP()`              | ✅ UTC   | ✅ UTC |
+| Token Marked Used | `SET used_at = NOW()`            | ❌ Local | ✅ UTC |
+| Cleanup Job       | `WHERE <= NOW()`                 | ❌ Local | ✅ UTC |
 
 **Now everything uses UTC consistently!** ✅
 

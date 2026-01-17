@@ -13,6 +13,7 @@
 ### Step 1: Set Environment Variables on Your Hosting
 
 **Vercel Example**:
+
 ```bash
 # Go to: https://vercel.com/dashboard
 # Select your project
@@ -28,6 +29,7 @@ FRONTEND_URL1 = https://bbek.vercel.app
 ```
 
 **⚠️ Gmail App Password**:
+
 - NOT your regular password
 - Go to Google Account → Security
 - Create "App password" for Gmail
@@ -61,6 +63,7 @@ git push origin main
 ## 📍 If Email Doesn't Arrive
 
 **Check#1**: Environment variables set?
+
 ```bash
 # On Vercel, go to:
 # Settings → Environment Variables
@@ -68,16 +71,19 @@ git push origin main
 ```
 
 **Check #2**: Gmail app password?
+
 ```bash
 # Must be 16 characters (no spaces)
 # NOT your Google password
 ```
 
 **Check #3**: Spam folder?
+
 - Check email spam/junk folder
 - Mark as "Not Spam"
 
 **Check #4**: Backend logs
+
 - Vercel Deployments tab → Logs
 - Look for email sending errors
 
@@ -111,4 +117,4 @@ Just set environment variables and deploy. ✅
 
 ---
 
-*Questions? Check the full documentation files.*
+_Questions? Check the full documentation files._

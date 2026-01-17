@@ -3,31 +3,36 @@
 ## ✅ Fixes Applied
 
 ### 1. **Email Expiry Message Fixed**
+
 - **File**: [be/dbHelpers/emailHelper.js](be/dbHelpers/emailHelper.js)
 - **Change**: Updated email message from "expire after a certain period" to "expire after 7 days"
 - **Impact**: Users now know exactly how long they have to reset their password
 - **Status**: ✅ Complete
 
 ### 2. **Token Security Improved - Hashing Implemented**
+
 - **Files Modified**:
   - [be/dbHelpers/church_records/accountRecords.js](be/dbHelpers/church_records/accountRecords.js) - Hash tokens before storing
   - [be/routes/church_records/accountRoutes.js](be/routes/church_records/accountRoutes.js) - Verify hashed tokens with bcrypt.compare()
 - **Implementation**:
+
   ```javascript
   // Before: Plaintext token stored
   // await query(sql, [accountData.acc_id, resetToken]);
-  
+
   // After: Hashed token stored
   const tokenHash = await bcrypt.hash(resetToken, 10);
   await query(sql, [accountData.acc_id, tokenHash]);
-  
+
   // Verification uses bcrypt.compare() instead of direct comparison
   const isMatch = await bcrypt.compare(token, row.token);
   ```
+
 - **Security Benefit**: Even if database is compromised, attackers cannot use stolen token hashes
 - **Status**: ✅ Complete
 
 ### 3. **Token Verification Enhanced**
+
 - **File**: [be/routes/church_records/accountRoutes.js](be/routes/church_records/accountRoutes.js)
 - **Changes**:
   - `/verifyResetToken` endpoint: Now uses bcrypt comparison with hashed tokens
@@ -65,6 +70,7 @@ JWT_SECRET=your-jwt-secret
 ```
 
 **⚠️ CRITICAL**: For Gmail SMTP to work:
+
 1. Go to Google Account settings
 2. Enable 2-Step Verification
 3. Create an App Password
@@ -80,6 +86,7 @@ node test_email.js
 ```
 
 Expected output:
+
 ```
 ✅ Account details email sent successfully
 ```
@@ -100,6 +107,7 @@ git push origin main
 ### Step 4: Test on Production
 
 #### Test 1: Send Password Reset Email
+
 ```bash
 # Replace with your testing email
 curl -X POST https://your-backend-url/api/church-records/accounts/forgotPassword \
@@ -108,6 +116,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/forgotPassword
 ```
 
 **Expected Response**:
+
 ```json
 {
   "success": true,
@@ -120,12 +129,14 @@ curl -X POST https://your-backend-url/api/church-records/accounts/forgotPassword
 ```
 
 **Check**:
+
 - [ ] Email arrives in inbox (check spam folder too)
 - [ ] Email contains reset link
 - [ ] Reset link has correct production URL
 - [ ] Email message says "7 days"
 
 #### Test 2: Verify Reset Token
+
 ```bash
 # Use the token from the email
 curl -X POST https://your-backend-url/api/church-records/accounts/verifyResetToken \
@@ -134,6 +145,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/verifyResetTok
 ```
 
 **Expected Response**:
+
 ```json
 {
   "success": true,
@@ -147,6 +159,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/verifyResetTok
 ```
 
 #### Test 3: Reset Password with Token
+
 ```bash
 curl -X POST https://your-backend-url/api/church-records/accounts/resetPasswordWithToken \
   -H "Content-Type: application/json" \
@@ -154,6 +167,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/resetPasswordW
 ```
 
 **Expected Response**:
+
 ```json
 {
   "success": true,
@@ -165,6 +179,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/resetPasswordW
 ```
 
 #### Test 4: Frontend Flow
+
 1. Go to production frontend: https://bbek.vercel.app
 2. Click "Login"
 3. Click "Forgot password?"
@@ -186,6 +201,7 @@ No schema changes needed! The token column can store both plaintext (old) and ha
 **Optional: Keep plain text tokens readable for debugging**
 
 If you want to debug easily, you can split tokens into two columns:
+
 ```sql
 ALTER TABLE tbl_password_reset_tokens ADD COLUMN token_plain VARCHAR(255) NULL COMMENT 'Plaintext token sent in email (for admin reference only)';
 
@@ -204,12 +220,14 @@ But this is optional - current implementation is secure without it.
 ### Email Not Sending After Deployment
 
 **Check**:
+
 1. Is EMAIL_USER set? `echo $EMAIL_USER` in terminal
 2. Is EMAIL_PASS correct? (16-char app password, no spaces)
 3. Is FRONTEND_URL1 set to production URL?
 4. Check backend logs for email errors
 
 **Solution**:
+
 ```bash
 # Verify environment variables are set
 heroku config    # If using Heroku
@@ -223,12 +241,14 @@ EMAIL_USER=your-email EMAIL_PASS=your-pass npm run dev
 ### Reset Link Not Working
 
 **Check**:
+
 1. Does email show correct production URL? (should be https://bbek.vercel.app)
 2. Is token in URL properly encoded?
 3. Check browser console for JavaScript errors
 4. Check backend logs for token verification errors
 
 **Solution**:
+
 ```javascript
 // In console, check reset link format:
 // Should be: https://bbek.vercel.app/change-password/123?token=xxxxx&type=forgot_password
@@ -244,10 +264,12 @@ EMAIL_USER=your-email EMAIL_PASS=your-pass npm run dev
 ### Email Goes to Spam
 
 **Check**:
+
 1. Is FRONTEND_URL1 your real domain (not localhost)?
 2. Are email headers properly configured?
 
 **Solution**:
+
 1. Check spam folder for reset email
 2. Mark as "Not Spam" to train filter
 3. Consider switching to SendGrid for better deliverability
@@ -256,14 +278,14 @@ EMAIL_USER=your-email EMAIL_PASS=your-pass npm run dev
 
 ## 🔐 Security Improvements Summary
 
-| Issue | Before | After | Status |
-|-------|--------|-------|--------|
-| **Token Storage** | Plaintext in DB | Hashed with bcrypt | ✅ Fixed |
-| **Token Comparison** | Direct string match | bcrypt.compare() | ✅ Fixed |
-| **Email Expiry Message** | "Certain period" | "7 days" | ✅ Fixed |
-| **Token Reuse Prevention** | Mark used_at | Still marked used_at | ✅ Maintained |
-| **Password Hashing** | bcrypt | bcrypt | ✅ Maintained |
-| **Token Generation** | crypto.randomBytes() | crypto.randomBytes() | ✅ Maintained |
+| Issue                      | Before               | After                | Status        |
+| -------------------------- | -------------------- | -------------------- | ------------- |
+| **Token Storage**          | Plaintext in DB      | Hashed with bcrypt   | ✅ Fixed      |
+| **Token Comparison**       | Direct string match  | bcrypt.compare()     | ✅ Fixed      |
+| **Email Expiry Message**   | "Certain period"     | "7 days"             | ✅ Fixed      |
+| **Token Reuse Prevention** | Mark used_at         | Still marked used_at | ✅ Maintained |
+| **Password Hashing**       | bcrypt               | bcrypt               | ✅ Maintained |
+| **Token Generation**       | crypto.randomBytes() | crypto.randomBytes() | ✅ Maintained |
 
 ---
 
@@ -288,6 +310,7 @@ Modified Files:
 ## ✨ Next Steps (Optional Enhancements)
 
 1. **Rate Limiting**: Prevent spam on forgot password endpoint
+
    ```javascript
    const rateLimit = require('express-rate-limit');
    const forgotPasswordLimiter = rateLimit({
@@ -298,21 +321,23 @@ Modified Files:
    ```
 
 2. **SendGrid Integration**: For better email deliverability
+
    ```bash
    npm install @sendgrid/mail
    # Then use emailHelperSendGrid.js instead
    ```
 
 3. **Email Verification**: Add bounce/complaint handling
+
    - Subscribe to SendGrid webhooks
    - Mark accounts with invalid emails
 
 4. **Audit Logging**: Log all password reset attempts
    ```javascript
    await auditTrailRecords.createAuditTrail({
-     action: 'password_reset_requested',
+     action: "password_reset_requested",
      email: email,
-     success: result.success
+     success: result.success,
    });
    ```
 
