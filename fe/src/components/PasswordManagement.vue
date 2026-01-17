@@ -27,12 +27,12 @@
               <p class="text-body-1 mt-4">Verifying your request...</p>
             </div>
 
-            <!-- Invalid Token State -->
+            <!-- Invalid Link State -->
             <div v-else-if="!isValidToken" class="text-center py-8">
               <v-icon icon="mdi-alert-circle" size="64" color="error" class="mb-4"></v-icon>
-              <h2 class="text-h6 font-weight-bold mb-2">Invalid or Expired Link</h2>
+              <h2 class="text-h6 font-weight-bold mb-2">Invalid Link</h2>
               <p class="text-body-2 text-grey mb-4">
-                This password reset link is invalid or has expired. Please request a new one.
+                This password reset link is invalid. Please request a new one.
               </p>
               <v-btn color="primary" @click="requestNewLink">
                 Request New Link
@@ -281,8 +281,7 @@ const isProfileChange = computed(() => route.query.isProfileChange || route.para
 
 
 async function fetchAccountById(accountId) {
-  // Get token and type from URL
-  const urlToken = token.value
+  // Get parameters from URL
   const urlType = type.value?.toLowerCase()
 
   // Do not allow token-based password change when invoked from profile
@@ -293,90 +292,51 @@ async function fetchAccountById(accountId) {
     return
   }
 
-  // For account setup (new_account), no token validation needed
-  if (urlType === 'new_account') {
-    console.log('🔍 Processing new_account type, accountId:', route.params.acc_id || route.query.acc_id)
-    isValidToken.value = true
-    loading.value = false
-    pageType.value = 'change'
-    // Get account info by ID
-    try {
-      const accountId = route.params.acc_id || route.query.acc_id
-      console.log('🔍 Fetching account with ID:', accountId)
-
-      if (!accountId) {
-        console.log('❌ No account ID found in URL')
-        isValidToken.value = false
-        errorMessage.value = 'Invalid link. Account ID is missing.'
-        return
-      }
-
-      const account = await accountsStore.fetchAccountById(accountId)
-      console.log('🔍 Account fetch result:', account)
-
-      if (account && account.success) {
-        userEmail.value = account.email || ''
-        mockResponse.value = {
-          valid: true,
-          email: account.email,
-          acc_id: account.acc_id,
-          position: account.position,
-          status: account.status,
-          type: urlType
-        }
-        console.log('✅ Account setup link is valid')
-      } else {
-        console.log('❌ Account not found or fetch failed')
-        isValidToken.value = false
-        errorMessage.value = 'Account not found. Please contact the church administration.'
-      }
-    } catch (error) {
-      console.error('❌ Error fetching account:', error)
-      isValidToken.value = false
-      errorMessage.value = 'Failed to load account information. Please try again or contact support.'
-    }
-    return
-  }
-
-  // For password reset (forgot_password), token validation is required
-  if (!urlToken) {
-    isValidToken.value = false
-    loading.value = false
-    errorMessage.value = 'Missing token. Please check your email link.'
-    return
-  }
-
-  // Verify token with backend API
+  // For all cases (new_account, forgot_password, or any other), just validate account exists
   try {
-    const response = await fetch('/api/church-records/accounts/verifyResetToken', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token: urlToken })
-    })
+    const accountId = route.params.acc_id || route.query.acc_id
+    console.log('🔍 Processing password reset/change, accountId:', accountId)
 
-    const data = await response.json()
+    if (!accountId) {
+      console.log('❌ No account ID found in URL')
+      isValidToken.value = false
+      errorMessage.value = 'Invalid link. Account ID is missing.'
+      loading.value = false
+      return
+    }
 
-    if (data.success) {
+    const account = await accountsStore.fetchAccountById(accountId)
+    console.log('🔍 Account fetch result:', account)
+
+    if (account && account.acc_id) {
       isValidToken.value = true
-      userEmail.value = data.data.email || ''
+      userEmail.value = account.email || ''
       mockResponse.value = {
         valid: true,
-        email: data.data.email,
-        acc_id: data.data.acc_id,
-        position: data.data.position,
-        status: data.data.status,
+        email: account.email,
+        acc_id: account.acc_id,
+        position: account.position,
+        status: account.status,
         type: urlType
       }
+
+      // Set page type based on URL type
+      if (urlType === 'new_account') {
+        pageType.value = 'change'
+      } else {
+        pageType.value = 'forgot'
+      }
+
+      console.log('✅ Password reset/change link is valid')
     } else {
+      console.log('❌ Account not found or fetch failed')
       isValidToken.value = false
-      errorMessage.value = data.message || 'This link is invalid or has expired.'
+      errorMessage.value = 'Account not found. Please request a new password reset link.'
     }
   } catch (error) {
-    console.error('Error verifying token:', error)
+    console.error('❌ Error fetching account:', error)
     isValidToken.value = false
-    errorMessage.value = 'Failed to verify link. Please try again.'
+    errorMessage.value = 'Failed to load account information. Please try again or contact support.'
   } finally {
     loading.value = false
   }
@@ -394,12 +354,7 @@ const handleSubmitPassword = async () => {
   const { valid } = await passwordFormRef.value.validate()
   if (!valid) return
 
-  const urlToken = token.value
-
-  if (!urlToken && !isProfileChange.value) {
-    errorMessage.value = 'Token is missing. Please use the link from your email.'
-    return
-  }
+  // No token validation needed for the original system
 
   submitting.value = true
   errorMessage.value = ''
@@ -434,27 +389,21 @@ const handleSubmitPassword = async () => {
         return
       }
     } else {
-      // For password reset, use token-based API
-      const response = await fetch('/api/church-records/accounts/resetPasswordWithToken', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token: token.value,
-          newPassword: formData.value.newPassword
-        })
+      // For password reset, update password directly using account ID
+      const response = await accountsStore.updateAccount(mockResponse.value.acc_id, {
+        password: formData.value.newPassword,
+        email: mockResponse.value.email,
+        position: mockResponse.value.position,
+        status: mockResponse.value.status
       })
 
-      const data = await response.json()
-
-      if (data.success) {
-        const msg = data.message || 'Password reset successfully.'
+      if (response && response.success) {
+        const msg = response.message || 'Password reset successfully.'
         ElMessage.success(msg)
         successMessage.value = msg
         passwordChanged.value = true
       } else {
-        const err = data.message || data.error || 'Failed to reset password.'
+        const err = response?.error || response?.message || 'Failed to reset password.'
         ElMessage.error(err)
         errorMessage.value = err
         return

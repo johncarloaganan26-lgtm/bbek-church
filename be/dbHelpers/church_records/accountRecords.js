@@ -814,22 +814,6 @@ async function forgotPasswordByEmail(email) {
 
     const accountData = account.data;
 
-    // Generate reset token
-    const crypto = require('crypto');
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    
-    // Hash the token for database storage (security improvement)
-    const tokenHash = await bcrypt.hash(resetToken, 10);
-
-    // Store token directly in the account record (original approach)
-    const sql = `
-      UPDATE tbl_accounts
-      SET reset_token = ?,
-          reset_token_expires = DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY)
-      WHERE acc_id = ?
-    `;
-    await query(sql, [tokenHash, accountData.acc_id]);
-
     // Try to get member information for personalized email
     let recipientName = 'User';
     try {
@@ -850,8 +834,7 @@ async function forgotPasswordByEmail(email) {
       acc_id: accountData.acc_id,
       email: accountData.email,
       name: recipientName,
-      type: 'forgot_password',
-      token: resetToken
+      type: 'forgot_password'
     };
 
     // Send password reset email

@@ -111,11 +111,7 @@ const sendAccountDetails = async (accountDetails) => {
     
     const emailType = accountDetails.type || 'forgot_password';
     const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
-    const token = accountDetails.token || accountDetails.resetToken || generateResetToken();
-    const resetUrlBase = `${frontendUrl}/change-password/${accountDetails.acc_id}`;
-    const resetUrl = token
-      ? `${resetUrlBase}?token=${encodeURIComponent(token)}&type=${encodeURIComponent(emailType)}`
-      : resetUrlBase;
+    const resetUrl = `${frontendUrl}/change-password/${accountDetails.acc_id}`;
     const recipientName = accountDetails.name || 'Member';
     
     let subject, title, mainMessage, buttonText, importantNotes;
@@ -127,7 +123,6 @@ const sendAccountDetails = async (accountDetails) => {
       buttonText = 'Set Up My Account';
       importantNotes = [
         'Please set your password as soon as possible to secure your account',
-        'This link will expire after 24 hours for security reasons',
         'Do not share this link with anyone'
       ];
       if (accountDetails.temporaryPassword) {
@@ -139,7 +134,6 @@ const sendAccountDetails = async (accountDetails) => {
       mainMessage = `We received a request to reset your password for your ${CHURCH_NAME} account. Click the button below to create a new password.`;
       buttonText = 'Reset My Password';
       importantNotes = [
-        'This link will expire after 1 hour for security reasons',
         'If you did not request this, please ignore this email',
         'Do not share this link with anyone'
       ];

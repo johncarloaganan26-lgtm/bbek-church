@@ -20,6 +20,8 @@ const publicRoutes = [
   '/api/church-records/accounts/login',
   '/api/church-records/accounts/verifyCredentials',
   '/api/church-records/accounts/forgotPassword',
+  '/api/church-records/accounts/getAccountById',
+  '/api/church-records/accounts/updateAccount',
   // Member registration routes
   '/api/church-records/ministries/getPublicMinistries',
   '/api/church-records/members/getAllMembersForSelect',
