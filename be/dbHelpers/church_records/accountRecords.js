@@ -817,7 +817,6 @@ async function forgotPasswordByEmail(email) {
     // Generate reset token
     const crypto = require('crypto');
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
 
     // Store token in database
     // Delete expired/used tokens first to avoid conflicts
@@ -826,13 +825,13 @@ async function forgotPasswordByEmail(email) {
     
     const sql = `
       INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)
-      VALUES (?, ?, ?)
+      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
       ON DUPLICATE KEY UPDATE
         token = VALUES(token),
-        expires_at = VALUES(expires_at),
+        expires_at = DATE_ADD(NOW(), INTERVAL 24 HOUR),
         used_at = NULL
     `;
-    await query(sql, [accountData.acc_id, resetToken, expiresAt]);
+    await query(sql, [accountData.acc_id, resetToken]);
 
     // Try to get member information for personalized email
     let recipientName = 'User';
