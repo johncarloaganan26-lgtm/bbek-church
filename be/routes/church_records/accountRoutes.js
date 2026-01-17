@@ -642,22 +642,23 @@ router.post('/verifyResetToken', async (req, res) => {
       });
     }
 
-    // Get all valid tokens (not expired, not used) and account info
+    // Get account with valid reset token (not expired)
     const sql = `
-      SELECT t.*, a.email, a.position, a.status
-      FROM tbl_password_reset_tokens t
-      JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.expires_at > CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00') AND a.status = 'active' AND t.used_at IS NULL
+      SELECT acc_id, email, position, status, reset_token, reset_token_expires
+      FROM tbl_accounts
+      WHERE reset_token IS NOT NULL
+        AND reset_token_expires > CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00')
+        AND status = 'active'
     `;
     const [rows] = await query(sql, []);
 
-    console.log('🔍 Valid tokens found:', rows.length);
+    console.log('🔍 Valid reset tokens found:', rows.length);
 
     // Compare provided token against hashed tokens
     let matchedTokenData = null;
     for (const row of rows) {
       try {
-        const isMatch = await bcrypt.compare(token, row.token);
+        const isMatch = await bcrypt.compare(token, row.reset_token);
         if (isMatch) {
           matchedTokenData = row;
           break;
@@ -687,7 +688,7 @@ router.post('/verifyResetToken', async (req, res) => {
         email: tokenData.email,
         position: tokenData.position,
         status: tokenData.status,
-        expires_at: tokenData.expires_at
+        expires_at: tokenData.reset_token_expires
       }
     });
   } catch (error) {
@@ -723,12 +724,13 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       });
     }
 
-    // Get all valid tokens and compare
+    // Get account with valid reset token (not expired)
     const sql = `
-      SELECT t.*, a.email, a.position, a.status
-      FROM tbl_password_reset_tokens t
-      JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.expires_at > CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00') AND a.status = 'active'
+      SELECT acc_id, email, position, status, reset_token
+      FROM tbl_accounts
+      WHERE reset_token IS NOT NULL
+        AND reset_token_expires > CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00')
+        AND status = 'active'
     `;
     const [rows] = await query(sql, []);
 
@@ -736,7 +738,7 @@ router.post('/resetPasswordWithToken', async (req, res) => {
     let matchedTokenData = null;
     for (const row of rows) {
       try {
-        const isMatch = await bcrypt.compare(token, row.token);
+        const isMatch = await bcrypt.compare(token, row.reset_token);
         if (isMatch) {
           matchedTokenData = row;
           break;
@@ -756,8 +758,12 @@ router.post('/resetPasswordWithToken', async (req, res) => {
 
     const tokenData = matchedTokenData;
 
-    // Update password
-    const updateResult = await updateAccount(tokenData.acc_id, { password: newPassword });
+    // Update password and clear reset token
+    const updateResult = await updateAccount(tokenData.acc_id, {
+      password: newPassword,
+      reset_token: null,
+      reset_token_expires: null
+    });
 
     if (!updateResult.success) {
       return res.status(400).json({
@@ -766,11 +772,6 @@ router.post('/resetPasswordWithToken', async (req, res) => {
         error: updateResult.error
       });
     }
-
-    // Mark token as used instead of deleting (for audit trail and preventing reuse)
-    // Use UTC_TIMESTAMP() to match the timezone used for token creation
-    const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE acc_id = ?';
-    await query(markUsedSql, [tokenData.acc_id]);
 
     res.status(200).json({
       success: true,

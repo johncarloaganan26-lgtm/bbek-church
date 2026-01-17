@@ -466,8 +466,8 @@ async function getAccountByEmail(email, includePassword = false) {
       throw new Error('Email is required');
     }
 
-    const fields = includePassword 
-      ? 'acc_id, email, password, position, status, date_created'
+    const fields = includePassword
+      ? 'acc_id, email, password, position, status, date_created, reset_token, reset_token_expires'
       : 'acc_id, email, position, status, date_created';
     
     const sql = `SELECT ${fields} FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))`;
@@ -821,21 +821,14 @@ async function forgotPasswordByEmail(email) {
     // Hash the token for database storage (security improvement)
     const tokenHash = await bcrypt.hash(resetToken, 10);
 
-    // Store token in database
-    // Delete expired/used tokens first to avoid conflicts
-    const deleteSql = 'DELETE FROM tbl_password_reset_tokens WHERE acc_id = ? AND (expires_at <= UTC_TIMESTAMP() OR used_at IS NOT NULL)';
-    await query(deleteSql, [accountData.acc_id]);
-
+    // Store token directly in the account record (original approach)
     const sql = `
-      INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at, created_at)
-      VALUES (?, ?, DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY), CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'))
-      ON DUPLICATE KEY UPDATE
-        token = VALUES(token),
-        expires_at = DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY),
-        created_at = CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'),
-        used_at = NULL
+      UPDATE tbl_accounts
+      SET reset_token = ?,
+          reset_token_expires = DATE_ADD(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00'), INTERVAL 7 DAY)
+      WHERE acc_id = ?
     `;
-    await query(sql, [accountData.acc_id, tokenHash]);
+    await query(sql, [tokenHash, accountData.acc_id]);
 
     // Try to get member information for personalized email
     let recipientName = 'User';
