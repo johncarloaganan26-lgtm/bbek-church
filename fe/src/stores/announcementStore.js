@@ -190,6 +190,11 @@ export const useAnnouncementStore = defineStore('announcement', {
 
     async fetchActiveAnnouncementsForUser() {
       try {
+        // Check if announcements are already cached and still valid
+        if (this.activeAnnouncements.length > 0) {
+          return this.activeAnnouncements
+        }
+
         const accessToken = localStorage.getItem('accessToken')
         const headers = {}
         

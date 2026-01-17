@@ -12,7 +12,7 @@ const {
 const { getMemberById, createMember, getSpecificMemberByEmailAndStatus } = require('../../dbHelpers/church_records/memberRecords');
 const { checkDuplicateAccount } = require('../../dbHelpers/church_records/accountRecords');
 const { getAccountByEmail, createAccount } = require('../../dbHelpers/church_records/accountRecords');
-const { sendAccountDetails, sendWaterBaptismDetails } = require('../../dbHelpers/emailHelperSendGrid');
+const { sendAccountDetails, sendWaterBaptismDetails } = require('../../dbHelpers/emailHelper');
 const { query } = require('../../database/db');
 
 const router = express.Router();

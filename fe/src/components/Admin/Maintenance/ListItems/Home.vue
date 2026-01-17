@@ -51,54 +51,70 @@
     </div>
     <el-divider v-if="homeData.backgroundType === 'image'" />
 
-    <!-- Home Video -->
-    <div class="list-item" v-if="homeData.backgroundType === 'video'">
-      <div class="item-label">Home Video</div>
+    <!-- Home Carousel Images -->
+    <div class="list-item" v-if="homeData.backgroundType === 'carousel'">
+      <div class="item-label">Carousel Images</div>
       <div class="item-preview">
-        <div class="video-preview">
-          <div v-if="uploadingVideo" class="upload-status">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span class="ml-2">Processing video...</span>
-          </div>
-          <div v-else-if="homeData.homeVideo" class="video-status">
+        <div class="carousel-preview">
+          <div v-if="homeData.carouselImages && homeData.carouselImages.length > 0" class="images-count">
             <el-icon class="success-icon"><CircleCheck /></el-icon>
-            <span class="ml-2 text-success">Video ready</span>
-            <span class="text-grey ml-2">({{ formatVideoSize(homeData.homeVideo) }})</span>
+            <span class="ml-2 text-success">{{ homeData.carouselImages.length }} image(s) ready</span>
           </div>
-          <span v-else class="text-grey">No file chosen</span>
+          <span v-else class="text-grey">No images selected</span>
         </div>
       </div>
       <div class="item-action">
-        <div class="action-buttons">
+        <div class="carousel-actions">
           <el-upload
             :auto-upload="false"
             :show-file-list="false"
-            :disabled="uploadingVideo"
-            accept="video/*"
-            @change="handleVideoChange"
+            accept="image/*"
+            multiple
+            @change="handleCarouselImagesChange"
           >
             <template #trigger>
-              <el-button size="small" type="primary" :loading="uploadingVideo" :disabled="uploadingVideo">
-                <el-icon v-if="!uploadingVideo"><Upload /></el-icon>
-                {{ uploadingVideo ? 'Processing...' : 'Choose File' }}
+              <el-button size="small" type="primary">
+                <el-icon><Upload /></el-icon>
+                Add Images
               </el-button>
             </template>
           </el-upload>
           <el-button
-            v-if="homeData.homeVideo && !uploadingVideo"
+            v-if="homeData.carouselImages && homeData.carouselImages.length > 0"
             size="small"
             type="danger"
-            @click="handleDeleteVideo"
+            @click="clearAllCarouselImages"
             style="margin-left: 8px;"
           >
             <el-icon><Delete /></el-icon>
-            Delete Video
+            Clear All
           </el-button>
         </div>
-        <span v-if="!homeData.homeVideo && !uploadingVideo" class="text-grey ml-2">No file chosen</span>
+        <!-- Display selected images -->
+        <div v-if="homeData.carouselImages && homeData.carouselImages.length > 0" class="selected-images">
+          <div
+            v-for="(image, index) in homeData.carouselImages"
+            :key="`carousel-${index}`"
+            class="image-item"
+          >
+            <el-image
+              :src="image"
+              fit="cover"
+              class="thumbnail"
+            />
+            <el-button
+              size="small"
+              type="danger"
+              @click="removeCarouselImage(index)"
+              class="remove-btn"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+        </div>
       </div>
     </div>
-    <el-divider v-if="homeData.backgroundType === 'video'" />
+    <el-divider v-if="homeData.backgroundType === 'carousel'" />
 
     <!-- Home Welcome Text -->
     <div class="list-item">
@@ -597,6 +613,7 @@ const defaultHomeData = {
   homeBackgroundImageFile: null,
   homeVideo: null,
   homeVideoFile: null,
+  carouselImages: [],
   welcomeText: 'Welcome to Bible Baptist Church of Kwali',
   sundayService: 'Sunday Worship 9:30 AM - 12:00 PM',
   wednesdayService: 'Wednesday Service 7:00 PM - 9:00 PM',
@@ -653,8 +670,8 @@ const createReactiveCopy = (data) => {
 }
 
 // Initialize homeData with props or default
-const homeData = props.homeData 
-  ? createReactiveCopy(props.homeData) 
+const homeData = props.homeData
+  ? createReactiveCopy(props.homeData)
   : reactive(JSON.parse(JSON.stringify(defaultHomeData)))
 
 // Load data from CMS on mount
@@ -687,8 +704,8 @@ onMounted(async () => {
           // These are handled by images, but set them if they exist
           // Explicitly check if the value is valid (not null, not empty, is a valid data URL)
           const value = loadedData[key]
-          if (value && 
-              typeof value === 'string' && 
+          if (value &&
+              typeof value === 'string' &&
               value.length > 0 &&
               (value.startsWith('data:image/') || value.startsWith('data:video/'))) {
             homeData[key] = value
@@ -715,6 +732,22 @@ onMounted(async () => {
           homeData[key] = loadedData[key]
         }
       })
+
+      // Handle carousel images - reconstruct array from individual image keys
+      // The loadedData structure has images in a separate property
+      const carouselImages = [];
+      const imagesData = loadedData.images || {};
+      for (const [key, value] of Object.entries(imagesData)) {
+        if (key.startsWith('carouselImages[') && key.endsWith(']')) {
+          const match = key.match(/carouselImages\[(\d+)\]/);
+          if (match) {
+            const index = parseInt(match[1]);
+            carouselImages[index] = value;
+          }
+        }
+      }
+      // Remove undefined entries and assign
+      homeData.carouselImages = carouselImages.filter(img => img);
     }
   }
 })
@@ -816,7 +849,7 @@ const handleDeleteVideo = async () => {
     // Clear local state immediately
     homeData.homeVideo = null
     homeData.homeVideoFile = null
-    
+
     // Prepare to save with null video (will trigger deletion)
     const contentToSave = JSON.parse(JSON.stringify(homeData))
     delete contentToSave.homeVideoFile
@@ -826,17 +859,17 @@ const handleDeleteVideo = async () => {
         delete service.imageFile
       })
     }
-    
+
     // Mark video for deletion
     const imagesToSave = {
       homeVideo: null // null will trigger deletion in backend
     }
-    
+
     console.log('Deleting video from CMS')
-    
+
     // Save to CMS (this will delete the video)
     const success = await savePageData(contentToSave, imagesToSave)
-    
+
     if (success) {
       ElMessage.success('Video deleted successfully!')
       // Reload data to confirm deletion
@@ -844,7 +877,7 @@ const handleDeleteVideo = async () => {
       const loadedData = await loadPageData(true)
       if (loadedData) {
         // Explicitly clear video if it's deleted
-        if (!loadedData.homeVideo || 
+        if (!loadedData.homeVideo ||
             (typeof loadedData.homeVideo === 'string' && loadedData.homeVideo.length === 0) ||
             !loadedData.homeVideo.startsWith('data:video/')) {
           homeData.homeVideo = null
@@ -861,10 +894,33 @@ const handleDeleteVideo = async () => {
   }
 }
 
+const handleCarouselImagesChange = (fileList) => {
+  if (!homeData.carouselImages) {
+    homeData.carouselImages = []
+  }
+  fileList.forEach(file => {
+    if (file.raw) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        homeData.carouselImages.push(ev.target?.result)
+      }
+      reader.readAsDataURL(file.raw)
+    }
+  })
+}
+
+const removeCarouselImage = (index) => {
+  homeData.carouselImages.splice(index, 1)
+}
+
+const clearAllCarouselImages = () => {
+  homeData.carouselImages = []
+}
+
 const getBackgroundTypeLabel = (type) => {
   switch (type) {
-    case 'image': return 'Background Image'
-    case 'video': return 'Video'
+    case 'image': return 'Single Image'
+    case 'carousel': return 'Image Carousel'
     case 'none': return 'None (Gradient)'
     default: return 'None (Gradient)'
   }
@@ -949,11 +1005,12 @@ const saveChanges = async () => {
       })
       // Only mark for deletion if homeData.homeVideo is explicitly null/empty
       // Otherwise, it might already be saved and we don't want to delete it
-      if (!homeData.homeVideo || 
+      if (!homeData.homeVideo ||
           (typeof homeData.homeVideo === 'string' && homeData.homeVideo.length === 0)) {
         console.log('homeVideo is empty in homeData - marking for deletion')
         imagesToSave.homeVideo = null
-      } else {
+      }
+      else {
         console.log('homeVideo exists in homeData but not in contentToSave - keeping existing video')
         // Don't include it in imagesToSave, which means it won't be updated or deleted
       }
@@ -972,6 +1029,17 @@ const saveChanges = async () => {
       delete contentToSave.homeBackgroundImage
     }
     
+    // Handle carousel images
+    if (contentToSave.carouselImages && Array.isArray(contentToSave.carouselImages)) {
+      contentToSave.carouselImages.forEach((image, index) => {
+        if (image && typeof image === 'string' && image.startsWith('data:image/')) {
+          imagesToSave[`carouselImages[${index}]`] = image
+        }
+      })
+      // Clear carouselImages from content since they're stored in images
+      contentToSave.carouselImages = []
+    }
+
     // Handle service images
     if (contentToSave.services && Array.isArray(contentToSave.services)) {
       contentToSave.services.forEach((service, index) => {
@@ -1030,6 +1098,21 @@ const saveChanges = async () => {
             homeData[key] = loadedData[key]
           }
         })
+
+        // Handle carousel images - reconstruct array from individual image keys
+        const carouselImages = [];
+        const imagesData = loadedData.images || {};
+        for (const [key, value] of Object.entries(imagesData)) {
+          if (key.startsWith('carouselImages[') && key.endsWith(']')) {
+            const match = key.match(/carouselImages\[(\d+)\]/);
+            if (match) {
+              const index = parseInt(match[1]);
+              carouselImages[index] = value;
+            }
+          }
+        }
+        // Remove undefined entries and assign
+        homeData.carouselImages = carouselImages.filter(img => img);
 
         // Verify video was saved or deleted
         if (imagesToSave.homeVideo === null) {

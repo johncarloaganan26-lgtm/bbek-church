@@ -75,9 +75,6 @@ onMounted(async () => {
       userInfo.value = null
       router.push({ name: 'LandingPage' })
     }
-    
-    // Fetch announcements for all users (logged-in and visitors)
-    await fetchActiveAnnouncements()
   }, 1000 * 60 * 60)
   // Fetch announcements when app loads for all users
   await fetchActiveAnnouncements()

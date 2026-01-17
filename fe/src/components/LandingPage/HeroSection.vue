@@ -28,23 +28,23 @@ u<template>
         class="hero-background-image"
         :style="{ backgroundImage: `url(${homeData.homeBackgroundImage})` }"
       ></div>
-      <!-- Video Background -->
-      <video
-        v-else-if="homeData.backgroundType === 'video' && videoExists && videoSrc"
-        ref="videoRef"
-        :key="`video-${videoKey}`"
-        class="hero-video"
-        autoplay
-        muted
-        loop
-        playsinline
-        @loadedmetadata="onVideoLoaded"
-        @timeupdate="onTimeUpdate"
-        @error="onVideoError"
+      <!-- Carousel Background -->
+      <v-carousel
+        v-else-if="homeData.backgroundType === 'carousel' && homeData.carouselImages && homeData.carouselImages.length > 0"
+        class="hero-carousel"
+        height="100%"
+        hide-delimiters
+        show-arrows="hover"
+        cycle
+        interval="5000"
       >
-        <source :src="videoSrc" type="video/mp4" @error="onVideoError" />
-        Your browser does not support the video tag.
-      </video>
+        <v-carousel-item
+          v-for="(image, index) in homeData.carouselImages"
+          :key="`carousel-${index}`"
+          :src="image"
+          cover
+        />
+      </v-carousel>
       <!-- Fallback Background -->
       <div
         v-else
@@ -53,62 +53,8 @@ u<template>
       ></div>
 
       <!-- Overlay -->
-      <div class="hero-overlay" :class="{ 'dark-overlay': homeData.backgroundType === 'image' }"></div>
+      <div class="hero-overlay" :class="{ 'dark-overlay': homeData.backgroundType === 'image' || homeData.backgroundType === 'carousel' }"></div>
 
-      <!-- Video Controls -->
-      <div
-        v-if="homeData.backgroundType === 'video' && videoExists && showControls"
-        class="video-controls"
-        @mouseenter="showControls = true"
-        @mouseleave="hideControls"
-      >
-        <div class="video-controls-bar">
-          <v-btn
-            icon
-            variant="text"
-            color="white"
-            size="small"
-            @click="togglePlay"
-          >
-            <v-icon size="20">{{ isPlaying ? 'mdi-pause' : 'mdi-play' }}</v-icon>
-          </v-btn>
-          <span class="time-display">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
-          <v-btn
-            icon
-            variant="text"
-            color="white"
-            size="small"
-            @click="toggleMute"
-          >
-            <v-icon size="20">{{ isMuted ? 'mdi-volume-mute' : 'mdi-volume-high' }}</v-icon>
-          </v-btn>
-          <v-menu location="top">
-            <template v-slot:activator="{ props }">
-              <v-btn
-                icon
-                variant="text"
-                color="white"
-                size="small"
-                v-bind="props"
-                @click.stop
-              >
-                <v-icon size="20">mdi-dots-vertical</v-icon>
-              </v-btn>
-            </template>
-            <v-list density="compact" class="speed-menu">
-              <v-list-subheader>Playback Speed</v-list-subheader>
-              <v-list-item
-                v-for="speed in playbackSpeeds"
-                :key="speed"
-                :active="playbackRate === speed"
-                @click="changePlaybackRate(speed)"
-              >
-                <v-list-item-title>{{ speed }}x</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-        </div>
-      </div>
     </div>
 
     <!-- Content -->
@@ -208,7 +154,8 @@ const homeData = ref({
   button2Link: '/services/water-baptism',
   button2Variant: 'filled', // 'filled' or 'outlined'
   homeVideo: null,
-  homeBackgroundImage: null
+  homeBackgroundImage: null,
+  carouselImages: []
 })
 
 const floatingElements = ref([
@@ -333,6 +280,20 @@ const fetchHomeData = async (forceRefresh = false) => {
       if (images?.homeBackgroundImage) {
         homeData.value.homeBackgroundImage = images.homeBackgroundImage
       }
+
+      // Handle carousel images - reconstruct array from individual image keys
+      const carouselImages = [];
+      for (const [key, value] of Object.entries(images || {})) {
+        if (key.startsWith('carouselImages[') && key.endsWith(']')) {
+          const match = key.match(/carouselImages\[(\d+)\]/);
+          if (match) {
+            const index = parseInt(match[1]);
+            carouselImages[index] = value;
+          }
+        }
+      }
+      // Remove undefined entries and assign
+      homeData.value.carouselImages = carouselImages.filter(img => img);
       
       // Handle video - wait a bit more to ensure DOM is cleared
       await nextTick()

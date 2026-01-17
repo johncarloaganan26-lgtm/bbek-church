@@ -112,3 +112,4 @@ playwright/.cache/
 *.bak
 *.backup
 *.old
+.vercel
