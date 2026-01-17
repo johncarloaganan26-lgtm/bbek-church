@@ -281,50 +281,97 @@ const isProfileChange = computed(() => route.query.isProfileChange || route.para
 
 
 async function fetchAccountById(accountId) {
-   // Get token and type from URL
+  // Get token and type from URL
   const urlToken = token.value
   const urlType = type.value?.toLowerCase()
 
   // Do not allow token-based password change when invoked from profile
-  if (isProfileChange.value ) {
+  if (isProfileChange.value) {
     isValidToken.value = true
     loading.value = false
     pageType.value = 'change'
+    return
   }
 
-  else if (!urlToken) {
+  // For account setup (new_account), no token validation needed
+  if (urlType === 'new_account') {
+    console.log('🔍 Processing new_account type, accountId:', route.params.acc_id || route.query.acc_id)
+    isValidToken.value = true
+    loading.value = false
+    pageType.value = 'change'
+    // Get account info by ID
+    try {
+      const accountId = route.params.acc_id || route.query.acc_id
+      console.log('🔍 Fetching account with ID:', accountId)
+
+      if (!accountId) {
+        console.log('❌ No account ID found in URL')
+        isValidToken.value = false
+        errorMessage.value = 'Invalid link. Account ID is missing.'
+        return
+      }
+
+      const account = await accountsStore.fetchAccountById(accountId)
+      console.log('🔍 Account fetch result:', account)
+
+      if (account && account.success) {
+        userEmail.value = account.email || ''
+        mockResponse.value = {
+          valid: true,
+          email: account.email,
+          acc_id: account.acc_id,
+          position: account.position,
+          status: account.status,
+          type: urlType
+        }
+        console.log('✅ Account setup link is valid')
+      } else {
+        console.log('❌ Account not found or fetch failed')
+        isValidToken.value = false
+        errorMessage.value = 'Account not found. Please contact the church administration.'
+      }
+    } catch (error) {
+      console.error('❌ Error fetching account:', error)
+      isValidToken.value = false
+      errorMessage.value = 'Failed to load account information. Please try again or contact support.'
+    }
+    return
+  }
+
+  // For password reset (forgot_password), token validation is required
+  if (!urlToken) {
     isValidToken.value = false
     loading.value = false
     errorMessage.value = 'Missing token. Please check your email link.'
     return
   }
 
-  // Verify token with backend
+  // Verify token with backend API
   try {
-    // TODO: Replace with actual API call to verify token
-    // const response = await fetch(`/api/auth/verify-token?token=${urlToken}&type=${urlType}`)
-    // const data = await response.json()
-    
-    // Simulate API call
-    const account = await accountsStore.fetchAccountById(accountId)
-    if(account) {
-      // Mock response - replace with actual API response
+    const response = await fetch('/api/church-records/accounts/verifyResetToken', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token: urlToken })
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      isValidToken.value = true
+      userEmail.value = data.data.email || ''
       mockResponse.value = {
         valid: true,
-        email: account.email, // This would come from the API
-        type: urlType,
-        ...account
+        email: data.data.email,
+        acc_id: data.data.acc_id,
+        position: data.data.position,
+        status: data.data.status,
+        type: urlType
       }
-        if (mockResponse.value.valid) {
-        isValidToken.value = true
-        userEmail.value = mockResponse.value.email || ''
-      } else {
-        isValidToken.value = false
-        errorMessage.value = 'This link is invalid or has expired.'
-      }
-    }else{
+    } else {
       isValidToken.value = false
-      errorMessage.value = 'Account not found.'
+      errorMessage.value = data.message || 'This link is invalid or has expired.'
     }
   } catch (error) {
     console.error('Error verifying token:', error)
@@ -359,23 +406,59 @@ const handleSubmitPassword = async () => {
   successMessage.value = ''
 
   try {
-   
-    if(formData.value.newPassword === formData.value.confirmPassword){
-      const response = await accountsStore.updateAccount(mockResponse.value.acc_id, { password: formData.value.newPassword, email: mockResponse.value.email, position: mockResponse.value.position, status: mockResponse.value.status })
+    if(formData.value.newPassword !== formData.value.confirmPassword){
+      errorMessage.value = 'Passwords do not match.'
+      return
+    }
+
+    const urlType = type.value?.toLowerCase()
+
+    if (urlType === 'new_account') {
+      // For account setup, update password directly
+      const response = await accountsStore.updateAccount(mockResponse.value.acc_id, {
+        password: formData.value.newPassword,
+        email: mockResponse.value.email,
+        position: mockResponse.value.position,
+        status: mockResponse.value.status
+      })
+
       if (response && response.success) {
-        const msg = response.message || 'Password changed successfully.'
+        const msg = response.message || 'Account setup completed successfully.'
         ElMessage.success(msg)
         successMessage.value = msg
         passwordChanged.value = true
       } else {
-        const err = response?.error || 'Failed to change password.'
+        const err = response?.error || 'Failed to set up account.'
         ElMessage.error(err)
         errorMessage.value = err
         return
       }
-    }else{
-      errorMessage.value = 'Passwords do not match.'
-      return
+    } else {
+      // For password reset, use token-based API
+      const response = await fetch('/api/church-records/accounts/resetPasswordWithToken', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token: token.value,
+          newPassword: formData.value.newPassword
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        const msg = data.message || 'Password reset successfully.'
+        ElMessage.success(msg)
+        successMessage.value = msg
+        passwordChanged.value = true
+      } else {
+        const err = data.message || data.error || 'Failed to reset password.'
+        ElMessage.error(err)
+        errorMessage.value = err
+        return
+      }
     }
     // Reset form
     formData.value = {

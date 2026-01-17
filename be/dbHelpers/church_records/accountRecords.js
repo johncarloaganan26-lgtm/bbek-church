@@ -814,6 +814,21 @@ async function forgotPasswordByEmail(email) {
 
     const accountData = account.data;
 
+    // Generate reset token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+    // Store token in database
+    const sql = `
+      INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        token = VALUES(token),
+        expires_at = VALUES(expires_at)
+    `;
+    await query(sql, [accountData.acc_id, resetToken, expiresAt]);
+
     // Try to get member information for personalized email
     let recipientName = 'User';
     try {
@@ -834,7 +849,8 @@ async function forgotPasswordByEmail(email) {
       acc_id: accountData.acc_id,
       email: accountData.email,
       name: recipientName,
-      type: 'forgot_password'
+      type: 'forgot_password',
+      token: resetToken
     };
 
     // Send password reset email

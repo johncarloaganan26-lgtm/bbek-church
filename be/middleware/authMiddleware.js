@@ -113,6 +113,9 @@ const publicRoutes = [
   '/api/cms/info/save',
   // forgot password routes
   '/api/church-records/accounts/forgotPassword',
+  '/api/church-records/accounts/verifyResetToken',
+  '/api/church-records/accounts/resetPasswordWithToken',
+  '/api/church-records/accounts/createResetTokensTable',
   // Child dedication routes (public for member creation)
   '/api/church-records/child-dedications/createChildDedication',
   '/api/church-records/child-dedications/check-duplicate',

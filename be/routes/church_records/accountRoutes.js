@@ -1,5 +1,6 @@
 const express = require('express');
 const moment = require('moment');
+const { query } = require('../../database/db');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const {
   createAccount,
@@ -555,31 +556,214 @@ router.post('/forgotPassword', async (req, res) => {
 });
 
 /**
- * LOGOUT - Log user out and record audit trail
- * POST /api/church-records/accounts/logout
- * Body: { logout_reason? }
+  * LOGOUT - Log user out and record audit trail
+  * POST /api/church-records/accounts/logout
+  * Body: { logout_reason? }
+  */
+ router.post('/logout', async (req, res) => {
+   try {
+     // Get user info from token
+     const userEmail = req.user?.email || null;
+     const userId = req.user?.acc_id || null;
+     const logoutReason = req.body?.logout_reason || 'User initiated logout';
+
+     res.status(200).json({
+       success: true,
+       message: 'Logged out successfully',
+       data: {
+         email: userEmail,
+         acc_id: userId,
+         logout_reason: logoutReason
+       }
+     });
+   } catch (error) {
+     console.error('Error during logout:', error);
+     res.status(500).json({
+       success: false,
+       error: error.message || 'Failed to logout'
+     });
+   }
+ });
+
+/**
+ * CREATE PASSWORD RESET TOKENS TABLE - Temporary endpoint to create the table
+ * POST /api/church-records/accounts/createResetTokensTable
  */
-router.post('/logout', async (req, res) => {
+router.post('/createResetTokensTable', async (req, res) => {
   try {
-    // Get user info from token
-    const userEmail = req.user?.email || null;
-    const userId = req.user?.acc_id || null;
-    const logoutReason = req.body?.logout_reason || 'User initiated logout';
+    const createTableSQL = `
+      CREATE TABLE IF NOT EXISTS \`tbl_password_reset_tokens\` (
+        \`id\` INT NOT NULL AUTO_INCREMENT,
+        \`acc_id\` VARCHAR(45) NOT NULL COMMENT 'Account ID from tbl_accounts',
+        \`token\` VARCHAR(255) NOT NULL COMMENT 'Reset token',
+        \`expires_at\` DATETIME NOT NULL COMMENT 'Token expiration time',
+        \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Token creation time',
+        PRIMARY KEY (\`id\`),
+        UNIQUE KEY \`unique_token\` (\`token\`),
+        UNIQUE KEY \`unique_account\` (\`acc_id\`),
+        INDEX \`idx_expires_at\` (\`expires_at\`),
+        INDEX \`idx_acc_id\` (\`acc_id\`),
+        CONSTRAINT \`fk_reset_token_account\` FOREIGN KEY (\`acc_id\`) REFERENCES \`tbl_accounts\` (\`acc_id\`)
+          ON DELETE CASCADE
+      ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'Password reset tokens for secure password recovery';
+    `;
+
+    await query(createTableSQL);
+    res.status(200).json({
+      success: true,
+      message: 'Password reset tokens table created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating table:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to create table'
+    });
+  }
+});
+
+/**
+ * VERIFY PASSWORD RESET TOKEN - Verify if a password reset token is valid
+ * POST /api/church-records/accounts/verifyResetToken
+ * Body: { token }
+ */
+router.post('/verifyResetToken', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    console.log('🔍 Verifying token:', token ? token.substring(0, 10) + '...' : 'null');
+
+    if (!token) {
+      console.log('❌ No token provided');
+      return res.status(400).json({
+        success: false,
+        error: 'Token is required'
+      });
+    }
+
+    // Check if token exists and is not expired
+    const sql = `
+      SELECT t.*, a.email, a.position, a.status
+      FROM tbl_password_reset_tokens t
+      JOIN tbl_accounts a ON t.acc_id = a.acc_id
+      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active'
+    `;
+    const [rows] = await query(sql, [token]);
+
+    console.log('🔍 Token query result:', rows.length, 'rows found');
+
+    if (rows.length === 0) {
+      // Let's check what went wrong
+      const checkTokenSql = 'SELECT * FROM tbl_password_reset_tokens WHERE token = ?';
+      const [tokenRows] = await query(checkTokenSql, [token]);
+      console.log('🔍 Token exists in DB:', tokenRows.length > 0);
+
+      if (tokenRows.length > 0) {
+        const tokenData = tokenRows[0];
+        console.log('🔍 Token expiration:', tokenData.expires_at, 'Current time:', new Date());
+        console.log('🔍 Token expired:', new Date(tokenData.expires_at) < new Date());
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token',
+        error: 'Token not found or expired'
+      });
+    }
+
+    const tokenData = rows[0];
+    console.log('✅ Token is valid for account:', tokenData.email);
 
     res.status(200).json({
       success: true,
-      message: 'Logged out successfully',
+      message: 'Token is valid',
       data: {
-        email: userEmail,
-        acc_id: userId,
-        logout_reason: logoutReason
+        acc_id: tokenData.acc_id,
+        email: tokenData.email,
+        position: tokenData.position,
+        status: tokenData.status,
+        expires_at: tokenData.expires_at
       }
     });
   } catch (error) {
-    console.error('Error during logout:', error);
+    console.error('❌ Error verifying reset token:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to logout'
+      error: error.message || 'Failed to verify token'
+    });
+  }
+});
+
+/**
+ * RESET PASSWORD WITH TOKEN - Reset password using a valid token
+ * POST /api/church-records/accounts/resetPasswordWithToken
+ * Body: { token, newPassword }
+ */
+router.post('/resetPasswordWithToken', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token and new password are required'
+      });
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters long'
+      });
+    }
+
+    // Check if token exists and is not expired
+    const sql = `
+      SELECT t.*, a.email, a.position, a.status
+      FROM tbl_password_reset_tokens t
+      JOIN tbl_accounts a ON t.acc_id = a.acc_id
+      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active'
+    `;
+    const [rows] = await query(sql, [token]);
+
+    if (rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token',
+        error: 'Token not found or expired'
+      });
+    }
+
+    const tokenData = rows[0];
+
+    // Update password
+    const updateResult = await updateAccount(tokenData.acc_id, { password: newPassword });
+
+    if (!updateResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: updateResult.message,
+        error: updateResult.error
+      });
+    }
+
+    // Delete the used token
+    const deleteSql = 'DELETE FROM tbl_password_reset_tokens WHERE token = ?';
+    await query(deleteSql, [token]);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+      data: {
+        email: tokenData.email
+      }
+    });
+  } catch (error) {
+    console.error('Error resetting password with token:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to reset password'
     });
   }
 });

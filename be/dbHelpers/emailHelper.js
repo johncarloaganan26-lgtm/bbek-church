@@ -63,11 +63,22 @@ const sendAccountDetails = async (accountDetails) => {
     const emailType = accountDetails.type || 'forgot_password'; // 'new_account' or 'forgot_password'
     const transporter = createTransporter();
     const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173' || 'http://localhost:5174';
-    const token = accountDetails.token || accountDetails.resetToken || generateResetToken();
     const resetUrlBase = `${frontendUrl}/change-password/${accountDetails.acc_id}`;
-    const resetUrl = token
-      ? `${resetUrlBase}?token=${encodeURIComponent(token)}&type=${encodeURIComponent(emailType)}`
-      : resetUrlBase;
+
+    // For account setup (new_account), don't use tokens - allow direct access
+    // For password reset (forgot_password), use tokens with expiration
+    let token = null;
+    let resetUrl = resetUrlBase;
+
+    if (emailType === 'forgot_password') {
+      token = accountDetails.token || accountDetails.resetToken || generateResetToken();
+      resetUrl = token
+        ? `${resetUrlBase}?token=${encodeURIComponent(token)}&type=${encodeURIComponent(emailType)}`
+        : resetUrlBase;
+    } else {
+      // For new_account, no token needed - direct access
+      resetUrl = `${resetUrlBase}?type=${encodeURIComponent(emailType)}`;
+    }
     const recipientName = accountDetails.name || 'User';
 
     // Determine email content based on type

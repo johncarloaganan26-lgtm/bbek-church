@@ -3,7 +3,7 @@ CREATE TABLE
 IF
   NOT EXISTS `tbl_password_reset_tokens` (
     `id` INT NOT NULL AUTO_INCREMENT
-    , `acc_id` VARCHAR(45) NOT NULL COMMENT 'Account ID from tbl_accounts'
+    , `acc_id` INT NOT NULL COMMENT 'Account ID from tbl_accounts'
     , `token` VARCHAR(255) NOT NULL COMMENT 'Reset token'
     , `expires_at` DATETIME NOT NULL COMMENT 'Token expiration time'
     , `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Token creation time'
