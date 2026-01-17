@@ -646,7 +646,7 @@ router.post('/verifyResetToken', async (req, res) => {
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active' AND t.used_at IS NULL
+      WHERE t.token = ? AND t.expires_at > UTC_TIMESTAMP() AND a.status = 'active' AND t.used_at IS NULL
     `;
     const [rows] = await query(sql, [token]);
 
@@ -724,7 +724,7 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active'
+      WHERE t.token = ? AND t.expires_at > UTC_TIMESTAMP() AND a.status = 'active'
     `;
     const [rows] = await query(sql, [token]);
 
@@ -836,8 +836,8 @@ router.post('/migratePasswordResetTokens', async (req, res) => {
     // Cleanup old tokens
     console.log('🧹 Cleaning up old tokens...');
     const [result] = await query(`
-      DELETE FROM tbl_password_reset_tokens 
-      WHERE expires_at <= NOW()
+      DELETE FROM tbl_password_reset_tokens
+      WHERE expires_at <= UTC_TIMESTAMP()
     `);
     console.log(`✅ Cleaned up ${result.affectedRows} expired tokens`);
 
