@@ -641,12 +641,12 @@ router.post('/verifyResetToken', async (req, res) => {
       });
     }
 
-    // Check if token exists and is not expired
+    // Check if token exists, not expired, and not already used
     const sql = `
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active'
+      WHERE t.token = ? AND t.expires_at > NOW() AND a.status = 'active' AND t.used_at IS NULL
     `;
     const [rows] = await query(sql, [token]);
 
@@ -662,12 +662,13 @@ router.post('/verifyResetToken', async (req, res) => {
         const tokenData = tokenRows[0];
         console.log('🔍 Token expiration:', tokenData.expires_at, 'Current time:', new Date());
         console.log('🔍 Token expired:', new Date(tokenData.expires_at) < new Date());
+        console.log('🔍 Token already used:', tokenData.used_at !== null);
       }
 
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired token',
-        error: 'Token not found or expired'
+        message: 'Invalid, expired, or already used token',
+        error: 'Token not found, expired, or already used'
       });
     }
 
@@ -748,9 +749,9 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       });
     }
 
-    // Delete the used token
-    const deleteSql = 'DELETE FROM tbl_password_reset_tokens WHERE token = ?';
-    await query(deleteSql, [token]);
+    // Mark token as used instead of deleting (for audit trail and preventing reuse)
+    const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = NOW() WHERE token = ?';
+    await query(markUsedSql, [token]);
 
     res.status(200).json({
       success: true,
@@ -791,6 +792,67 @@ router.get('/me', (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to get user profile'
+    });
+  }
+});
+
+/**
+ * MIGRATION - Add used_at column to password reset tokens table
+ * POST /api/church-records/accounts/migratePasswordResetTokens
+ * This endpoint adds the used_at column if it doesn't exist
+ */
+router.post('/migratePasswordResetTokens', async (req, res) => {
+  try {
+    console.log('🔄 Starting password reset token migration...');
+
+    // Check if used_at column already exists
+    const [columns] = await query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tbl_password_reset_tokens' AND COLUMN_NAME = 'used_at'"
+    );
+
+    if (columns.length > 0) {
+      console.log('ℹ️  used_at column already exists');
+      return res.status(200).json({
+        success: true,
+        message: 'Migration already applied - used_at column exists'
+      });
+    }
+
+    // Add the column
+    console.log('📝 Adding used_at column...');
+    await query(`
+      ALTER TABLE \`tbl_password_reset_tokens\` 
+      ADD COLUMN \`used_at\` DATETIME NULL COMMENT 'Timestamp when token was successfully used for password reset' AFTER \`expires_at\`
+    `);
+    console.log('✅ Column added');
+
+    // Create index for performance
+    console.log('📝 Creating index...');
+    await query(`
+      CREATE INDEX \`idx_used_at\` ON \`tbl_password_reset_tokens\` (\`used_at\`)
+    `);
+    console.log('✅ Index created');
+
+    // Cleanup old tokens
+    console.log('🧹 Cleaning up old tokens...');
+    const [result] = await query(`
+      DELETE FROM tbl_password_reset_tokens 
+      WHERE expires_at <= NOW()
+    `);
+    console.log(`✅ Cleaned up ${result.affectedRows} expired tokens`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Migration completed successfully',
+      data: {
+        tokensDeleted: result.affectedRows
+      }
+    });
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Migration failed'
     });
   }
 });

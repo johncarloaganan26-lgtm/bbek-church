@@ -820,12 +820,17 @@ async function forgotPasswordByEmail(email) {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
 
     // Store token in database
+    // Delete expired/used tokens first to avoid conflicts
+    const deleteSql = 'DELETE FROM tbl_password_reset_tokens WHERE acc_id = ? AND (expires_at <= NOW() OR used_at IS NOT NULL)';
+    await query(deleteSql, [accountData.acc_id]);
+    
     const sql = `
       INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)
       VALUES (?, ?, ?)
       ON DUPLICATE KEY UPDATE
         token = VALUES(token),
-        expires_at = VALUES(expires_at)
+        expires_at = VALUES(expires_at),
+        used_at = NULL
     `;
     await query(sql, [accountData.acc_id, resetToken, expiresAt]);
 
