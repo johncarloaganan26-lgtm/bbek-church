@@ -768,8 +768,9 @@ router.post('/resetPasswordWithToken', async (req, res) => {
     }
 
     // Mark token as used instead of deleting (for audit trail and preventing reuse)
-    const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = NOW() WHERE token = ?';
-    await query(markUsedSql, [token]);
+    // Use UTC_TIMESTAMP() to match the timezone used for token creation
+    const markUsedSql = 'UPDATE tbl_password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE acc_id = ?';
+    await query(markUsedSql, [tokenData.acc_id]);
 
     res.status(200).json({
       success: true,

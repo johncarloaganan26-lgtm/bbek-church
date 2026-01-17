@@ -400,7 +400,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
       // Cleanup old expired tokens
       const [result] = await query(`
         DELETE FROM tbl_password_reset_tokens 
-        WHERE expires_at <= NOW()
+        WHERE expires_at <= UTC_TIMESTAMP()
       `);
       console.log(`✅ Migration complete - Cleaned up ${result.affectedRows} expired tokens`);
       
@@ -424,7 +424,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
         try {
           const result = await query(`
             DELETE FROM tbl_password_reset_tokens 
-            WHERE expires_at <= NOW() OR (used_at IS NOT NULL AND used_at < DATE_SUB(NOW(), INTERVAL 7 DAY))
+            WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY))
           `);
           if (result[0].affectedRows > 0) {
             console.log(`🧹 Cleaned up ${result[0].affectedRows} expired password reset tokens`);
@@ -439,7 +439,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
         try {
           const result = await query(`
             DELETE FROM tbl_password_reset_tokens 
-            WHERE expires_at <= NOW() OR (used_at IS NOT NULL AND used_at < DATE_SUB(NOW(), INTERVAL 7 DAY))
+            WHERE expires_at <= UTC_TIMESTAMP() OR (used_at IS NOT NULL AND used_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY))
           `);
           if (result[0].affectedRows > 0) {
             console.log(`🧹 Initial cleanup: Removed ${result[0].affectedRows} expired tokens`);
