@@ -825,10 +825,10 @@ async function forgotPasswordByEmail(email) {
 
     const sql = `
       INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)
-      VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 24 HOUR))
+      VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 7 DAY))
       ON DUPLICATE KEY UPDATE
         token = VALUES(token),
-        expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 24 HOUR),
+        expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 7 DAY),
         used_at = NULL
     `;
     await query(sql, [accountData.acc_id, resetToken]);
