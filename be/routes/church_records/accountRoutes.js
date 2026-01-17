@@ -1,5 +1,6 @@
 const express = require('express');
 const moment = require('moment');
+const bcrypt = require('bcrypt');
 const { query } = require('../../database/db');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const {
@@ -641,30 +642,33 @@ router.post('/verifyResetToken', async (req, res) => {
       });
     }
 
-    // Check if token exists, not expired, and not already used
+    // Get all valid tokens (not expired, not used) and account info
     const sql = `
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.token = ? AND t.expires_at > UTC_TIMESTAMP() AND a.status = 'active' AND t.used_at IS NULL
+      WHERE t.expires_at > UTC_TIMESTAMP() AND a.status = 'active' AND t.used_at IS NULL
     `;
-    const [rows] = await query(sql, [token]);
+    const [rows] = await query(sql, []);
 
-    console.log('🔍 Token query result:', rows.length, 'rows found');
+    console.log('🔍 Valid tokens found:', rows.length);
 
-    if (rows.length === 0) {
-      // Let's check what went wrong
-      const checkTokenSql = 'SELECT * FROM tbl_password_reset_tokens WHERE token = ?';
-      const [tokenRows] = await query(checkTokenSql, [token]);
-      console.log('🔍 Token exists in DB:', tokenRows.length > 0);
-
-      if (tokenRows.length > 0) {
-        const tokenData = tokenRows[0];
-        console.log('🔍 Token expiration:', tokenData.expires_at, 'Current time:', new Date());
-        console.log('🔍 Token expired:', new Date(tokenData.expires_at) < new Date());
-        console.log('🔍 Token already used:', tokenData.used_at !== null);
+    // Compare provided token against hashed tokens
+    let matchedTokenData = null;
+    for (const row of rows) {
+      try {
+        const isMatch = await bcrypt.compare(token, row.token);
+        if (isMatch) {
+          matchedTokenData = row;
+          break;
+        }
+      } catch (compareError) {
+        console.log('Token comparison error for account:', row.acc_id);
       }
+    }
 
+    if (!matchedTokenData) {
+      console.log('❌ Token not found or invalid');
       return res.status(400).json({
         success: false,
         message: 'Invalid, expired, or already used token',
@@ -672,7 +676,7 @@ router.post('/verifyResetToken', async (req, res) => {
       });
     }
 
-    const tokenData = rows[0];
+    const tokenData = matchedTokenData;
     console.log('✅ Token is valid for account:', tokenData.email);
 
     res.status(200).json({
@@ -719,16 +723,30 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       });
     }
 
-    // Check if token exists and is not expired
+    // Get all valid tokens and compare
     const sql = `
       SELECT t.*, a.email, a.position, a.status
       FROM tbl_password_reset_tokens t
       JOIN tbl_accounts a ON t.acc_id = a.acc_id
-      WHERE t.token = ? AND t.expires_at > UTC_TIMESTAMP() AND a.status = 'active'
+      WHERE t.expires_at > UTC_TIMESTAMP() AND a.status = 'active'
     `;
-    const [rows] = await query(sql, [token]);
+    const [rows] = await query(sql, []);
 
-    if (rows.length === 0) {
+    // Compare provided token against hashed tokens
+    let matchedTokenData = null;
+    for (const row of rows) {
+      try {
+        const isMatch = await bcrypt.compare(token, row.token);
+        if (isMatch) {
+          matchedTokenData = row;
+          break;
+        }
+      } catch (compareError) {
+        console.log('Token comparison error for account:', row.acc_id);
+      }
+    }
+
+    if (!matchedTokenData) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired token',
@@ -736,7 +754,7 @@ router.post('/resetPasswordWithToken', async (req, res) => {
       });
     }
 
-    const tokenData = rows[0];
+    const tokenData = matchedTokenData;
 
     // Update password
     const updateResult = await updateAccount(tokenData.acc_id, { password: newPassword });

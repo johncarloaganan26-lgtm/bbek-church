@@ -107,7 +107,7 @@ const sendAccountDetails = async (accountDetails) => {
       importantNotes = `
         <p><strong>Important:</strong></p>
         <ul>
-          <li>This link will expire after a certain period for security reasons.</li>
+          <li>This link will expire after 7 days for security reasons.</li>
           <li>If you did not request this password reset, please ignore this email and contact the church administration immediately.</li>
           <li>For security, do not share this link with anyone.</li>
         </ul>
