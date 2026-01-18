@@ -297,8 +297,8 @@ async function createWaterBaptism(baptismData) {
 
     // Format dates - baptism_date can be null
     const formattedBaptismDate = baptism_date ? moment(baptism_date).format('YYYY-MM-DD HH:mm:ss') : null;
-    // date_created is VARCHAR(45), so format as string
-    const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
+    // date_created is VARCHAR(45), so format as string - use UTC to ensure consistency
+    const formattedDateCreated = moment.utc(date_created).format('YYYY-MM-DD HH:mm:ss');
     const formattedBirthdate = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
 
     // Build SQL conditionally based on whether baptism_date is provided

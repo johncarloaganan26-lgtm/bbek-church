@@ -94,9 +94,9 @@ async function createForm(formData) {
     }
 
     const sql = `
-      INSERT INTO tbl_forms 
-      (form_type, submitted_by, status, name, email, phone, form_data, admin_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbl_forms
+      (form_type, submitted_by, status, name, email, phone, form_data, admin_notes, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
     `;
 
     const params = [

@@ -137,25 +137,34 @@ export default defineComponent({
     const showDismissDialog = ref(false);
     const notificationToDismiss = ref(null);
 
-    // Format date using native JavaScript
+    // Format date using native JavaScript with proper timezone handling
     const formatDate = (dateString) => {
       if (!dateString) return 'Just now';
 
-      const date = new Date(dateString);
+      // Parse the date string - backend sends ISO strings, convert to Philippine time
+      let date;
+      try {
+        // Parse as UTC first
+        const utcDate = new Date(dateString);
+
+        // Convert to Philippine time (UTC+8)
+        date = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));
+
+        // Validate the date
+        if (isNaN(date.getTime())) {
+          console.warn('Invalid date string:', dateString);
+          return 'Invalid date';
+        }
+      } catch (error) {
+        console.warn('Error parsing date:', dateString, error);
+        return 'Invalid date';
+      }
+
       const now = new Date();
       const diffMs = now - date;
       const diffHours = diffMs / (1000 * 60 * 60);
 
-      // Relative time for recent notifications
-      if (diffHours < 24) {
-        if (diffHours < 1) {
-          const diffMinutes = Math.floor(diffMs / (1000 * 60));
-          return diffMinutes < 1 ? 'Just now' : `${diffMinutes}m ago`;
-        }
-        return `${Math.floor(diffHours)}h ago`;
-      }
-
-      // Full date for older notifications
+      // Show absolute time for better accuracy
       return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',

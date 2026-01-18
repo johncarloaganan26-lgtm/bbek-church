@@ -217,7 +217,7 @@ async function createBurialService(burialData) {
     const formattedServiceDate = (service_date === null || service_date === '' || !service_date)
       ? null
       : moment(service_date).format('YYYY-MM-DD HH:mm:ss');
-    const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
+    const formattedDateCreated = moment.utc(date_created).format('YYYY-MM-DD HH:mm:ss');
     const formattedBirthdate = deceased_birthdate ? (moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
       ? deceased_birthdate
       : moment(deceased_birthdate).format('YYYY-MM-DD')) : null;

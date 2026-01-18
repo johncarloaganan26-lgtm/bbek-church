@@ -183,6 +183,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import axios from '@/api/axios';
 
 // Notification List Component (will be created next)
@@ -363,12 +364,14 @@ export default {
         // Add to read notifications set and save to localStorage
         readNotificationIds.value.add(notificationId);
         saveReadNotifications();
+        ElMessage.success('Notification marked as read');
       } catch (error) {
         // Handle 401 Unauthorized gracefully
         if (error.response?.status === 401) {
           return;
         }
         console.error('Error marking notification as read:', error);
+        ElMessage.error('Failed to mark notification as read');
       }
     };
 
@@ -382,12 +385,14 @@ export default {
           readNotificationIds.value.add(n.id);
         });
         saveReadNotifications();
+        ElMessage.success('All notifications marked as read');
       } catch (error) {
         // Handle 401 Unauthorized gracefully
         if (error.response?.status === 401) {
           return;
         }
         console.error('Error marking all notifications as read:', error);
+        ElMessage.error('Failed to mark all notifications as read');
       }
     };
 
@@ -431,6 +436,7 @@ export default {
     const handleDismiss = (notificationId) => {
       dismissedNotificationIds.value.add(notificationId);
       saveDismissedNotifications();
+      ElMessage.success('Notification dismissed successfully');
     };
 
     // Toggle notification panel

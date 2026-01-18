@@ -95,13 +95,13 @@ function formatDateValue(value) {
   
   // Try to parse and format the date/datetime
   try {
-    const date = moment(value);
+    const date = moment.utc(value); // Parse as UTC
     if (date.isValid()) {
       // Check if the original value contained time information
       const originalString = String(value);
       if (originalString.includes(':') || originalString.includes('T')) {
-        // Format as datetime
-        return date.format('YYYY-MM-DD HH:mm:ss');
+        // Format as ISO datetime for better frontend parsing
+        return date.toISOString();
       } else {
         // Format as date only
         return date.format('YYYY-MM-DD');
