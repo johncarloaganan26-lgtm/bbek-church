@@ -871,7 +871,7 @@ const handleDeleteVideo = async () => {
     const success = await savePageData(contentToSave, imagesToSave)
 
     if (success) {
-      ElMessage.success('Video deleted successfully!')
+      // ElMessage.success('Video deleted successfully!')
       // Reload data to confirm deletion
       await new Promise(resolve => setTimeout(resolve, 500))
       const loadedData = await loadPageData(true)
@@ -1119,7 +1119,7 @@ const saveChanges = async () => {
           // Video was marked for deletion
           if (!loadedData.homeVideo ||
               (typeof loadedData.homeVideo === 'string' && loadedData.homeVideo.length === 0)) {
-            ElMessage.success('Video deleted successfully!')
+            // ElMessage.success('Video deleted successfully!')
           } else {
             ElMessage.warning('Video may not have been deleted. Please try again.')
           }
