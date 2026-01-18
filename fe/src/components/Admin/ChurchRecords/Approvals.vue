@@ -388,26 +388,58 @@ const getStatusColor = (status) => {
 
 const approveRequest = async (approval) => {
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to approve this ${approval.type} request?`,
-      'Confirm Approval',
-      {
-        confirmButtonText: 'Approve',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      }
-    )
-
-    const result = await approvalsStore.updateApprovalStatus(approval.approval_id, 'approved')
-    if (result.success) {
-      ElMessage.success('Approval request approved successfully')
+    let scheduleDate = null;
+    let scheduleTime = null;
+    
+    // For child dedications, ask admin to select approval date/time
+    if (approval.type === 'child_dedication') {
+      const scheduleInput = await ElMessageBox.prompt(
+        `Enter the approved dedication date and time for this child dedication request (Format: YYYY-MM-DD HH:MM)`,
+        'Schedule Approval',
+        {
+          confirmButtonText: 'OK',
+          cancelButtonText: 'Cancel',
+          inputPattern: /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/,
+          inputErrorMessage: 'Please use format: YYYY-MM-DD HH:MM',
+          inputValue: ''
+        }
+      );
+      
+      // Parse the input into date and time
+      const [date, time] = scheduleInput.split(' ');
+      scheduleDate = date;
+      scheduleTime = time + ':00'; // Add seconds
     } else {
-      ElMessage.error(result.error || 'Failed to approve request')
+      // For non-child-dedications, just ask for confirmation
+      await ElMessageBox.confirm(
+        `Are you sure you want to approve this ${approval.type} request?`,
+        'Confirm Approval',
+        {
+          confirmButtonText: 'Approve',
+          cancelButtonText: 'Cancel',
+          type: 'warning',
+        }
+      );
+    }
+
+    const result = await approvalsStore.updateApprovalStatus(
+      approval.approval_id, 
+      'approved',
+      scheduleDate,
+      scheduleTime
+    );
+    
+    if (result.success) {
+      ElMessage.success('Approval request approved successfully');
+      // Refresh the approvals list
+      await approvalsStore.fetchApprovals();
+    } else {
+      ElMessage.error(result.error || 'Failed to approve request');
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error approving request:', error)
-      ElMessage.error('Failed to approve request')
+      console.error('Error approving request:', error);
+      ElMessage.error('Failed to approve request');
     }
   }
 }

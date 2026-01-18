@@ -303,6 +303,8 @@ const sendMarriageDetails = async (marriageDetails) => {
  * @param {string} [baptismDetails.baptismDate] - Baptism date (optional)
  * @param {string} [baptismDetails.location] - Baptism location (optional)
  * @param {string} [baptismDetails.recipientName] - Recipient name (optional)
+ * @param {string} [baptismDetails.pastorName] - Pastor name (optional)
+ * @param {boolean} [baptismDetails.isMember] - Whether recipient is a member (optional)
  * @returns {Promise<Object>} - Result object with success status and message
  */
 const sendWaterBaptismDetails = async (baptismDetails) => {
@@ -333,8 +335,29 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
 
     const recipientName = baptismDetails.recipientName || 'Valued Member';
     const memberName = baptismDetails.memberName || 'N/A';
-    const baptismDate = baptismDetails.baptismDate || 'To be determined';
-    const location = baptismDetails.location || 'To be determined';
+    const pastorName = baptismDetails.pastorName || 'N/A';
+    const isMember = baptismDetails.isMember || false;
+
+    // Format baptism date
+    let baptismDate = baptismDetails.baptismDate || 'To be determined';
+    if (baptismDate !== 'To be determined' && status === 'approved') {
+      // Format with AM/PM for approved status
+      const date = new Date(baptismDate);
+      baptismDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    // Handle location for non-members in pending status
+    let location = baptismDetails.location || 'To be determined';
+    if (status === 'pending' && !isMember) {
+      location = '';
+    }
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
@@ -371,6 +394,12 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Member Name:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${memberName}</td>
                 </tr>
+                ${status === 'approved' ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Baptism Date:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${baptismDate}</td>
@@ -415,10 +444,13 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
  * @param {string} dedicationDetails.email - Recipient email
  * @param {string} dedicationDetails.status - Status: 'pending', 'ongoing', or 'completed'
  * @param {string} [dedicationDetails.childName] - Child's name (optional)
- * @param {string} [dedicationDetails.parentName] - Parent's name (optional)
+ * @param {string} [dedicationDetails.fatherName] - Father's name (optional)
+ * @param {string} [dedicationDetails.motherName] - Mother's name (optional)
  * @param {string} [dedicationDetails.dedicationDate] - Dedication date (optional)
  * @param {string} [dedicationDetails.location] - Dedication location (optional)
  * @param {string} [dedicationDetails.recipientName] - Recipient name (optional)
+ * @param {string} [dedicationDetails.pastorName] - Pastor name (optional)
+ * @param {boolean} [dedicationDetails.isMember] - Whether recipient is a member (optional)
  * @returns {Promise<Object>} - Result object with success status and message
  */
 const sendChildDedicationDetails = async (dedicationDetails) => {
@@ -449,9 +481,42 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
 
     const recipientName = dedicationDetails.recipientName || 'Valued Member';
     const childName = dedicationDetails.childName || 'N/A';
-    const parentName = dedicationDetails.parentName || 'N/A';
-    const dedicationDate = dedicationDetails.dedicationDate || 'To be determined';
-    const location = dedicationDetails.location || 'To be determined';
+    const fatherName = dedicationDetails.fatherName || '';
+    const motherName = dedicationDetails.motherName || '';
+
+    // Construct guardian information
+    let guardianInfo = 'N/A';
+    if (fatherName && motherName) {
+      guardianInfo = `${fatherName} & ${motherName}`;
+    } else if (fatherName) {
+      guardianInfo = fatherName;
+    } else if (motherName) {
+      guardianInfo = motherName;
+    }
+
+    const pastorName = dedicationDetails.pastorName || 'N/A';
+    const isMember = dedicationDetails.isMember || false;
+
+    // Format dedication date
+    let dedicationDate = dedicationDetails.dedicationDate || 'To be determined';
+    if (dedicationDate !== 'To be determined' && status === 'approved') {
+      // Format with AM/PM for approved status
+      const date = new Date(dedicationDate);
+      dedicationDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    // Handle location for non-members in pending status
+    let location = dedicationDetails.location || 'To be determined';
+    if (status === 'pending' && !isMember) {
+      location = '';
+    }
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
@@ -489,9 +554,15 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${childName}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Parent Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${parentName}</td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Guardian:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${guardianInfo}</td>
                 </tr>
+                ${status === 'approved' ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Dedication Date:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDate}</td>
@@ -672,6 +743,8 @@ const sendBurialServiceRequestNotification = async (requestDetails) => {
  * @param {string} [burialDetails.burialDate] - Burial date (optional)
  * @param {string} [burialDetails.location] - Burial location (optional)
  * @param {string} [burialDetails.recipientName] - Recipient name (optional)
+ * @param {string} [burialDetails.pastorName] - Pastor name (optional)
+ * @param {boolean} [burialDetails.isMember] - Whether recipient is a member (optional)
  * @returns {Promise<Object>} - Result object with success status and message
  */
 const sendBurialDetails = async (burialDetails) => {
@@ -703,8 +776,29 @@ const sendBurialDetails = async (burialDetails) => {
     const recipientName = burialDetails.recipientName || 'Valued Member';
     const deceasedName = burialDetails.deceasedName || 'N/A';
     const familyContact = burialDetails.familyContact || 'N/A';
-    const burialDate = burialDetails.burialDate || 'To be determined';
-    const location = burialDetails.location || 'To be determined';
+    const pastorName = burialDetails.pastorName || 'N/A';
+    const isMember = burialDetails.isMember || false;
+
+    // Format burial date
+    let burialDate = burialDetails.burialDate || 'To be determined';
+    if (burialDate !== 'To be determined' && status === 'approved') {
+      // Format with AM/PM for approved status
+      const date = new Date(burialDate);
+      burialDate = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    // Handle location for non-members in pending status
+    let location = burialDetails.location || 'To be determined';
+    if (status === 'pending' && !isMember) {
+      location = '';
+    }
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
@@ -745,6 +839,12 @@ const sendBurialDetails = async (burialDetails) => {
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Family Contact:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${familyContact}</td>
                 </tr>
+                ${status === 'approved' ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Burial Date:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${burialDate}</td>

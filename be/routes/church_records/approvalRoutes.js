@@ -137,13 +137,15 @@ router.get('/getApprovalById/:id', async (req, res) => {
 /**
  * UPDATE - Update approval status
  * PUT /api/church-records/approvals/updateApprovalStatus/:id
+ * Body: { status, schedule_date?, schedule_time? }
+ * For child dedications: include schedule_date and schedule_time when approving
  */
 router.put('/updateApprovalStatus/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, schedule_date, schedule_time } = req.body;
 
-    const result = await updateApprovalStatus(id, status);
+    const result = await updateApprovalStatus(id, status, schedule_date, schedule_time);
     if (result.success) {
       return res.status(200).json({
         success: true,

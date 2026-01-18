@@ -80,16 +80,6 @@ instance.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
-      // Clear invalid tokens
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
-
-      // Show error message if available
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Unauthorized. Please login again.'
-      ElMessage.error(errorMessage)
-
       // Only redirect if it's NOT a login request (login failures should be handled by the component)
       const isLoginRequest = originalRequest.url?.includes('/accounts/login')
       
@@ -115,6 +105,19 @@ instance.interceptors.response.use(
                           currentPath === '/messages' ||
                           currentPath === '/schedule-change' ||
                           currentPath.startsWith('/beoneofus/')
+      
+      // Only clear tokens and show error if NOT on a public path
+      if (!isPublicPath && !isPublicEndpoint) {
+        // Clear invalid tokens
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+        
+        // Show error message if available, but only for non-public routes
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Unauthorized. Please login again.'
+        ElMessage.error(errorMessage)
+      }
       
       // Only redirect if:
       // 1. Not a login request

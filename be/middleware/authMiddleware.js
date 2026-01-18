@@ -23,7 +23,12 @@ const publicRoutes = [
   '/api/church-records/accounts/getAccountById',
   '/api/church-records/accounts/updateAccount',
   // Member registration routes
+  // Ministry public READ routes (viewing ministries doesn't require auth)
   '/api/church-records/ministries/getPublicMinistries',
+  '/api/church-records/ministries/getAllMinistries',
+  '/api/church-records/ministries/getMinistryById**',
+  '/api/church-records/ministries/getAllMinistriesForSelect',
+  '/api/church-records/ministries/exportExcel',
   '/api/church-records/members/getAllMembersForSelect',
   '/api/church-records/members/getAllDepartmentMembersForSelect',
   '/api/church-records/departments/getAllDepartmentsForSelect',

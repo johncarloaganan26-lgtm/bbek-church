@@ -660,7 +660,7 @@ async function updateServiceDateForScheduleChange(formData) {
       'child-dedication': {
         table: 'tbl_childdedications',
         idColumn: 'child_id',
-        dateColumn: 'dedication_date',
+        dateColumn: 'preferred_dedication_date',
         updateFunction: require('./services/childDedicationRecords').updateChildDedication
       }
     };
@@ -711,7 +711,12 @@ async function updateServiceDateForScheduleChange(formData) {
     } else if (serviceType === 'burial') {
       updateData.service_date = requestedDateFormatted;
     } else if (serviceType === 'child-dedication') {
-      updateData.dedication_date = requestedDateFormatted;
+      // For child dedication, split date and time
+      updateData.preferred_dedication_date = moment(requestedDate).format('YYYY-MM-DD');
+      // Only update time if requestedDate contains time information
+      if (moment(requestedDate).format('HH:mm:ss') !== '00:00:00') {
+        updateData.preferred_dedication_time = moment(requestedDate).format('HH:mm:ss');
+      }
     }
 
     const updateResult = await serviceConfig.updateFunction(finalServiceId, updateData);

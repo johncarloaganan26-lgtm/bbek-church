@@ -18,7 +18,8 @@ const {
   getAllDepartmentMembersForSelect,
   getAllPastorsForSelect,
   getAllMembersWithoutPastorsForSelect,
-  getMembersWithoutBaptism
+  getMembersWithoutBaptism,
+  getSpecificMemberByEmailAndStatus
 } = require('../../dbHelpers/church_records/memberRecords');
 
 const router = express.Router();
@@ -590,6 +591,47 @@ router.get('/getMemberById/:id', async (req, res) => {
     console.error('Error fetching member:', error);
     res.status(500).json({
       error: error.message || 'Failed to fetch member'
+    });
+  }
+});
+
+/**
+ * READ ONE - Get a single member by email (real-time lookup)
+ * GET /api/church-records/members/getSpecificMemberByEmail/:email
+ */
+router.get('/getSpecificMemberByEmail/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    if (!email || email.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+        error: 'Email is required'
+      });
+    }
+
+    const result = await getSpecificMemberByEmailAndStatus(email);
+    
+    if (result) {
+      res.status(200).json({
+        success: true,
+        message: 'Member retrieved successfully',
+        data: result
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Member not found',
+        data: null
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching member by email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching member',
+      error: error.message || 'Failed to fetch member by email'
     });
   }
 });

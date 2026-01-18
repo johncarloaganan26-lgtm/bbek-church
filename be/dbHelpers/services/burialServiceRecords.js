@@ -25,6 +25,94 @@ async function getNextBurialId() {
   }
 }
 
+/**
+ * Check if a time slot is available for burial service
+ * @param {String} serviceDate - Service date to check
+ * @param {String} excludeBurialId - Optional burial_id to exclude from check (for updates)
+ * @returns {Promise<Object>} Object with isBooked flag and conflicting burial
+ */
+async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
+  try {
+    const formattedDate = serviceDate && moment(serviceDate, 'YYYY-MM-DD HH:mm:ss', true).isValid()
+      ? moment(serviceDate).format('YYYY-MM-DD')
+      : moment(serviceDate).format('YYYY-MM-DD');
+    const formattedTime = serviceDate && moment(serviceDate, 'YYYY-MM-DD HH:mm:ss', true).isValid()
+      ? moment(serviceDate).format('HH:mm:ss')
+      : moment(serviceDate).format('HH:mm:ss');
+
+    let sql = `
+      SELECT burial_id, deceased_name, service_date, status
+      FROM tbl_burialservice
+      WHERE DATE(service_date) = ?
+      AND TIME(service_date) = ?
+      AND status = 'approved'
+    `;
+    const params = [formattedDate, formattedTime];
+
+    if (excludeBurialId) {
+      sql += ' AND burial_id != ?';
+      params.push(excludeBurialId);
+    }
+
+    const [rows] = await query(sql, params);
+
+    return {
+      isBooked: rows.length > 0,
+      conflictingBurial: rows.length > 0 ? rows[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking time slot availability:', error);
+    // Don't throw - allow the operation to proceed if check fails
+    return {
+      isBooked: false,
+      conflictingBurial: null
+    };
+  }
+}
+
+/**
+ * Check if a member has a pending approval for burial service
+ * @param {String} memberId - Member ID to check
+ * @param {String} requesterEmail - Email address of requester (for non-members)
+ * @returns {Promise<Object>} Object with hasPendingApproval flag and approval details
+ */
+async function checkPendingBurialServiceApproval(memberId, requesterEmail = null) {
+  try {
+    let sql = `SELECT id, type, status, created_at 
+                 FROM tbl_approval 
+                 WHERE type = 'burial_service' 
+                 AND status = 'pending'
+                 AND (`;
+    const params = [];
+
+    if (memberId) {
+      sql += `email IN (SELECT email FROM tbl_members WHERE member_id = ?)`;
+      params.push(memberId);
+    }
+
+    if (requesterEmail) {
+      if (memberId) {
+        sql += ` OR email = ?`;
+      } else {
+        sql += `email = ?`;
+      }
+      params.push(requesterEmail);
+    }
+
+    sql += `) LIMIT 1`;
+
+    const [rows] = await query(sql, params);
+
+    return {
+      hasPendingApproval: rows.length > 0,
+      approval: rows.length > 0 ? rows[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking for pending burial service approval:', error);
+    throw error;
+  }
+}
+
 async function createBurialService(burialData) {
   try {
     const new_burial_id = await getNextBurialId();
@@ -79,6 +167,36 @@ async function createBurialService(burialData) {
         success: false,
         message: 'A burial service record already exists for this member with the same deceased name and birthdate.'
       };
+    }
+
+    // Check if member has a pending burial service approval
+    const pendingApprovalCheck = await checkPendingBurialServiceApproval(
+      member_id ? String(member_id).trim() : null,
+      requester_email ? String(requester_email).trim() : null
+    );
+    if (pendingApprovalCheck.hasPendingApproval) {
+      return {
+        success: false,
+        message: 'You have a pending burial service request. Please wait for approval or contact the administrator to reject it first.',
+        error: 'Pending approval exists'
+      };
+    }
+
+    // Check for time slot conflicts - Only check time, not date
+    // Multiple burial services are allowed on the same date, but not at the same time
+    if (service_date) {
+      const timeSlotCheck = await checkTimeSlotAvailability(
+        service_date,
+        null // No exclusion for new records
+      );
+
+      if (timeSlotCheck.isBooked) {
+        return {
+          success: false,
+          message: `Time slot conflict: ${service_date} is already booked.`,
+          error: 'Time slot conflict'
+        };
+      }
     }
 
     const final_burial_id = String(burial_id || new_burial_id).trim();
@@ -144,7 +262,9 @@ async function createBurialService(burialData) {
               ? moment(createdBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
               : 'To be determined',
             location: createdBurialService.data.location,
-            recipientName
+            recipientName,
+            pastorName: createdBurialService.data.pastor_name,
+            isMember: true
           });
         }
       } else if (final_requester_email) {
@@ -158,7 +278,9 @@ async function createBurialService(burialData) {
             ? moment(createdBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
           location: createdBurialService.data.location,
-          recipientName: final_requester_name || 'Requester'
+          recipientName: final_requester_name || 'Requester',
+          pastorName: createdBurialService.data.pastor_name,
+          isMember: false
         });
       }
     } catch (emailError) {
@@ -381,22 +503,36 @@ async function getBurialServicesByMemberId(memberId) {
 
     const memberIdStr = String(memberId).trim();
 
+    // First get the member's email
+    const memberSql = 'SELECT email FROM tbl_members WHERE member_id = ?';
+    const [memberRows] = await query(memberSql, [memberIdStr]);
+
+    if (!memberRows || memberRows.length === 0) {
+      return {
+        success: false,
+        message: 'Member not found',
+        data: []
+      };
+    }
+
+    const memberEmail = memberRows[0].email;
+
     const sql = `SELECT
       bs.*,
       m.firstname,
       m.lastname,
       m.middle_name,
       CONCAT(
-        m.firstname,
+        COALESCE(m.firstname, ''),
         IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
+        IF(m.firstname IS NOT NULL OR m.middle_name IS NOT NULL, ' ', ''),
+        COALESCE(m.lastname, '')
       ) as fullname
     FROM tbl_burialservice bs
     LEFT JOIN tbl_members m ON bs.member_id = m.member_id
-    WHERE bs.member_id = ?
+    WHERE bs.member_id = ? OR bs.requester_email = ?
     ORDER BY bs.date_created DESC`;
-    const [rows] = await query(sql, [memberIdStr]);
+    const [rows] = await query(sql, [memberIdStr, memberEmail]);
 
     return {
       success: true,
@@ -483,6 +619,26 @@ async function updateBurialService(burialId, burialData) {
       deceased_birthdate,
       date_death
     } = burialData;
+
+    // Check for time slot conflicts before updating
+    const currentData = burialCheck.data;
+    const finalServiceDate = service_date !== undefined ? service_date : currentData.service_date;
+
+    // Only check conflicts if service_date is being updated
+    if (service_date !== undefined && finalServiceDate) {
+      const timeSlotCheck = await checkTimeSlotAvailability(
+        finalServiceDate,
+        burialId
+      );
+
+      if (timeSlotCheck.isBooked) {
+        return {
+          success: false,
+          message: `Time slot conflict: ${finalServiceDate} is already booked.`,
+          error: 'Time slot conflict'
+        };
+      }
+    }
 
     const fields = [];
     const params = [];
@@ -621,7 +777,9 @@ async function updateBurialService(burialId, burialData) {
               ? moment(updatedBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
               : 'To be determined',
             location: updatedBurialService.data.location,
-            recipientName
+            recipientName,
+            pastorName: updatedBurialService.data.pastor_name,
+            isMember: true
           });
         }
       } else if (updatedBurialService.data.requester_email) {
@@ -635,7 +793,9 @@ async function updateBurialService(burialId, burialData) {
             ? moment(updatedBurialService.data.service_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
           location: updatedBurialService.data.location,
-          recipientName: updatedBurialService.data.requester_name || 'Requester'
+          recipientName: updatedBurialService.data.requester_name || 'Requester',
+          pastorName: updatedBurialService.data.pastor_name,
+          isMember: false
         });
       }
     } catch (emailError) {
@@ -937,5 +1097,7 @@ module.exports = {
   deleteBurialService,
   exportBurialServicesToExcel,
   searchBurialServicesFulltext,
-  analyzeBurialServiceAvailability
+  analyzeBurialServiceAvailability,
+  checkTimeSlotAvailability,
+  checkPendingBurialServiceApproval
 };

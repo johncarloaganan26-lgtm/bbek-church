@@ -885,8 +885,27 @@ const handleSubmit = async () => {
       service_date: formData.service_date
     })
     
-    // Only include member_id if it's provided (optional for admin/staff)
-    if (formData.member_id) submitData.member_id = String(formData.member_id).trim()
+    // Get member_id: either from form (admin/staff selected) or fetch real-time from logged-in user's email
+    let finalMemberId = formData.member_id
+    
+    if (!finalMemberId && userInfo.value?.account?.email) {
+      // Fetch member_id in real-time from API using current logged-in user's email
+      try {
+        const memberResponse = await axios.get(`/church-records/members/getSpecificMemberByEmail/${userInfo.value.account.email}`)
+        if (memberResponse.data?.success && memberResponse.data?.data?.member_id) {
+          finalMemberId = String(memberResponse.data.data.member_id).trim()
+          console.log('Real-time member_id fetched:', finalMemberId)
+        }
+      } catch (error) {
+        console.warn('Could not fetch real-time member_id:', error.message)
+        // Fallback to localStorage member_id if API call fails
+        if (userInfo.value?.member?.member_id) {
+          finalMemberId = String(userInfo.value.member.member_id).trim()
+        }
+      }
+    }
+    
+    if (finalMemberId) submitData.member_id = finalMemberId
 
     // Always include requester info (required for backend processing)
     submitData.requester_name = formData.requester_name ? formData.requester_name.trim() : null

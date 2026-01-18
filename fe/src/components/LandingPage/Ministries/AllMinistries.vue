@@ -288,7 +288,9 @@ const getAllMinistryList = async () => {
     
     // Build query parameters
     const params = new URLSearchParams()
-    params.append('status', 'active') // Only show active ministries on landing page
+    // Show both active and not_active ministries on public landing page
+    // Only restrict status filter if user has explicitly selected a status
+    // params.append('status', 'active') // Commented out - show all ministries for visitors
     params.append('page', pageNumber.value.toString())
     params.append('pageSize', '11')
     
@@ -304,11 +306,14 @@ const getAllMinistryList = async () => {
     
     params.append('sortBy', 'Date Created (Newest)')
     
+    console.log('📍 Fetching ministries with params:', params.toString())
     const response = await axios.get(`/church-records/ministries/getAllMinistries?${params}`)
+    console.log('📦 Ministries response:', response.data)
     
     if (response.data.success) {
       ministryData.value = response.data.data || []
       totalPage.value = response.data.pagination?.totalPages || 1
+      console.log(`✅ Loaded ${ministryData.value.length} ministries`)
     } else {
       console.error('Failed to fetch ministries:', response.data.message)
       ministryData.value = []

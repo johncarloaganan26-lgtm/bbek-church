@@ -636,8 +636,13 @@ const handleSubmit = async (e) => {
 
   try {
     // Show confirmation dialog
+    const isMemberRequest = isLoggedIn.value && userInfo.value.member && userInfo.value.member.member_id
+    const confirmMessage = isMemberRequest
+      ? 'Are you sure you want to submit this burial service request?'
+      : 'Are you sure you want to submit this burial service request? This will create a burial service record without creating a member account.'
+
     await ElMessageBox.confirm(
-      'Are you sure you want to submit this burial service request? This will create a burial service record without creating a member account.',
+      confirmMessage,
       'Confirm Submission',
       {
         confirmButtonText: 'Submit',
@@ -660,15 +665,20 @@ const handleSubmit = async (e) => {
       deceased_name: deceasedName.value.trim(),
       deceased_birthdate: deceasedBirthDate.value,
       date_death: deceasedDeathDate.value,
-      // No member_id - this is for non-member requests
-      member_id: null
+      // Use member_id if logged in and has member record, otherwise null for non-member requests
+      member_id: (isLoggedIn.value && userInfo.value.member && userInfo.value.member.member_id) ? userInfo.value.member.member_id : null
     }
 
     const result = await burialServiceStore.createService(payload)
     
     if (result.success) {
-      showSuccessDialog('Success!', 'Burial service request submitted successfully! Our pastoral team will support you during this time. No member account was created.')
-      
+      const isMemberRequest = isLoggedIn.value && userInfo.value.member && userInfo.value.member.member_id
+      const successMessage = isMemberRequest
+        ? 'Burial service request submitted successfully! Our pastoral team will support you during this time.'
+        : 'Burial service request submitted successfully! Our pastoral team will support you during this time. No member account was created.'
+
+      showSuccessDialog('Success!', successMessage)
+
       // Clear form after successful submission
       resetForm()
     } else {

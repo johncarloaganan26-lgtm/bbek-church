@@ -203,17 +203,61 @@ const formatDate = (date) => {
 const fetchMinistryData = async () => {
   try {
     loading.value = true
-    // For now, use the model from state if available
+    
+    // Try to get ministry from state first
     if (ministryModelFromState.value) {
+      console.log('✅ Ministry found in route state:', ministryModelFromState.value)
       model.value = ministryModelFromState.value
       loading.value = false
+      return
+    }
+    
+    // If no ministry in state, try to fetch from API using ministry ID from route params
+    const ministryId = route.params?.id
+    console.log('📍 Looking for ministry with ID:', ministryId)
+    
+    if (ministryId) {
+      try {
+        console.log(`🔄 Fetching ministry data from API: /church-records/ministries/getMinistryById/${ministryId}`)
+        const response = await axios.get(`/church-records/ministries/getMinistryById/${ministryId}`)
+        console.log('📦 API Response:', response)
+        
+        if (response.data?.success || response.status === 200) {
+          const ministryData = response.data?.data || response.data
+          console.log('✅ Ministry data retrieved:', ministryData)
+          
+          model.value = {
+            ministry_id: ministryData.ministry_id,
+            ministry_name: ministryData.ministry_name,
+            description: ministryData.description,
+            schedule: ministryData.schedule,
+            leader_id: ministryData.leader_id,
+            department_id: ministryData.department_id,
+            members: ministryData.members,
+            status: ministryData.status,
+            imageUrl: ministryData.imageUrl,
+            image: ministryData.image,
+            department_name: ministryData.department_name,
+            leader_fullname: ministryData.leader_fullname
+          }
+        } else {
+          console.warn('⚠️ Unexpected response format:', response.data)
+          model.value = null
+        }
+      } catch (apiError) {
+        console.error('❌ Error fetching ministry from API:', apiError)
+        model.value = null
+      }
     } else {
-      loading.value = false
+      console.warn('⚠️ No ministry ID in route params')
       model.value = null
     }
+    
+    loading.value = false
   } catch (error) {
-    console.error('Error fetching ministry:', error)
-    router.push('/ministries')
+    console.error('❌ Error in fetchMinistryData:', error)
+    loading.value = false
+    model.value = null
   }
 }
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const { authenticateToken } = require('../../middleware/authMiddleware');
 const {
   createMinistry,
   getAllMinistries,
@@ -33,11 +34,12 @@ const upload = multer({
 /**
  * CREATE - Insert a new ministry record
  * POST /api/church-records/ministries/createMinistry
+ * REQUIRES AUTHENTICATION - Only authorized users can create ministries
  * Supports both:
  *   - JSON body with base64 image: { ministry_name, schedule, leader_id, department_id, members, status?, date_created?, image?, description? }
  *   - multipart/form-data with file upload: form fields + 'image' file field
  */
-router.post('/createMinistry', upload.single('image'), async (req, res) => {
+router.post('/createMinistry', authenticateToken, upload.single('image'), async (req, res) => {
   try {
     // Prepare ministry data from request
     let ministryData = { ...req.body };
@@ -189,11 +191,12 @@ router.get('/getMinistryById/:id', async (req, res) => {
 /**
  * UPDATE - Update an existing ministry record
  * PUT /api/church-records/ministries/updateMinistry/:id
+ * REQUIRES AUTHENTICATION - Only authorized users can update ministries
  * Supports both:
  *   - JSON body with base64 image: { ministry_name?, schedule?, leader_id?, department_id?, members?, status?, date_created?, image?, description? }
  *   - multipart/form-data with file upload: form fields + 'image' file field
  */
-router.put('/updateMinistry/:id', upload.single('image'), async (req, res) => {
+router.put('/updateMinistry/:id', authenticateToken, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const ministryId = parseInt(id);
@@ -249,8 +252,9 @@ router.put('/updateMinistry/:id', upload.single('image'), async (req, res) => {
 /**
  * DELETE - Delete a ministry record
  * DELETE /api/church-records/ministries/deleteMinistry/:id
+ * REQUIRES AUTHENTICATION - Only authorized users can delete ministries
  */
-router.delete('/deleteMinistry/:id', async (req, res) => {
+router.delete('/deleteMinistry/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const ministryId = parseInt(id);

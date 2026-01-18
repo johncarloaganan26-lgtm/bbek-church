@@ -121,6 +121,33 @@ async function getNextChildId() {
 }
 
 /**
+ * Check if a member has a pending approval for child dedication
+ * @param {String} memberId - Member ID to check
+ * @returns {Promise<Object>} Object with hasPendingApproval flag and approval details
+ */
+async function checkPendingChildDedicationApproval(memberId) {
+  try {
+    const sql = `SELECT id, type, status, created_at 
+                 FROM tbl_approval 
+                 WHERE type = 'child_dedication' 
+                 AND email IN (
+                   SELECT email FROM tbl_members WHERE member_id = ?
+                 )
+                 AND status = 'pending'
+                 LIMIT 1`;
+    const [rows] = await query(sql, [memberId]);
+
+    return {
+      hasPendingApproval: rows.length > 0,
+      approval: rows.length > 0 ? rows[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking for pending child dedication approval:', error);
+    throw error;
+  }
+}
+
+/**
  * CREATE - Insert a new child dedication record
  * @param {Object} dedicationData - Child dedication data object
  * @returns {Promise<Object>} Result object
@@ -266,6 +293,16 @@ async function createChildDedication(dedicationData) {
       };
     }
 
+    // Check if member has a pending child dedication approval
+    const pendingApprovalCheck = await checkPendingChildDedicationApproval(requested_by.trim());
+    if (pendingApprovalCheck.hasPendingApproval) {
+      return {
+        success: false,
+        message: 'You have a pending child dedication request. Please wait for approval or contact the administrator to reject it first.',
+        error: 'Pending approval exists'
+      };
+    }
+
     // Ensure child_id is set
     const final_child_id = child_id || new_child_id;
 
@@ -280,17 +317,40 @@ async function createChildDedication(dedicationData) {
           ? preferred_dedication_date
           : moment(preferred_dedication_date).format('YYYY-MM-DD'))
       : null;
-    
+
+    // Format preferred dedication time to HH:mm:ss
+    let formattedPreferredTime = preferred_dedication_time;
+    if (formattedPreferredTime) {
+      // Handle various time formats
+      let timeMoment;
+      if (formattedPreferredTime.includes(':')) {
+        // Try 24-hour formats first
+        timeMoment = moment(formattedPreferredTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+        if (!timeMoment.isValid()) {
+          // Try 12-hour formats
+          timeMoment = moment(formattedPreferredTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+        }
+      }
+
+      if (timeMoment && timeMoment.isValid()) {
+        formattedPreferredTime = timeMoment.format('HH:mm:ss');
+      } else {
+        // Fallback: ensure it's in HH:mm:ss format
+        console.warn('Could not parse time format:', formattedPreferredTime, '- using as-is');
+      }
+    }
+
     const formattedDateCompleted = date_completed
       ? (moment(date_completed, 'YYYY-MM-DD', true).isValid()
           ? date_completed
           : moment(date_completed).format('YYYY-MM-DD'))
       : null;
-    
+
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
     // Check for time slot conflicts - Only check time, not date
     // Multiple child dedications are allowed on the same date, but not at the same time
+    let timeSlotWarning = null;
     if (preferred_dedication_date && preferred_dedication_time) {
       const timeSlotCheck = await checkTimeSlotAvailability(
         preferred_dedication_date,
@@ -299,12 +359,7 @@ async function createChildDedication(dedicationData) {
       );
 
       if (timeSlotCheck && timeSlotCheck.isBooked) {
-        return {
-          success: false,
-          message: `Time slot conflict: ${preferred_dedication_date} at ${preferred_dedication_time} is already booked.`,
-          error: 'Time slot conflict',
-          conflict: timeSlotCheck.conflictingDedication
-        };
+        timeSlotWarning = `Time slot conflict: ${preferred_dedication_date} at ${preferred_dedication_time} is already booked.`;
       }
     }
 
@@ -333,7 +388,7 @@ async function createChildDedication(dedicationData) {
       place_of_birth.trim(),
       normalizedGender,
       formattedPreferredDate,
-      preferred_dedication_time,
+      formattedPreferredTime,
       formattedDateCompleted,
       contact_phone_number.trim(),
       contact_email ? contact_email.trim() : null,
@@ -410,11 +465,14 @@ async function createChildDedication(dedicationData) {
           status: dedicationStatus,
           recipientName: recipientName,
           childName: childName,
-          parentName: recipientName,
+          fatherName: createdDedication.data?.father_firstname ?
+            `${createdDedication.data.father_firstname} ${createdDedication.data.father_lastname || ''}`.trim() : '',
+          motherName: createdDedication.data?.mother_firstname ?
+            `${createdDedication.data.mother_firstname} ${createdDedication.data.mother_lastname || ''}`.trim() : '',
           dedicationDate: dedicationDate,
-          dedicationTime: createdDedication.data?.preferred_dedication_time || null,
           location: dedicationLocation,
-          pastor: createdDedication.data?.pastor || null
+          pastorName: createdDedication.data?.pastor || null,
+          isMember: true
         });
       }
 
@@ -428,11 +486,14 @@ async function createChildDedication(dedicationData) {
             status: dedicationStatus,
             recipientName: 'Valued Member',
             childName: childName,
-            parentName: 'Valued Member',
+            fatherName: createdDedication.data?.father_firstname ?
+              `${createdDedication.data.father_firstname} ${createdDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: createdDedication.data?.mother_firstname ?
+              `${createdDedication.data.mother_firstname} ${createdDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: createdDedication.data?.pastor || null
+            pastorName: createdDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -450,11 +511,14 @@ async function createChildDedication(dedicationData) {
             status: dedicationStatus,
             recipientName: fatherName,
             childName: childName,
-            parentName: fatherName,
+            fatherName: createdDedication.data?.father_firstname ?
+              `${createdDedication.data.father_firstname} ${createdDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: createdDedication.data?.mother_firstname ?
+              `${createdDedication.data.mother_firstname} ${createdDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: createdDedication.data?.pastor || null
+            pastorName: createdDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -472,11 +536,14 @@ async function createChildDedication(dedicationData) {
             status: dedicationStatus,
             recipientName: motherName,
             childName: childName,
-            parentName: motherName,
+            fatherName: createdDedication.data?.father_firstname ?
+              `${createdDedication.data.father_firstname} ${createdDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: createdDedication.data?.mother_firstname ?
+              `${createdDedication.data.mother_firstname} ${createdDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: createdDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: createdDedication.data?.pastor || null
+            pastorName: createdDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -521,7 +588,8 @@ async function createChildDedication(dedicationData) {
         location,
         status,
         date_created: formattedDateCreated
-      }
+      },
+      timeSlotWarning: timeSlotWarning
     };
   } catch (error) {
     console.error('Error creating child dedication:', error);
@@ -926,6 +994,8 @@ async function getChildDedicationsByRequester(memberId) {
  */
 async function updateChildDedication(childId, dedicationData) {
   try {
+    let timeSlotWarning = null;
+
     if (!childId) {
       throw new Error('Child ID is required');
     }
@@ -1095,12 +1165,7 @@ async function updateChildDedication(childId, dedicationData) {
         );
 
         if (timeSlotCheck && timeSlotCheck.isBooked) {
-          return {
-            success: false,
-            message: `Time slot conflict: ${finalPreferredDate} at ${finalPreferredTime} is already booked.`,
-            error: 'Time slot conflict',
-            conflict: timeSlotCheck.conflictingDedication
-          };
+          timeSlotWarning = `Time slot conflict: ${finalPreferredDate} at ${finalPreferredTime} is already booked.`;
         }
       }
 
@@ -1110,8 +1175,27 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     if (preferred_dedication_time !== undefined) {
+      // Format preferred dedication time to HH:mm:ss
+      let formattedPreferredTime = preferred_dedication_time;
+      if (formattedPreferredTime) {
+        // Handle various time formats
+        let timeMoment;
+        if (formattedPreferredTime.includes(':')) {
+          // Try 24-hour formats first
+          timeMoment = moment(formattedPreferredTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+          if (!timeMoment.isValid()) {
+            // Try 12-hour formats
+            timeMoment = moment(formattedPreferredTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+          }
+        }
+
+        if (timeMoment && timeMoment.isValid()) {
+          formattedPreferredTime = timeMoment.format('HH:mm:ss');
+        }
+      }
+
       fields.push('preferred_dedication_time = ?');
-      params.push(preferred_dedication_time);
+      params.push(formattedPreferredTime);
     }
 
     if (date_completed !== undefined) {
@@ -1257,6 +1341,25 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     if (date_created !== undefined) {
+      // Format preferred dedication time to HH:mm:ss
+      let formattedPreferredTime = preferred_dedication_time;
+      if (formattedPreferredTime) {
+        // Handle various time formats
+        let timeMoment;
+        if (formattedPreferredTime.includes(':')) {
+          // Try 24-hour formats first
+          timeMoment = moment(formattedPreferredTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+          if (!timeMoment.isValid()) {
+            // Try 12-hour formats
+            timeMoment = moment(formattedPreferredTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+          }
+        }
+  
+        if (timeMoment && timeMoment.isValid()) {
+          formattedPreferredTime = timeMoment.format('HH:mm:ss');
+        }
+      }
+  
       const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
       fields.push('date_created = ?');
       params.push(formattedDateCreated);
@@ -1270,9 +1373,13 @@ async function updateChildDedication(childId, dedicationData) {
       };
     }
 
-    // If updating child name or date of birth, check for duplicates
-    if (child_firstname !== undefined || child_lastname !== undefined || date_of_birth !== undefined) {
-      const currentData = dedicationCheck.data;
+    // Check for duplicates only if identifying fields actually changed
+    const currentData = dedicationCheck.data;
+    const hasNameChange = (child_firstname !== undefined && child_firstname.trim() !== currentData.child_firstname?.trim()) ||
+                         (child_lastname !== undefined && child_lastname.trim() !== currentData.child_lastname?.trim());
+    const hasDateChange = date_of_birth !== undefined && date_of_birth !== currentData.date_of_birth;
+
+    if (hasNameChange || hasDateChange) {
       const checkFirstname = child_firstname !== undefined ? child_firstname : currentData.child_firstname;
       const checkLastname = child_lastname !== undefined ? child_lastname : currentData.child_lastname;
       const checkDateOfBirth = date_of_birth !== undefined ? date_of_birth : currentData.date_of_birth;
@@ -1287,7 +1394,7 @@ async function updateChildDedication(childId, dedicationData) {
           : moment(checkDateOfBirth).format('YYYY-MM-DD'),
         childId
       );
-      
+
       if (duplicateCheck.isDuplicate) {
         return {
           success: false,
@@ -1381,11 +1488,14 @@ async function updateChildDedication(childId, dedicationData) {
            status: dedicationStatus,
            recipientName: recipientName,
            childName: childName,
-           parentName: recipientName,
+           fatherName: updatedDedication.data?.father_firstname ?
+             `${updatedDedication.data.father_firstname} ${updatedDedication.data.father_lastname || ''}`.trim() : '',
+           motherName: updatedDedication.data?.mother_firstname ?
+             `${updatedDedication.data.mother_firstname} ${updatedDedication.data.mother_lastname || ''}`.trim() : '',
            dedicationDate: dedicationDate,
-           dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
            location: dedicationLocation,
-           pastor: updatedDedication.data?.pastor || null
+           pastorName: updatedDedication.data?.pastor || null,
+           isMember: true
          });
       }
 
@@ -1399,11 +1509,14 @@ async function updateChildDedication(childId, dedicationData) {
             status: dedicationStatus,
             recipientName: 'Valued Member',
             childName: childName,
-            parentName: 'Valued Member',
+            fatherName: updatedDedication.data?.father_firstname ?
+              `${updatedDedication.data.father_firstname} ${updatedDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: updatedDedication.data?.mother_firstname ?
+              `${updatedDedication.data.mother_firstname} ${updatedDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: updatedDedication.data?.pastor || null
+            pastorName: updatedDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -1420,11 +1533,14 @@ async function updateChildDedication(childId, dedicationData) {
             status: dedicationStatus,
             recipientName: fatherName,
             childName: childName,
-            parentName: fatherName,
+            fatherName: updatedDedication.data?.father_firstname ?
+              `${updatedDedication.data.father_firstname} ${updatedDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: updatedDedication.data?.mother_firstname ?
+              `${updatedDedication.data.mother_firstname} ${updatedDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: updatedDedication.data?.pastor || null
+            pastorName: updatedDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -1441,11 +1557,14 @@ async function updateChildDedication(childId, dedicationData) {
             status: dedicationStatus,
             recipientName: motherName,
             childName: childName,
-            parentName: motherName,
+            fatherName: updatedDedication.data?.father_firstname ?
+              `${updatedDedication.data.father_firstname} ${updatedDedication.data.father_lastname || ''}`.trim() : '',
+            motherName: updatedDedication.data?.mother_firstname ?
+              `${updatedDedication.data.mother_firstname} ${updatedDedication.data.mother_lastname || ''}`.trim() : '',
             dedicationDate: dedicationDate,
-            dedicationTime: updatedDedication.data?.preferred_dedication_time || null,
             location: dedicationLocation,
-            pastor: updatedDedication.data?.pastor || null
+            pastorName: updatedDedication.data?.pastor || null,
+            isMember: false
           });
         }
       }
@@ -1457,7 +1576,8 @@ async function updateChildDedication(childId, dedicationData) {
     return {
       success: true,
       message: 'Child dedication updated successfully',
-      data: updatedDedication.data || dedicationCheck.data
+      data: updatedDedication.data || dedicationCheck.data,
+      timeSlotWarning: timeSlotWarning
     };
   } catch (error) {
     console.error('Error updating child dedication:', error);
@@ -1611,8 +1731,29 @@ async function checkTimeSlotAvailability(preferredDedicationDate, preferredDedic
     const formattedDate = preferredDedicationDate && moment(preferredDedicationDate, 'YYYY-MM-DD', true).isValid()
       ? preferredDedicationDate
       : moment(preferredDedicationDate).format('YYYY-MM-DD');
-    const formattedTime = preferredDedicationTime;
-    
+
+    // Normalize time format to HH:mm:ss for consistent comparison
+    let formattedTime = preferredDedicationTime;
+    if (formattedTime) {
+      // Handle various time formats
+      let timeMoment;
+      if (formattedTime.includes(':')) {
+        // Try 24-hour formats first
+        timeMoment = moment(formattedTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+        if (!timeMoment.isValid()) {
+          // Try 12-hour formats
+          timeMoment = moment(formattedTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+        }
+      }
+
+      if (timeMoment && timeMoment.isValid()) {
+        formattedTime = timeMoment.format('HH:mm:ss');
+      } else {
+        // Fallback: ensure it's in HH:mm:ss format
+        console.warn('Could not parse time format:', formattedTime, '- using as-is');
+      }
+    }
+
     let sql = `
       SELECT child_id, requested_by, preferred_dedication_date, preferred_dedication_time, status,
              child_firstname, child_lastname
@@ -1630,6 +1771,14 @@ async function checkTimeSlotAvailability(preferredDedicationDate, preferredDedic
 
     const [rows] = await query(sql, params);
 
+    console.log('Time slot check - Child Dedication:', {
+      date: formattedDate,
+      time: formattedTime,
+      originalTime: preferredDedicationTime,
+      conflicts: rows.length,
+      status: rows.length > 0 ? 'BLOCKED' : 'ALLOWED'
+    });
+
     return {
       isBooked: rows.length > 0,
       conflictingDedication: rows.length > 0 ? rows[0] : null
@@ -1646,6 +1795,7 @@ async function checkTimeSlotAvailability(preferredDedicationDate, preferredDedic
 
 module.exports = {
   checkDuplicateChildDedication,
+  checkPendingChildDedicationApproval,
   checkPreferredDedicationDateConflict,
   checkTimeSlotAvailability,
   createChildDedication,

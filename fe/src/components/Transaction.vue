@@ -104,7 +104,7 @@
           <v-row>
             <!-- All Transactions Table -->
             <v-col v-if="selectedServiceTypeFilter === 'all'" cols="12">
-              <v-card variant="outlined" class="mx-auto" style="max-width: 1200px;">
+              <v-card variant="outlined" class="mx-auto" style="max-width: 100%;">
                 <v-card-title class="text-h6 font-weight-bold text-center">All Transactions</v-card-title>
                 <v-card-text>
                   <v-table density="compact" sort-by="[{ key: 'sort_date', order: 'desc' }]">
@@ -112,26 +112,30 @@
                       <tr>
                         <th class="text-left">Service Type</th>
                         <th class="text-left">Service ID</th>
-                        <th class="text-left">Name</th>
+                        <th class="text-left">Name/Details</th>
                         <th class="text-left">Status</th>
+                        <th class="text-left">Service Date</th>
+                        <th class="text-left">Location</th>
                         <th class="text-left">Date Created</th>
                         <th class="text-left">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-if="allTransactions.length === 0">
-                        <td colspan="6" class="text-center py-4 text-grey">No transactions found</td>
+                        <td colspan="8" class="text-center py-4 text-grey">No transactions found</td>
                       </tr>
                       <tr v-for="transaction in allTransactions" :key="`${transaction.service_type}-${transaction.service_id}`">
                         <td>{{ transaction.service_type }}</td>
-                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ transaction.service_id }}</td>
-                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ transaction.display_name }}</td>
-                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;" class="text-primary font-weight-medium">{{ transaction.service_id }}</td>
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;">{{ transaction.display_name }}</td>
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;">
                           <v-chip size="small" :color="getStatusColor(transaction.status)">
                             {{ transaction.status }}
                           </v-chip>
                         </td>
-                        <td @click="viewServiceDetails(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))" style="cursor: pointer;">{{ formatDateTime(transaction.date_created) }}</td>
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;">{{ getServiceDate(transaction) || 'N/A' }}</td>
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;">{{ transaction.location || 'N/A' }}</td>
+                        <td @click="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))" style="cursor: pointer;">{{ formatDateTime(transaction.date_created) }}</td>
                         <td>
                           <v-btn
                             v-if="transaction.status?.toLowerCase() === 'completed' && transaction.service_type !== 'Burial Service'"
@@ -139,8 +143,16 @@
                             variant="text"
                             size="small"
                             color="primary"
-                            @click.stop="viewServiceCertificate(transaction, transaction.service_type.toLowerCase().replace(' ', '_'))"
+                            @click.stop="viewServiceCertificate(transaction, getServiceTypeKey(transaction.service_type))"
                             title="View Certificate"
+                          ></v-btn>
+                          <v-btn
+                            icon="mdi-eye"
+                            variant="text"
+                            size="small"
+                            color="blue"
+                            @click.stop="viewServiceDetails(transaction, getServiceTypeKey(transaction.service_type))"
+                            title="View Details"
                           ></v-btn>
                         </td>
                       </tr>
@@ -277,7 +289,18 @@
                             {{ service.status }}
                           </v-chip>
                         </td>
-                     </tr>
+                        <td>
+                          <v-btn
+                            v-if="service.status?.toLowerCase() === 'completed'"
+                            icon="mdi-certificate"
+                            variant="text"
+                            size="small"
+                            color="primary"
+                            @click.stop="viewServiceCertificate(service, 'burial')"
+                            title="View Certificate"
+                          ></v-btn>
+                        </td>
+                      </tr>
                     </tbody>
                   </v-table>
                 </v-card-text>
@@ -360,7 +383,7 @@
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Service ID</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.baptism_id || 'N/A' }}</div>
-    </div>
+                    </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
@@ -373,19 +396,121 @@
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Member Name</div>
-                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.fullname || 'N/A' }}</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.fullname || `${selectedServiceData.firstname || ''} ${selectedServiceData.lastname || ''}`.trim() || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Email</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.email || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Phone Number</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.phone_number || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Birthdate</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.birthdate) || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Age</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.age || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Gender</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.gender || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Address</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.address || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Civil Status</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.civil_status || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Profession</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.profession || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Spouse Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.spouse_name || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Marriage Date</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.marriage_date) || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Children</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.children || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Desire of Ministry</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.desire_ministry || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Baptism Date</div>
-                      <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.baptism_date) || 'N/A' }}</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.baptism_date) || 'Not scheduled' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Preferred Baptism Time</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.preferred_baptism_time || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Location</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.location || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Pastor Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_name || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Guardian Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.guardian_name || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Guardian Contact</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.guardian_contact || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Guardian Relationship</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.guardian_relationship || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -416,14 +541,26 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Groom</div>
+                      <div class="text-caption text-grey mb-1">Groom Name</div>
                       <div class="text-body-1 font-weight-medium">{{ getGroomDisplayName(selectedServiceData) }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Bride</div>
+                      <div class="text-caption text-grey mb-1">Bride Name</div>
                       <div class="text-body-1 font-weight-medium">{{ getBrideDisplayName(selectedServiceData) }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Groom Member ID</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.groom_member_id || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Bride Member ID</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.bride_member_id || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -440,20 +577,38 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Pastor ID</div>
-                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_id || 'N/A' }}</div>
+                      <div class="text-caption text-grey mb-1">Pastor Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_name || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Date Created</div>
-                      <div class="text-body-1 font-weight-medium">{{ formatDateTime(selectedServiceData.date_created) || 'N/A' }}</div>
+                      <div class="text-caption text-grey mb-1">Pastor ID</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_id || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" v-if="selectedServiceData.guardians && Array.isArray(selectedServiceData.guardians) && selectedServiceData.guardians.length > 0">
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Guardians</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.guardians.join(', ') }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Groom Age</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.groom_age || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Bride Age</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.bride_age || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Date Created</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDateTime(selectedServiceData.date_created) || 'N/A' }}</div>
                     </div>
                   </v-col>
                 </v-row>
@@ -484,13 +639,43 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Member ID</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.member_id || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Requester Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.requester_name || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Requester Email</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.requester_email || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Deceased Name</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.deceased_name || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Relationship</div>
+                      <div class="text-caption text-grey mb-1">Deceased Birthdate</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.deceased_birthdate) || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Date of Death</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDateTime(selectedServiceData.date_death) || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Relationship to Deceased</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.relationship || 'N/A' }}</div>
                     </div>
                   </v-col>
@@ -508,14 +693,8 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Date of Death</div>
-                      <div class="text-body-1 font-weight-medium">{{ formatDateTime(selectedServiceData.date_death) || 'N/A' }}</div>
-                    </div>
-                  </v-col>
-                  <v-col cols="12" md="6">
-                    <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Pastor ID</div>
-                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_id || 'N/A' }}</div>
+                      <div class="text-caption text-grey mb-1">Pastor Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor_name || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -546,14 +725,44 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Child Name</div>
-                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.child_fullname || `${selectedServiceData.child_firstname || ''} ${selectedServiceData.child_lastname || ''}`.trim() || 'N/A' }}</div>
+                      <div class="text-caption text-grey mb-1">Requested By (Member ID)</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.requested_by || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Requester Relationship</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.requester_relationship || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Child's First Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.child_firstname || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Child's Last Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.child_lastname || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Child's Middle Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.child_middle_name || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Date of Birth</div>
                       <div class="text-body-1 font-weight-medium">{{ formatDate(selectedServiceData.date_of_birth) || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Place of Birth</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.place_of_birth || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -570,8 +779,8 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <div class="detail-item mb-4">
-                      <div class="text-caption text-grey mb-1">Place of Birth</div>
-                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.place_of_birth || 'N/A' }}</div>
+                      <div class="text-caption text-grey mb-1">Preferred Dedication Time</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.preferred_dedication_time || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -584,6 +793,48 @@
                     <div class="detail-item mb-4">
                       <div class="text-caption text-grey mb-1">Contact Email</div>
                       <div class="text-body-1 font-weight-medium">{{ selectedServiceData.contact_email || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Contact Address</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.contact_address || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Father's Full Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ `${selectedServiceData.father_firstname || ''} ${selectedServiceData.father_lastname || ''}`.trim() || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Father's Email</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.father_email || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Mother's Full Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ `${selectedServiceData.mother_firstname || ''} ${selectedServiceData.mother_lastname || ''}`.trim() || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Mother's Email</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.mother_email || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Pastor Name</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.pastor || 'N/A' }}</div>
+                    </div>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <div class="detail-item mb-4">
+                      <div class="text-caption text-grey mb-1">Location</div>
+                      <div class="text-body-1 font-weight-medium">{{ selectedServiceData.location || 'N/A' }}</div>
                     </div>
                   </v-col>
                   <v-col cols="12" md="6">
@@ -928,6 +1179,17 @@ const viewServiceDetails = (service, serviceType) => {
   serviceDetailsDialog.value = true
 }
 
+// Get service type key for function calls
+const getServiceTypeKey = (serviceType) => {
+  const keyMap = {
+    'Water Baptism': 'water_baptism',
+    'Marriage Service': 'marriage',
+    'Burial Service': 'burial',
+    'Child Dedication': 'child_dedication'
+  }
+  return keyMap[serviceType] || serviceType.toLowerCase()
+}
+
 // Get service type title
 const getServiceTypeTitle = (type) => {
   const titleMap = {
@@ -945,9 +1207,18 @@ const formatDate = (dateString) => {
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'short',
+    month: 'long',
     day: 'numeric'
   })
+}
+
+// Get service date based on service type
+const getServiceDate = (transaction) => {
+  if (transaction.service_type === 'Water Baptism') return formatDateTime(transaction.baptism_date)
+  if (transaction.service_type === 'Marriage Service') return formatDateTime(transaction.marriage_date)
+  if (transaction.service_type === 'Burial Service') return formatDateTime(transaction.service_date)
+  if (transaction.service_type === 'Child Dedication') return formatDate(transaction.preferred_dedication_date)
+  return 'N/A'
 }
 
 // Fetch services on mount

@@ -139,13 +139,23 @@ export const useApprovalsStore = defineStore('approvals', {
       }
     },
 
-    async updateApprovalStatus(id, status) {
+    async updateApprovalStatus(id, status, scheduleDate = null, scheduleTime = null) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
+        const payload = { status };
+        
+        // Include schedule date/time for child dedication approvals
+        if (scheduleDate) {
+          payload.schedule_date = scheduleDate;
+        }
+        if (scheduleTime) {
+          payload.schedule_time = scheduleTime;
+        }
+        
         const response = await axios.put(`/church-records/approvals/updateApprovalStatus/${id}`, 
-          { status },
+          payload,
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,

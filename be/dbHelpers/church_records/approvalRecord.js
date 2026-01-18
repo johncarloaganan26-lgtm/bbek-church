@@ -363,8 +363,12 @@ async function getApprovalById(id) {
 
 /**
  * UPDATE - Update approval status
+ * @param {number} id - Approval ID
+ * @param {string} status - New status (pending, approved, rejected)
+ * @param {string} schedule_date - For child dedication approvals: the scheduled date (YYYY-MM-DD)
+ * @param {string} schedule_time - For child dedication approvals: the scheduled time (HH:MM:SS)
  */
-async function updateApprovalStatus(id, status) {
+async function updateApprovalStatus(id, status, schedule_date = null, schedule_time = null) {
   const approvalId = parseInt(id);
   if (isNaN(approvalId)) {
     return { success: false, message: 'Invalid approval ID', data: null };
@@ -437,10 +441,56 @@ async function updateApprovalStatus(id, status) {
           }
           await query(`UPDATE tbl_ministry SET members = ? WHERE ministry_id = ?`, [json, request_id]);
         }
+      } else if (type === 'child_dedication') {
+        // Handle child dedication approval with schedule date/time
+        console.log(`📋 Updating child dedication - request_id: ${request_id}, schedule_date: ${schedule_date}, schedule_time: ${schedule_time}`);
+        
+        // First, verify the child dedication exists
+        const [childDedResults] = await query(`SELECT child_id, status FROM tbl_childdedications WHERE child_id = ?`, [request_id]);
+        if (!childDedResults.length) {
+          console.error(`❌ Child dedication not found with child_id: ${request_id}`);
+          return { success: false, message: 'Child dedication not found', data: null };
+        }
+        
+        console.log(`✅ Found child dedication:`, childDedResults[0]);
+        
+        const updateFields = ['status = ?'];
+        const updateParams = ['approved'];
+        
+        // Update the preferred_dedication_date if schedule_date provided
+        if (schedule_date) {
+          console.log(`📅 Setting dedication date to: ${schedule_date}`);
+          updateFields.push('preferred_dedication_date = ?');
+          updateParams.push(schedule_date);
+        }
+        
+        // Update the preferred_dedication_time if schedule_time provided
+        if (schedule_time) {
+          console.log(`🕐 Setting dedication time to: ${schedule_time}`);
+          updateFields.push('preferred_dedication_time = ?');
+          updateParams.push(schedule_time);
+        }
+        
+        // Add the child_id to the WHERE clause
+        updateParams.push(request_id);
+        
+        // Build and execute the update query
+        const updateSql = `UPDATE tbl_childdedications SET ${updateFields.join(', ')} WHERE child_id = ?`;
+        console.log(`🔄 Executing update: ${updateSql}`);
+        console.log(`📝 With params:`, updateParams);
+        
+        const [updateResult] = await query(updateSql, updateParams);
+        console.log(`✅ Update result:`, updateResult);
+        
+        if (updateResult.affectedRows === 0) {
+          console.warn(`⚠️  No rows updated for child_id: ${request_id}`);
+        } else {
+          console.log(`✅ Successfully updated ${updateResult.affectedRows} child dedication record(s)`);
+        }
       }
     } catch (err) {
-      console.error('Error updating membership on approval:', err);
-      return { success: false, message: 'Failed to update related members', data: null };
+      console.error('Error updating related record on approval:', err);
+      return { success: false, message: 'Failed to update related record', data: null };
     }
   }
 

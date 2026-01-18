@@ -109,7 +109,6 @@
           style="width: 100%"
           :disabled="loading"
           :disabled-date="(date) => date > new Date()"
-          :default-time="() => new Date(0, 0, 0, 12, 0, 0)"
         />
       </el-form-item>
 
@@ -772,21 +771,8 @@ const isDateDisabled = (date) => {
 
 // Get disabled hours for time picker based on selected date
 const getDisabledHours = () => {
-  if (!formData.preferred_dedication_date) return []
-
-  const selectedDateStr = formData.preferred_dedication_date
-  const bookedTimesForDate = unavailableTimeSlots.value
-    .filter(slot => {
-      // Allow current dedication's time slot if editing
-      if (isEditMode.value && props.dedicationData?.child_id === slot.id) {
-        return false
-      }
-      return slot.date === selectedDateStr
-    })
-    .map(slot => parseInt(slot.time.split(':')[0]))
-
-  // Return array of hours that are booked (0-23)
-  return bookedTimesForDate
+  // No longer disable hours - allow selection and show warnings instead
+  return []
 }
 
 // Get disabled minutes for time picker based on selected date and hour
@@ -824,8 +810,8 @@ const onDateChange = async (date) => {
 
     if (!isValid) {
       // Show immediate toast notification for time slot conflict only
-      ElMessage.error({
-        message: `Time slot conflict: ${date} at ${formData.preferred_dedication_time} is already booked. Please choose a different time.`,
+      ElMessage.warning({
+        message: `Time slot conflict: ${date} at ${formData.preferred_dedication_time} is already booked. You can still proceed.`,
         duration: 5000, // Show for 5 seconds
         showClose: true,
         dangerouslyUseHTMLString: false
@@ -1220,7 +1206,15 @@ watch(() => props.dedicationData, (newData) => {
     formData.child_firstname = newData.child_firstname || ''
     formData.child_lastname = newData.child_lastname || ''
     formData.child_middle_name = newData.child_middle_name || ''
-    formData.date_of_birth = newData.date_of_birth || ''
+    // Ensure date_of_birth is in YYYY-MM-DD format
+    formData.date_of_birth = newData.date_of_birth ? (() => {
+      try {
+        const date = new Date(newData.date_of_birth)
+        return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0]
+      } catch (e) {
+        return ''
+      }
+    })() : ''
     formData.place_of_birth = newData.place_of_birth || ''
     formData.gender = newData.gender || ''
     formData.preferred_dedication_date = newData.preferred_dedication_date || ''
@@ -1280,7 +1274,15 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.child_firstname = data.child_firstname || ''
       formData.child_lastname = data.child_lastname || ''
       formData.child_middle_name = data.child_middle_name || ''
-      formData.date_of_birth = data.date_of_birth || ''
+      // Ensure date_of_birth is in YYYY-MM-DD format
+      formData.date_of_birth = data.date_of_birth ? (() => {
+        try {
+          const date = new Date(data.date_of_birth)
+          return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0]
+        } catch (e) {
+          return ''
+        }
+      })() : ''
       formData.place_of_birth = data.place_of_birth || ''
       formData.gender = data.gender || ''
       formData.preferred_dedication_date = data.preferred_dedication_date || ''
@@ -1426,7 +1428,8 @@ const handleSubmit = async () => {
             requested_by: formData.requested_by,
             child_firstname: formData.child_firstname.trim(),
             child_lastname: formData.child_lastname.trim(),
-            date_of_birth: formData.date_of_birth
+            date_of_birth: formData.date_of_birth,
+            exclude_child_id: isEditMode.value ? props.dedicationData?.child_id : null
           }
         })
 
@@ -1471,13 +1474,13 @@ const handleSubmit = async () => {
 
         if (timeCheckResponse.data.success && timeCheckResponse.data.data && timeCheckResponse.data.data.isBooked) {
           const conflictingDedication = timeCheckResponse.data.data.conflictingDedication
-          ElMessage.error({
-            message: `Time Slot Conflict: The selected time slot (${formData.preferred_dedication_date} at ${formData.preferred_dedication_time}) is already booked. Process stopped.`,
+          ElMessage.warning({
+            message: `Time Slot Conflict: The selected time slot (${formData.preferred_dedication_date} at ${formData.preferred_dedication_time}) is already booked. Proceeding with submission.`,
             duration: 8000,
             showClose: true
           })
-          console.log('Process STOPPED: Time slot already booked')
-          return // STOP PROCESS - Do not proceed with submission
+          console.log('Warning: Time slot already booked, but proceeding')
+          // Continue with submission
         }
       } catch (timeError) {
         console.error('Error checking time slot availability:', timeError)

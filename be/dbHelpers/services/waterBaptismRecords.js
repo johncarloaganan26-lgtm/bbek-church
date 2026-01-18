@@ -28,7 +28,7 @@ async function checkDuplicateEmail(email) {
   try {
     const sql = 'SELECT acc_id, email FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))';
     const [rows] = await query(sql, [email]);
-    
+
     return {
       isDuplicate: rows.length > 0,
       account: rows.length > 0 ? rows[0] : null
@@ -36,6 +36,90 @@ async function checkDuplicateEmail(email) {
   } catch (error) {
     console.error('Error checking for duplicate email:', error);
     throw error;
+  }
+}
+
+/**
+ * Check if a time slot is available for water baptism
+ * @param {String} baptismDate - Baptism date to check
+ * @param {String} preferredBaptismTime - Preferred baptism time to check
+ * @param {String} excludeBaptismId - Optional baptism_id to exclude from check (for updates)
+ * @returns {Promise<Object>} Object with isBooked flag and conflicting baptism
+ */
+async function checkTimeSlotAvailability(baptismDate, preferredBaptismTime, excludeBaptismId = null) {
+  try {
+    const formattedDate = baptismDate && moment(baptismDate, 'YYYY-MM-DD', true).isValid()
+      ? baptismDate
+      : moment(baptismDate).format('YYYY-MM-DD');
+
+    // Normalize time format to HH:mm:ss for consistent comparison
+    let formattedTime = preferredBaptismTime;
+    if (formattedTime) {
+      // Handle various time formats
+      let timeMoment;
+      if (formattedTime.includes(':')) {
+        // Try 24-hour formats first
+        timeMoment = moment(formattedTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+        if (!timeMoment.isValid()) {
+          // Try 12-hour formats
+          timeMoment = moment(formattedTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+        }
+      }
+
+      if (timeMoment && timeMoment.isValid()) {
+        formattedTime = timeMoment.format('HH:mm:ss');
+      } else {
+        // Fallback: ensure it's in HH:mm:ss format
+        console.warn('Could not parse time format:', formattedTime, '- using as-is');
+      }
+    }
+
+    // Extract minutes from the formatted time
+    const minutes = formattedTime ? formattedTime.split(':')[1] : null;
+
+    if (!minutes) {
+      console.warn('Could not extract minutes from time:', formattedTime);
+      return {
+        isBooked: false,
+        conflictingBaptism: null
+      };
+    }
+
+    let sql = `
+      SELECT baptism_id, firstname, lastname, preferred_baptism_time, status
+      FROM tbl_waterbaptism
+      WHERE DATE(baptism_date) = ?
+      AND preferred_baptism_time LIKE CONCAT('%:', ?, ':%')
+      AND status = 'approved'
+    `;
+    const params = [formattedDate, minutes];
+
+    if (excludeBaptismId) {
+      sql += ' AND baptism_id != ?';
+      params.push(excludeBaptismId);
+    }
+
+    const [rows] = await query(sql, params);
+
+    console.log('Minute slot check - Water Baptism:', {
+      date: formattedDate,
+      minutes: minutes,
+      originalTime: preferredBaptismTime,
+      conflicts: rows.length,
+      status: rows.length > 0 ? 'BLOCKED' : 'ALLOWED'
+    });
+
+    return {
+      isBooked: rows.length > 0,
+      conflictingBaptism: rows.length > 0 ? rows[0] : null
+    };
+  } catch (error) {
+    console.error('Error checking time slot availability:', error);
+    // Don't throw - allow the operation to proceed if check fails
+    return {
+      isBooked: false,
+      conflictingBaptism: null
+    };
   }
 }
 
@@ -137,6 +221,8 @@ async function getNextBaptismId() {
  */
 async function createWaterBaptism(baptismData) {
   try {
+    let timeSlotWarning = null;
+
     // Get next baptism_id if not provided
     const new_baptism_id = await getNextBaptismId();
     console.log('New baptism ID:', new_baptism_id);
@@ -186,6 +272,20 @@ async function createWaterBaptism(baptismData) {
       const emailCheck = await checkDuplicateEmail(email);
       if (emailCheck.isDuplicate) {
         throw new Error('An account with this email already exists. Please use a different email address.');
+      }
+    }
+
+    // Check for time slot conflicts - Only check time, not date
+    // Multiple water baptisms are allowed on the same date, but not at the same time
+    if (baptism_date && baptism_time) {
+      const timeSlotCheck = await checkTimeSlotAvailability(
+        baptism_date,
+        baptism_time,
+        null // No exclusion for new records
+      );
+
+      if (timeSlotCheck.isBooked) {
+        timeSlotWarning = `Time slot conflict: ${baptism_date} at ${baptism_time} is already booked.`;
       }
     }
 
@@ -319,7 +419,9 @@ async function createWaterBaptism(baptismData) {
           baptismDate: createdBaptism.data.baptism_date
             ? moment(createdBaptism.data.baptism_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
-          location: createdBaptism.data.location || 'To be determined'
+          location: createdBaptism.data.location || 'To be determined',
+          pastorName: createdBaptism.data.pastor_name,
+          isMember: is_member && !!member_id
         });
       }
     } catch (emailError) {
@@ -330,7 +432,8 @@ async function createWaterBaptism(baptismData) {
     return {
       success: true,
       message: 'Water baptism created successfully',
-      data: createdBaptism.data
+      data: createdBaptism.data,
+      timeSlotWarning: timeSlotWarning
     };
   } catch (error) {
     console.error('Error creating water baptism:', error);
@@ -699,7 +802,9 @@ async function getWaterBaptismById(baptismId) {
  */
 async function updateWaterBaptism(baptismId, baptismData) {
    try {
-     if (!baptismId) {
+    let timeSlotWarning = null;
+
+    if (!baptismId) {
        throw new Error('Baptism ID is required');
      }
 
@@ -741,6 +846,26 @@ async function updateWaterBaptism(baptismId, baptismData) {
       guardian_contact,
       guardian_relationship
     } = baptismData;
+
+    // Check for time slot conflicts before updating
+    const currentData = baptismCheck.data;
+    const finalBaptismDate = baptism_date !== undefined ? baptism_date : currentData.baptism_date;
+    const finalBaptismTime = baptism_time !== undefined ? baptism_time : currentData.preferred_baptism_time;
+
+    // Only check conflicts if baptism_date or baptism_time is being updated
+    if (baptism_date !== undefined || baptism_time !== undefined) {
+      if (finalBaptismDate && finalBaptismTime) {
+        const timeSlotCheck = await checkTimeSlotAvailability(
+          finalBaptismDate,
+          finalBaptismTime,
+          baptismId
+        );
+
+        if (timeSlotCheck.isBooked) {
+          timeSlotWarning = `Time slot conflict: ${finalBaptismDate} at ${finalBaptismTime} is already booked.`;
+        }
+      }
+    }
 
     // Build dynamic update query based on provided fields
     const fields = [];
@@ -943,7 +1068,9 @@ async function updateWaterBaptism(baptismId, baptismData) {
           baptismDate: updatedBaptism.data.baptism_date
             ? moment(updatedBaptism.data.baptism_date).format('YYYY-MM-DD HH:mm:ss')
             : 'To be determined',
-          location: updatedBaptism.data.location || 'To be determined'
+          location: updatedBaptism.data.location || 'To be determined',
+          pastorName: updatedBaptism.data.pastor_name,
+          isMember: updatedBaptism.data.is_member === 1 && !!updatedBaptism.data.member_id
         });
       }
     } catch (emailError) {
@@ -954,7 +1081,8 @@ async function updateWaterBaptism(baptismId, baptismData) {
     return {
       success: true,
       message: 'Water baptism updated successfully',
-      data: updatedBaptism.data
+      data: updatedBaptism.data,
+      timeSlotWarning: timeSlotWarning
     };
   } catch (error) {
     console.error('Error updating water baptism:', error);
@@ -1146,5 +1274,6 @@ module.exports = {
   updateWaterBaptism,
   deleteWaterBaptism,
   exportWaterBaptismsToExcel,
-  getSpecificWaterBaptismDataByMemberIdIfBaptized
+  getSpecificWaterBaptismDataByMemberIdIfBaptized,
+  checkTimeSlotAvailability
 };
