@@ -384,7 +384,9 @@ router.put('/updateBurialService/:id', async (req, res) => {
       });
     }
 
-    const result = await updateBurialService(id, req.body);
+    // Check if user is admin
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'staff';
+    const result = await updateBurialService(id, req.body, isAdmin);
     
     if (result.success) {
       res.status(200).json({

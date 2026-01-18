@@ -32,7 +32,6 @@
           style="
             font-family: 'Georgia', serif;
             font-style: italic;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
           "
         >
           {{ eventsTitle }}
@@ -42,7 +41,6 @@
           style="
             font-family: 'Georgia', serif;
             font-style: italic;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
           "
         >
           {{ eventsSubtitle }}
@@ -679,7 +677,6 @@ onBeforeUnmount(() => {
   font-weight: bold;
   margin-bottom: 0.75rem;
   font-family: 'Poppins', 'Inter', sans-serif;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .event-date {
@@ -687,7 +684,6 @@ onBeforeUnmount(() => {
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
   font-family: 'Poppins', 'Inter', sans-serif;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .event-location {
@@ -695,7 +691,6 @@ onBeforeUnmount(() => {
   font-size: 0.875rem;
   margin-bottom: 1rem;
   font-family: 'Poppins', 'Inter', sans-serif;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .event-content :deep(.v-btn) {

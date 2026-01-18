@@ -18,7 +18,7 @@
     <v-container>
       <!-- Section Header -->
       <div class="text-center mb-16">
-        <h1 class="text-h3 text-md-h4 font-weight-bold text-black mb-4 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+        <h1 class="text-h3 text-md-h4 font-weight-bold text-black mb-4 fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
           {{ servicesTitle }}
         </h1>
         <p class="text-h6 text-grey-darken-1 max-width-3xl mx-auto fade-in-up-delay">
@@ -268,7 +268,6 @@ onMounted(async () => {
   font-family: 'Georgia', serif;
   font-style: italic;
   color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   margin: 0 0 0.5rem 0;
   text-align: left;
 }
@@ -279,7 +278,6 @@ onMounted(async () => {
   font-family: 'Georgia', serif;
   font-style: italic;
   color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   margin: 0 0 1rem 0;
   text-align: left;
   line-height: 1.3;

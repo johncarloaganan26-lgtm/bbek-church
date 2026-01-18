@@ -37,13 +37,13 @@
               <div>
                 <h2
                   class="text-h4 font-weight-bold text-grey-darken-3 mb-4"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                  style="font-family: 'Georgia', serif; font-style: italic;"
                 >
                   {{ planVisitData.churchName }}
                 </h2>
                 <p
                   class="text-body-1 text-grey-darken-1"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
+                  style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.6;"
                 >
                   {{ planVisitData.churchDescription }}
                 </p>
@@ -53,7 +53,7 @@
               <div>
                 <h3
                   class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                  style="font-family: 'Georgia', serif; font-style: italic;"
                 >
                   Service Times
                 </h3>
@@ -63,13 +63,13 @@
                     <div>
                       <p
                         class="font-weight-semibold text-grey-darken-3"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         Sunday Worship
                       </p>
                       <p
                         class="text-grey-darken-1"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         {{ planVisitData.sundayServiceTime }}
                       </p>
@@ -80,13 +80,13 @@
                     <div>
                       <p
                         class="font-weight-semibold text-grey-darken-3"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         Wednesday Service
                       </p>
                       <p
                         class="text-grey-darken-1"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         {{ planVisitData.wednesdayServiceTime }}
                       </p>
@@ -99,7 +99,7 @@
               <div>
                 <h3
                   class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                  style="font-family: 'Georgia', serif; font-style: italic;"
                 >
                   Location
                 </h3>
@@ -109,7 +109,7 @@
                   </v-avatar>
                   <p
                     class="text-body-1 text-grey-darken-1"
-                    style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                    style="font-family: 'Georgia', serif; font-style: italic;"
                   >
                     {{ planVisitData.location }}
                   </p>
@@ -127,7 +127,7 @@
               <div>
                 <h3
                   class="text-h5 font-weight-bold text-grey-darken-3 mb-4"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                  style="font-family: 'Georgia', serif; font-style: italic;"
                 >
                   Contact Info
                 </h3>
@@ -139,14 +139,14 @@
                     <div>
                       <p
                         class="font-weight-semibold text-grey-darken-3"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         Phone
                       </p>
                       <a
                         :href="`tel:${planVisitData.phone}`"
                         class="text-blue text-decoration-none"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         {{ planVisitData.phone }}
                       </a>
@@ -159,14 +159,14 @@
                     <div>
                       <p
                         class="font-weight-semibold text-grey-darken-3"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         Email
                       </p>
                       <a
                         :href="`mailto:${planVisitData.email}`"
                         class="text-blue text-decoration-none"
-                        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);"
+                        style="font-family: 'Georgia', serif; font-style: italic;"
                       >
                         {{ planVisitData.email }}
                       </a>
@@ -182,13 +182,13 @@
             <v-card class="pa-8" variant="flat" color="rgba(255, 255, 255, 0.5)">
               <h2
                 class="text-h4 font-weight-bold text-grey-darken-3 mb-4"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 Get In Touch With Us
               </h2>
               <p
                 class="text-body-1 text-grey-darken-1 mb-8"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); line-height: 1.6;"
+                style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.6;"
               >
                 We'd love to hear from you. Send us a message and we'll respond as soon as possible.
               </p>
@@ -633,14 +633,12 @@ onMounted(async () => {
   margin-bottom: 1rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
   font-family: 'Georgia', serif;
   font-style: italic;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .main-content {

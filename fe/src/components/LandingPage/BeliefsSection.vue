@@ -3,14 +3,14 @@
     <v-container>
       <h2
         class="text-h3 text-md-h4 text-lg-h3 font-weight-bold text-center text-grey-darken-3 mb-16 fade-in-up"
-        style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+        style="font-family: 'Georgia', serif; font-style: italic;"
       >
         {{ beliefData.doctrinalTitle || 'Doctrinal Statement' }}
       </h2>
       <v-card class="pa-12 mb-16" elevation="2">
         <p
           class="text-h6 text-grey-darken-1 text-center mb-8"
-          style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+          style="font-family: 'Georgia', serif; font-style: italic;"
         >
           {{ beliefData.doctrinalText || 'We believe that doctrine matters — not because it divides, but because it anchors our faith in truth. While misunderstandings can create division, essential biblical teachings are non-negotiable for us. At the same time, we honor freedom in areas where Scripture allows for diversity. Above all, we strive to grow in love.' }}
         </p>
@@ -19,13 +19,13 @@
             <div class="text-center pa-4">
               <h3
                 class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.essentialsTitle || 'In essentials, unity.' }}
               </h3>
               <p
                 class="text-body-2 text-grey-darken-1"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.essentialsText || 'We hold tightly to core Christian truths.' }}
               </p>
@@ -35,13 +35,13 @@
             <div class="text-center pa-4">
               <h3
                 class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.libertyTitle || 'In non-essentials, liberty.' }}
               </h3>
               <p
                 class="text-body-2 text-grey-darken-1"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.libertyText || 'We give grace for secondary theological convictions.' }}
               </p>
@@ -51,13 +51,13 @@
             <div class="text-center pa-4">
               <h3
                 class="text-h6 font-weight-bold text-grey-darken-3 mb-2"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.loveTitle || 'In all things, love.' }}
               </h3>
               <p
                 class="text-body-2 text-grey-darken-1"
-                style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                style="font-family: 'Georgia', serif; font-style: italic;"
               >
                 {{ beliefData.loveText || 'Everything we believe and do is rooted in the love of Christ.' }}
               </p>

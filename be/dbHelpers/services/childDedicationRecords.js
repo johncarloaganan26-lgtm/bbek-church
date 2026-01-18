@@ -992,7 +992,7 @@ async function getChildDedicationsByRequester(memberId) {
  * @param {Object} dedicationData - Updated child dedication data
  * @returns {Promise<Object>} Result object
  */
-async function updateChildDedication(childId, dedicationData) {
+async function updateChildDedication(childId, dedicationData, isAdmin = false) {
   try {
     let timeSlotWarning = null;
 
@@ -1044,24 +1044,15 @@ async function updateChildDedication(childId, dedicationData) {
       date_created
     } = dedicationData;
 
-    // Check current status and block updates if pending
+    // Check current status and block updates if pending (except for admins or status changes)
     const currentData = dedicationCheck.data;
     
-    // Prevent any updates when status is pending (except status change by admin)
-    if (currentData.status === 'pending' && status === undefined) {
+    // Only block updates if user is NOT an admin and status is pending
+    if (!isAdmin && currentData.status === 'pending' && status === undefined) {
       return {
         success: false,
-        message: 'Cannot update child dedication while pending approval. Please wait for admin approval first.',
+        message: 'Cannot update child dedication while pending approval. Only admins can modify pending requests.',
         error: 'Cannot update pending request'
-      };
-    }
-
-    // Specifically block schedule changes when pending
-    if ((preferred_dedication_date !== undefined || preferred_dedication_time !== undefined) && currentData.status === 'pending') {
-      return {
-        success: false,
-        message: 'Cannot request schedule change while child dedication is pending approval. Please wait for admin approval first.',
-        error: 'Cannot update schedule on pending request'
       };
     }
 
@@ -1222,6 +1213,28 @@ async function updateChildDedication(childId, dedicationData) {
       const formattedDateCompleted = date_completed ? moment(date_completed).format('YYYY-MM-DD') : null;
       fields.push('date_completed = ?');
       params.push(formattedDateCompleted);
+    }
+
+    if (contact_phone_number !== undefined) {
+      // If only requester is being updated, still check for conflicts with current preferred date
+      // Check for preferred dedication date conflicts - DISABLED
+      // Multiple child dedications are allowed on the same date
+      // if (currentData.preferred_dedication_date) {
+      //   const conflictCheck = await checkPreferredDedicationDateConflict(
+      //     currentData.preferred_dedication_date,
+      //     requested_by.trim(),
+      //     childId // Exclude current child dedication for update
+      //   );
+
+      //   if (conflictCheck && conflictCheck.hasConflict) {
+      //     return {
+      //       success: false,
+      //       message: conflictCheck.message,
+      //       error: 'Preferred dedication date conflict',
+      //       conflict: conflictCheck.conflictingDedication
+      //     };
+      //   }
+      // }
     }
 
     if (contact_phone_number !== undefined) {

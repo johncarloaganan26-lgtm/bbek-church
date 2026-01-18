@@ -11,13 +11,13 @@
         <v-col cols="12" md="6">
           <h2
             class="vision-title text-h3 text-md-h4 font-weight-bold text-grey-darken-3 mb-6"
-            style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);"
+            style="font-family: 'Georgia', serif; font-style: italic;"
           >
             {{ visionTitle }}
           </h2>
           <p
             class="vision-subtitle text-h6 text-grey-darken-1 mb-8"
-            style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); line-height: 1.6;"
+            style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.6;"
           >
             {{ visionSubtitle }}
           </p>
@@ -34,13 +34,13 @@
               <v-card-text class="pa-6">
                 <h3
                   class="vision-item-title text-h6 font-weight-bold text-teal-darken-3 mb-3"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);"
+                  style="font-family: 'Georgia', serif; font-style: italic;"
                 >
                   {{ item.title }}
                 </h3>
                 <p
                   class="vision-item-description text-body-1 text-teal-darken-2"
-                  style="font-family: 'Georgia', serif; font-style: italic; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); line-height: 1.7;"
+                  style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7;"
                 >
                   {{ item.description }}
                 </p>

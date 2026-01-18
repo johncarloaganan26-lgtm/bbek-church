@@ -616,7 +616,7 @@ async function getBurialServiceById(burialId) {
   }
 }
 
-async function updateBurialService(burialId, burialData) {
+async function updateBurialService(burialId, burialData, isAdmin = false) {
   try {
     if (!burialId) {
       throw new Error('Burial ID is required');
@@ -646,29 +646,24 @@ async function updateBurialService(burialId, burialData) {
       date_death
     } = burialData;
 
-    // Check current status and block updates if pending
+    // Check current status and block updates if pending (except for admins or status changes)
     const currentData = burialCheck.data;
     
-    // Prevent any updates when status is pending (except status change by admin)
-    if (currentData.status === 'pending' && status === undefined) {
+    // Only block updates if user is NOT an admin and status is pending
+    if (!isAdmin && currentData.status === 'pending' && status === undefined) {
       return {
         success: false,
-        message: 'Cannot update burial service while pending approval. Please wait for admin approval first.',
+        message: 'Cannot update burial service while pending approval. Only admins can modify pending requests.',
         error: 'Cannot update pending request'
       };
     }
 
-    // Specifically block schedule changes when pending
-    if (service_date !== undefined && service_date !== null && currentData.status === 'pending') {
-      return {
-        success: false,
-        message: 'Cannot request schedule change while burial service is pending approval. Please wait for admin approval first.',
-        error: 'Cannot update schedule on pending request'
-      };
+    // If admin tries to change requester info for a member record, don't allow it
+    // The requester info should be preserved from original request
+    if (isAdmin && currentData.member_id && (requester_name !== undefined || requester_email !== undefined)) {
+      // Silently ignore attempts to change requester info for member records
+      // This preserves the original requester information
     }
-
-    // Check for time slot conflicts before updating
-
     const finalServiceDate = service_date !== undefined ? service_date : currentData.service_date;
 
     // Only check conflicts if service_date is being updated
@@ -697,18 +692,25 @@ async function updateBurialService(burialId, burialData) {
       fields.push('member_id = NULL');
     }
 
-    if (requester_name !== undefined && requester_name !== null && requester_name !== '') {
-      fields.push('requester_name = ?');
-      params.push(String(requester_name).trim());
-    } else if (requester_name === null || requester_name === '') {
-      fields.push('requester_name = NULL');
-    }
+    // For member records, don't allow changing requester_name/requester_email
+    // These should always come from the member record, not be overwritten
+    if (currentData.member_id) {
+      // Don't update requester fields for member records
+    } else {
+      // Only allow updating requester fields for non-member records
+      if (requester_name !== undefined && requester_name !== null && requester_name !== '') {
+        fields.push('requester_name = ?');
+        params.push(String(requester_name).trim());
+      } else if (requester_name === null || requester_name === '') {
+        fields.push('requester_name = NULL');
+      }
 
-    if (requester_email !== undefined && requester_email !== null && requester_email !== '') {
-      fields.push('requester_email = ?');
-      params.push(String(requester_email).trim());
-    } else if (requester_email === null || requester_email === '') {
-      fields.push('requester_email = NULL');
+      if (requester_email !== undefined && requester_email !== null && requester_email !== '') {
+        fields.push('requester_email = ?');
+        params.push(String(requester_email).trim());
+      } else if (requester_email === null || requester_email === '') {
+        fields.push('requester_email = NULL');
+      }
     }
 
     if (relationship !== undefined && relationship !== null && relationship !== '') {

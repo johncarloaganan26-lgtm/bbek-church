@@ -343,7 +343,9 @@ router.put('/updateChildDedication/:id', async (req, res) => {
       });
     }
 
-    const result = await updateChildDedication(id, req.body);
+    // Check if user is admin
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'staff';
+    const result = await updateChildDedication(id, req.body, isAdmin);
     
     if (result.success) {
       res.status(200).json({
