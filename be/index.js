@@ -1,5 +1,8 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+// Set timezone to UTC for consistent timestamp handling across all environments
+process.env.TZ = 'UTC';
+
 // System Logs Module Integration - Trigger nodemon restart
 
 /**

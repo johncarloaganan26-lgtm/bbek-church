@@ -49,6 +49,9 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || 'root',
   database: process.env.DB_NAME || 'bbekdb',
 
+  // Timezone configuration - ensure UTC for consistent timestamps
+  timezone: '+00:00',
+
   // Connection pool configuration
   waitForConnections: true,
   connectionLimit: getConnectionLimit(),
@@ -107,6 +110,20 @@ const dbConfig = {
 // Create a shared connection pool
 let pool = mysql.createPool(dbConfig);
 
+// Set timezone for all connections
+pool.on('connection', async (connection) => {
+  if (!IS_PRODUCTION) {
+    console.log('New database connection established:', connection.threadId);
+  }
+
+  // Set session timezone to UTC for consistent timestamp handling
+  try {
+    await connection.execute('SET time_zone = "+00:00"');
+  } catch (error) {
+    console.warn('Failed to set session timezone:', error.message);
+  }
+});
+
 /**
  * Recreate the connection pool with optional reduced connection limit
  * Used when encountering max_connection errors or other critical connection issues
@@ -140,9 +157,16 @@ const recreatePool = async (newConnectionLimit = null) => {
   pool = mysql.createPool(dbConfig);
   
   // Re-attach event listeners
-  pool.on('connection', (connection) => {
+  pool.on('connection', async (connection) => {
     if (!IS_PRODUCTION) {
       console.log('New database connection established:', connection.threadId);
+    }
+
+    // Set session timezone to UTC for consistent timestamp handling
+    try {
+      await connection.execute('SET time_zone = "+00:00"');
+    } catch (error) {
+      console.warn('Failed to set session timezone:', error.message);
     }
   });
   
