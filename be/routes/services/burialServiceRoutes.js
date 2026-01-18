@@ -203,9 +203,21 @@ router.post('/createBurialService', async (req, res) => {
     }
   } catch (error) {
     console.error('Error creating burial service:', error);
+    
+    // Provide more detailed error message for debugging
+    let errorMessage = error.message || 'Failed to create burial service';
+    
+    // Handle specific database constraint errors
+    if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.code === 'ER_NO_REFERENCED_ROW') {
+      errorMessage = 'Invalid member ID or database constraint violation. Please ensure the member exists or provide non-member requester details.';
+    } else if (error.code === 'ER_BAD_NULL_ERROR') {
+      errorMessage = 'Missing required field. Please ensure all required fields are provided.';
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to create burial service'
+      error: errorMessage,
+      code: error.code || 'UNKNOWN_ERROR'
     });
   }
 });

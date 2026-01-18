@@ -40,14 +40,25 @@ async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
       ? moment(serviceDate).format('HH:mm:ss')
       : moment(serviceDate).format('HH:mm:ss');
 
+    // Extract minutes from the formatted time
+    const minutes = formattedTime ? formattedTime.split(':')[1] : null;
+
+    if (!minutes) {
+      console.warn('Could not extract minutes from time:', formattedTime);
+      return {
+        isBooked: false,
+        conflictingBurial: null
+      };
+    }
+
     let sql = `
       SELECT burial_id, deceased_name, service_date, status
       FROM tbl_burialservice
       WHERE DATE(service_date) = ?
-      AND TIME(service_date) = ?
+      AND TIME(service_date) LIKE CONCAT('%:', ?, ':%')
       AND status = 'approved'
     `;
-    const params = [formattedDate, formattedTime];
+    const params = [formattedDate, minutes];
 
     if (excludeBurialId) {
       sql += ' AND burial_id != ?';
@@ -78,7 +89,7 @@ async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
  */
 async function checkPendingBurialServiceApproval(memberId, requesterEmail = null) {
   try {
-    let sql = `SELECT id, type, status, created_at 
+    let sql = `SELECT approval_id, type, status, date_created 
                  FROM tbl_approval 
                  WHERE type = 'burial_service' 
                  AND status = 'pending'
@@ -119,6 +130,7 @@ async function createBurialService(burialData) {
     console.log('New burial ID:', new_burial_id);
     
     const {
+      id, // Ignore id field if sent by frontend
       burial_id = new_burial_id,
       member_id,
       requester_name,
@@ -184,6 +196,7 @@ async function createBurialService(burialData) {
 
     // Check for time slot conflicts - Only check time, not date
     // Multiple burial services are allowed on the same date, but not at the same time
+    let timeSlotWarning = null;
     if (service_date) {
       const timeSlotCheck = await checkTimeSlotAvailability(
         service_date,
@@ -191,11 +204,7 @@ async function createBurialService(burialData) {
       );
 
       if (timeSlotCheck.isBooked) {
-        return {
-          success: false,
-          message: `Time slot conflict: ${service_date} is already booked.`,
-          error: 'Time slot conflict'
-        };
+        timeSlotWarning = `Time slot conflict: ${service_date} is already booked.`;
       }
     }
 
@@ -205,13 +214,13 @@ async function createBurialService(burialData) {
     const final_requester_email = requester_email ? String(requester_email).trim() : null;
     const final_pastor_name = pastor_name ? String(pastor_name).trim() : null;
 
-    const formattedServiceDate = (service_date === null || service_date === '' || !service_date) 
-      ? null 
+    const formattedServiceDate = (service_date === null || service_date === '' || !service_date)
+      ? null
       : moment(service_date).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
-    const formattedBirthdate = deceased_birthdate && moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
+    const formattedBirthdate = deceased_birthdate ? (moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
       ? deceased_birthdate
-      : moment(deceased_birthdate).format('YYYY-MM-DD');
+      : moment(deceased_birthdate).format('YYYY-MM-DD')) : null;
     const formattedDateDeath = date_death ? moment(date_death).format('YYYY-MM-DD HH:mm:ss') : null;
 
     const sql = `
@@ -235,6 +244,22 @@ async function createBurialService(burialData) {
       formattedBirthdate,
       formattedDateDeath
     ];
+
+    console.log('Executing burial service INSERT with params:', {
+      burial_id: final_burial_id,
+      member_id: final_member_id,
+      requester_name: final_requester_name,
+      requester_email: final_requester_email,
+      relationship: relationship.trim(),
+      location: location.trim(),
+      pastor_name: final_pastor_name,
+      service_date: formattedServiceDate,
+      status: status,
+      date_created: formattedDateCreated,
+      deceased_name: deceased_name ? deceased_name.trim() : null,
+      deceased_birthdate: formattedBirthdate,
+      date_death: formattedDateDeath
+    });
 
     const [result] = await query(sql, params);
     const createdBurialService = await getBurialServiceById(final_burial_id);
@@ -290,7 +315,8 @@ async function createBurialService(burialData) {
     return {
       success: true,
       message: 'Burial service created successfully',
-      data: createdBurialService.data
+      data: createdBurialService.data,
+      timeSlotWarning: timeSlotWarning
     };
   } catch (error) {
     console.error('Error creating burial service:', error);
@@ -620,8 +646,29 @@ async function updateBurialService(burialId, burialData) {
       date_death
     } = burialData;
 
-    // Check for time slot conflicts before updating
+    // Check current status and block updates if pending
     const currentData = burialCheck.data;
+    
+    // Prevent any updates when status is pending (except status change by admin)
+    if (currentData.status === 'pending' && status === undefined) {
+      return {
+        success: false,
+        message: 'Cannot update burial service while pending approval. Please wait for admin approval first.',
+        error: 'Cannot update pending request'
+      };
+    }
+
+    // Specifically block schedule changes when pending
+    if (service_date !== undefined && service_date !== null && currentData.status === 'pending') {
+      return {
+        success: false,
+        message: 'Cannot request schedule change while burial service is pending approval. Please wait for admin approval first.',
+        error: 'Cannot update schedule on pending request'
+      };
+    }
+
+    // Check for time slot conflicts before updating
+
     const finalServiceDate = service_date !== undefined ? service_date : currentData.service_date;
 
     // Only check conflicts if service_date is being updated

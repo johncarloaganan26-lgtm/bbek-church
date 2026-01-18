@@ -127,7 +127,7 @@ async function getNextChildId() {
  */
 async function checkPendingChildDedicationApproval(memberId) {
   try {
-    const sql = `SELECT id, type, status, created_at 
+    const sql = `SELECT approval_id, type, status, date_created 
                  FROM tbl_approval 
                  WHERE type = 'child_dedication' 
                  AND email IN (
@@ -1044,6 +1044,27 @@ async function updateChildDedication(childId, dedicationData) {
       date_created
     } = dedicationData;
 
+    // Check current status and block updates if pending
+    const currentData = dedicationCheck.data;
+    
+    // Prevent any updates when status is pending (except status change by admin)
+    if (currentData.status === 'pending' && status === undefined) {
+      return {
+        success: false,
+        message: 'Cannot update child dedication while pending approval. Please wait for admin approval first.',
+        error: 'Cannot update pending request'
+      };
+    }
+
+    // Specifically block schedule changes when pending
+    if ((preferred_dedication_date !== undefined || preferred_dedication_time !== undefined) && currentData.status === 'pending') {
+      return {
+        success: false,
+        message: 'Cannot request schedule change while child dedication is pending approval. Please wait for admin approval first.',
+        error: 'Cannot update schedule on pending request'
+      };
+    }
+
     // Build dynamic update query based on provided fields
     const fields = [];
     const params = [];
@@ -1152,7 +1173,6 @@ async function updateChildDedication(childId, dedicationData) {
 
     if (preferred_dedication_date !== undefined) {
       // Check for time slot conflicts before updating
-      const currentData = dedicationCheck.data;
       const finalPreferredDate = preferred_dedication_date;
       const finalPreferredTime = preferred_dedication_time !== undefined ? preferred_dedication_time : currentData.preferred_dedication_time;
 
@@ -1202,29 +1222,6 @@ async function updateChildDedication(childId, dedicationData) {
       const formattedDateCompleted = date_completed ? moment(date_completed).format('YYYY-MM-DD') : null;
       fields.push('date_completed = ?');
       params.push(formattedDateCompleted);
-    }
-
-    if (contact_phone_number !== undefined) {
-      // If only requester is being updated, still check for conflicts with current preferred date
-      const currentData = dedicationCheck.data;
-      // Check for preferred dedication date conflicts - DISABLED
-      // Multiple child dedications are allowed on the same date
-      // if (currentData.preferred_dedication_date) {
-      //   const conflictCheck = await checkPreferredDedicationDateConflict(
-      //     currentData.preferred_dedication_date,
-      //     requested_by.trim(),
-      //     childId // Exclude current child dedication for update
-      //   );
-
-      //   if (conflictCheck && conflictCheck.hasConflict) {
-      //     return {
-      //       success: false,
-      //       message: conflictCheck.message,
-      //       error: 'Preferred dedication date conflict',
-      //       conflict: conflictCheck.conflictingDedication
-      //     };
-      //   }
-      // }
     }
 
     if (contact_phone_number !== undefined) {
@@ -1374,7 +1371,6 @@ async function updateChildDedication(childId, dedicationData) {
     }
 
     // Check for duplicates only if identifying fields actually changed
-    const currentData = dedicationCheck.data;
     const hasNameChange = (child_firstname !== undefined && child_firstname.trim() !== currentData.child_firstname?.trim()) ||
                          (child_lastname !== undefined && child_lastname.trim() !== currentData.child_lastname?.trim());
     const hasDateChange = date_of_birth !== undefined && date_of_birth !== currentData.date_of_birth;
