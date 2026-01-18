@@ -705,24 +705,13 @@ watch(
         formData.pastor_name = data.pastor_name ?? null
         formData.service_date = data.service_date && data.service_date.includes(' ') ? new Date(data.service_date.replace(' ', 'T')) : (data.service_date ? new Date(data.service_date) : null)
         formData.status = data.status || 'pending'
-        if (isMember.value) {
-          const memberInfo = userInfo.value.member
-          if (memberInfo) {
-            formData.requester_name = `${memberInfo.firstname || ''} ${memberInfo.middle_name || ''} ${memberInfo.lastname || ''}`.trim()
-            formData.requester_email = memberInfo.email || ''
-          } else {
-            const accountName = `${userInfo.value.account.firstname || ''} ${userInfo.value.account.lastname || ''}`.trim()
-            formData.requester_name = accountName || userInfo.value.account.email || ''
-            formData.requester_email = userInfo.value.account.email || ''
-          }
-        }
       } else {
         resetForm()
         if (userInfo.value && userInfo.value.account && (userInfo.value.account.position === 'admin' || userInfo.value.account.position === 'staff')) {
           // For admin/staff users, clear requester info
           formData.requester_name = ''
           formData.requester_email = ''
-        } else if (userInfo.value?.account?.member_id) {
+        } else if (userInfo.value?.account?.member_id && userInfo.value.account.position !== 'admin' && userInfo.value.account.position !== 'staff') {
           // For member users, auto-populate their information
           const memberInfo = userInfo.value.member
           if (memberInfo) {
@@ -885,11 +874,13 @@ const handleSubmit = async () => {
       service_date: formData.service_date
     })
     
-    // Get member_id: either from form (admin/staff selected) or fetch real-time from logged-in user's email
+    // Get member_id: only from form selection (admin/staff) or for member users
     let finalMemberId = formData.member_id
-    
-    if (!finalMemberId && userInfo.value?.account?.email) {
-      // Fetch member_id in real-time from API using current logged-in user's email
+
+    // For non-admin users, allow fetching member_id from their email if not already set
+    if (!finalMemberId && userInfo.value?.account?.email &&
+        userInfo.value.account.position !== 'admin' && userInfo.value.account.position !== 'staff') {
+      // Fetch member_id in real-time from API using current logged-in user's email (only for member users)
       try {
         const memberResponse = await axios.get(`/church-records/members/getSpecificMemberByEmail/${userInfo.value.account.email}`)
         if (memberResponse.data?.success && memberResponse.data?.data?.member_id) {
