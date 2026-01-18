@@ -53,8 +53,8 @@ u<template>
       ></div>
 
       <!-- Overlay -->
-      <div class="hero-overlay" :class="{ 'dark-overlay': homeData.backgroundType === 'image' || homeData.backgroundType === 'carousel' }"></div>
-
+      <div class="hero-overlay"></div>
+     
     </div>
 
     <!-- Content -->
@@ -460,9 +460,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.hero-overlay.dark-overlay {
-  background: rgba(0, 0, 0, 0.6) !important;
-}
 
 .hero-content {
   position: relative;
