@@ -43,11 +43,13 @@ const bodyParser = require('body-parser');
 const path = require('path');
 
 // Wrap route imports in try-catch to prevent serverless function crashes
+console.log('🚀 Starting API server initialization...');
 let authenticateToken, memberRouter, accountRouter, departmentOfficerRouter, departmentRouter;
 let tithesRouter, ministryRouter, eventRouter, churchLeaderRouter, approvalRoutes;
 let childDedicationRouter, burialServiceRouter, waterBaptismRouter, marriageServiceRouter;
 let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRouter;
 let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
+let notificationRouter;
 
 try {
   const authMiddleware = require('../middleware/authMiddleware');
@@ -76,8 +78,13 @@ try {
   auditTrailRouter = require('../routes/auditTrailRoutes');
   auditTrailMiddleware = require('../middleware/auditTrailMiddleware');
   authRouter = require('../routes/authRoutes');
+  console.log('🔄 Loading notificationRouter...');
+  notificationRouter = require('../routes/notificationRoutes');
+  console.log('📋 Loaded notificationRouter:', !!notificationRouter, typeof notificationRouter);
+  console.log('📋 notificationRouter stack length:', notificationRouter ? notificationRouter.stack.length : 'N/A');
 } catch (error) {
   console.error('❌ Error loading route modules:', error.message);
+  console.error('Stack:', error.stack);
   // Continue with app creation even if some routes fail to load
   // This prevents serverless function crashes
 }
@@ -293,6 +300,18 @@ if (announcementRouter) app.use('/api/announcements', announcementRouter);
 
 // Form routes
 if (formRouter) app.use('/api/forms', formRouter);
+
+// Notification routes
+console.log('🔍 Checking notificationRouter for registration...');
+console.log('   notificationRouter exists:', !!notificationRouter);
+console.log('   notificationRouter type:', typeof notificationRouter);
+if (notificationRouter) {
+  console.log('📋 Registering notification routes at /api/notifications');
+  app.use('/api/notifications', notificationRouter);
+  console.log('✅ Notification routes registered successfully');
+} else {
+  console.log('⚠️ notificationRouter not loaded - skipping registration');
+}
 
 // CMS routes (Landing Page Content Management)
 if (cmsRouter) app.use('/api/cms', cmsRouter);

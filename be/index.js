@@ -61,6 +61,7 @@ const dashboardRouter = require('./routes/dashboardRoutes');
 const auditTrailRouter = require('./routes/auditTrailRoutes');
 const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
 const authRouter = require('./routes/authRoutes');
+const notificationRouter = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -265,6 +266,9 @@ app.use('/api/dashboard', dashboardRouter);
 
 // Audit trail routes
 app.use('/api/audit-trail', auditTrailRouter);
+
+// Notification routes
+app.use('/api/notifications', notificationRouter);
 
 
 // Fallback for unknown routes

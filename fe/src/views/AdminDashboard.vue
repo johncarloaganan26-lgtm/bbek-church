@@ -190,6 +190,10 @@
         class="menu-button"
       ></v-app-bar-nav-icon>
       <v-spacer></v-spacer>
+
+      <!-- Notification Icon -->
+      <NotificationIcon class="mr-4" />
+
       <v-menu location="bottom end" offset="8">
         <template v-slot:activator="{ props }">
           <div 
@@ -240,6 +244,7 @@ import { checkAccessTokenValidity } from '@/utils/tokenValidation'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useCmsStore } from '@/stores/cmsStore'
 import { useDisplay } from 'vuetify'
+import NotificationIcon from '@/components/NotificationIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
