@@ -13,13 +13,13 @@
     >
       <template v-slot:activator="{ props }">
         <v-badge
+          v-if="unreadCount > 0"
           :content="unreadCount"
-          :value="unreadCount"
           color="red"
           bordered
-          overlap
-          offset-x="10"
-          offset-y="10"
+          location="top end"
+          offset-x="8"
+          offset-y="8"
           class="notification-badge"
         >
           <v-btn
@@ -32,6 +32,16 @@
             <v-icon size="24">mdi-bell</v-icon>
           </v-btn>
         </v-badge>
+        <v-btn
+          v-else
+          icon
+          class="notification-btn"
+          v-bind="props"
+          title="Notifications"
+          aria-label="View notifications"
+        >
+          <v-icon size="24">mdi-bell</v-icon>
+        </v-btn>
       </template>
 
       <!-- Notification Panel (Dropdown) -->
@@ -500,6 +510,11 @@ export default {
 
 <style scoped>
 .notification-icon-container {
+  position: relative;
+  display: inline-block;
+}
+
+.notification-icon-wrapper {
   position: relative;
   display: inline-block;
 }
