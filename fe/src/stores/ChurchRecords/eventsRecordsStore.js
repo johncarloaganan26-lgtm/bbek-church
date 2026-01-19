@@ -35,17 +35,25 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
     filters: {
       sortBy: 'Date Created (Newest)',
       status: 'All Statuses',
-      type: 'All Types'
+      type: 'All Types',
+      dateRangeStart: null,
+      dateRangeEnd: null
     },
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     itemsPerPage: 10,
     pageSizeOptions: [10, 20, 50, 100],
-    memberOptions: []
+    memberOptions: [],
+    searchTimeout: null
   }),
 
-  getters: {},
+  getters: {
+    paginatedEvents: (state) => {
+      // Backend handles pagination, so just return events
+      return state.events
+    }
+  },
 
   actions: {
     async fetchEvents(options = {}) {
@@ -88,6 +96,20 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
           this.totalCount = response.data.totalCount || 0
           this.totalPages = response.data.pagination?.totalPages || 1
           this.currentPage = response.data.pagination?.page || 1
+
+          // Update filters if provided
+          if (options.search !== undefined) {
+            this.searchQuery = search
+          }
+          if (options.sortBy !== undefined) {
+            this.filters.sortBy = sortBy
+          }
+          if (options.dateRangeStart !== undefined) {
+            this.filters.dateRangeStart = dateRangeStart
+          }
+          if (options.dateRangeEnd !== undefined) {
+            this.filters.dateRangeEnd = dateRangeEnd
+          }
         } else {
           this.error = response.data.message || 'Failed to fetch events'
         }
@@ -361,8 +383,20 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchEvents({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchEvents({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {

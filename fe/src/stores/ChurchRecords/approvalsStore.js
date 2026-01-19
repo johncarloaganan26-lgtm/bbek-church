@@ -10,13 +10,15 @@ export const useApprovalsStore = defineStore('approvals', {
     filters: {
       sortBy: 'Date Created (Newest)',
       status: 'All Statuses',
-      type: 'All Types'
+      type: 'All Types',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     itemsPerPage: 10,
     pageSizeOptions: [10, 20, 50, 100],
+    searchTimeout: null,
     summaryStats: {
       totalApprovals: 0,
       pendingApprovals: 0,
@@ -69,6 +71,7 @@ export const useApprovalsStore = defineStore('approvals', {
         const status = options.status !== undefined ? options.status : this.filters.status
         const type = options.type !== undefined ? options.type : this.filters.type
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -82,6 +85,9 @@ export const useApprovalsStore = defineStore('approvals', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/approvals/getAllApprovals?${params}`, {
@@ -218,7 +224,20 @@ export const useApprovalsStore = defineStore('approvals', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      this.fetchApprovals({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchApprovals({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {
@@ -262,6 +281,9 @@ export const useApprovalsStore = defineStore('approvals', {
         }
         if (options.sortBy) {
           params.append('sortBy', options.sortBy)
+        }
+        if (options.dateRange && options.dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(options.dateRange))
         }
         
         // Make request with responseType: 'blob' to handle binary data

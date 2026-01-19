@@ -707,6 +707,17 @@ async function getAllMembers(options = {}) {
       const joinMonth = options.joinMonth || null;
       const gender = options.gender || null;
       const sortBy = options.sortBy || null;
+      let startDate = null;
+      let endDate = null;
+      if (options.dateRange) {
+        try {
+          const [start, end] = typeof options.dateRange === 'string' ? JSON.parse(options.dateRange) : options.dateRange;
+          startDate = start;
+          endDate = end;
+        } catch (error) {
+          console.warn('Invalid date range format:', options.dateRange);
+        }
+      }
       
       // Build base query for counting total records
       let countSql = 'SELECT COUNT(*) as total FROM tbl_members';
@@ -799,7 +810,15 @@ async function getAllMembers(options = {}) {
         params.push(dbGender);
         hasWhere = true;
       }
-  
+
+      // Add date range filter
+      if (startDate && endDate) {
+        whereConditions.push('DATE(date_created) BETWEEN ? AND ?');
+        countParams.push(startDate, endDate);
+        params.push(startDate, endDate);
+        hasWhere = true;
+      }
+
       // Apply WHERE clause if any conditions exist
       if (hasWhere) {
         const whereClause = ' WHERE ' + whereConditions.join(' AND ');

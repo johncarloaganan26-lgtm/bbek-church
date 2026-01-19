@@ -1,4 +1,4 @@
-i<template>
+<template>
   <div class="settings-page">
     <div class="page-header">
       <h1>Settings</h1>
@@ -143,6 +143,20 @@ i<template>
             <el-option label="Inactive" :value="false" />
           </el-select>
         </el-form-item>
+        <el-form-item label="Date Range">
+          <el-date-picker
+            v-model="dateRangeValue"
+            type="daterange"
+            start-placeholder="Start date"
+            end-placeholder="End date"
+            range-separator="to"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            :disabled="loading"
+            @change="handleDateRangeChange"
+            style="width: 250px"
+          />
+        </el-form-item>
         <el-form-item label="Sort By">
           <el-select
             v-model="sortBy"
@@ -155,6 +169,8 @@ i<template>
             <el-option label="Date (Oldest)" value="Date (Oldest)" />
             <el-option label="Title (A-Z)" value="Title (A-Z)" />
             <el-option label="Priority (High to Low)" value="Priority (High to Low)" />
+            <el-option label="Date Range (Newest)" value="Date Range (Newest)" />
+            <el-option label="Date Range (Oldest)" value="Date Range (Oldest)" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -367,7 +383,7 @@ i<template>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAnnouncementStore } from '@/stores/announcementStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -395,7 +411,10 @@ const searchQuery = computed({
   get: () => announcementStore.searchQuery,
   set: (value) => announcementStore.setSearchQuery(value)
 })
-const filters = computed(() => announcementStore.filters)
+const filters = computed({
+  get: () => announcementStore.filters,
+  set: (value) => announcementStore.setFilters(value)
+})
 const currentPage = computed({
   get: () => announcementStore.currentPage,
   set: (value) => announcementStore.setCurrentPage(value)
@@ -417,6 +436,10 @@ const sortBy = computed({
   get: () => announcementStore.filters.sortBy || 'Date (Newest)',
   set: (value) => announcementStore.setFilters({ sortBy: value })
 })
+const dateRangeValue = computed({
+  get: () => announcementStore.filters.dateRange || [],
+  set: (value) => announcementStore.setFilters({ dateRange: value })
+})
 
 // Methods
 const fetchAnnouncements = async () => {
@@ -428,10 +451,23 @@ const fetchSummaryStats = async () => {
 }
 
 const handleSearch = () => {
-  fetchAnnouncements()
+  // Clear previous timeout
+  if (window.settingsSearchTimeout) {
+    clearTimeout(window.settingsSearchTimeout)
+  }
+
+  // Set new timeout to trigger search after user stops typing (500ms delay)
+  window.settingsSearchTimeout = setTimeout(() => {
+    fetchAnnouncements()
+  }, 500)
 }
 
 const handleFilterChange = () => {
+  fetchAnnouncements()
+}
+
+const handleDateRangeChange = (value) => {
+  announcementStore.setFilters({ dateRange: value })
   fetchAnnouncements()
 }
 
@@ -661,6 +697,13 @@ onMounted(async () => {
     fetchAnnouncements(),
     fetchSummaryStats()
   ])
+})
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (window.settingsSearchTimeout) {
+    clearTimeout(window.settingsSearchTimeout)
+  }
 })
 </script>
 

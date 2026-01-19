@@ -112,6 +112,20 @@
               @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
           <v-col cols="12" md="3" class="d-flex align-center gap-2">
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
@@ -347,6 +361,10 @@ const handleFilterChange = () => {
   const statusText = filters.value.status || 'All Statuses'
   const typeText = filters.value.type || 'All Types'
   ElMessage.info(`Filtering by: ${statusText}, ${typeText}`)
+  approvalsStore.setFilters(filters.value)
+}
+
+const handleDateRangeChange = () => {
   approvalsStore.setFilters(filters.value)
 }
 

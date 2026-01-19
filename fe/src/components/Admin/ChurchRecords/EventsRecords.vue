@@ -55,6 +55,20 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="localDateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              style="width: 100%;"
+            />
+          </v-col>
+          <v-col cols="12" md="2">
             <v-select
               v-model="itemsPerPage"
               :items="pageSizeOptions"
@@ -70,7 +84,7 @@
           <v-col cols="12" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-printer"
                   variant="outlined"
                   v-bind="props"
@@ -81,7 +95,7 @@
             </v-tooltip>
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-download"
                   variant="outlined"
                   v-bind="props"
@@ -195,7 +209,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useEventsRecordsStore } from '@/stores/ChurchRecords/eventsRecordsStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import EventRecordsDialog from '@/components/Dialogs/EventRecordsDialog.vue'
@@ -203,7 +217,7 @@ import EventRecordsDialog from '@/components/Dialogs/EventRecordsDialog.vue'
 const eventsRecordsStore = useEventsRecordsStore()
 
 // Computed properties from store
-const events = computed(() => eventsRecordsStore.events)
+const events = computed(() => eventsRecordsStore.paginatedEvents)
 
 // Sort events with Pending status first, followed by ongoing and completed
 const sortedEvents = computed(() => {
@@ -297,6 +311,24 @@ const statusOptions = ['All Statuses', 'Pending', 'Ongoing', 'Completed']
 // Dialog state
 const eventRecordsDialog = ref(false)
 const eventRecordsData = ref(null)
+
+// Date range handling
+const localDateRange = ref([])
+watch(() => filters.value.dateRangeStart, (newStart) => {
+  localDateRange.value = newStart && filters.value.dateRangeEnd ? [newStart, filters.value.dateRangeEnd] : []
+}, { immediate: true })
+
+watch(() => filters.value.dateRangeEnd, (newEnd) => {
+  localDateRange.value = filters.value.dateRangeStart && newEnd ? [filters.value.dateRangeStart, newEnd] : []
+}, { immediate: true })
+
+const handleDateRangeChange = (value) => {
+  // Update store filters and trigger fetch
+  eventsRecordsStore.setFilters({
+    dateRangeStart: value && value[0] ? value[0] : null,
+    dateRangeEnd: value && value[1] ? value[1] : null
+  })
+}
 
 // Handlers
 const handleEventRecordsDialog = () => {

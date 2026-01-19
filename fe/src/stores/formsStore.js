@@ -11,7 +11,8 @@ export const useFormsStore = defineStore('forms', {
     filters: {
       status: null,
       form_type: null,
-      sortBy: 'Date (Newest)'
+      sortBy: 'Date (Newest)',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -63,6 +64,7 @@ export const useFormsStore = defineStore('forms', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const status = options.status !== undefined ? options.status : this.filters.status
         const form_type = options.form_type !== undefined ? options.form_type : this.filters.form_type
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = {
           page,
@@ -72,6 +74,9 @@ export const useFormsStore = defineStore('forms', {
         if (search) params.search = search
         if (status) params.status = status
         if (form_type) params.form_type = form_type
+        if (dateRange && dateRange.length === 2) {
+          params.dateRange = JSON.stringify(dateRange)
+        }
 
         // Remove undefined values
         Object.keys(params).forEach(key => params[key] === undefined && delete params[key])

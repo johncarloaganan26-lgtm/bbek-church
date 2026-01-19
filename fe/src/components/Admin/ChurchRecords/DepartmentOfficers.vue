@@ -27,6 +27,7 @@
               density="compact"
               :disabled="loading"
               hide-details
+              @update:model-value="handleSearchChange"
             ></v-text-field>
           </v-col>
           <v-col cols="12" md="3">
@@ -236,6 +237,10 @@ const sortByOptions = [
 watch(() => filters.value.sortBy, (newSortBy) => {
   departmentOfficersStore.setFilters({ sortBy: newSortBy })
 })
+
+const handleSearchChange = (value) => {
+  departmentOfficersStore.setSearchQuery(value)
+}
 
 const openDepartmentOfficersDialog = () => {
   departmentOfficersData.value = null

@@ -21,7 +21,8 @@ export const useTransactionsStore = defineStore('transactions', {
       grand_total: 0,
       total_transactions: 0
     },
-    loadingTotals: false
+    loadingTotals: false,
+    searchTimeout: null
   }),
 
   getters: {
@@ -239,8 +240,17 @@ export const useTransactionsStore = defineStore('transactions', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchTransactions({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Debounce search to avoid too many API calls
+      this.searchTimeout = setTimeout(() => {
+        // Refetch with new search query
+        this.fetchTransactions({ search: query, page: 1, pageSize: this.itemsPerPage })
+      }, 500) // 500ms debounce
     },
 
     setFilters(filters) {

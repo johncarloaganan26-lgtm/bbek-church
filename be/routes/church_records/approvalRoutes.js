@@ -17,7 +17,26 @@ const router = express.Router();
  */
 router.get('/getAllApprovals', async (req, res) => {
   try {
-    const options = req.query;
+    // Get parameters from query string
+    const {
+      search, limit, offset, page, pageSize, status, type, sortBy, dateRange
+    } = req.query;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, type, sortBy,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllApprovals(options);
     if (result.success) {
       return res.status(200).json({
@@ -47,7 +66,26 @@ router.get('/getAllApprovals', async (req, res) => {
 // POST version to support payload filters
 router.post('/getAllApprovals', async (req, res) => {
   try {
-    const options = req.body;
+    // Get parameters from request body (payload)
+    const {
+      search, limit, offset, page, pageSize, status, type, sortBy, dateRange
+    } = req.body;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, type, sortBy,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllApprovals(options);
     if (result.success) {
       return res.status(200).json({

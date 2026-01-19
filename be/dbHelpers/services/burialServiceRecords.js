@@ -334,6 +334,16 @@ async function getAllBurialServices(options = {}) {
     const status = options.status || null;
     const sortBy = options.sortBy || null;
     const useFulltext = options.useFulltext === true;
+    let dateRange = options.dateRange || null;
+    // Parse dateRange if it's a JSON string (from query parameters)
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange JSON:', dateRange);
+        dateRange = null;
+      }
+    }
 
     let countSql = 'SELECT COUNT(*) as total FROM tbl_burialservice bs INNER JOIN tbl_members m ON bs.member_id = m.member_id';
     let countParams = [];
@@ -367,6 +377,14 @@ async function getAllBurialServices(options = {}) {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);
+      hasWhere = true;
+    }
+
+    // Add date range filter (filter by date_created)
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+      whereConditions.push('DATE(bs.date_created) BETWEEN ? AND ?');
+      countParams.push(dateRange[0], dateRange[1]);
+      params.push(dateRange[0], dateRange[1]);
       hasWhere = true;
     }
 
@@ -437,9 +455,15 @@ async function getAllBurialServices(options = {}) {
           params.push(searchValue);
         }
         orderByClause += 'bs.date_created DESC';
-        break;
-      default:
-        orderByClause += 'bs.date_created DESC';
+       break;
+     case 'Date Range (Newest)':
+       orderByClause += 'bs.service_date DESC';
+       break;
+     case 'Date Range (Oldest)':
+       orderByClause += 'bs.service_date ASC';
+       break;
+     default:
+       orderByClause += 'bs.date_created DESC';
     }
     sql += orderByClause;
 

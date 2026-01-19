@@ -50,7 +50,7 @@ router.post('/createChurchLeader', async (req, res) => {
  * READ ALL - Get all church leader records with pagination and filters
  * GET /api/church-records/church-leaders/getAllChurchLeaders (query params)
  * POST /api/church-records/church-leaders/getAllChurchLeaders (body payload)
- * Parameters: search, limit, offset, page, pageSize, sortBy
+ * Parameters: search, limit, offset, page, pageSize, sortBy, dateRange
  */
 router.get('/getAllChurchLeaders', async (req, res) => {
   try {

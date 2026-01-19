@@ -55,6 +55,20 @@
               @update:model-value="fetchForms"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
           <v-col cols="12" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Export CSV" location="top">
               <template v-slot:activator="{ props }">
@@ -279,6 +293,11 @@ const formTypeFilter = computed({
   set: (value) => formsStore.setFilters({ form_type: value })
 })
 
+const filters = computed({
+  get: () => formsStore.filters,
+  set: (value) => formsStore.setFilters(value)
+})
+
 const loading = computed(() => formsStore.loading)
 const forms = computed(() => formsStore.forms)
 const currentPage = computed({
@@ -308,7 +327,9 @@ const sortByOptions = [
   'This Month',
   'Last Month',
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'July', 'August', 'September', 'October', 'November', 'December',
+  'Date Range (Newest)',
+  'Date Range (Oldest)'
 ]
 
 const statusOptions = [
@@ -335,6 +356,10 @@ const debouncedSearch = () => {
   }, 500)
 }
 
+const handleDateRangeChange = () => {
+  fetchForms()
+}
+
 const fetchForms = async () => {
   try {
     await formsStore.fetchForms({
@@ -343,7 +368,8 @@ const fetchForms = async () => {
       pageSize: pageSize.value,
       status: statusFilter.value,
       form_type: formTypeFilter.value,
-      sortBy: sortBy.value
+      sortBy: sortBy.value,
+      dateRange: filters.value.dateRange
     })
   } catch (error) {
     // Error is already handled in the store

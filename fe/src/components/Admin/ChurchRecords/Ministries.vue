@@ -61,7 +61,7 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="2">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -82,7 +82,6 @@
               density="compact"
               :disabled="loading"
               hide-details
-              @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
           <v-col cols="12" md="2">
@@ -94,7 +93,6 @@
               density="compact"
               :disabled="loading"
               hide-details
-              @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
           <v-col cols="12" md="2">
@@ -109,7 +107,21 @@
               @update:model-value="handleCategoryChange"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="3" class="d-flex align-center">
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
+          <v-col cols="12" md="2">
             <v-select
               v-model="itemsPerPage"
               :items="pageSizeOptions"
@@ -291,10 +303,7 @@ const searchQuery = computed({
   get: () => ministriesStore.searchQuery,
   set: (value) => ministriesStore.setSearchQuery(value)
 })
-const filters = computed({
-  get: () => ministriesStore.filters,
-  set: (value) => ministriesStore.setFilters(value)
-})
+const filters = computed(() => ministriesStore.filters)
 
 // Options for dropdowns
 const leaderOptions = computed(() => ministriesStore.leaderOptions)
@@ -414,12 +423,16 @@ const handleFilterChange = () => {
 // Handle category filter change
 const handleCategoryChange = () => {
   // Convert category to department_name_pattern
-  const pattern = selectedCategory.value 
-    ? `%${selectedCategory.value}%` 
+  const pattern = selectedCategory.value
+    ? `%${selectedCategory.value}%`
     : ''
-  
+
   // Update filters and refetch
   filters.value.departmentNamePattern = pattern
+  ministriesStore.setFilters(filters.value)
+}
+
+const handleDateRangeChange = () => {
   ministriesStore.setFilters(filters.value)
 }
 

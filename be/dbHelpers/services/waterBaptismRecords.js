@@ -456,6 +456,17 @@ async function getAllWaterBaptisms(options = {}) {
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
+    let dateRange = options.dateRange || null;
+
+    // Parse dateRange if it's a JSON string
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange:', dateRange);
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records (with LEFT JOIN for accurate count including non-members)
     let countSql = 'SELECT COUNT(*) as total FROM tbl_waterbaptism wb LEFT JOIN tbl_members m ON wb.member_id = m.member_id';
@@ -511,11 +522,11 @@ async function getAllWaterBaptisms(options = {}) {
 
     // Add search functionality (search by baptism_id, member_id, member name, non-member name, location, or pastor_name)
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
-    if (searchValue) {
-      const searchCondition = `(wb.baptism_id LIKE ? OR wb.member_id LIKE ? 
-        OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? 
-        OR wb.firstname LIKE ? OR wb.lastname LIKE ? OR wb.email LIKE ? 
-        OR wb.location LIKE ? OR wb.pastor_name LIKE ? 
+    if (searchValue && searchValue.length >= 2) {
+      const searchCondition = `(wb.baptism_id LIKE ? OR wb.member_id LIKE ?
+        OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ?
+        OR wb.firstname LIKE ? OR wb.lastname LIKE ? OR wb.email LIKE ?
+        OR wb.location LIKE ? OR wb.pastor_name LIKE ?
         OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?
         OR CONCAT(wb.firstname, ' ', IFNULL(wb.middle_name, ''), ' ', wb.lastname) LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
@@ -532,6 +543,17 @@ async function getAllWaterBaptisms(options = {}) {
       countParams.push(status);
       params.push(status);
       hasWhere = true;
+    }
+
+    // Add baptism date range filter
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+      const [startDate, endDate] = dateRange;
+      if (startDate && endDate) {
+        whereConditions.push('wb.baptism_date BETWEEN ? AND ?');
+        countParams.push(startDate, endDate);
+        params.push(startDate, endDate);
+        hasWhere = true;
+      }
     }
 
     // Initialize sortByValue before using it
@@ -593,9 +615,15 @@ async function getAllWaterBaptisms(options = {}) {
           WHEN 'Cancelled' THEN 5 
           ELSE 6 
         END, wb.date_created DESC`;
-        break;
-      default:
-        orderByClause += 'wb.date_created DESC'; // Default sorting
+       break;
+     case 'Date Range (Newest)':
+       orderByClause += 'wb.baptism_date DESC';
+       break;
+     case 'Date Range (Oldest)':
+       orderByClause += 'wb.baptism_date ASC';
+       break;
+     default:
+       orderByClause += 'wb.date_created DESC'; // Default sorting
     }
     sql += orderByClause;
 
@@ -1145,7 +1173,7 @@ async function deleteWaterBaptism(baptismId, archivedBy = null) {
 
 /**
  * EXPORT - Export water baptism records to Excel
- * @param {Object} options - Optional query parameters (same as getAllWaterBaptisms: search, status, sortBy)
+ * @param {Object} options - Optional query parameters (same as getAllWaterBaptisms: search, status, sortBy, dateRange)
  * @returns {Promise<Buffer>} Excel file buffer
  */
 async function exportWaterBaptismsToExcel(options = {}) {

@@ -142,6 +142,15 @@ async function getAllTithes(options = {}) {
     const type = options.type || null;
     const donationType = options.donationType || null;
     const sortBy = options.sortBy || null;
+    let dateRange = options.dateRange || null;
+    // Parse dateRange if it's a JSON string
+    if (typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_tithes t LEFT JOIN tbl_members m ON t.member_id = m.member_id';
@@ -209,24 +218,16 @@ async function getAllTithes(options = {}) {
       hasWhere = true;
     }
 
-    // Initialize sortByValue before using it
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
-
-    // Add month filter (e.g., 'January', 'February', 'This Month', 'Last Month')
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    if (sortByValue && monthNames.includes(sortByValue)) {
-      const monthIndex = monthNames.indexOf(sortByValue) + 1; // 1-12
-      whereConditions.push('MONTH(t.date_created) = ? AND YEAR(t.date_created) = YEAR(CURDATE())');
-      countParams.push(monthIndex);
-      params.push(monthIndex);
-      hasWhere = true;
-    } else if (sortByValue === 'This Month') {
-      whereConditions.push('MONTH(t.date_created) = MONTH(CURDATE()) AND YEAR(t.date_created) = YEAR(CURDATE())');
-      hasWhere = true;
-    } else if (sortByValue === 'Last Month') {
-      whereConditions.push('MONTH(t.date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(t.date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+    // Add date range filter
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+      whereConditions.push('DATE(t.date_created) BETWEEN ? AND ?');
+      countParams.push(dateRange[0], dateRange[1]);
+      params.push(dateRange[0], dateRange[1]);
       hasWhere = true;
     }
+
+    // Initialize sortByValue before using it
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
 
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
@@ -251,10 +252,10 @@ async function getAllTithes(options = {}) {
         orderByClause += 't.amount DESC';
         break;
       case 'Date Created (Newest)':
-        orderByClause += 't.date_created DESC';
+        orderByClause += 'COALESCE(STR_TO_DATE(t.date_created, \'%Y-%m-%d %H:%i:%s\'), STR_TO_DATE(t.date_created, \'%Y-%m-%d\'), CAST(\'9999-12-31\' AS DATE)) DESC';
         break;
       case 'Date Created (Oldest)':
-        orderByClause += 't.date_created ASC';
+        orderByClause += 'COALESCE(STR_TO_DATE(t.date_created, \'%Y-%m-%d %H:%i:%s\'), STR_TO_DATE(t.date_created, \'%Y-%m-%d\'), CAST(\'9999-12-31\' AS DATE)) ASC';
         break;
       case 'Type (A-Z)':
         orderByClause += 't.type ASC';

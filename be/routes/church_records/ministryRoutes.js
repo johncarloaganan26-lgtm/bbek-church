@@ -81,15 +81,33 @@ router.post('/createMinistry', authenticateToken, upload.single('image'), async 
 });
 
 /**
- * READ ALL - Get all ministry records with pagination and filters
- * GET /api/church-records/ministries/getAllMinistries (query params)
- * POST /api/church-records/ministries/getAllMinistries (body payload)
- * Parameters: search, limit, offset, page, pageSize, status, sortBy
- */
+  * READ ALL - Get all ministry records with pagination and filters
+  * GET /api/church-records/ministries/getAllMinistries (query params)
+  * POST /api/church-records/ministries/getAllMinistries (body payload)
+  * Parameters: search, limit, offset, page, pageSize, status, sortBy, department_name_pattern, dateRange
+  */
 router.get('/getAllMinistries', async (req, res) => {
   try {
     // Get parameters from query string
-    const options = req.query;
+    const {
+      search, limit, offset, page, pageSize, status, sortBy, department_name_pattern, dateRange
+    } = req.query;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, sortBy, department_name_pattern,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllMinistries(options);
     if (result.success) {
       res.status(200).json({
@@ -120,7 +138,25 @@ router.get('/getAllMinistries', async (req, res) => {
 router.post('/getAllMinistries', async (req, res) => {
   try {
     // Get parameters from request body (payload)
-    const options = req.body;
+    const {
+      search, limit, offset, page, pageSize, status, sortBy, department_name_pattern, dateRange
+    } = req.body;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, sortBy, department_name_pattern,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllMinistries(options);
     if (result.success) {
       res.status(200).json({
@@ -418,14 +454,32 @@ router.get('/getAllMinistriesForSelect', async (req, res) => {
 });
 
 /**
- * EXPORT - Export ministries to Excel
- * GET /api/church-records/ministries/exportExcel (query params)
- * Parameters: search, status, sortBy, department_name_pattern
- */
+  * EXPORT - Export ministries to Excel
+  * GET /api/church-records/ministries/exportExcel (query params)
+  * Parameters: search, status, sortBy, department_name_pattern, dateRange
+  */
 router.get('/exportExcel', async (req, res) => {
   try {
     // Get parameters from query string
-    const options = req.query;
+    const {
+      search, status, sortBy, department_name_pattern, dateRange
+    } = req.query;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, status, sortBy, department_name_pattern,
+      dateRange: parsedDateRange
+    };
+
     const result = await exportMinistriesToExcel(options);
 
     if (result.success) {

@@ -166,9 +166,20 @@ async function getAllDepartments(options = {}) {
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
+    let startDate = null;
+    let endDate = null;
+    if (options.dateRange) {
+      try {
+        const [start, end] = typeof options.dateRange === 'string' ? JSON.parse(options.dateRange) : options.dateRange;
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', options.dateRange);
+      }
+    }
 
     // Build base query for counting total records
-    let countSql = 'SELECT COUNT(*) as total FROM tbl_departments d';
+    let countSql = 'SELECT COUNT(*) as total FROM tbl_departments d LEFT JOIN tbl_members m ON d.member_id = m.member_id';
     let countParams = [];
 
     // Build query for fetching records with JOIN to get member fullname
@@ -217,6 +228,14 @@ async function getAllDepartments(options = {}) {
       whereConditions.push('d.status = ?');
       countParams.push(status);
       params.push(status);
+      hasWhere = true;
+    }
+
+    // Add date range filter
+    if (startDate && endDate) {
+      whereConditions.push('DATE(d.date_created) BETWEEN ? AND ?');
+      countParams.push(startDate, endDate);
+      params.push(startDate, endDate);
       hasWhere = true;
     }
 
@@ -290,7 +309,7 @@ async function getAllDepartments(options = {}) {
     const totalCount = countResult[0]?.total || 0;
 
     // Get total joined members across all departments (not just current page)
-    let totalJoinedMembersQuery = 'SELECT SUM(CASE WHEN joined_members IS NULL OR joined_members = "" THEN 0 ELSE JSON_LENGTH(joined_members) END) as total FROM tbl_departments d';
+    let totalJoinedMembersQuery = 'SELECT SUM(CASE WHEN d.joined_members IS NULL OR d.joined_members = "" THEN 0 ELSE JSON_LENGTH(d.joined_members) END) as total FROM tbl_departments d LEFT JOIN tbl_members m ON d.member_id = m.member_id';
     if (hasWhere) {
       totalJoinedMembersQuery += ' WHERE ' + whereConditions.join(' AND ');
     }

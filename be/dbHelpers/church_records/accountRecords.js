@@ -262,6 +262,8 @@ async function getAllAccounts(options = {}) {
     const position = options.position || null;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
+    const startDate = options.start_date || null;
+    const endDate = options.end_date || null;
 
     // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_accounts';
@@ -300,6 +302,24 @@ async function getAllAccounts(options = {}) {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);
+      hasWhere = true;
+    }
+
+    // Add date range filter
+    if (startDate && endDate) {
+      whereConditions.push('DATE(date_created) BETWEEN ? AND ?');
+      countParams.push(startDate, endDate);
+      params.push(startDate, endDate);
+      hasWhere = true;
+    } else if (startDate) {
+      whereConditions.push('DATE(date_created) >= ?');
+      countParams.push(startDate);
+      params.push(startDate);
+      hasWhere = true;
+    } else if (endDate) {
+      whereConditions.push('DATE(date_created) <= ?');
+      countParams.push(endDate);
+      params.push(endDate);
       hasWhere = true;
     }
 
@@ -346,9 +366,6 @@ async function getAllAccounts(options = {}) {
         break;
       case 'Position (A-Z)':
         orderByClause += 'position ASC';
-        break;
-      case 'Status (A-Z)':
-        orderByClause += 'status ASC';
         break;
       default:
         orderByClause += 'date_created DESC'; // Default sorting

@@ -15,12 +15,15 @@
         <v-row>
           <v-col cols="12" md="3">
             <v-text-field
-              v-model="searchQuery"
+              v-model="localSearchQuery"
               prepend-inner-icon="mdi-magnify"
+              :append-inner-icon="localSearchQuery ? 'mdi-close' : undefined"
               placeholder="Search members..."
               variant="outlined"
               density="compact"
               hide-details
+              @click:append-inner="clearSearch()"
+              @input="handleSearch"
             ></v-text-field>
           </v-col>
           <v-col cols="12" md="2">
@@ -45,16 +48,19 @@
               @update:model-value="handleFilterChange('gender', $event)"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
-            <v-select
-              v-model="memberStore.filters.joinMonth"
-              :items="joinMonthOptions"
-              label="Join Month"
-              variant="outlined"
-              density="compact"
-              hide-details
-              @update:model-value="handleFilterChange('joinMonth', $event)"
-            ></v-select>
+          <v-col cols="12" md="3">
+            <el-date-picker
+              v-model="localDateRange"
+              type="daterange"
+              range-separator="to"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              class="w-100"
+              :disabled="memberStore.loading"
+              @change="handleDateRangeChange"
+            />
           </v-col>
           <v-col cols="12" md="2">
             <v-select
@@ -129,7 +135,7 @@
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
-          <tr v-for="member in memberStore.members" :key="member.member_id">
+          <tr v-for="member in memberStore.paginatedMembers" :key="member.member_id">
             <td>{{ getMemberName(member) }}</td>
             <td>{{ member.age }}</td>
             <td>{{ member.address }}</td>
@@ -221,11 +227,14 @@ const memberStore = useMemberRecordStore()
 // Component state
 const memberDialog = ref(false)
 const memberData = ref(null)
+const localDateRange = ref([])
+
+// Local search state
+const localSearchQuery = ref('')
 
 // Filter options
 const ageRangeOptions = ['All Ages', '0-18', '19-30', '31-50', '51+']
 const genderOptions = ['All Genders', 'Male', 'Female']
-const joinMonthOptions = ['All Months', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const sortByOptions = [
   'Name (A-Z)',
   'Name (Z-A)',
@@ -239,13 +248,8 @@ const sortByOptions = [
   'Gender (Female First)'
 ]
 
-// Computed properties for two-way binding with store
-const searchQuery = computed({
-  get: () => memberStore.searchQuery,
-  set: (value) => {
-    memberStore.setSearchQuery(value)
-  }
-})
+// Initialize local search query
+localSearchQuery.value = memberStore.searchQuery
 
 
 const currentPage = computed({
@@ -255,19 +259,42 @@ const currentPage = computed({
   }
 })
 
-// Watch for search query changes with debounce
-let searchTimeout = null
-watch(() => searchQuery.value, (newValue) => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    memberStore.setSearchQuery(newValue)
-  }, 500) // 500ms debounce
-})
 
 // Handle filter changes
 const handleFilterChange = (filterName, value) => {
   memberStore.setFilters({ [filterName]: value })
 }
+
+const handleDateRangeChange = (value) => {
+  // Update store filters and trigger fetch
+  memberStore.setFilters({ dateRange: value })
+}
+
+// Simple search function
+const handleSearch = () => {
+  const query = localSearchQuery.value.trim()
+  if (query.length >= 3 || query.length === 0) {
+    memberStore.setSearchQuery(query)
+  }
+}
+
+// Clear search function
+const clearSearch = () => {
+  localSearchQuery.value = ''
+  memberStore.setSearchQuery('')
+}
+
+// Watch for store search query changes to sync local state
+watch(() => memberStore.searchQuery, (newQuery) => {
+  if (newQuery !== localSearchQuery.value) {
+    localSearchQuery.value = newQuery
+  }
+}, { immediate: false }) // Don't trigger on initialization
+
+// Watch for store dateRange changes to sync local state
+watch(() => memberStore.filters.dateRange, (newDateRange) => {
+  localDateRange.value = newDateRange || []
+}, { immediate: true })
 
 // Methods
 const openMemberDialog = () => {

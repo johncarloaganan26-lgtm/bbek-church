@@ -416,7 +416,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArchiveStore } from '@/stores/archiveStore'
 import { ElMessage } from 'element-plus'
@@ -519,7 +519,15 @@ const fetchSummaryStats = async () => {
 }
 
 const handleSearch = () => {
-  fetchArchives()
+  // Clear previous timeout
+  if (window.archiveSearchTimeout) {
+    clearTimeout(window.archiveSearchTimeout)
+  }
+
+  // Set new timeout to trigger search after user stops typing (500ms delay)
+  window.archiveSearchTimeout = setTimeout(() => {
+    fetchArchives()
+  }, 500)
 }
 
 const handleFilterChange = () => {
@@ -776,28 +784,35 @@ const printData = () => {
 onMounted(async () => {
   // Check for query parameters from System Logs
   const { table, search: searchParam, action } = route.query
-  
+
   if (table) {
     // Set table filter
     archiveStore.setFilters({ original_table: table })
   }
-  
+
   if (searchParam) {
     // Set search query
     archiveStore.setSearchQuery(searchParam)
   }
-  
+
   if (action === 'restore') {
     // Show restore hint
     ElMessage.info('Click the restore button on any archived record to restore it')
     // Clear the query param
     router.replace({ query: { ...route.query, action: undefined } })
   }
-  
+
   await Promise.all([
     fetchArchives(),
     fetchSummaryStats()
   ])
+})
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (window.archiveSearchTimeout) {
+    clearTimeout(window.archiveSearchTimeout)
+  }
 })
 </script>
 

@@ -47,7 +47,7 @@ router.post('/createTithe', async (req, res) => {
  * READ ALL - Get all tithe records with pagination and filters
  * GET /api/church-records/tithes/getAllTithes (query params)
  * POST /api/church-records/tithes/getAllTithes (body payload)
- * Parameters: search, limit, offset, page, pageSize, type, status, sortBy
+ * Parameters: search, limit, offset, page, pageSize, type, status, sortBy, dateRange
  */
 router.get('/getAllTithes', async (req, res) => {
   try {

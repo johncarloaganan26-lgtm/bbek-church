@@ -12,7 +12,8 @@ export const useAnnouncementStore = defineStore('announcement', {
       priority: 'All Priorities',
       target_audience: 'All Audiences',
       is_active: null,
-      sortBy: 'Date (Newest)'
+      sortBy: 'Date (Newest)',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -48,7 +49,8 @@ export const useAnnouncementStore = defineStore('announcement', {
           priority: this.filters.priority && this.filters.priority !== 'All Priorities' ? this.filters.priority : undefined,
           target_audience: this.filters.target_audience && this.filters.target_audience !== 'All Audiences' ? this.filters.target_audience : undefined,
           is_active: this.filters.is_active !== null && this.filters.is_active !== undefined ? this.filters.is_active : undefined,
-          sortBy: this.filters.sortBy || 'Date (Newest)'
+          sortBy: this.filters.sortBy || 'Date (Newest)',
+          dateRange: this.filters.dateRange && this.filters.dateRange.length === 2 ? JSON.stringify(this.filters.dateRange) : undefined
         }
 
         // Remove undefined values

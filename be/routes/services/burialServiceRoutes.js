@@ -231,7 +231,25 @@ router.post('/createBurialService', async (req, res) => {
 router.get('/getAllBurialServices', async (req, res) => {
   try {
     // Get parameters from query string
-    const options = req.query;
+    const {
+      search, limit, offset, page, pageSize, status, sortBy, dateRange
+    } = req.query;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, sortBy,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllBurialServices(options);
     if (result.success) {
       res.status(200).json({
@@ -262,7 +280,25 @@ router.get('/getAllBurialServices', async (req, res) => {
 router.post('/getAllBurialServices', async (req, res) => {
   try {
     // Get parameters from request body (payload)
-    const options = req.body;
+    const {
+      search, limit, offset, page, pageSize, status, sortBy, dateRange
+    } = req.body;
+
+    // Parse date range if provided
+    let parsedDateRange = null;
+    if (dateRange) {
+      try {
+        parsedDateRange = JSON.parse(dateRange);
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, status, sortBy,
+      dateRange: parsedDateRange
+    };
+
     const result = await getAllBurialServices(options);
     if (result.success) {
       res.status(200).json({

@@ -182,6 +182,17 @@ async function getAllForms(options = {}) {
     const status = options.status || null;
     const submitted_by = options.submitted_by || null;
     const sortBy = options.sortBy || null;
+    let dateRange = options.dateRange || null;
+
+    // Parse dateRange if it's a JSON string
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange:', dateRange);
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_forms f';
@@ -250,6 +261,17 @@ async function getAllForms(options = {}) {
       hasWhere = true;
     }
 
+    // Add date range filter
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+      const [startDate, endDate] = dateRange;
+      if (startDate && endDate) {
+        whereConditions.push('f.created_at BETWEEN ? AND ?');
+        countParams.push(startDate, endDate);
+        params.push(startDate, endDate);
+        hasWhere = true;
+      }
+    }
+
     // Initialize sortByValue before using it
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
 
@@ -299,6 +321,12 @@ async function getAllForms(options = {}) {
         break;
       case 'Name (A-Z)':
         orderByClause += 'f.name ASC';
+        break;
+      case 'Date Range (Newest)':
+        orderByClause += 'f.created_at DESC';
+        break;
+      case 'Date Range (Oldest)':
+        orderByClause += 'f.created_at ASC';
         break;
       default:
         orderByClause += 'f.created_at DESC'; // Default sorting

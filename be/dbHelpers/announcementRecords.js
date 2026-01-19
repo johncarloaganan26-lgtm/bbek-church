@@ -123,6 +123,17 @@ async function getAllAnnouncements(options = {}) {
     const target_audience = options.target_audience || null;
     const is_active = options.is_active !== undefined ? options.is_active : null;
     const sortBy = options.sortBy || null;
+    let dateRange = options.dateRange || null;
+
+    // Parse dateRange if it's a JSON string
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange:', dateRange);
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_announcements a';
@@ -193,6 +204,19 @@ async function getAllAnnouncements(options = {}) {
       hasWhere = true;
     }
 
+    // Add date range filter
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+      const [startDate, endDate] = dateRange;
+      if (startDate && endDate) {
+        // Include the entire end date by adding 23:59:59
+        const endDateTime = `${endDate} 23:59:59`;
+        whereConditions.push('a.created_at BETWEEN ? AND ?');
+        countParams.push(startDate, endDateTime);
+        params.push(startDate, endDateTime);
+        hasWhere = true;
+      }
+    }
+
     // Apply WHERE clause if any conditions exist
     if (hasWhere) {
       const whereClause = ' WHERE ' + whereConditions.join(' AND ');
@@ -215,6 +239,12 @@ async function getAllAnnouncements(options = {}) {
         break;
       case 'Priority (High to Low)':
         orderByClause += "FIELD(a.priority, 'urgent', 'high', 'normal', 'low')";
+        break;
+      case 'Date Range (Newest)':
+        orderByClause += 'a.created_at DESC';
+        break;
+      case 'Date Range (Oldest)':
+        orderByClause += 'a.created_at ASC';
         break;
       default:
         orderByClause += 'a.created_at DESC'; // Default sorting

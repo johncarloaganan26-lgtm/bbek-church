@@ -35,7 +35,8 @@ export const useMinistriesStore = defineStore('ministries', {
     filters: {
       sortBy: 'Date Created (Newest)',
       status: 'All Statuses',
-      departmentNamePattern: ''
+      departmentNamePattern: '',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -46,6 +47,7 @@ export const useMinistriesStore = defineStore('ministries', {
     leaderOptions: [],
     departmentOptions: [],
     memberOptions: [],
+    searchTimeout: null,
     summaryStats: {
       totalMinistries: 0,
       activeMinistries: 0,
@@ -92,9 +94,10 @@ export const useMinistriesStore = defineStore('ministries', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
-        const departmentNamePattern = options.departmentNamePattern !== undefined 
-          ? options.departmentNamePattern 
+        const departmentNamePattern = options.departmentNamePattern !== undefined
+          ? options.departmentNamePattern
           : this.filters.departmentNamePattern
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -109,6 +112,9 @@ export const useMinistriesStore = defineStore('ministries', {
         if (departmentNamePattern) {
           params.append('department_name_pattern', departmentNamePattern)
         }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
+        }
 
         const response = await axios.get(`/church-records/ministries/getAllMinistries?${params}`)
         if (response.data.success) {
@@ -120,6 +126,20 @@ export const useMinistriesStore = defineStore('ministries', {
             totalMinistries: 0,
             activeMinistries: 0,
             totalMembers: 0
+          }
+
+          // Update search query and filters if provided
+          if (options.search !== undefined) {
+            this.searchQuery = search
+          }
+          if (options.status !== undefined) {
+            this.filters.status = status
+          }
+          if (options.sortBy !== undefined) {
+            this.filters.sortBy = sortBy
+          }
+          if (options.dateRange !== undefined) {
+            this.filters.dateRange = dateRange
           }
         } else {
           this.error = response.data.message || 'Failed to fetch ministries'
@@ -479,8 +499,20 @@ export const useMinistriesStore = defineStore('ministries', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchMinistries({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchMinistries({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {
@@ -528,6 +560,9 @@ export const useMinistriesStore = defineStore('ministries', {
         }
         if (options.departmentNamePattern) {
           params.append('department_name_pattern', options.departmentNamePattern)
+        }
+        if (options.dateRange && options.dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(options.dateRange))
         }
         
         // Make request with responseType: 'blob' to handle binary data

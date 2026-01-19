@@ -96,6 +96,7 @@ g<template>
               density="compact"
               :disabled="loading"
               hide-details
+              @update:model-value="handleSearchChange"
             ></v-text-field>
           </v-col>
           <v-col cols="12" md="3">
@@ -294,7 +295,7 @@ import axios from '@/api/axios'
 const transactionsStore = useTransactionsStore()
 
 // Computed properties from store
-const transactions = computed(() => transactionsStore.transactions)
+const transactions = computed(() => transactionsStore.paginatedTransactions)
 const loading = computed(() => transactionsStore.loading)
 const totalsByServiceType = computed(() => transactionsStore.totalsByServiceType)
 const summaryStats = computed(() => transactionsStore.summaryStats)
@@ -369,6 +370,11 @@ watch(
     }, 500)
   }
 )
+
+// Handle search changes
+const handleSearchChange = (value) => {
+  transactionsStore.setSearchQuery(value)
+}
 
 // Handle dialog
 const handleTransactionDialog = () => {

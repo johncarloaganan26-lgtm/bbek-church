@@ -27,6 +27,16 @@ async function getAllApprovals(options = {}) {
   const status = options.status || null;
   const type = options.type || null;
   const sortBy = options.sortBy || null;
+  let dateRange = options.dateRange || null;
+  // Parse dateRange if it's a JSON string (from query parameters)
+  if (dateRange && typeof dateRange === 'string') {
+    try {
+      dateRange = JSON.parse(dateRange);
+    } catch (e) {
+      console.warn('Failed to parse dateRange JSON:', dateRange);
+      dateRange = null;
+    }
+  }
 
   const limit = options.pageSize !== undefined
     ? parseInt(options.pageSize)
@@ -61,6 +71,12 @@ async function getAllApprovals(options = {}) {
   if (type && type !== 'All Types') {
     where.push('a.type = ?');
     params.push(type);
+  }
+
+  // Add date range filter (filter by date_created)
+  if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+    where.push('DATE(a.date_created) BETWEEN ? AND ?');
+    params.push(dateRange[0], dateRange[1]);
   }
 
   if (where.length) {

@@ -276,7 +276,7 @@ router.get('/getAllMembers', async (req, res) => {
  * READ ALL - Get all member records with pagination and filters
  * GET /api/church-records/members/getAllPastorsForSelect (query params)
  * POST /api/church-records/members/getAllPastorsForSelect (body payload)
- * Parameters: search, limit, offset, page, pageSize, ageRange, joinMonth, sortBy
+ * Parameters: search, limit, offset, page, pageSize, ageRange, joinMonth, sortBy, dateRange
  */
 router.get('/getAllPastorsForSelect', async (req, res) => {
   try {

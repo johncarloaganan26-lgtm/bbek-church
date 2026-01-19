@@ -15,7 +15,8 @@ export const useDepartmentOfficersStore = defineStore('departmentOfficers', {
     totalCount: 0,
     itemsPerPage: 10,
     pageSizeOptions: [5, 10, 15],
-    memberOptions: []
+    memberOptions: [],
+    searchTimeout: null
   }),
 
   getters: {
@@ -229,8 +230,20 @@ export const useDepartmentOfficersStore = defineStore('departmentOfficers', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchOfficers({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchOfficers({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {

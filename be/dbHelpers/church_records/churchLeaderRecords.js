@@ -124,6 +124,17 @@ async function getAllChurchLeaders(options = {}) {
     const page = options.page !== undefined ? parseInt(options.page) : undefined;
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const sortBy = options.sortBy || null;
+    let startDate = null;
+    let endDate = null;
+    if (options.dateRange) {
+      try {
+        const [start, end] = typeof options.dateRange === 'string' ? JSON.parse(options.dateRange) : options.dateRange;
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', options.dateRange);
+      }
+    }
 
     // Build base query for counting total records (with JOIN for accurate count)
     let countSql = 'SELECT COUNT(*) as total FROM tbl_churchleaders cl INNER JOIN tbl_members m ON cl.member_id = m.member_id';
@@ -161,6 +172,14 @@ async function getAllChurchLeaders(options = {}) {
       whereConditions.push(searchCondition);
       countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      hasWhere = true;
+    }
+
+    // Add date range filter
+    if (startDate && endDate) {
+      whereConditions.push('DATE(cl.date_created) BETWEEN ? AND ?');
+      countParams.push(startDate, endDate);
+      params.push(startDate, endDate);
       hasWhere = true;
     }
 

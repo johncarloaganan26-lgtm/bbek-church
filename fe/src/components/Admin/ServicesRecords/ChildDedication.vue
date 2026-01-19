@@ -102,6 +102,20 @@
               @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
           <v-col cols="12" md="2" class="d-flex align-center">
             <v-select
               v-model="itemsPerPage"
@@ -258,7 +272,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useChildDedicationStore } from '@/stores/ServicesRecords/childDedicationStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
@@ -312,7 +326,10 @@ const itemsPerPage = computed({
 const pageSizeOptions = computed(() => childDedicationStore.pageSizeOptions)
 const searchQuery = computed({
   get: () => childDedicationStore.searchQuery,
-  set: (value) => childDedicationStore.setSearchQuery(value)
+  set: (value) => {
+    // Update the store value without triggering search
+    childDedicationStore.searchQuery = value
+  }
 })
 const filters = computed({
   get: () => childDedicationStore.filters,
@@ -331,7 +348,9 @@ const sortByOptions = [
   'This Month',
   'Last Month',
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'July', 'August', 'September', 'October', 'November', 'December',
+  'Date Range (Newest)',
+  'Date Range (Oldest)'
 ]
 
 const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
@@ -435,10 +454,22 @@ const handleSubmit = async (data) => {
 }
 
 const handleSearchChange = (value) => {
-  childDedicationStore.setSearchQuery(value)
+  // Clear previous timeout
+  if (window.childDedicationSearchTimeout) {
+    clearTimeout(window.childDedicationSearchTimeout)
+  }
+
+  // Set new timeout to trigger search after user stops typing (500ms delay)
+  window.childDedicationSearchTimeout = setTimeout(() => {
+    childDedicationStore.setSearchQuery(value)
+  }, 500)
 }
 
 const handleFilterChange = () => {
+  childDedicationStore.setFilters(filters.value)
+}
+
+const handleDateRangeChange = () => {
   childDedicationStore.setFilters(filters.value)
 }
 
@@ -750,6 +781,13 @@ const printCertificate = (dedication) => {
 // Initialize on mount
 onMounted(async () => {
   await childDedicationStore.fetchDedications()
+})
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (window.childDedicationSearchTimeout) {
+    clearTimeout(window.childDedicationSearchTimeout)
+  }
 })
 </script>
 

@@ -264,6 +264,16 @@ async function getAllMinistries(options = {}) {
     const sortBy = options.sortBy || null;
     const department_id = options.department_id || options.departmentId || null;
     const department_name_pattern = options.department_name_pattern || null;
+    let dateRange = options.dateRange || null;
+    // Parse dateRange if it's a JSON string (from query parameters)
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange JSON:', dateRange);
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records (with JOINs for accurate count)
     let countSql = `SELECT COUNT(*) as total 
@@ -342,6 +352,14 @@ async function getAllMinistries(options = {}) {
       whereConditions.push('d.department_name LIKE ?');
       countParams.push(department_name_pattern);
       params.push(department_name_pattern);
+      hasWhere = true;
+    }
+
+    // Add date range filter (filter by date_created)
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+      whereConditions.push('DATE(m.date_created) BETWEEN ? AND ?');
+      countParams.push(dateRange[0], dateRange[1]);
+      params.push(dateRange[0], dateRange[1]);
       hasWhere = true;
     }
 

@@ -79,7 +79,7 @@ router.post('/createEvent', upload.single('image'), async (req, res) => {
  * READ ALL - Get all event records with pagination and filters
  * GET /api/church-records/events/getAllEvents (query params)
  * POST /api/church-records/events/getAllEvents (body payload)
- * Parameters: search, limit, offset, page, pageSize, status, type, sortBy
+ * Parameters: search, limit, offset, page, pageSize, status, type, sortBy, dateRangeStart, dateRangeEnd
  */
 router.get('/getAllEvents', async (req, res) => {
   try {

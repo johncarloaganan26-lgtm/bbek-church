@@ -110,6 +110,20 @@
               @update:model-value="handleFilterChange"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
           <v-col cols="12" md="2" class="d-flex align-center">
             <v-select
               v-model="itemsPerPage"
@@ -123,7 +137,7 @@
               @update:model-value="handlePageSizeChange"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="5" class="d-flex align-center gap-2">
+          <v-col cols="12" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn
@@ -260,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
@@ -314,7 +328,10 @@ const itemsPerPage = computed({
 const pageSizeOptions = computed(() => burialServiceStore.pageSizeOptions)
 const searchQuery = computed({
   get: () => burialServiceStore.searchQuery,
-  set: (value) => burialServiceStore.setSearchQuery(value)
+  set: (value) => {
+    // Update the store value without triggering search
+    burialServiceStore.searchQuery = value
+  }
 })
 const filters = computed({
   get: () => burialServiceStore.filters,
@@ -333,7 +350,9 @@ const sortByOptions = [
   'This Month',
   'Last Month',
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'July', 'August', 'September', 'October', 'November', 'December',
+  'Date Range (Newest)',
+  'Date Range (Oldest)'
 ]
 
 const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
@@ -430,13 +449,24 @@ const handleSubmit = async (data) => {
 }
 
 const handleSearchChange = (value) => {
-  ElMessage.info('Searching records...')
-  burialServiceStore.setSearchQuery(value)
+  // Clear previous timeout
+  if (window.burialSearchTimeout) {
+    clearTimeout(window.burialSearchTimeout)
+  }
+
+  // Set new timeout to trigger search after user stops typing (500ms delay)
+  window.burialSearchTimeout = setTimeout(() => {
+    burialServiceStore.setSearchQuery(value)
+  }, 500)
 }
 
 const handleFilterChange = () => {
   const statusText = filters.value.status || 'All Statuses'
   ElMessage.info(`Filtering by: ${statusText}`)
+  burialServiceStore.setFilters(filters.value)
+}
+
+const handleDateRangeChange = () => {
   burialServiceStore.setFilters(filters.value)
 }
 
@@ -786,6 +816,13 @@ const handlePrint = () => {
 // Initialize on mount
 onMounted(async () => {
   await burialServiceStore.fetchServices()
+})
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (window.burialSearchTimeout) {
+    clearTimeout(window.burialSearchTimeout)
+  }
 })
 </script>
 

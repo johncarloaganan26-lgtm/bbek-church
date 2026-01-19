@@ -9,7 +9,8 @@ export const useChildDedicationStore = defineStore('childDedication', {
     searchQuery: '',
     filters: {
       sortBy: 'Dedication Date (Newest)',
-      status: 'All Statuses'
+      status: 'All Statuses',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -41,6 +42,7 @@ export const useChildDedicationStore = defineStore('childDedication', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -51,6 +53,9 @@ export const useChildDedicationStore = defineStore('childDedication', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/child-dedications/getAllChildDedications?${params}`)
@@ -178,6 +183,7 @@ export const useChildDedicationStore = defineStore('childDedication', {
         const search = options.search !== undefined ? options.search : this.searchQuery
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
@@ -186,6 +192,9 @@ export const useChildDedicationStore = defineStore('childDedication', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/child-dedications/exportExcel?${params}`, {

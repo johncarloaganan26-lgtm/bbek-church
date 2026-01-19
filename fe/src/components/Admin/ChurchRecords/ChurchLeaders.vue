@@ -18,7 +18,7 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="3">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -28,6 +28,20 @@
               :disabled="loading"
               hide-details
             ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="3">
+            <el-date-picker
+              v-model="localDateRange"
+              type="daterange"
+              range-separator="to"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              class="w-100"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+            />
           </v-col>
           <v-col cols="12" md="3">
             <v-select
@@ -197,6 +211,7 @@ const churchLeadersStore = useChurchLeadersStore()
 
 const churchLeaderDialog = ref(false)
 const churchLeaderData = ref(null)
+const localDateRange = ref([])
 
 // Computed properties from store
 const leaders = computed(() => churchLeadersStore.paginatedLeaders)
@@ -238,6 +253,15 @@ const sortByOptions = [
 watch(() => filters.value.sortBy, (newSortBy) => {
   churchLeadersStore.setFilters({ sortBy: newSortBy })
 })
+
+watch(() => filters.value.dateRange, (newDateRange) => {
+  localDateRange.value = newDateRange || []
+}, { immediate: true })
+
+const handleDateRangeChange = (value) => {
+  // Update store filters and trigger fetch
+  churchLeadersStore.setFilters({ dateRange: value })
+}
 
 const openChurchLeaderDialog = () => {
   churchLeaderData.value = null

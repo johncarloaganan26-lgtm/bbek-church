@@ -9,7 +9,8 @@ export const useBurialServiceStore = defineStore('burialService', {
     searchQuery: '',
     filters: {
       sortBy: 'Service Date (Newest)',
-      status: 'All Statuses'
+      status: 'All Statuses',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -225,6 +226,7 @@ export const useBurialServiceStore = defineStore('burialService', {
         const search = options.search !== undefined ? options.search : this.searchQuery
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)

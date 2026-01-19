@@ -73,18 +73,19 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="3">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
               placeholder="Search departments..."
               variant="outlined"
               density="compact"
-              hide-details
               :disabled="loading"
+              hide-details
+              @update:model-value="handleSearchChange"
             ></v-text-field>
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="2">
             <v-select
               v-model="filters.status"
               :items="statusOptions"
@@ -96,6 +97,20 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="3">
+            <el-date-picker
+              v-model="localDateRange"
+              type="daterange"
+              range-separator="to"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              class="w-100"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+            />
+          </v-col>
+          <v-col cols="12" md="2">
             <v-select
               v-model="filters.sortBy"
               :items="sortByOptions"
@@ -288,9 +303,10 @@ const joinedMemberOptions = computed(() => {
 // Component state
 const departmentDialog = ref(false)
 const departmentData = ref(null)
+const localDateRange = ref([])
 
 // Computed properties from store
-const departments = computed(() => departmentsStore.departments)
+const departments = computed(() => departmentsStore.paginatedDepartments)
 const loading = computed(() => departmentsStore.loading)
 const searchQuery = computed({
   get: () => departmentsStore.searchQuery,
@@ -332,6 +348,16 @@ const sortByOptions = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
+// Handle search changes
+const handleSearchChange = (value) => {
+  departmentsStore.setSearchQuery(value)
+}
+
+const handleDateRangeChange = (value) => {
+  // Update store filters and trigger fetch
+  departmentsStore.setFilters({ dateRange: value })
+}
+
 // Watch for filter changes
 watch(
   () => filters.value.status,
@@ -347,17 +373,14 @@ watch(
   }
 )
 
-// Debounce search query
-let searchTimeout = null
 watch(
-  () => searchQuery.value,
-  (newQuery) => {
-    if (searchTimeout) clearTimeout(searchTimeout)
-    searchTimeout = setTimeout(() => {
-      departmentsStore.setSearchQuery(newQuery)
-    }, 500)
-  }
+  () => filters.value.dateRange,
+  (newDateRange) => {
+    localDateRange.value = newDateRange || []
+  },
+  { immediate: true }
 )
+
 
 // Handle dialog
 const handleDepartmentDialog = (data = null) => {

@@ -11,14 +11,16 @@ export const useAccountsStore = defineStore('accounts', {
     filters: {
       status: 'All Statuses',
       position: 'All Positions',
-      sortBy: 'Date Created (Newest)'
+      sortBy: 'Date Created (Newest)',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     itemsPerPage: 10,
     pageSizeOptions: [5, 10, 15],
-    emailOptions: []
+    emailOptions: [],
+    searchTimeout: null
   }),
 
   getters: {
@@ -72,6 +74,7 @@ export const useAccountsStore = defineStore('accounts', {
         const status = options.status !== undefined ? options.status : this.filters.status
         const position = options.position !== undefined ? options.position : this.filters.position
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -92,6 +95,9 @@ export const useAccountsStore = defineStore('accounts', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
         const response = await axios.get(`/church-records/accounts/getAllAccounts?${params}`)
         
@@ -125,6 +131,9 @@ export const useAccountsStore = defineStore('accounts', {
           }
           if (options.sortBy !== undefined) {
             this.filters.sortBy = sortBy
+          }
+          if (options.dateRange !== undefined) {
+            this.filters.dateRange = dateRange
           }
         } else {
           this.error = response.data?.message || 'Failed to fetch accounts'
@@ -273,8 +282,20 @@ export const useAccountsStore = defineStore('accounts', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchAccounts({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchAccounts({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {

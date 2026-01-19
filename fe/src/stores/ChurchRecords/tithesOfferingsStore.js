@@ -10,7 +10,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
     filters: {
       sortBy: 'Date Created (Newest)',
       type: 'All Types',
-      donationType: 'all'
+      donationType: 'all',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -18,6 +19,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
     itemsPerPage: 10,
     pageSizeOptions: [5, 10, 15],
     memberOptions: [],
+    searchTimeout: null,
     summaryStats: {
       totalDonations: 0,
       totalTithes: 0,
@@ -56,6 +58,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         const type = options.type !== undefined ? options.type : this.filters.type
         const donationType = options.donationType !== undefined ? options.donationType : this.filters.donationType
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -76,6 +79,9 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/tithes/getAllTithes?${params}`, {
@@ -123,6 +129,9 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
           }
           if (options.sortBy !== undefined) {
             this.filters.sortBy = sortBy
+          }
+          if (options.dateRange !== undefined) {
+            this.filters.dateRange = dateRange
           }
         } else {
           this.error = response.data?.message || 'Failed to fetch donations'
@@ -264,8 +273,20 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchDonations({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchDonations({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {

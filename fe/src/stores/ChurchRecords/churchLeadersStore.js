@@ -8,14 +8,16 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
     error: null,
     searchQuery: '',
     filters: {
-      sortBy: 'Leader ID (Low to High)'
+      sortBy: 'Leader ID (Low to High)',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     itemsPerPage: 10,
     pageSizeOptions: [5, 10, 15],
-    memberOptions: []
+    memberOptions: [],
+    searchTimeout: null
   }),
 
   getters: {
@@ -40,6 +42,7 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
         const pageSize = options.pageSize !== undefined ? options.pageSize : this.itemsPerPage
         const search = options.search !== undefined ? options.search : this.searchQuery
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -54,6 +57,9 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
         // Add filter parameters
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/church-leaders/getAllChurchLeaders?${params}`)
@@ -82,6 +88,9 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
           }
           if (options.sortBy !== undefined) {
             this.filters.sortBy = sortBy
+          }
+          if (options.dateRange !== undefined) {
+            this.filters.dateRange = dateRange
           }
         } else {
           this.error = response.data?.message || 'Failed to fetch leaders'
@@ -223,8 +232,20 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchLeaders({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchLeaders({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {
@@ -264,6 +285,7 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
         // Use current filters if not provided
         const search = options.search !== undefined ? options.search : this.searchQuery
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Build query parameters
         const params = new URLSearchParams()

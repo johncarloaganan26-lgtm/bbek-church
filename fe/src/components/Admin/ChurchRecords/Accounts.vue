@@ -8,7 +8,7 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="3">
+          <v-col cols="12" sm="6" md="3">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -19,7 +19,7 @@
               hide-details
             ></v-text-field>
           </v-col>
-          <v-col cols="12" md="2">
+          <v-col cols="12" sm="6" md="2">
             <v-select
               v-model="filters.status"
               :items="statusOptions"
@@ -30,7 +30,7 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
+          <v-col cols="12" sm="6" md="2">
             <v-select
               v-model="filters.position"
               :items="positionOptions"
@@ -41,7 +41,21 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
+          <v-col cols="12" sm="6" md="3">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              range-separator="to"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              class="w-100"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+            />
+          </v-col>
+          <v-col cols="12" sm="6" md="2">
             <v-select
               v-model="filters.sortBy"
               :items="sortByOptions"
@@ -52,7 +66,7 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2" class="d-flex align-center gap-2">
+          <v-col cols="12" sm="6" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
@@ -66,12 +80,12 @@
             </v-tooltip>
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-download"
                   variant="outlined"
                   v-bind="props"
-                  :loading="loading"
-                  :disabled="loading"
+                  :loading="accountsStore.loading"
+                  :disabled="accountsStore.loading"
                   @click="handleExportExcel"
                 ></v-btn>
               </template>
@@ -226,6 +240,11 @@ const accountsStore = useAccountsStore()
 const accountDialog = ref(false)
 const accountData = ref(null)
 
+const handleDateRangeChange = () => {
+  accountsStore.setFilters(filters.value)
+}
+
+
 // Computed properties from store
 const accounts = computed(() => accountsStore.paginatedAccounts)
 const loading = computed(() => accountsStore.loading)
@@ -247,6 +266,9 @@ const itemsPerPage = computed({
 const pageSizeOptions = computed(() => accountsStore.pageSizeOptions)
 const emailOptions = computed(() => accountsStore.emailOptions)
 
+
+
+
 const statusOptions = ['All Statuses', 'active', 'inactive']
 const positionOptions = ['All Positions', 'admin', 'staff', 'member']
 const createdMonthOptions = ['All Months', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -256,11 +278,11 @@ const sortByOptions = [
   'Date Created (Newest)',
   'Date Created (Oldest)',
   'Position (A-Z)',
-  'Status (A-Z)',
   'Group by Member',
   'Group by Staff',
   'Group by Admin'
 ]
+
 
 // Watch for filter changes
 watch(() => filters.value.status, (newStatus) => {
@@ -274,6 +296,7 @@ watch(() => filters.value.position, (newPosition) => {
 watch(() => filters.value.sortBy, (newSortBy) => {
   accountsStore.setFilters({ sortBy: newSortBy })
 })
+
 
 const openAccountDialog = () => {
   accountData.value = null
@@ -357,6 +380,7 @@ const handleExportExcel = async () => {
 const handlePageSizeChange = (pageSize) => {
   accountsStore.setPageSize(pageSize)
 }
+
 
 const getStartIndex = () => {
   if (accounts.length === 0) return 0

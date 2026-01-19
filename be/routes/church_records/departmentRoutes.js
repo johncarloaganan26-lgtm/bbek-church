@@ -47,7 +47,7 @@ router.post('/createDepartment', async (req, res) => {
  * READ ALL - Get all department records with pagination and filters
  * GET /api/church-records/departments/getAllDepartments (query params)
  * POST /api/church-records/departments/getAllDepartments (body payload)
- * Parameters: search, limit, offset, page, pageSize, status, sortBy
+ * Parameters: search, limit, offset, page, pageSize, status, sortBy, dateRange
  */
 router.get('/getAllDepartments', async (req, res) => {
   try {

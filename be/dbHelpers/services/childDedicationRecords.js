@@ -612,6 +612,17 @@ async function getAllChildDedications(options = {}) {
     const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
     const status = options.status || null;
     const sortBy = options.sortBy || null;
+    let dateRange = options.dateRange || null;
+
+    // Parse dateRange if it's a JSON string
+    if (dateRange && typeof dateRange === 'string') {
+      try {
+        dateRange = JSON.parse(dateRange);
+      } catch (e) {
+        console.warn('Failed to parse dateRange:', dateRange);
+        dateRange = null;
+      }
+    }
 
     // Build base query for counting total records (with JOIN for requester info)
     let countSql = `SELECT COUNT(*) as total 
@@ -691,6 +702,17 @@ async function getAllChildDedications(options = {}) {
       hasWhere = true;
     }
 
+    // Add date range filter
+    if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+      const [startDate, endDate] = dateRange;
+      if (startDate && endDate) {
+        whereConditions.push('cd.preferred_dedication_date BETWEEN ? AND ?');
+        countParams.push(startDate, endDate);
+        params.push(startDate, endDate);
+        hasWhere = true;
+      }
+    }
+
     // Initialize sortByValue before using it
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
 
@@ -756,9 +778,15 @@ async function getAllChildDedications(options = {}) {
           WHEN 'Cancelled' THEN 5 
           ELSE 6 
         END, cd.date_created DESC`;
-        break;
-      default:
-        orderByClause += 'cd.date_created DESC'; // Default sorting
+       break;
+     case 'Date Range (Newest)':
+       orderByClause += 'cd.preferred_dedication_date DESC';
+       break;
+     case 'Date Range (Oldest)':
+       orderByClause += 'cd.preferred_dedication_date ASC';
+       break;
+     default:
+       orderByClause += 'cd.date_created DESC'; // Default sorting
     }
     sql += orderByClause;
 

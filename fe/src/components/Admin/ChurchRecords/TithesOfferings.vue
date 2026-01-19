@@ -74,7 +74,7 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="2">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -108,7 +108,21 @@
               hide-details
             ></v-select>
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              style="width: 100%;"
+            />
+          </v-col>
+          <v-col cols="12" md="2">
             <v-select
               v-model="filters.sortBy"
               :items="sortByOptions"
@@ -122,7 +136,7 @@
           <v-col cols="12" md="2" class="d-flex align-center gap-2">
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-printer"
                   variant="outlined"
                   v-bind="props"
@@ -133,7 +147,7 @@
             </v-tooltip>
             <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
-                <v-btn 
+                <v-btn
                   icon="mdi-download"
                   variant="outlined"
                   v-bind="props"
@@ -314,6 +328,11 @@ const tithesOfferingsStore = useTithesOfferingsStore()
 const tithesOfferingsDialog = ref(false)
 const tithesOfferingsData = ref(null)
 
+const handleDateRangeChange = () => {
+  // Trigger fetch when date range changes
+  tithesOfferingsStore.fetchDonations()
+}
+
 // Computed properties from store
 const donations = computed(() => tithesOfferingsStore.paginatedDonations)
 const loading = computed(() => tithesOfferingsStore.loading)
@@ -341,6 +360,7 @@ const totalTithes = computed(() => tithesOfferingsStore.totalTithes)
 const totalOfferings = computed(() => tithesOfferingsStore.totalOfferings)
 const totalSpecialOfferings = computed(() => tithesOfferingsStore.totalSpecialOfferings)
 
+
 const sortByOptions = [
   'Tithes ID (Low to High)',
   'Tithes ID (High to Low)',
@@ -350,11 +370,7 @@ const sortByOptions = [
   'Date Created (Oldest)',
   'Type (A-Z)',
   'Name (A-Z)',
-  'Name (Z-A)',
-  'This Month',
-  'Last Month',
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'Name (Z-A)'
 ]
 const typeOptions = [
   'All Types',
@@ -366,20 +382,17 @@ const typeOptions = [
 
 const donationTypeOptions = ['all', 'money', 'inkind']
 
-// Watch for filter changes with toast notifications
-watch(() => filters.value.sortBy, (newSortBy) => {
-  ElMessage.info(`Sorted by: ${newSortBy || 'Default'}`)
-  tithesOfferingsStore.setFilters({ sortBy: newSortBy })
-})
-
+// Watch for filter changes
 watch(() => filters.value.type, (newType) => {
-  ElMessage.info(`Filtering by type: ${newType === 'All Types' ? 'All Types' : formatType(newType)}`)
   tithesOfferingsStore.setFilters({ type: newType })
 })
 
 watch(() => filters.value.donationType, (newDonationType) => {
-  ElMessage.info(`Filtering by donation type: ${newDonationType === 'all' ? 'All Types' : newDonationType === 'money' ? 'Money' : 'In-Kind'}`)
   tithesOfferingsStore.setFilters({ donationType: newDonationType })
+})
+
+watch(() => filters.value.sortBy, (newSortBy) => {
+  tithesOfferingsStore.setFilters({ sortBy: newSortBy })
 })
 
 const handleTithesOfferingsDialog = () => {

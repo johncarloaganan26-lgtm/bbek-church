@@ -52,12 +52,34 @@ router.post('/createAccount', async (req, res) => {
  * READ ALL - Get all account records with pagination and filters
  * GET /api/church-records/accounts/getAllAccounts (query params)
  * POST /api/church-records/accounts/getAllAccounts (body payload)
- * Parameters: search, limit, offset, page, pageSize, position, status, sortBy
+ * Parameters: search, limit, offset, page, pageSize, position, status, sortBy, dateRange
  */
 router.get('/getAllAccounts', async (req, res) => {
   try {
     // Get parameters from query string
-    const options = req.query;
+    const {
+      search, limit, offset, page, pageSize, position, status, sortBy, dateRange
+    } = req.query;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, position, status, sortBy,
+      start_date: startDate,
+      end_date: endDate
+    };
+
     const result = await getAllAccounts(options);
     if (result.success) {
       res.status(200).json({
@@ -87,7 +109,29 @@ router.get('/getAllAccounts', async (req, res) => {
 router.post('/getAllAccounts', async (req, res) => {
   try {
     // Get parameters from request body (payload)
-    const options = req.body;
+    const {
+      search, limit, offset, page, pageSize, position, status, sortBy, dateRange
+    } = req.body;
+
+    // Parse date range if provided
+    let startDate = null;
+    let endDate = null;
+    if (dateRange) {
+      try {
+        const [start, end] = JSON.parse(dateRange);
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', dateRange);
+      }
+    }
+
+    const options = {
+      search, limit, offset, page, pageSize, position, status, sortBy,
+      start_date: startDate,
+      end_date: endDate
+    };
+
     const result = await getAllAccounts(options);
     if (result.success) {
       res.status(200).json({

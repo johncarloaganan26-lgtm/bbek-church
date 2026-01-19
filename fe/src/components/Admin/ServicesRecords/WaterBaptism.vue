@@ -103,6 +103,20 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="2">
+            <el-date-picker
+              v-model="filters.dateRange"
+              type="daterange"
+              start-placeholder="Start date"
+              end-placeholder="End date"
+              range-separator="to"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled="loading"
+              @change="handleDateRangeChange"
+              class="w-100"
+            />
+          </v-col>
+          <v-col cols="12" md="2">
             <v-select
               v-model="itemsPerPage"
               :items="pageSizeOptions"
@@ -248,7 +262,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WaterBaptismDialog from '@/components/Dialogs/WaterBaptismDialog.vue'
@@ -302,12 +316,16 @@ const itemsPerPage = computed({
 const pageSizeOptions = computed(() => waterBaptismStore.pageSizeOptions)
 const searchQuery = computed({
   get: () => waterBaptismStore.searchQuery,
-  set: (value) => waterBaptismStore.setSearchQuery(value)
+  set: (value) => {
+    // Update the store value without triggering search
+    waterBaptismStore.searchQuery = value
+  }
 })
 const filters = computed({
   get: () => waterBaptismStore.filters,
   set: (value) => waterBaptismStore.setFilters(value)
 })
+
 
 const sortByOptions = [
   'Status (Pending First)',
@@ -321,7 +339,9 @@ const sortByOptions = [
   'This Month',
   'Last Month',
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'July', 'August', 'September', 'October', 'November', 'December',
+  'Date Range (Newest)',
+  'Date Range (Oldest)'
 ]
 
 const statusOptions = computed(() => waterBaptismStore.filters.statusOptions)
@@ -332,6 +352,7 @@ const baptismData = ref(null)
 const certificateDialog = ref(false)
 const certificateType = ref('')
 const certificateData = ref(null)
+
 
 // Handlers
 const openBaptismDialog = () => {
@@ -427,7 +448,15 @@ const handleSubmit = async (data) => {
 }
 
 const handleSearchChange = (value) => {
-  waterBaptismStore.setSearchQuery(value)
+  // Clear previous timeout
+  if (window.waterBaptismSearchTimeout) {
+    clearTimeout(window.waterBaptismSearchTimeout)
+  }
+
+  // Set new timeout to trigger search after user stops typing (500ms delay)
+  window.waterBaptismSearchTimeout = setTimeout(() => {
+    waterBaptismStore.setSearchQuery(value)
+  }, 500)
 }
 
 const handleFilterChange = () => {
@@ -441,6 +470,11 @@ const handlePageChange = (page) => {
 const handlePageSizeChange = (pageSize) => {
   waterBaptismStore.setPageSize(pageSize)
 }
+
+const handleDateRangeChange = () => {
+  waterBaptismStore.setFilters(filters.value)
+}
+
 
 const handleExportExcel = async () => {
   try {
@@ -686,6 +720,13 @@ const printCertificate = (baptism) => {
 // Initialize on mount
 onMounted(async () => {
   await waterBaptismStore.fetchBaptisms()
+})
+
+// Cleanup timeout on unmount
+onUnmounted(() => {
+  if (window.waterBaptismSearchTimeout) {
+    clearTimeout(window.waterBaptismSearchTimeout)
+  }
 })
 </script>
 

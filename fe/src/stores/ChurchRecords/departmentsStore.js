@@ -9,7 +9,8 @@ export const useDepartmentsStore = defineStore('departments', {
     searchQuery: '',
     filters: {
       status: 'All Statuses',
-      sortBy: 'Date Created (Newest)'
+      sortBy: 'Date Created (Newest)',
+      dateRange: []
     },
     currentPage: 1,
     totalPages: 1,
@@ -18,6 +19,7 @@ export const useDepartmentsStore = defineStore('departments', {
     pageSizeOptions: [5, 10, 15],
     // Options for dropdowns
     memberOptions: [],
+    searchTimeout: null,
     summaryStats: {
       totalJoinedMembers: 0
     }
@@ -62,6 +64,7 @@ export const useDepartmentsStore = defineStore('departments', {
         const search = options.search !== undefined ? options.search : this.searchQuery
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -79,6 +82,9 @@ export const useDepartmentsStore = defineStore('departments', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/departments/getAllDepartments?${params}`, {
@@ -252,8 +258,20 @@ export const useDepartmentsStore = defineStore('departments', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-      // Refetch with new search query
-      this.fetchDepartments({ search: query, page: 1, pageSize: this.itemsPerPage })
+
+      // Clear existing timeout
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+
+      // Only search if query has at least 3 characters or is empty
+      if (query.length >= 3 || query.length === 0) {
+        // Debounce search to avoid too many API calls
+        this.searchTimeout = setTimeout(() => {
+          // Refetch with new search query
+          this.fetchDepartments({ search: query, page: 1, pageSize: this.itemsPerPage })
+        }, 500) // 500ms debounce
+      }
     },
 
     setFilters(filters) {
@@ -293,6 +311,7 @@ export const useDepartmentsStore = defineStore('departments', {
         const search = options.search !== undefined ? options.search : this.searchQuery
         const status = options.status !== undefined ? options.status : this.filters.status
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
+        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
