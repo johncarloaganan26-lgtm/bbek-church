@@ -203,7 +203,10 @@ const handleLogin = async () => {
       const result = await accountsStore.login(loginForm.email, loginForm.password)
       console.log(result , 'result')
       if (result.success) {
-        ElMessage.success('Welcome ' + result.data.member.firstname + ' ' + result.data.member.lastname)
+        const memberName = result.data.member
+          ? `${result.data.member.firstname} ${result.data.member.lastname}`
+          : result.data.account.email || 'User'
+        ElMessage.success('Welcome ' + memberName)
    
         
         // Close dialog after successful login
