@@ -109,7 +109,24 @@
         </v-row>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
-            <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} events</span>
+            <div class="d-flex gap-2" v-if="selectedEvents.length > 0">
+              <v-btn
+                color="error"
+                variant="flat"
+                prepend-icon="mdi-delete-multiple"
+                :disabled="loading"
+                @click="handleBulkDelete"
+              >
+                Delete Selected ({{ selectedEvents.length }})
+              </v-btn>
+              <v-btn
+                variant="text"
+                @click="clearSelection"
+              >
+                Clear Selection
+              </v-btn>
+            </div>
+            <span class="text-body-2 ml-auto">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} events</span>
           </v-col>
         </v-row>
       </v-card-text>
@@ -120,6 +137,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || sortedEvents.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Event Title</th>
             <th class="text-left font-weight-bold">Start Date</th>
             <th class="text-left font-weight-bold">End Date</th>
@@ -216,6 +243,9 @@ import EventRecordsDialog from '@/components/Dialogs/EventRecordsDialog.vue'
 
 const eventsRecordsStore = useEventsRecordsStore()
 
+// Selection state
+const selectedEvents = ref([])
+
 // Computed properties from store
 const events = computed(() => eventsRecordsStore.paginatedEvents)
 
@@ -265,6 +295,15 @@ const filters = computed({
   set: (value) => eventsRecordsStore.setFilters(value)
 })
 
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return sortedEvents.value.length > 0 && selectedEvents.value.length === sortedEvents.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedEvents.value.length > 0 && selectedEvents.value.length < sortedEvents.value.length
+})
+
 // Sort options - Month-based sorting
 const sortByOptions = [
   'Status (Pending First)',
@@ -312,6 +351,75 @@ const statusOptions = ['All Statuses', 'Pending', 'Ongoing', 'Completed']
 const eventRecordsDialog = ref(false)
 const eventRecordsData = ref(null)
 
+// Selection methods
+const isEventSelected = (event) => {
+  return selectedEvents.value.some(selected => selected.event_id === event.event_id)
+}
+
+const toggleEventSelection = (event, selected) => {
+  if (selected) {
+    if (!isEventSelected(event)) {
+      selectedEvents.value.push(event)
+    }
+  } else {
+    selectedEvents.value = selectedEvents.value.filter(selected => selected.event_id !== event.event_id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedEvents.value = []
+  } else {
+    selectedEvents.value = [...sortedEvents.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedEvents.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedEvents.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedEvents.value.length} selected event(s)?`,
+      'Bulk Delete Events',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const results = []
+    for (const event of selectedEvents.value) {
+      const result = await eventsRecordsStore.deleteEvent(event.event_id)
+      results.push(result)
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    if (successCount > 0) {
+      ElMessage.success(`${successCount} event(s) deleted successfully`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`Failed to delete ${failCount} event(s)`)
+    }
+
+    // Clear selection and refresh data
+    selectedEvents.value = []
+    await eventsRecordsStore.fetchEvents()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk delete error:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
+}
+
 // Date range handling
 const localDateRange = ref([])
 watch(() => filters.value.dateRangeStart, (newStart) => {
@@ -321,6 +429,32 @@ watch(() => filters.value.dateRangeStart, (newStart) => {
 watch(() => filters.value.dateRangeEnd, (newEnd) => {
   localDateRange.value = filters.value.dateRangeStart && newEnd ? [filters.value.dateRangeStart, newEnd] : []
 }, { immediate: true })
+
+// Clear selection when data changes
+watch(() => sortedEvents.value, () => {
+  selectedEvents.value = []
+}, { deep: true })
+
+// Clear selection when filters change
+watch(() => searchQuery.value, () => {
+  selectedEvents.value = []
+})
+
+watch(() => filters.value.sortBy, () => {
+  selectedEvents.value = []
+})
+
+watch(() => filters.value.type, () => {
+  selectedEvents.value = []
+})
+
+watch(() => filters.value.dateRangeStart, () => {
+  selectedEvents.value = []
+})
+
+watch(() => filters.value.dateRangeEnd, () => {
+  selectedEvents.value = []
+})
 
 const handleDateRangeChange = (value) => {
   // Update store filters and trigger fetch

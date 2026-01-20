@@ -164,6 +164,43 @@
             </v-tooltip>
           </v-col>
         </v-row>
+        <!-- Bulk Actions Row -->
+        <v-row v-if="selectedServices.length > 0" class="mt-2">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedServices.length }}</strong> service{{ selectedServices.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    size="small"
+                    :disabled="loading"
+                    @click="bulkDeleteServices"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Delete Selected
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    size="small"
+                    @click="clearSelection"
+                  >
+                    <v-icon left>mdi-close</v-icon>
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} services</span>
@@ -176,9 +213,18 @@
     <v-card elevation="2" v-loading="loading" loading-text="Loading burial services..." class="position-relative">
       <v-table>
         <thead>
-          <tr>
-            <!-- <th class="text-left font-weight-bold">Burial ID</th> -->
-            <th class="text-left font-weight-bold">Member</th>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+               ></v-checkbox>
+             </th>
+             <!-- <th class="text-left font-weight-bold">Burial ID</th> -->
+             <th class="text-left font-weight-bold">Member</th>
             <th class="text-left font-weight-bold">Requester Name</th>
             <th class="text-left font-weight-bold">Requester Email</th>
             <th class="text-left font-weight-bold">Deceased Name</th>
@@ -200,6 +246,14 @@
             </td>
           </tr>
           <tr v-for="service in sortedServices" :key="service.burial_id">
+            <td>
+              <v-checkbox
+                :model-value="isServiceSelected(service)"
+                @update:model-value="toggleServiceSelection(service)"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ service.burial_id }}</td> -->
             <td>{{ service.member_id ? 'Member' : 'Non-Member' }}</td>
             <td>{{ service.member_id ? (service.fullname || service.member_id) : (service.requester_name || 'N/A') }}</td>
@@ -274,12 +328,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
 
 const burialServiceStore = useBurialServiceStore()
+
+// Selection state
+const selectedServices = ref([])
 
 // Computed properties from store
 const services = computed(() => burialServiceStore.services)
@@ -336,6 +393,15 @@ const searchQuery = computed({
 const filters = computed({
   get: () => burialServiceStore.filters,
   set: (value) => burialServiceStore.setFilters(value)
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return sortedServices.value.length > 0 && selectedServices.value.length === sortedServices.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedServices.value.length > 0 && selectedServices.value.length < sortedServices.value.length
 })
 
 const sortByOptions = [
@@ -419,6 +485,70 @@ const deleteService = async (id) => {
     if (error !== 'cancel') {
       console.error('Error deleting burial service:', error)
       ElMessage.error('Failed to delete burial service')
+    }
+  }
+}
+
+// Selection methods
+const isServiceSelected = (service) => {
+  return selectedServices.value.some(selected => selected.burial_id === service.burial_id)
+}
+
+const toggleServiceSelection = (service) => {
+  const index = selectedServices.value.findIndex(selected => selected.burial_id === service.burial_id)
+  if (index > -1) {
+    selectedServices.value.splice(index, 1)
+  } else {
+    selectedServices.value.push(service)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedServices.value = []
+  } else {
+    selectedServices.value = [...sortedServices.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedServices.value = []
+}
+
+const bulkDeleteServices = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedServices.value.length} selected burial service${selectedServices.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedServices.value.map(service =>
+      burialServiceStore.deleteService(service.burial_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} burial service${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} burial service${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await burialServiceStore.fetchServices()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting services:', error)
+      ElMessage.error('Failed to delete selected burial services')
     }
   }
 }
@@ -812,6 +942,19 @@ const handlePrint = () => {
     printWindow.close()
   }, 250)
 }
+
+// Watchers to clear selections when data changes
+watch(() => services.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
+})
 
 // Initialize on mount
 onMounted(async () => {

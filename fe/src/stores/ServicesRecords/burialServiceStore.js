@@ -85,6 +85,9 @@ export const useBurialServiceStore = defineStore('burialService', {
         if (sortBy) {
           params.append('sortBy', sortBy)
         }
+        if (this.filters.dateRange && this.filters.dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(this.filters.dateRange))
+        }
 
         const response = await axios.get(`/church-records/burial-services/getAllBurialServices?${params}`)
         if (response.data.success) {
@@ -235,6 +238,9 @@ export const useBurialServiceStore = defineStore('burialService', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
+        }
+        if (dateRange && dateRange.length === 2) {
+          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/burial-services/exportExcel?${params}`, {

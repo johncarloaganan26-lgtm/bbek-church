@@ -55,10 +55,9 @@
           <!-- Action Buttons -->
           <div class="action-buttons">
             <v-btn
-              v-if="!notification.read"
               icon
               x-small
-              @click.stop="markAsRead(notification.id)"
+              @click.stop="markAsRead(notification)"
               title="Mark as read"
               class="mark-read-btn"
             >
@@ -117,6 +116,7 @@
 
 <script>
 import { defineComponent, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 
 export default defineComponent({
   name: 'NotificationList',
@@ -225,8 +225,12 @@ export default defineComponent({
     };
 
     // Mark notification as read
-    const markAsRead = (notificationId) => {
-      emit('mark-as-read', notificationId);
+    const markAsRead = (notification) => {
+      if (notification.read) {
+        ElMessage.info('This message is already marked as read');
+        return;
+      }
+      emit('mark-as-read', notification.id);
     };
 
     const dismiss = (notificationId) => {

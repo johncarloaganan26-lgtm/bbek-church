@@ -162,6 +162,44 @@
       </v-card-text>
     </v-card>
 
+    <!-- Bulk Actions Row -->
+    <v-row v-if="selectedTithes.length > 0" class="mt-2 mb-4">
+      <v-col cols="12">
+        <v-alert
+          type="info"
+          variant="tonal"
+          class="mb-0"
+          density="compact"
+        >
+          <div class="d-flex align-center justify-space-between">
+            <div class="text-body-2">
+              <strong>{{ selectedTithes.length }}</strong> donation{{ selectedTithes.length > 1 ? 's' : '' }} selected
+            </div>
+            <div class="d-flex gap-2">
+              <v-btn
+                color="error"
+                variant="flat"
+                size="small"
+                :disabled="loading"
+                @click="handleBulkDelete"
+              >
+                <v-icon left>mdi-delete</v-icon>
+                Delete Selected
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                size="small"
+                @click="clearSelection"
+              >
+                <v-icon left>mdi-close</v-icon>
+                Clear Selection
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+      </v-col>
+    </v-row>
+
     <!-- Table -->
     <v-card elevation="2" class="position-relative">
       <!-- Loading Overlay -->
@@ -180,6 +218,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || donations.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Member Name</th>
             <th class="text-left font-weight-bold">Donation Type</th>
             <th class="text-left font-weight-bold">Amount/Items</th>
@@ -191,12 +239,12 @@
         </thead>
         <tbody>
           <tr v-if="!loading && donations.length === 0">
-            <td colspan="7" class="text-center py-12">
+            <td colspan="8" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="7" class="text-center py-12">
+            <td colspan="8" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -205,6 +253,15 @@
             </td>
           </tr>
           <tr v-for="donation in donations" :key="donation.tithes_id" v-show="!loading">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isTitheSelected(donation)"
+                @update:model-value="(selected) => toggleTitheSelection(donation, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>
               <div v-if="donation.is_anonymous" class="d-flex align-center">
                 <v-icon size="small" class="mr-1" color="grey">mdi-incognito</v-icon>
@@ -328,6 +385,9 @@ const tithesOfferingsStore = useTithesOfferingsStore()
 const tithesOfferingsDialog = ref(false)
 const tithesOfferingsData = ref(null)
 
+// Selection state
+const selectedTithes = ref([])
+
 const handleDateRangeChange = () => {
   // Trigger fetch when date range changes
   tithesOfferingsStore.fetchDonations()
@@ -359,6 +419,15 @@ const totalDonations = computed(() => tithesOfferingsStore.totalDonations)
 const totalTithes = computed(() => tithesOfferingsStore.totalTithes)
 const totalOfferings = computed(() => tithesOfferingsStore.totalOfferings)
 const totalSpecialOfferings = computed(() => tithesOfferingsStore.totalSpecialOfferings)
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return donations.value.length > 0 && selectedTithes.value.length === donations.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedTithes.value.length > 0 && selectedTithes.value.length < donations.value.length
+})
 
 
 const sortByOptions = [
@@ -394,6 +463,97 @@ watch(() => filters.value.donationType, (newDonationType) => {
 watch(() => filters.value.sortBy, (newSortBy) => {
   tithesOfferingsStore.setFilters({ sortBy: newSortBy })
 })
+
+// Clear selection when data changes
+watch(() => donations.value, () => {
+  selectedTithes.value = []
+}, { deep: true })
+
+// Clear selection when filters change
+watch(() => searchQuery.value, () => {
+  selectedTithes.value = []
+})
+
+watch(() => filters.value.type, () => {
+  selectedTithes.value = []
+})
+
+watch(() => filters.value.donationType, () => {
+  selectedTithes.value = []
+})
+
+watch(() => filters.value.dateRange, () => {
+  selectedTithes.value = []
+})
+
+// Selection methods
+const isTitheSelected = (tithe) => {
+  return selectedTithes.value.some(selected => selected.tithes_id === tithe.tithes_id)
+}
+
+const toggleTitheSelection = (tithe, selected) => {
+  if (selected) {
+    if (!isTitheSelected(tithe)) {
+      selectedTithes.value.push(tithe)
+    }
+  } else {
+    selectedTithes.value = selectedTithes.value.filter(selected => selected.tithes_id !== tithe.tithes_id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedTithes.value = []
+  } else {
+    selectedTithes.value = [...donations.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedTithes.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedTithes.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedTithes.value.length} selected donation(s)?`,
+      'Bulk Delete Donations',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const results = []
+    for (const tithe of selectedTithes.value) {
+      const result = await tithesOfferingsStore.deleteDonation(tithe.tithes_id)
+      results.push(result)
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    if (successCount > 0) {
+      ElMessage.success(`${successCount} donation(s) deleted successfully`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`Failed to delete ${failCount} donation(s)`)
+    }
+
+    // Clear selection and refresh data
+    selectedTithes.value = []
+    await tithesOfferingsStore.fetchDonations()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk delete error:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
+}
 
 const handleTithesOfferingsDialog = () => {
   tithesOfferingsData.value = null

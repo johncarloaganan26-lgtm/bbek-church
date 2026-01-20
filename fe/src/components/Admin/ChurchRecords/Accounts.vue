@@ -2,6 +2,23 @@
   <div class="accounts">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Accounts</h1>
+      <div class="d-flex gap-2" v-if="selectedAccounts.length > 0">
+        <v-btn
+          color="error"
+          variant="flat"
+          prepend-icon="mdi-delete-multiple"
+          :disabled="loading"
+          @click="handleBulkDelete"
+        >
+          Delete Selected ({{ selectedAccounts.length }})
+        </v-btn>
+        <v-btn
+          variant="text"
+          @click="clearSelection"
+        >
+          Clear Selection
+        </v-btn>
+      </div>
     </div>
 
     <!-- Filtering and Sorting Section -->
@@ -113,6 +130,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || accounts.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <!-- <th class="text-left font-weight-bold">Account ID</th> -->
             <th class="text-left font-weight-bold">Email</th>
             <th class="text-left font-weight-bold">Position</th>
@@ -123,12 +150,12 @@
         </thead>
         <tbody>
           <tr v-if="!loading && accounts.length === 0">
-            <td colspan="6" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="6" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -137,6 +164,15 @@
             </td>
           </tr>
           <tr v-for="account in accounts" :key="account.acc_id || account.id" v-show="!loading">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isAccountSelected(account)"
+                @update:model-value="(selected) => toggleAccountSelection(account, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ account.acc_id }}</td> -->
             <td>{{ account.email }}</td>
             <td>
@@ -239,6 +275,7 @@ const accountsStore = useAccountsStore()
 
 const accountDialog = ref(false)
 const accountData = ref(null)
+const selectedAccounts = ref([])
 
 const handleDateRangeChange = () => {
   accountsStore.setFilters(filters.value)
@@ -266,6 +303,15 @@ const itemsPerPage = computed({
 const pageSizeOptions = computed(() => accountsStore.pageSizeOptions)
 const emailOptions = computed(() => accountsStore.emailOptions)
 
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return accounts.value.length > 0 && selectedAccounts.value.length === accounts.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedAccounts.value.length > 0 && selectedAccounts.value.length < accounts.value.length
+})
+
 
 
 
@@ -287,15 +333,23 @@ const sortByOptions = [
 // Watch for filter changes
 watch(() => filters.value.status, (newStatus) => {
   accountsStore.setFilters({ status: newStatus })
+  selectedAccounts.value = [] // Clear selection when filters change
 })
 
 watch(() => filters.value.position, (newPosition) => {
   accountsStore.setFilters({ position: newPosition })
+  selectedAccounts.value = [] // Clear selection when filters change
 })
 
 watch(() => filters.value.sortBy, (newSortBy) => {
   accountsStore.setFilters({ sortBy: newSortBy })
+  selectedAccounts.value = [] // Clear selection when filters change
 })
+
+// Clear selection when accounts data changes
+watch(() => accounts, () => {
+  selectedAccounts.value = []
+}, { deep: true })
 
 
 const openAccountDialog = () => {
@@ -552,6 +606,81 @@ const handlePrint = () => {
     printWindow.print()
     printWindow.close()
   }, 250)
+}
+
+// Selection functions
+const isAccountSelected = (account) => {
+ const accountId = account.acc_id || account.id
+ return selectedAccounts.value.some(selected => (selected.acc_id || selected.id) === accountId)
+}
+
+const toggleAccountSelection = (account, selected) => {
+ const accountId = account.acc_id || account.id
+ if (selected) {
+   if (!selectedAccounts.value.some(selected => (selected.acc_id || selected.id) === accountId)) {
+     selectedAccounts.value.push(account)
+   }
+ } else {
+   selectedAccounts.value = selectedAccounts.value.filter(selected =>
+     (selected.acc_id || selected.id) !== accountId
+   )
+ }
+}
+
+const toggleSelectAll = (selected) => {
+ if (selected) {
+   selectedAccounts.value = [...accounts.value]
+ } else {
+   selectedAccounts.value = []
+ }
+}
+
+const clearSelection = () => {
+ selectedAccounts.value = []
+}
+
+const handleBulkDelete = async () => {
+ if (selectedAccounts.value.length === 0) return
+
+ try {
+   await ElMessageBox.confirm(
+     `Are you sure you want to delete ${selectedAccounts.value.length} selected account(s)? This action cannot be undone.`,
+     'Confirm Bulk Delete',
+     {
+       confirmButtonText: 'Delete All',
+       cancelButtonText: 'Cancel',
+       type: 'warning',
+     }
+   )
+
+   // Delete accounts one by one
+   const deletePromises = selectedAccounts.value.map(account =>
+     accountsStore.deleteAccount(account.acc_id || account.id)
+   )
+
+   const results = await Promise.allSettled(deletePromises)
+
+   const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+   const failed = results.length - successful
+
+   if (successful > 0) {
+     ElMessage.success(`Successfully deleted ${successful} account(s)`)
+   }
+
+   if (failed > 0) {
+     ElMessage.error(`Failed to delete ${failed} account(s)`)
+   }
+
+   // Clear selection and refresh data
+   selectedAccounts.value = []
+   await accountsStore.fetchAccounts()
+
+ } catch (error) {
+   if (error !== 'cancel') {
+     console.error('Error in bulk delete:', error)
+     ElMessage.error('Bulk delete operation failed')
+   }
+ }
 }
 
 // Initialize on mount

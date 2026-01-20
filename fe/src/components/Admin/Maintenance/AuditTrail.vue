@@ -293,7 +293,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Refresh, Download, View, Printer } from '@element-plus/icons-vue'
+import { Filter, Refresh, Download, View, Printer, Close } from '@element-plus/icons-vue'
 import { useAuditTrailStore } from '@/stores/auditTrailStore'
 
 // Store
@@ -586,12 +586,6 @@ const getRoleTagType = (position) => {
   return types[position] || 'primary'
 }
 
-const handleSizeChange = (newSize) => {
-  pagination.value.pageSize = newSize
-  pagination.value.page = 1
-  fetchLogs()
-}
-
 const handleCurrentChange = (newPage) => {
   pagination.value.page = newPage
   fetchLogs()
@@ -617,6 +611,15 @@ const formatJsonDescription = (description) => {
   }
   return description
 }
+
+// Pagination handlers
+const handleSizeChange = (size) => {
+  pagination.value.pageSize = size
+  pagination.value.page = 1
+  fetchLogs()
+}
+
+// Dialog handlers
 
 // Lifecycle
 onMounted(() => {

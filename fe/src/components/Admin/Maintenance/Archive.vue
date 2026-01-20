@@ -156,6 +156,41 @@
       </el-form>
     </el-card>
 
+    <!-- Bulk Actions Row -->
+    <el-alert
+      v-if="selectedArchives.length > 0"
+      title=""
+      :description="`${selectedArchives.length} archive${selectedArchives.length > 1 ? 's' : ''} selected`"
+      type="info"
+      show-icon
+      class="mb-4"
+      :closable="false"
+    >
+      <template #title>
+        <div class="d-flex justify-content-between align-items-center">
+          <span>{{ selectedArchives.length }} archive{{ selectedArchives.length > 1 ? 's' : '' }} selected</span>
+          <div>
+            <el-button
+              type="danger"
+              size="small"
+              :disabled="loading"
+              @click="bulkDeleteArchives"
+            >
+              <el-icon><Delete /></el-icon>
+              Delete Selected
+            </el-button>
+            <el-button
+              size="small"
+              @click="clearSelection"
+            >
+              <el-icon><Close /></el-icon>
+              Clear Selection
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-alert>
+
     <!-- Archive Table -->
     <el-card class="table-card" shadow="hover">
       <template #header>
@@ -201,7 +236,9 @@
           style="width: 100%"
           empty-text="No archived records found"
           table-layout="auto"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="55" />
           <el-table-column prop="archived_at" label="Archived Date" min-width="160" width="180">
             <template #default="{ row }">
               {{ formatDateTime(row.archived_at) }}
@@ -419,23 +456,28 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArchiveStore } from '@/stores/archiveStore'
-import { ElMessage } from 'element-plus'
-import { 
-  Document, 
-  RefreshRight, 
-  Folder, 
-  Search, 
-  View, 
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Document,
+  RefreshRight,
+  Folder,
+  Search,
+  View,
   Loading,
   Refresh,
   Download,
   Printer,
-  Delete
+  Delete,
+  Close
 } from '@element-plus/icons-vue'
 
 const archiveStore = useArchiveStore()
 const route = useRoute()
 const router = useRouter()
+
+// Selection state
+const selectedArchives = ref([])
+const selectAll = ref(false)
 
 // Computed properties
 const archives = computed(() => archiveStore.archives)
@@ -556,6 +598,53 @@ const handlePageChange = (page) => {
 
 const handlePageSizeChange = () => {
   fetchArchives()
+}
+
+// Selection methods
+const handleSelectionChange = (selection) => {
+  selectedArchives.value = selection
+}
+
+const clearSelection = () => {
+  selectedArchives.value = []
+}
+
+const bulkDeleteArchives = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to permanently delete ${selectedArchives.value.length} selected archive${selectedArchives.value.length > 1 ? 's' : ''}? This action cannot be undone.`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete Permanently',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedArchives.value.map(archive =>
+      archiveStore.deleteArchivePermanently(archive.archive_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} archive${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} archive${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await fetchArchives()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting archives:', error)
+      ElMessage.error('Failed to delete selected archives')
+    }
+  }
 }
 
 const resetFilters = () => {

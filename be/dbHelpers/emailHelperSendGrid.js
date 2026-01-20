@@ -5,7 +5,7 @@ require('dotenv').config();
 // Church branding constants
 const CHURCH_NAME = 'Bible Baptist Ekklesia of Kawit';
 const CHURCH_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'biblebaptistekklesia@gmail.com';
-const CHURCH_WEBSITE = 'https://bbek.vercel.app';
+const CHURCH_WEBSITE = 'https://biblebaptistekklesiaofkawit.xyz';
 const CHURCH_PHONE = '(046) 123-4567';
 const CHURCH_ADDRESS = 'Kawit, Cavite, Philippines';
 

@@ -243,7 +243,7 @@ The app uses different API connection methods for development vs production:
 ```
 # If backend is deployed separately:
 VITE_API_URL=https://your-backend.vercel.app
-VITE_API_URL=https://api.yourdomain.com
+VITE_API_URL=https://api.biblebaptistekklesiaofkawit.xyz
 
 # If backend is on a VPS/server:
 VITE_API_URL=https://your-server-ip:5000

@@ -47,7 +47,7 @@ DB_CONNECTION_LIMIT=10
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 
 # CORS Configuration (Production)
-FRONTEND_URL1=https://your-frontend.vercel.app
+FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz
 FRONTEND_URL2=https://your-frontend-alt.vercel.app
 # OR use CLIENT_ORIGIN (comma-separated)
 # CLIENT_ORIGIN=https://app1.com,https://app2.com
@@ -63,6 +63,7 @@ SMTP_PASS=your_password
 ### 3. Database Setup
 
 1. Create the MySQL database:
+
    ```sql
    CREATE DATABASE bbekdb;
    ```
@@ -101,11 +102,13 @@ npm start
 All endpoints are prefixed with `/api`.
 
 ### Authentication
+
 - `POST /api/church-records/accounts/login` - User login (public)
 - `POST /api/church-records/accounts/verifyCredentials` - Verify credentials (public)
 - `POST /api/church-records/accounts/forgotPassword` - Password reset (public)
 
 ### Church Records
+
 - `/api/church-records/members` - Member management
   - `POST /createMember` - Create new member
   - `GET|POST /getAllMembers` - Get all members (with pagination, filters)
@@ -137,6 +140,7 @@ All endpoints are prefixed with `/api`.
 - `/api/church-records/burial-services` - Burial services
 
 ### Services
+
 - `/api/services/water-baptisms` - Water baptism services
   - `POST /createWaterBaptism` - Create water baptism record
   - `GET|POST /getAllWaterBaptisms` - Get all records
@@ -151,6 +155,7 @@ All endpoints are prefixed with `/api`.
   - `DELETE /deleteMarriageService/:id` - Delete record
 
 ### Other Features
+
 - `/api/transactions` - Transaction management
   - `GET|POST /getAllTransactions` - Get all transactions
   - `POST /createTransaction` - Create transaction
@@ -187,6 +192,7 @@ All endpoints are prefixed with `/api`.
   - `GET /getRecentActivities` - Get recent activities
 
 ### Health Check
+
 - `GET /api/health` - Health check endpoint (public)
 
 ## Project Structure
@@ -276,8 +282,10 @@ The application uses MySQL connection pooling for efficient database access:
 All database queries use parameterized statements to prevent SQL injection:
 
 ```javascript
-const { query } = require('./database/db');
-const [rows] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [memberId]);
+const { query } = require("./database/db");
+const [rows] = await query("SELECT * FROM tbl_members WHERE member_id = ?", [
+  memberId,
+]);
 ```
 
 ## Middleware
@@ -285,6 +293,7 @@ const [rows] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [mem
 ### Authentication Middleware
 
 `middleware/authMiddleware.js`
+
 - Validates JWT tokens
 - Attaches user info to `req.user`
 - Bypasses public routes
@@ -292,6 +301,7 @@ const [rows] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [mem
 ### Audit Trail Middleware
 
 `middleware/auditTrailMiddleware.js`
+
 - Automatically logs all authenticated requests
 - Tracks user actions, entity types, and changes
 - Non-blocking (logs asynchronously after response)
@@ -299,6 +309,7 @@ const [rows] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [mem
 ### CORS Middleware
 
 Configured based on environment:
+
 - **Development**: Allows `localhost:5173`, `localhost:5174`, `localhost:5175`
 - **Production**: Uses `FRONTEND_URL1`, `FRONTEND_URL2`, or `CLIENT_ORIGIN` from `.env`
 
@@ -387,6 +398,7 @@ Uses `nodemon` for automatic server restarts on file changes.
 ### Environment
 
 Set `NODE_ENV=development` for:
+
 - Verbose logging
 - Detailed error messages with stack traces
 - More permissive CORS (localhost ports)
@@ -414,6 +426,7 @@ Ensure all production environment variables are set:
 ### Database Considerations
 
 Cloud databases often have connection limits:
+
 - **Free tiers**: Usually 5 connections (max_connections and max_user_connections)
 - **Recommendation**: Use `DB_CONNECTION_LIMIT=2` to stay safe
 - **SSL**: Enable with `DB_SSL=true` for cloud databases
@@ -425,6 +438,7 @@ The server binds to `0.0.0.0` to accept connections from all network interfaces,
 ### Graceful Shutdown
 
 The application handles shutdown signals (`SIGTERM`, `SIGINT`) gracefully:
+
 - Closes HTTP server
 - Closes database connection pool
 - Exits cleanly
@@ -438,6 +452,7 @@ The application handles shutdown signals (`SIGTERM`, `SIGINT`) gracefully:
 ## Dependencies
 
 ### Core Dependencies
+
 - `express@^5.1.0` - Web framework
 - `mysql2@^3.15.3` - MySQL client with promises
 - `jsonwebtoken@^9.0.3` - JWT implementation
@@ -447,6 +462,7 @@ The application handles shutdown signals (`SIGTERM`, `SIGINT`) gracefully:
 - `body-parser@^2.2.1` - Request body parsing
 
 ### Service Dependencies
+
 - `@sendgrid/mail@^8.1.4` - SendGrid email service
 - `nodemailer@^7.0.11` - Email sending
 - `multer@^2.0.2` - File uploads
@@ -456,6 +472,7 @@ The application handles shutdown signals (`SIGTERM`, `SIGINT`) gracefully:
 - `crypto@^1.0.1` - Cryptographic functionality
 
 ### Development Dependencies
+
 - `nodemon@^3.1.11` - Auto-restart on file changes
 
 ## Troubleshooting
@@ -500,4 +517,3 @@ netstat -ano | findstr :5000  # Windows
 ## License
 
 ISC
-

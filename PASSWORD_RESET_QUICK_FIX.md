@@ -25,7 +25,7 @@ EMAIL_PORT = 587
 EMAIL_SECURE = false
 EMAIL_USER = your-gmail@gmail.com
 EMAIL_PASS = your-16-char-app-password
-FRONTEND_URL1 = https://bbek.vercel.app
+FRONTEND_URL1 = https://biblebaptistekklesiaofkawit.xyz
 ```
 
 **⚠️ Gmail App Password**:
@@ -48,7 +48,7 @@ git push origin main
 
 ### Step 3: Test (5 minutes)
 
-1. Go to https://bbek.vercel.app
+1. Go to https://biblebaptistekklesiaofkawit.xyz
 2. Click "Login" → "Forgot password?"
 3. Enter any email address
 4. Check inbox (and spam folder)

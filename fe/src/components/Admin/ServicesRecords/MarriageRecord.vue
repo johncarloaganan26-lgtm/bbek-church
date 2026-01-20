@@ -136,6 +136,43 @@
             </v-tooltip>
           </v-col>
         </v-row>
+        <!-- Bulk Actions Row -->
+        <v-row v-if="selectedMarriages.length > 0" class="mt-2">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedMarriages.length }}</strong> marriage{{ selectedMarriages.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    size="small"
+                    :disabled="loading"
+                    @click="bulkDeleteMarriages"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Delete Selected
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    size="small"
+                    @click="clearSelection"
+                  >
+                    <v-icon left>mdi-close</v-icon>
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} marriages</span>
@@ -154,9 +191,18 @@
       </v-card-title>
       <v-table>
         <thead>
-          <tr>
-            <!-- <th class="text-left font-weight-bold">Marriage ID</th> -->
-            <th class="text-left font-weight-bold">Groom</th>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+               ></v-checkbox>
+             </th>
+             <!-- <th class="text-left font-weight-bold">Marriage ID</th> -->
+             <th class="text-left font-weight-bold">Groom</th>
             <th class="text-left font-weight-bold">Bride</th>
             <th class="text-left font-weight-bold">Guardians</th>
             <th class="text-left font-weight-bold">Pastor ID</th>
@@ -174,6 +220,14 @@
             </td>
           </tr>
           <tr v-for="marriage in sortedMarriages" :key="marriage.marriage_id">
+            <td>
+              <v-checkbox
+                :model-value="isMarriageSelected(marriage)"
+                @update:model-value="toggleMarriageSelection(marriage)"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ marriage.marriage_id }}</td> -->
             <td>{{ getGroomDisplayName(marriage) }}</td>
             <td>{{ getBrideDisplayName(marriage) }}</td>
@@ -251,6 +305,9 @@ import MarriageServiceDialog from '@/components/Dialogs/MarriageServiceDialog.vu
 
 const marriageServiceStore = useMarriageServiceStore()
 
+// Selection state
+const selectedMarriages = ref([])
+
 // Computed properties from store
 const marriages = computed(() => marriageServiceStore.marriages)
 
@@ -300,6 +357,15 @@ const searchQuery = computed({
 const filters = computed({
   get: () => marriageServiceStore.filters,
   set: (value) => marriageServiceStore.setFilters(value)
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return sortedMarriages.value.length > 0 && selectedMarriages.value.length === sortedMarriages.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedMarriages.value.length > 0 && selectedMarriages.value.length < sortedMarriages.value.length
 })
 
 // Sort options
@@ -370,6 +436,70 @@ const deleteMarriage = async (id) => {
     if (error !== 'cancel') {
       console.error('Error deleting marriage:', error)
       ElMessage.error('Failed to delete marriage record')
+    }
+  }
+}
+
+// Selection methods
+const isMarriageSelected = (marriage) => {
+  return selectedMarriages.value.some(selected => selected.marriage_id === marriage.marriage_id)
+}
+
+const toggleMarriageSelection = (marriage) => {
+  const index = selectedMarriages.value.findIndex(selected => selected.marriage_id === marriage.marriage_id)
+  if (index > -1) {
+    selectedMarriages.value.splice(index, 1)
+  } else {
+    selectedMarriages.value.push(marriage)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedMarriages.value = []
+  } else {
+    selectedMarriages.value = [...sortedMarriages.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedMarriages.value = []
+}
+
+const bulkDeleteMarriages = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedMarriages.value.length} selected marriage record${selectedMarriages.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedMarriages.value.map(marriage =>
+      marriageServiceStore.deleteMarriage(marriage.marriage_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} marriage record${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} marriage record${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await marriageServiceStore.fetchMarriages()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting marriages:', error)
+      ElMessage.error('Failed to delete selected marriage records')
     }
   }
 }
@@ -656,6 +786,19 @@ const handlePrint = () => {
     printWindow.close()
   }, 250)
 }
+
+// Watchers to clear selections when data changes
+watch(() => marriages.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
+})
 
 // Initialize on mount
 onMounted(async () => {

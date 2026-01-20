@@ -163,7 +163,7 @@ EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASS=your-gmail-app-password  # 16-char app password, NOT regular password
 
 # Frontend URL (REQUIRED for reset links!)
-FRONTEND_URL1=https://bbek.vercel.app
+FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz
 ```
 
 If these aren't set:
@@ -197,13 +197,11 @@ If these aren't set:
    ```
 
 2. **Set Environment Variables on Hosting**
-
    - Vercel: Project Settings → Environment Variables
    - Azure: App Service → Configuration
    - AWS: Systems Manager → Parameters
 
 3. **Test After Deployment**
-
    - Request password reset
    - Check email arrives
    - Verify reset link works

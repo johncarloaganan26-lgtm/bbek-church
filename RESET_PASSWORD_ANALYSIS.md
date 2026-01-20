@@ -1,4 +1,9 @@
-# Reset Password Flow Analysis - "Forgot Password" Feature
+1. Email Templates
+Files: be/dbHelpers/emailHelperSendGrid.js and be/dbHelpers/emailHelperSMTP.js
+What: Contains CHURCH_WEBSITE constant used in password reset and other emails
+Impact: Emails would show broken links if not updated
+
+2. CORS Configuration# Reset Password Flow Analysis - "Forgot Password" Feature
 
 ## Overview
 
@@ -36,13 +41,13 @@ const handleForgotPassword = async () => {
     if (result) {
       showSuccessDialog(
         "Success!",
-        "Password reset link has been sent to your email address"
+        "Password reset link has been sent to your email address",
       );
     } else {
       showSuccessDialog(
         "Error",
         accountsStore.error || "Failed to send reset link. Please try again.",
-        true
+        true,
       );
     }
   } catch (error) {
@@ -203,7 +208,7 @@ EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-app-password  # Gmail App Password, NOT regular password
 
 # Frontend URL for reset link
-FRONTEND_URL1=https://bbek.vercel.app  # Production URL
+FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz  # Production URL
 
 # Optional for SendGrid
 SENDGRID_API_KEY=your-sendgrid-key
@@ -242,7 +247,6 @@ SENDGRID_FROM_EMAIL=your-sendgrid@example.com
 
 - **Problem**: Email credentials need to be set in environment variables
 - **Location**: Backend environment variables must include:
-
   - `EMAIL_HOST`
   - `EMAIL_PORT`
   - `EMAIL_USER`
@@ -262,7 +266,7 @@ SENDGRID_FROM_EMAIL=your-sendgrid@example.com
 - **Problem**: If `FRONTEND_URL1` is not set, reset links will point to `localhost:5173` on production!
 - **Fix Required**: Ensure `FRONTEND_URL1` is set to your production frontend URL:
   ```
-  FRONTEND_URL1=https://bbek.vercel.app
+  FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz
   ```
 
 #### Issue #3: Token Expiry Mismatch
@@ -401,13 +405,11 @@ curl -X POST http://your-hosting-url/api/church-records/accounts/resetPasswordWi
 ### ⚠️ Security Issues
 
 1. **CRITICAL**: Tokens stored as plaintext in database
-
    - **Fix**: Hash tokens with bcrypt before storing
    - **Current**: `INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at)`
    - **Should Be**: `INSERT INTO tbl_password_reset_tokens (acc_id, token_hash, expires_at)`
 
 2. **MEDIUM**: Email expiry message says 1 hour but actually 7 days
-
    - Users might not hurry to reset
    - Creates confusion
    - **Fix**: Change to 7 days in email
@@ -458,7 +460,7 @@ CREATE TABLE tbl_password_reset_tokens (
 ### High Priority
 
 1. ✅ Set all EMAIL\_\* environment variables on your hosting
-2. ✅ Set FRONTEND_URL1 to production URL (https://bbek.vercel.app)
+2. ✅ Set FRONTEND_URL1 to production URL (https://biblebaptistekklesiaofkawit.xyz)
 3. ⚠️ **Hash password reset tokens in database** (security improvement)
 4. ⚠️ Fix email expiry message to say "7 days"
 

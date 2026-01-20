@@ -19,6 +19,25 @@
       <v-card-text>
         <v-row>
           <v-col cols="12" md="3">
+            <div class="d-flex gap-2" v-if="selectedLeaders.length > 0">
+              <v-btn
+                color="error"
+                variant="flat"
+                prepend-icon="mdi-delete-multiple"
+                :disabled="loading"
+                @click="handleBulkDelete"
+              >
+                Delete Selected ({{ selectedLeaders.length }})
+              </v-btn>
+              <v-btn
+                variant="text"
+                @click="clearSelection"
+              >
+                Clear Selection
+              </v-btn>
+            </div>
+          </v-col>
+          <v-col cols="12" md="3">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -101,6 +120,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || leaders.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Leader ID</th>
             <th class="text-left font-weight-bold">Member ID</th>
             <th class="text-left font-weight-bold">Full Name</th>
@@ -111,12 +140,12 @@
         </thead>
         <tbody>
           <tr v-if="!loading && leaders.length === 0">
-            <td colspan="6" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="6" class="text-center py-12">
+            <td colspan="7" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -125,6 +154,15 @@
             </td>
           </tr>
           <tr v-for="leader in leaders" :key="leader.leader_id" v-show="!loading">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isLeaderSelected(leader)"
+                @update:model-value="(selected) => toggleLeaderSelection(leader, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>{{ leader.leader_id }}</td>
             <td>{{ leader.member_id }}</td>
             <td>{{ leader.fullname || 'N/A' }}</td>
@@ -212,6 +250,7 @@ const churchLeadersStore = useChurchLeadersStore()
 const churchLeaderDialog = ref(false)
 const churchLeaderData = ref(null)
 const localDateRange = ref([])
+const selectedLeaders = ref([])
 
 // Computed properties from store
 const leaders = computed(() => churchLeadersStore.paginatedLeaders)
@@ -233,6 +272,84 @@ const itemsPerPage = computed({
 })
 const pageSizeOptions = computed(() => churchLeadersStore.pageSizeOptions)
 const memberOptions = computed(() => churchLeadersStore.memberOptions)
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return leaders.value.length > 0 && selectedLeaders.value.length === leaders.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedLeaders.value.length > 0 && selectedLeaders.value.length < leaders.value.length
+})
+
+// Selection methods
+const isLeaderSelected = (leader) => {
+  return selectedLeaders.value.some(selected => selected.leader_id === leader.leader_id)
+}
+
+const toggleLeaderSelection = (leader, selected) => {
+  if (selected) {
+    if (!isLeaderSelected(leader)) {
+      selectedLeaders.value.push(leader)
+    }
+  } else {
+    selectedLeaders.value = selectedLeaders.value.filter(selected => selected.leader_id !== leader.leader_id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedLeaders.value = []
+  } else {
+    selectedLeaders.value = [...leaders.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedLeaders.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedLeaders.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedLeaders.value.length} selected leader(s)?`,
+      'Bulk Delete Leaders',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const results = []
+    for (const leader of selectedLeaders.value) {
+      const result = await churchLeadersStore.deleteLeader(leader.leader_id)
+      results.push(result)
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    if (successCount > 0) {
+      ElMessage.success(`${successCount} leader(s) deleted successfully`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`Failed to delete ${failCount} leader(s)`)
+    }
+
+    // Clear selection and refresh data
+    selectedLeaders.value = []
+    await churchLeadersStore.fetchLeaders()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk delete error:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
+}
 
 const sortByOptions = [
   'Leader ID (Low to High)',
@@ -257,6 +374,24 @@ watch(() => filters.value.sortBy, (newSortBy) => {
 watch(() => filters.value.dateRange, (newDateRange) => {
   localDateRange.value = newDateRange || []
 }, { immediate: true })
+
+// Clear selection when data changes
+watch(() => leaders.value, () => {
+  selectedLeaders.value = []
+}, { deep: true })
+
+// Clear selection when filters change
+watch(() => searchQuery.value, () => {
+  selectedLeaders.value = []
+})
+
+watch(() => filters.value.sortBy, () => {
+  selectedLeaders.value = []
+})
+
+watch(() => filters.value.dateRange, () => {
+  selectedLeaders.value = []
+})
 
 const handleDateRangeChange = (value) => {
   // Update store filters and trigger fetch

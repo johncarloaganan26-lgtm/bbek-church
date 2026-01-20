@@ -157,9 +157,26 @@
                 ></v-btn>
               </template>
             </v-tooltip>
-            <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }}</span>
+            <div class="d-flex gap-2" v-if="selectedMinistries.length > 0">
+              <v-btn
+                color="error"
+                variant="flat"
+                prepend-icon="mdi-delete-multiple"
+                :disabled="loading"
+                @click="handleBulkDelete"
+              >
+                Delete Selected ({{ selectedMinistries.length }})
+              </v-btn>
+              <v-btn
+                variant="text"
+                @click="clearSelection"
+              >
+                Clear Selection
+              </v-btn>
+            </div>
+            <span class="text-body-2 ml-auto">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }}</span>
           </v-col>
-        </v-row>
+       </v-row>
       </v-card-text>
     </v-card>
 
@@ -173,6 +190,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || ministries.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Ministry Name</th>
             <th class="text-left font-weight-bold">Schedule</th>
             <th class="text-left font-weight-bold">Leader</th>
@@ -186,11 +213,20 @@
         </thead>
         <tbody>
           <tr v-if="!loading && ministries.length === 0">
-            <td colspan="8" class="text-center py-12">
+            <td colspan="9" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-for="ministry in ministries" :key="ministry.ministry_id">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isMinistrySelected(ministry)"
+                @update:model-value="(selected) => toggleMinistrySelection(ministry, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>{{ ministry.ministry_name }}</td>
             <td>{{ formatDateTime(ministry.schedule) }}</td>
             <td>{{ ministry.leader_fullname || ministry.leader_id || 'N/A' }}</td>
@@ -282,6 +318,9 @@ import MinistryDialog from '@/components/Dialogs/MinistryDialog.vue'
 
 const ministriesStore = useMinistriesStore()
 
+// Selection state
+const selectedMinistries = ref([])
+
 // Computed properties from store
 const ministries = computed(() => ministriesStore.ministries)
 const loading = computed(() => ministriesStore.loading)
@@ -304,6 +343,15 @@ const searchQuery = computed({
   set: (value) => ministriesStore.setSearchQuery(value)
 })
 const filters = computed(() => ministriesStore.filters)
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return ministries.value.length > 0 && selectedMinistries.value.length === ministries.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedMinistries.value.length > 0 && selectedMinistries.value.length < ministries.value.length
+})
 
 // Options for dropdowns
 const leaderOptions = computed(() => ministriesStore.leaderOptions)
@@ -337,9 +385,105 @@ const categoryOptions = [
 // Category filter state
 const selectedCategory = ref('')
 
+// Watch for filter changes
+watch(() => filters.value.sortBy, (newSortBy) => {
+  ministriesStore.setFilters({ sortBy: newSortBy })
+})
+
+watch(() => filters.value.status, (newStatus) => {
+  ministriesStore.setFilters({ status: newStatus })
+})
+
+// Clear selection when data changes
+watch(() => ministries.value, () => {
+  selectedMinistries.value = []
+}, { deep: true })
+
+// Clear selection when filters change
+watch(() => searchQuery.value, () => {
+  selectedMinistries.value = []
+})
+
+watch(() => selectedCategory.value, () => {
+  selectedMinistries.value = []
+})
+
+watch(() => filters.value.dateRange, () => {
+  selectedMinistries.value = []
+})
+
 // Dialog state
 const ministryDialog = ref(false)
 const ministryData = ref(null)
+
+// Selection methods
+const isMinistrySelected = (ministry) => {
+  return selectedMinistries.value.some(selected => selected.ministry_id === ministry.ministry_id)
+}
+
+const toggleMinistrySelection = (ministry, selected) => {
+  if (selected) {
+    if (!isMinistrySelected(ministry)) {
+      selectedMinistries.value.push(ministry)
+    }
+  } else {
+    selectedMinistries.value = selectedMinistries.value.filter(selected => selected.ministry_id !== ministry.ministry_id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedMinistries.value = []
+  } else {
+    selectedMinistries.value = [...ministries.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedMinistries.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedMinistries.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedMinistries.value.length} selected ministry/ministries?`,
+      'Bulk Delete Ministries',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const results = []
+    for (const ministry of selectedMinistries.value) {
+      const result = await ministriesStore.deleteMinistry(ministry.ministry_id)
+      results.push(result)
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    if (successCount > 0) {
+      ElMessage.success(`${successCount} ministry/ministries deleted successfully`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`Failed to delete ${failCount} ministry/ministries`)
+    }
+
+    // Clear selection and refresh data
+    selectedMinistries.value = []
+    await ministriesStore.fetchMinistries()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk delete error:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
+}
 
 // Handlers
 const handleMinistryDialog = () => {

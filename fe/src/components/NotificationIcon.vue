@@ -64,6 +64,15 @@
             <v-btn
               icon
               small
+              @click="toggleShowReadNotifications"
+              :title="showReadNotifications ? 'Hide read notifications' : 'Show read notifications'"
+              class="header-btn"
+            >
+              <v-icon size="18">{{ showReadNotifications ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              small
               @click="markAllAsRead"
               title="Mark all as read"
               :disabled="unreadCount === 0"
@@ -265,55 +274,65 @@ export default {
 
     // Computed properties for filtering notifications
     const allNotifications = computed(() => {
-      let filtered = notifications.value.filter(n => !dismissedNotificationIds.value.has(n.id));
-      if (!showReadNotifications.value) {
-        filtered = filtered.filter(n => !readNotificationIds.value.has(n.id));
-      }
-      return filtered;
+      return notifications.value
+        .filter(n => !dismissedNotificationIds.value.has(n.id))
+        .filter(n => showReadNotifications.value || !readNotificationIds.value.has(n.id))
+        .map(n => ({
+          ...n,
+          read: readNotificationIds.value.has(n.id)
+        }));
     });
 
     const messageNotifications = computed(() => {
-      let filtered = notifications.value.filter(n =>
-        n.category === 'message' &&
-        !dismissedNotificationIds.value.has(n.id)
-      );
-      if (!showReadNotifications.value) {
-        filtered = filtered.filter(n => !readNotificationIds.value.has(n.id));
-      }
-      return filtered;
+      return notifications.value
+        .filter(n =>
+          n.category === 'message' &&
+          !dismissedNotificationIds.value.has(n.id)
+        )
+        .filter(n => showReadNotifications.value || !readNotificationIds.value.has(n.id))
+        .map(n => ({
+          ...n,
+          read: readNotificationIds.value.has(n.id)
+        }));
     });
 
     const prayerNotifications = computed(() => {
-      let filtered = notifications.value.filter(n =>
-        n.category === 'prayer_request' &&
-        !dismissedNotificationIds.value.has(n.id)
-      );
-      if (!showReadNotifications.value) {
-        filtered = filtered.filter(n => !readNotificationIds.value.has(n.id));
-      }
-      return filtered;
+      return notifications.value
+        .filter(n =>
+          n.category === 'prayer_request' &&
+          !dismissedNotificationIds.value.has(n.id)
+        )
+        .filter(n => showReadNotifications.value || !readNotificationIds.value.has(n.id))
+        .map(n => ({
+          ...n,
+          read: readNotificationIds.value.has(n.id)
+        }));
     });
 
     const scheduleNotifications = computed(() => {
-      let filtered = notifications.value.filter(n =>
-        n.category === 'schedule_change' &&
-        !dismissedNotificationIds.value.has(n.id)
-      );
-      if (!showReadNotifications.value) {
-        filtered = filtered.filter(n => !readNotificationIds.value.has(n.id));
-      }
-      return filtered;
+      return notifications.value
+        .filter(n =>
+          n.category === 'schedule_change' &&
+          !dismissedNotificationIds.value.has(n.id)
+        )
+        .filter(n => showReadNotifications.value || !readNotificationIds.value.has(n.id))
+        .map(n => ({
+          ...n,
+          read: readNotificationIds.value.has(n.id)
+        }));
     });
 
     const serviceNotifications = computed(() => {
-      let filtered = notifications.value.filter(n =>
-        n.category === 'service' &&
-        !dismissedNotificationIds.value.has(n.id)
-      );
-      if (!showReadNotifications.value) {
-        filtered = filtered.filter(n => !readNotificationIds.value.has(n.id));
-      }
-      return filtered;
+      return notifications.value
+        .filter(n =>
+          n.category === 'service' &&
+          !dismissedNotificationIds.value.has(n.id)
+        )
+        .filter(n => showReadNotifications.value || !readNotificationIds.value.has(n.id))
+        .map(n => ({
+          ...n,
+          read: readNotificationIds.value.has(n.id)
+        }));
     });
 
     const filteredNotifications = computed(() => {
@@ -366,6 +385,12 @@ export default {
 
     // Mark notification as read
     const markAsRead = async (notificationId) => {
+      // Check if already read
+      if (readNotificationIds.value.has(notificationId)) {
+        ElMessage.info('This notification is already marked as read');
+        return;
+      }
+
       try {
         await axios.put(`/notifications/mark-as-read/${notificationId}`, {
           sourceType: 'form'

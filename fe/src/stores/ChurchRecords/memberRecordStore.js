@@ -11,15 +11,13 @@ export const useMemberRecordStore = defineStore('memberRecord', {
       ageRange: 'All Ages',
       gender: 'All Genders',
       joinMonth: 'All Months',
-      sortBy: 'Name (A-Z)',
-      dateRange: []
+      sortBy: 'Name (A-Z)'
     },
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     itemsPerPage: 10,
-    pageSizeOptions: [5, 10, 15],
-    searchTimeout: null
+    pageSizeOptions: [5, 10, 15]
   }),
 
   getters: {
@@ -117,7 +115,6 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         const gender = options.gender !== undefined ? options.gender : this.filters.gender
         const joinMonth = options.joinMonth !== undefined ? options.joinMonth : this.filters.joinMonth
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
-        const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -141,9 +138,6 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         }
         if (sortBy) {
           params.append('sortBy', sortBy)
-        }
-        if (dateRange && dateRange.length === 2) {
-          params.append('dateRange', JSON.stringify(dateRange))
         }
 
         const response = await axios.get(`/church-records/members/getAllMembers?${params}`, {
@@ -346,20 +340,8 @@ export const useMemberRecordStore = defineStore('memberRecord', {
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1
-
-      // Clear existing timeout
-      if (this.searchTimeout) {
-        clearTimeout(this.searchTimeout)
-      }
-
-      // Only search if query has at least 3 characters or is empty
-      if (query.length >= 3 || query.length === 0) {
-        // Debounce search to avoid too many API calls
-        this.searchTimeout = setTimeout(() => {
-          // Refetch with new search query
-          this.fetchMembers({ search: query, page: 1, pageSize: this.itemsPerPage })
-        }, 500) // 500ms debounce
-      }
+      // Refetch with new search query
+      this.fetchMembers({ search: query, page: 1, pageSize: this.itemsPerPage })
     },
 
     setFilters(filters) {

@@ -195,13 +195,11 @@ const API_URL = import.meta.env.PROD
 ### Authentication Flow
 
 1. **Login Request**
-
    - Frontend sends POST to `/api/church-records/accounts/login`
    - Backend validates credentials and returns JWT token
    - Frontend stores token in `localStorage` as `accessToken`
 
 2. **Authenticated Requests**
-
    - Axios interceptor adds `Authorization: Bearer <token>` header to all requests
    - Token is validated before each request
    - Expired/invalid tokens are cleared and user is redirected
@@ -548,7 +546,7 @@ DB_CONNECTION_LIMIT=10          # Override default pool size
 JWT_SECRET=your-secret-key
 
 # CORS
-FRONTEND_URL1=https://your-frontend.vercel.app
+FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz
 FRONTEND_URL2=https://your-frontend-alt.vercel.app
 # OR use CLIENT_ORIGIN (comma-separated)
 CLIENT_ORIGIN=https://app1.com,https://app2.com
@@ -565,7 +563,7 @@ SMTP_PASS=...
 
 ```env
 # API Connection (Production only)
-VITE_API_URL=https://your-backend-api.vercel.app
+VITE_API_URL=https://api.biblebaptistekklesiaofkawit.xyz
 
 # Note: In development, Vite proxy handles /api → localhost:5000
 # No env vars needed for development
@@ -703,7 +701,7 @@ export const useMemberRecordStore = defineStore("memberRecord", {
       try {
         const response = await axios.get(
           "/api/church-records/members/getAllMembers",
-          { params }
+          { params },
         );
         this.members = response.data.data.members;
         this.pagination = response.data.data.pagination;

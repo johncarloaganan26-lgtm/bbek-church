@@ -162,6 +162,43 @@
             ></v-select>
           </v-col>
         </v-row>
+        <!-- Bulk Actions Row -->
+        <v-row v-if="selectedApprovals.length > 0" class="mt-2">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedApprovals.length }}</strong> approval{{ selectedApprovals.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    size="small"
+                    :disabled="loading"
+                    @click="bulkDeleteApprovals"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Delete Selected
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    size="small"
+                    @click="clearSelection"
+                  >
+                    <v-icon left>mdi-close</v-icon>
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
       </v-card-text>
     </v-card>
 
@@ -174,15 +211,24 @@
     <v-card elevation="2" v-loading="loading" loading-text="Loading approvals..." class="position-relative">
       <v-table>
         <thead>
-          <tr>
-            <th class="text-left font-weight-bold">Type</th>
-            <th class="text-left font-weight-bold">Email</th>
-            <th class="text-left font-weight-bold">Status</th>
-            <th class="text-left font-weight-bold">Request ID</th>
-            <th class="text-left font-weight-bold">Date Created</th>
-            <th class="text-left font-weight-bold">Actions</th>
-          </tr>
-        </thead>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+               ></v-checkbox>
+             </th>
+             <th class="text-left font-weight-bold">Type</th>
+             <th class="text-left font-weight-bold">Email</th>
+             <th class="text-left font-weight-bold">Status</th>
+             <th class="text-left font-weight-bold">Request ID</th>
+             <th class="text-left font-weight-bold">Date Created</th>
+             <th class="text-left font-weight-bold">Actions</th>
+           </tr>
+         </thead>
         <tbody>
           <tr v-if="!loading && sortedApprovals.length === 0">
             <td colspan="6" class="text-center py-12">
@@ -190,6 +236,14 @@
             </td>
           </tr>
           <tr v-for="approval in sortedApprovals" :key="approval.approval_id">
+            <td>
+              <v-checkbox
+                :model-value="isApprovalSelected(approval)"
+                @update:model-value="toggleApprovalSelection(approval)"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>
               <v-chip
                 color="info"
@@ -283,6 +337,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 const approvalsStore = useApprovalsStore()
 
+// Selection state
+const selectedApprovals = ref([])
+
 // Computed properties from store
 const approvals = computed(() => approvalsStore.approvals)
 
@@ -335,6 +392,15 @@ const filters = computed({
   set: (value) => approvalsStore.setFilters(value)
 })
 
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return approvals.value.length > 0 && selectedApprovals.value.length === approvals.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedApprovals.value.length > 0 && selectedApprovals.value.length < approvals.value.length
+})
+
 // Options for dropdowns
 const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Rejected']
 const typeOptions = ['All Types', 'event', 'ministry', 'baptism', 'marriage', 'burial', 'child-dedication']
@@ -350,6 +416,19 @@ const sortByOptions = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
+
+// Watchers to clear selections when data changes
+watch(() => approvals.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
+})
 
 // Handlers
 const handleSearchChange = (value) => {
@@ -510,6 +589,70 @@ const deleteApproval = async (id) => {
     if (error !== 'cancel') {
       console.error('Error deleting approval:', error)
       ElMessage.error('Failed to delete approval')
+    }
+  }
+}
+
+// Selection methods
+const isApprovalSelected = (approval) => {
+  return selectedApprovals.value.some(selected => selected.approval_id === approval.approval_id)
+}
+
+const toggleApprovalSelection = (approval) => {
+  const index = selectedApprovals.value.findIndex(selected => selected.approval_id === approval.approval_id)
+  if (index > -1) {
+    selectedApprovals.value.splice(index, 1)
+  } else {
+    selectedApprovals.value.push(approval)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedApprovals.value = []
+  } else {
+    selectedApprovals.value = [...sortedApprovals.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedApprovals.value = []
+}
+
+const bulkDeleteApprovals = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedApprovals.value.length} selected approval${selectedApprovals.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedApprovals.value.map(approval =>
+      approvalsStore.deleteApproval(approval.approval_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} approval${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} approval${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await approvalsStore.fetchApprovals()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting approvals:', error)
+      ElMessage.error('Failed to delete selected approvals')
     }
   }
 }

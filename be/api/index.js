@@ -111,6 +111,7 @@ const getAllowedOrigins = () => {
   // For Vercel, allow the deployment URLs
   if (IS_VERCEL) {
     return [
+      'https://biblebaptistekklesiaofkawit.xyz',
       'https://bbek-church-app.vercel.app',
       'https://bbek-church-app-git-main-ulacdev.vercel.app',
       'http://localhost:5173',

@@ -3,6 +3,23 @@
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Church Members</h1>
       <div class="d-flex gap-2">
+        <div class="d-flex gap-2" v-if="selectedMembers.length > 0">
+          <v-btn
+            color="error"
+            variant="flat"
+            prepend-icon="mdi-delete-multiple"
+            :disabled="memberStore.loading"
+            @click="handleBulkDelete"
+          >
+            Delete Selected ({{ selectedMembers.length }})
+          </v-btn>
+          <v-btn
+            variant="text"
+            @click="clearSelection"
+          >
+            Clear Selection
+          </v-btn>
+        </div>
         <v-btn color="success" prepend-icon="mdi-account-plus" size="small" @click="openMemberDialog">
           Add New Member
         </v-btn>
@@ -118,6 +135,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="memberStore.loading || memberStore.paginatedMembers.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Name</th>
             <th class="text-left font-weight-bold">Age</th>
             <th class="text-left font-weight-bold">Address</th>
@@ -131,11 +158,20 @@
         </thead>
         <tbody>
           <tr v-if="!memberStore.loading && memberStore.members.length === 0">
-            <td colspan="9" class="text-center py-12">
+            <td colspan="10" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-for="member in memberStore.paginatedMembers" :key="member.member_id">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isMemberSelected(member)"
+                @update:model-value="(selected) => toggleMemberSelection(member, selected)"
+                :disabled="memberStore.loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>{{ getMemberName(member) }}</td>
             <td>{{ member.age }}</td>
             <td>{{ member.address }}</td>
@@ -228,6 +264,7 @@ const memberStore = useMemberRecordStore()
 const memberDialog = ref(false)
 const memberData = ref(null)
 const localDateRange = ref([])
+const selectedMembers = ref([])
 
 // Local search state
 const localSearchQuery = ref('')
@@ -257,6 +294,15 @@ const currentPage = computed({
   set: (value) => {
     memberStore.setCurrentPage(value)
   }
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return memberStore.paginatedMembers.length > 0 && selectedMembers.value.length === memberStore.paginatedMembers.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedMembers.value.length > 0 && selectedMembers.value.length < memberStore.paginatedMembers.length
 })
 
 
@@ -294,7 +340,26 @@ watch(() => memberStore.searchQuery, (newQuery) => {
 // Watch for store dateRange changes to sync local state
 watch(() => memberStore.filters.dateRange, (newDateRange) => {
   localDateRange.value = newDateRange || []
+  selectedMembers.value = [] // Clear selection when filters change
 }, { immediate: true })
+
+// Clear selection when filters change
+watch(() => memberStore.filters.ageRange, () => {
+  selectedMembers.value = []
+})
+
+watch(() => memberStore.filters.gender, () => {
+  selectedMembers.value = []
+})
+
+watch(() => memberStore.filters.sortBy, () => {
+  selectedMembers.value = []
+})
+
+// Clear selection when data changes
+watch(() => memberStore.paginatedMembers, () => {
+  selectedMembers.value = []
+}, { deep: true })
 
 // Methods
 const openMemberDialog = () => {
@@ -689,6 +754,75 @@ const handlePrint = async () => {
     ElMessage.error('Failed to print: ' + (error.message || 'Please try again.'))
   } finally {
     memberStore.loading = false
+  }
+}
+
+// Selection methods
+const isMemberSelected = (member) => {
+  return selectedMembers.value.some(selected => selected.member_id === member.member_id)
+}
+
+const toggleMemberSelection = (member, selected) => {
+  if (selected) {
+    if (!isMemberSelected(member)) {
+      selectedMembers.value.push(member)
+    }
+  } else {
+    selectedMembers.value = selectedMembers.value.filter(selected => selected.member_id !== member.member_id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedMembers.value = []
+  } else {
+    selectedMembers.value = [...memberStore.paginatedMembers]
+  }
+}
+
+const clearSelection = () => {
+  selectedMembers.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedMembers.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedMembers.value.length} selected member(s)?`,
+      'Bulk Delete Members',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const results = []
+    for (const member of selectedMembers.value) {
+      const result = await memberStore.deleteMember(member.member_id)
+      results.push(result)
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    if (successCount > 0) {
+      ElMessage.success(`${successCount} member(s) deleted successfully`)
+    }
+    if (failCount > 0) {
+      ElMessage.error(`Failed to delete ${failCount} member(s)`)
+    }
+
+    // Clear selection and refresh data
+    selectedMembers.value = []
+    handleMemberSuccess()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk delete error:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
   }
 }
 

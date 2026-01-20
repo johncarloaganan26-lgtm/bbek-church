@@ -176,6 +176,41 @@
       </el-form>
     </el-card>
 
+    <!-- Bulk Actions Row -->
+    <el-alert
+      v-if="selectedAnnouncements.length > 0"
+      title=""
+      :description="`${selectedAnnouncements.length} announcement${selectedAnnouncements.length > 1 ? 's' : ''} selected`"
+      type="info"
+      show-icon
+      class="mb-4"
+      :closable="false"
+    >
+      <template #title>
+        <div class="d-flex justify-content-between align-items-center">
+          <span>{{ selectedAnnouncements.length }} announcement{{ selectedAnnouncements.length > 1 ? 's' : '' }} selected</span>
+          <div>
+            <el-button
+              type="danger"
+              size="small"
+              :disabled="loading"
+              @click="bulkDeleteAnnouncements"
+            >
+              <el-icon><Delete /></el-icon>
+              Delete Selected
+            </el-button>
+            <el-button
+              size="small"
+              @click="clearSelection"
+            >
+              <el-icon><Close /></el-icon>
+              Clear Selection
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-alert>
+
     <!-- Announcements Table -->
     <el-card class="table-card" shadow="hover">
       <template #header>
@@ -223,7 +258,9 @@
           style="width: 100%"
           empty-text="No announcements found"
           table-layout="auto"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="55" />
           <el-table-column prop="title" label="Title" min-width="200" show-overflow-tooltip />
           <el-table-column prop="type" label="Type" width="100">
             <template #default="{ row }">
@@ -397,12 +434,16 @@ import {
   View,
   Edit,
   Delete,
+  Close,
   Download,
   Printer
 } from '@element-plus/icons-vue'
 import AnnouncementDialog from '@/components/Dialogs/AnnouncementDialog.vue'
 
 const announcementStore = useAnnouncementStore()
+
+// Selection state
+const selectedAnnouncements = ref([])
 
 // Computed properties
 const announcements = computed(() => announcementStore.announcements)
@@ -521,9 +562,59 @@ const handleDelete = async (announcement) => {
 
     await announcementStore.deleteAnnouncement(announcement.announcement_id)
     ElMessage.success('Announcement deleted successfully')
+    await fetchAnnouncements()
+    await fetchSummaryStats()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || 'Failed to delete announcement')
+    }
+  }
+}
+
+// Selection methods
+const handleSelectionChange = (selection) => {
+  selectedAnnouncements.value = selection
+}
+
+const clearSelection = () => {
+  selectedAnnouncements.value = []
+}
+
+const bulkDeleteAnnouncements = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedAnnouncements.value.length} selected announcement${selectedAnnouncements.value.length > 1 ? 's' : ''}?`,
+      'Bulk Delete Announcements',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedAnnouncements.value.map(announcement =>
+      announcementStore.deleteAnnouncement(announcement.announcement_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled').length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} announcement${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} announcement${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await fetchAnnouncements()
+    await fetchSummaryStats()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting announcements:', error)
+      ElMessage.error('Failed to delete selected announcements')
     }
   }
 }

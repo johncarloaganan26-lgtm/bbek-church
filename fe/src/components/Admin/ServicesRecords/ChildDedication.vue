@@ -155,6 +155,43 @@
             </v-tooltip>
           </v-col>
         </v-row>
+        <!-- Bulk Actions Row -->
+        <v-row v-if="selectedDedications.length > 0" class="mt-2">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedDedications.length }}</strong> dedication{{ selectedDedications.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    size="small"
+                    :disabled="loading"
+                    @click="bulkDeleteDedications"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Delete Selected
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    size="small"
+                    @click="clearSelection"
+                  >
+                    <v-icon left>mdi-close</v-icon>
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} dedications</span>
@@ -167,9 +204,18 @@
     <v-card elevation="2" v-loading="loading" loading-text="Loading child dedications..." class="position-relative">
       <v-table>
         <thead>
-          <tr>
-            <!-- <th class="text-left font-weight-bold">Child ID</th> -->
-            <th class="text-left font-weight-bold">Child Name</th>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+               ></v-checkbox>
+             </th>
+             <!-- <th class="text-left font-weight-bold">Child ID</th> -->
+             <th class="text-left font-weight-bold">Child Name</th>
             <th class="text-left font-weight-bold">Requester</th>
             <th class="text-left font-weight-bold">Preferred Date & Time</th>
             <th class="text-left font-weight-bold">Pastor</th>
@@ -188,6 +234,14 @@
             </td>
           </tr>
           <tr v-for="dedication in sortedDedications" :key="dedication.child_id">
+            <td>
+              <v-checkbox
+                :model-value="isDedicationSelected(dedication)"
+                @update:model-value="toggleDedicationSelection(dedication)"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ dedication.child_id }}</td> -->
             <td>{{ dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() }}</td>
             <td>{{ dedication.requester_fullname || dedication.requested_by }}</td>
@@ -272,13 +326,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useChildDedicationStore } from '@/stores/ServicesRecords/childDedicationStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
 
 const childDedicationStore = useChildDedicationStore()
+
+// Selection state
+const selectedDedications = ref([])
 
 // Computed properties from store
 const dedications = computed(() => childDedicationStore.dedications)
@@ -334,6 +391,15 @@ const searchQuery = computed({
 const filters = computed({
   get: () => childDedicationStore.filters,
   set: (value) => childDedicationStore.setFilters(value)
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return sortedDedications.value.length > 0 && selectedDedications.value.length === sortedDedications.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedDedications.value.length > 0 && selectedDedications.value.length < sortedDedications.value.length
 })
 
 const sortByOptions = [
@@ -425,6 +491,70 @@ const deleteDedication = async (id) => {
     if (error !== 'cancel') {
       console.error('Error deleting child dedication:', error)
       ElMessage.error('Failed to delete child dedication')
+    }
+  }
+}
+
+// Selection methods
+const isDedicationSelected = (dedication) => {
+  return selectedDedications.value.some(selected => selected.child_id === dedication.child_id)
+}
+
+const toggleDedicationSelection = (dedication) => {
+  const index = selectedDedications.value.findIndex(selected => selected.child_id === dedication.child_id)
+  if (index > -1) {
+    selectedDedications.value.splice(index, 1)
+  } else {
+    selectedDedications.value.push(dedication)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedDedications.value = []
+  } else {
+    selectedDedications.value = [...sortedDedications.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedDedications.value = []
+}
+
+const bulkDeleteDedications = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedDedications.value.length} selected child dedication${selectedDedications.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedDedications.value.map(dedication =>
+      childDedicationStore.deleteDedication(dedication.child_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} child dedication${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} child dedication${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await childDedicationStore.fetchDedications()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting dedications:', error)
+      ElMessage.error('Failed to delete selected child dedications')
     }
   }
 }
@@ -777,6 +907,19 @@ const printCertificate = (dedication) => {
   }
   certificateDialog.value = true
 }
+
+// Watchers to clear selections when data changes
+watch(() => dedications.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
+})
 
 // Initialize on mount
 onMounted(async () => {

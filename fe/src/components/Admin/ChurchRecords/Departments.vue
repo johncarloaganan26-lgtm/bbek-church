@@ -3,14 +3,33 @@
     <!-- Header -->
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Departments</h1>
-      <v-btn
-        color="success"
-        prepend-icon="mdi-plus"
-        size="small"
-        @click="handleDepartmentDialog()"
-      >
-        Create Department
-      </v-btn>
+      <div class="d-flex gap-2">
+        <div class="d-flex gap-2" v-if="selectedDepartments.length > 0">
+          <v-btn
+            color="error"
+            variant="flat"
+            prepend-icon="mdi-delete-multiple"
+            :disabled="loading"
+            @click="handleBulkDelete"
+          >
+            Delete Selected ({{ selectedDepartments.length }})
+          </v-btn>
+          <v-btn
+            variant="text"
+            @click="clearSelection"
+          >
+            Clear Selection
+          </v-btn>
+        </div>
+        <v-btn
+          color="success"
+          prepend-icon="mdi-plus"
+          size="small"
+          @click="handleDepartmentDialog()"
+        >
+          Create Department
+        </v-btn>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -164,6 +183,16 @@
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                :model-value="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @update:model-value="toggleSelectAll"
+                :disabled="loading || departments.length === 0"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </th>
             <!-- <th class="text-left font-weight-bold">Department ID</th> -->
             <th class="text-left font-weight-bold">Department Name</th>
             <th class="text-left font-weight-bold">Department Lead</th>
@@ -175,11 +204,20 @@
         </thead>
         <tbody>
           <tr v-if="!loading && departments.length === 0">
-            <td colspan="7" class="text-center py-12">
+            <td colspan="8" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-for="department in departments" :key="department.department_id">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isDepartmentSelected(department)"
+                @update:model-value="(selected) => toggleDepartmentSelection(department, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ department.department_id }}</td> -->
             <td>{{ department.department_name }}</td>
             <td>{{ department.member_fullname || '-' }}</td>
@@ -304,6 +342,7 @@ const joinedMemberOptions = computed(() => {
 const departmentDialog = ref(false)
 const departmentData = ref(null)
 const localDateRange = ref([])
+const selectedDepartments = ref([])
 
 // Computed properties from store
 const departments = computed(() => departmentsStore.paginatedDepartments)
@@ -329,6 +368,15 @@ const totalDepartments = computed(() => departmentsStore.totalDepartments)
 const activeDepartments = computed(() => departmentsStore.activeDepartments)
 const inactiveDepartments = computed(() => departmentsStore.inactiveDepartments)
 const totalJoinedMembers = computed(() => departmentsStore.totalJoinedMembers)
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return departments.value.length > 0 && selectedDepartments.value.length === departments.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedDepartments.value.length > 0 && selectedDepartments.value.length < departments.value.length
+})
 
 // Filter options
 const statusOptions = [
@@ -363,6 +411,7 @@ watch(
   () => filters.value.status,
   (newStatus) => {
     departmentsStore.setFilters({ status: newStatus })
+    selectedDepartments.value = [] // Clear selection when filters change
   }
 )
 
@@ -370,6 +419,7 @@ watch(
   () => filters.value.sortBy,
   (newSortBy) => {
     departmentsStore.setFilters({ sortBy: newSortBy })
+    selectedDepartments.value = [] // Clear selection when filters change
   }
 )
 
@@ -377,9 +427,15 @@ watch(
   () => filters.value.dateRange,
   (newDateRange) => {
     localDateRange.value = newDateRange || []
+    selectedDepartments.value = [] // Clear selection when filters change
   },
   { immediate: true }
 )
+
+// Clear selection when departments data changes
+watch(() => departments, () => {
+  selectedDepartments.value = []
+}, { deep: true })
 
 
 // Handle dialog
@@ -650,6 +706,79 @@ const handlePrint = () => {
     printWindow.print()
     printWindow.close()
   }, 250)
+}
+
+// Selection functions
+const isDepartmentSelected = (department) => {
+  return selectedDepartments.value.some(selected => selected.department_id === department.department_id)
+}
+
+const toggleDepartmentSelection = (department, selected) => {
+  if (selected) {
+    if (!selectedDepartments.value.some(selected => selected.department_id === department.department_id)) {
+      selectedDepartments.value.push(department)
+    }
+  } else {
+    selectedDepartments.value = selectedDepartments.value.filter(selected =>
+      selected.department_id !== department.department_id
+    )
+  }
+}
+
+const toggleSelectAll = (selected) => {
+  if (selected) {
+    selectedDepartments.value = [...departments.value]
+  } else {
+    selectedDepartments.value = []
+  }
+}
+
+const clearSelection = () => {
+  selectedDepartments.value = []
+}
+
+const handleBulkDelete = async () => {
+  if (selectedDepartments.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedDepartments.value.length} selected department(s)? This action cannot be undone.`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete All',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    // Delete departments one by one
+    const deletePromises = selectedDepartments.value.map(department =>
+      departmentsStore.deleteDepartment(department.department_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} department(s)`)
+    }
+
+    if (failed > 0) {
+      ElMessage.error(`Failed to delete ${failed} department(s)`)
+    }
+
+    // Clear selection and refresh data
+    selectedDepartments.value = []
+    await departmentsStore.fetchDepartments()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error in bulk delete:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
 }
 
 // Fetch departments and member options on mount

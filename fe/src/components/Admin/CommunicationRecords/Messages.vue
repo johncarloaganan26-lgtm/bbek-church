@@ -106,12 +106,60 @@
       </v-card-text>
     </v-card>
 
+    <!-- Bulk Actions Row -->
+    <v-row v-if="selectedForms.length > 0" class="mt-2 mb-4">
+      <v-col cols="12">
+        <v-alert
+          type="info"
+          variant="tonal"
+          class="mb-0"
+          density="compact"
+        >
+          <div class="d-flex align-center justify-space-between">
+            <div class="text-body-2">
+              <strong>{{ selectedForms.length }}</strong> message{{ selectedForms.length > 1 ? 's' : '' }} selected
+            </div>
+            <div class="d-flex gap-2">
+              <v-btn
+                color="error"
+                variant="flat"
+                size="small"
+                :disabled="loading"
+                @click="bulkDeleteForms"
+              >
+                <v-icon left>mdi-delete</v-icon>
+                Delete Selected
+              </v-btn>
+              <v-btn
+                variant="outlined"
+                size="small"
+                @click="clearSelection"
+              >
+                <v-icon left>mdi-close</v-icon>
+                Clear Selection
+              </v-btn>
+            </div>
+          </div>
+        </v-alert>
+      </v-col>
+    </v-row>
+
     <!-- Messages Table -->
     <v-card elevation="2">
       <v-table>
         <thead>
-          <tr>
-            <th class="text-left font-weight-bold">Name</th>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+                 :disabled="loading || forms.length === 0"
+               ></v-checkbox>
+             </th>
+             <th class="text-left font-weight-bold">Name</th>
             <th class="text-left font-weight-bold">Email</th>
             <th class="text-left font-weight-bold">Type</th>
             <th class="text-left font-weight-bold">Subject/Details</th>
@@ -132,6 +180,15 @@
             </td>
           </tr>
           <tr v-for="form in forms" :key="form.form_id">
+            <td>
+              <v-checkbox
+                :model-value="isFormSelected(form)"
+                @update:model-value="toggleFormSelection(form)"
+                density="compact"
+                hide-details
+                :disabled="loading"
+              ></v-checkbox>
+            </td>
             <td>{{ form.name || form.submitted_by_name || 'Anonymous' }}</td>
             <td>{{ form.email || form.submitted_by_email || '-' }}</td>
             <td>
@@ -278,6 +335,9 @@ import { useFormsStore } from '@/stores/formsStore'
 
 const formsStore = useFormsStore()
 
+// Selection state
+const selectedForms = ref([])
+
 const searchQuery = computed({
   get: () => formsStore.searchQuery,
   set: (value) => formsStore.setSearchQuery(value)
@@ -308,6 +368,15 @@ const totalPages = computed(() => formsStore.totalPages)
 const pageSize = computed({
   get: () => formsStore.itemsPerPage,
   set: (value) => formsStore.setPageSize(value)
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return forms.value.length > 0 && selectedForms.value.length === forms.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedForms.value.length > 0 && selectedForms.value.length < forms.value.length
 })
 
 const approvingId = ref(null)
@@ -440,9 +509,86 @@ const rejectForm = async (formId) => {
   }
 }
 
+// Selection methods
+const isFormSelected = (form) => {
+  return selectedForms.value.some(selected => selected.form_id === form.form_id)
+}
+
+const toggleFormSelection = (form) => {
+  const index = selectedForms.value.findIndex(selected => selected.form_id === form.form_id)
+  if (index > -1) {
+    selectedForms.value.splice(index, 1)
+  } else {
+    selectedForms.value.push(form)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedForms.value = []
+  } else {
+    selectedForms.value = [...forms.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedForms.value = []
+}
+
+const bulkDeleteForms = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedForms.value.length} selected message${selectedForms.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedForms.value.map(form =>
+      formsStore.deleteForm(form.form_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} message${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} message${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await fetchForms()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting forms:', error)
+      ElMessage.error('Failed to delete selected messages')
+    }
+  }
+}
+
 // Watch for filter changes and refetch
 watch([statusFilter, formTypeFilter, sortBy], () => {
   fetchForms()
+})
+
+// Watchers to clear selections when data changes
+watch(() => forms.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
 })
 
 const getCategoryColor = (formType) => {

@@ -56,7 +56,7 @@ EMAIL_USER=your-gmail@gmail.com
 EMAIL_PASS=your-gmail-app-password
 
 # Frontend URL (CRITICAL!)
-FRONTEND_URL1=https://bbek.vercel.app
+FRONTEND_URL1=https://biblebaptistekklesiaofkawit.xyz
 
 # Database Connection
 DB_HOST=your-database-host
@@ -180,7 +180,7 @@ curl -X POST https://your-backend-url/api/church-records/accounts/resetPasswordW
 
 #### Test 4: Frontend Flow
 
-1. Go to production frontend: https://bbek.vercel.app
+1. Go to production frontend: https://biblebaptistekklesiaofkawit.xyz
 2. Click "Login"
 3. Click "Forgot password?"
 4. Enter test email
@@ -242,7 +242,7 @@ EMAIL_USER=your-email EMAIL_PASS=your-pass npm run dev
 
 **Check**:
 
-1. Does email show correct production URL? (should be https://bbek.vercel.app)
+1. Does email show correct production URL? (should be https://biblebaptistekklesiaofkawit.xyz)
 2. Is token in URL properly encoded?
 3. Check browser console for JavaScript errors
 4. Check backend logs for token verification errors
@@ -251,7 +251,7 @@ EMAIL_USER=your-email EMAIL_PASS=your-pass npm run dev
 
 ```javascript
 // In console, check reset link format:
-// Should be: https://bbek.vercel.app/change-password/123?token=xxxxx&type=forgot_password
+// Should be: https://biblebaptistekklesiaofkawit.xyz/change-password/123?token=xxxxx&type=forgot_password
 // NOT: http://localhost:5173/change-password/123...
 ```
 
@@ -328,7 +328,6 @@ Modified Files:
    ```
 
 3. **Email Verification**: Add bounce/complaint handling
-
    - Subscribe to SendGrid webhooks
    - Mark accounts with invalid emails
 

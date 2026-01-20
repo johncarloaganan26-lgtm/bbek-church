@@ -155,6 +155,43 @@
             </v-tooltip>
           </v-col>
         </v-row>
+        <!-- Bulk Actions Row -->
+        <v-row v-if="selectedBaptisms.length > 0" class="mt-2">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedBaptisms.length }}</strong> baptism{{ selectedBaptisms.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn
+                    color="error"
+                    variant="flat"
+                    size="small"
+                    :disabled="loading"
+                    @click="bulkDeleteBaptisms"
+                  >
+                    <v-icon left>mdi-delete</v-icon>
+                    Delete Selected
+                  </v-btn>
+                  <v-btn
+                    variant="outlined"
+                    size="small"
+                    @click="clearSelection"
+                  >
+                    <v-icon left>mdi-close</v-icon>
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} baptisms</span>
@@ -167,15 +204,24 @@
     <v-card elevation="2" v-loading="loading" loading-text="Loading water baptisms..." class="position-relative">
       <v-table>
         <thead>
-          <tr>
-            <!-- <th class="text-left font-weight-bold">Baptism ID</th> -->
-            <th class="text-left font-weight-bold">Member</th>
-            <th class="text-left font-weight-bold">Baptism Date & Time</th>
-            <th class="text-left font-weight-bold">Status</th>
-            <th class="text-left font-weight-bold">Date Created</th>
-            <th class="text-left font-weight-bold">Actions</th>
-          </tr>
-        </thead>
+           <tr>
+             <th class="text-left font-weight-bold" style="width: 50px;">
+               <v-checkbox
+                 :model-value="isAllSelected"
+                 :indeterminate="isIndeterminate"
+                 @update:model-value="toggleSelectAll"
+                 density="compact"
+                 hide-details
+               ></v-checkbox>
+             </th>
+             <!-- <th class="text-left font-weight-bold">Baptism ID</th> -->
+             <th class="text-left font-weight-bold">Member</th>
+             <th class="text-left font-weight-bold">Baptism Date & Time</th>
+             <th class="text-left font-weight-bold">Status</th>
+             <th class="text-left font-weight-bold">Date Created</th>
+             <th class="text-left font-weight-bold">Actions</th>
+           </tr>
+         </thead>
         <tbody>
           <tr v-if="!loading && sortedBaptisms.length === 0">
             <td colspan="6" class="text-center py-12">
@@ -183,6 +229,14 @@
             </td>
           </tr>
           <tr v-for="baptism in sortedBaptisms" :key="baptism.baptism_id">
+            <td>
+              <v-checkbox
+                :model-value="isBaptismSelected(baptism)"
+                @update:model-value="toggleBaptismSelection(baptism)"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <!-- <td>{{ baptism.baptism_id }}</td> -->
             <td>{{ baptism.fullname || baptism.member_id }}</td>
             <td>{{ formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time) }}</td>
@@ -262,13 +316,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WaterBaptismDialog from '@/components/Dialogs/WaterBaptismDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
 
 const waterBaptismStore = useWaterBaptismStore()
+
+// Selection state
+const selectedBaptisms = ref([])
 
 // Computed properties from store
 const baptisms = computed(() => waterBaptismStore.baptisms)
@@ -324,6 +381,15 @@ const searchQuery = computed({
 const filters = computed({
   get: () => waterBaptismStore.filters,
   set: (value) => waterBaptismStore.setFilters(value)
+})
+
+// Selection computed properties
+const isAllSelected = computed(() => {
+  return sortedBaptisms.value.length > 0 && selectedBaptisms.value.length === sortedBaptisms.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedBaptisms.value.length > 0 && selectedBaptisms.value.length < sortedBaptisms.value.length
 })
 
 
@@ -414,6 +480,70 @@ const deleteBaptism = async (id) => {
     if (error !== 'cancel') {
       console.error('Error deleting water baptism:', error)
       ElMessage.error('Failed to delete water baptism record')
+    }
+  }
+}
+
+// Selection methods
+const isBaptismSelected = (baptism) => {
+  return selectedBaptisms.value.some(selected => selected.baptism_id === baptism.baptism_id)
+}
+
+const toggleBaptismSelection = (baptism) => {
+  const index = selectedBaptisms.value.findIndex(selected => selected.baptism_id === baptism.baptism_id)
+  if (index > -1) {
+    selectedBaptisms.value.splice(index, 1)
+  } else {
+    selectedBaptisms.value.push(baptism)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedBaptisms.value = []
+  } else {
+    selectedBaptisms.value = [...sortedBaptisms.value]
+  }
+}
+
+const clearSelection = () => {
+  selectedBaptisms.value = []
+}
+
+const bulkDeleteBaptisms = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedBaptisms.value.length} selected water baptism record${selectedBaptisms.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const deletePromises = selectedBaptisms.value.map(baptism =>
+      waterBaptismStore.deleteBaptism(baptism.baptism_id)
+    )
+
+    const results = await Promise.allSettled(deletePromises)
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
+    const failed = results.length - successful
+
+    if (successful > 0) {
+      ElMessage.success(`Successfully deleted ${successful} water baptism record${successful > 1 ? 's' : ''}`)
+    }
+
+    if (failed > 0) {
+      ElMessage.warning(`Failed to delete ${failed} water baptism record${failed > 1 ? 's' : ''}`)
+    }
+
+    clearSelection()
+    await waterBaptismStore.fetchBaptisms()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error bulk deleting baptisms:', error)
+      ElMessage.error('Failed to delete selected water baptism records')
     }
   }
 }
@@ -716,6 +846,19 @@ const printCertificate = (baptism) => {
   }
   certificateDialog.value = true
 }
+
+// Watchers to clear selections when data changes
+watch(() => baptisms.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => filters.value, () => {
+  clearSelection()
+}, { deep: true })
+
+watch(() => currentPage.value, () => {
+  clearSelection()
+})
 
 // Initialize on mount
 onMounted(async () => {
