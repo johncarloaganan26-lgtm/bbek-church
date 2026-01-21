@@ -25,19 +25,8 @@ const {
 const router = express.Router();
 
 // Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'import-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Use memory storage for hosting platforms (serverless environments)
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage: storage,
@@ -105,19 +94,17 @@ router.post('/import', upload.single('file'), async (req, res) => {
       });
     }
 
-    const filePath = req.file.path;
+    const fileBuffer = req.file.buffer;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
 
     let memberDataArray = [];
 
     // Parse file based on type
     if (fileExtension === '.csv') {
-      memberDataArray = await parseCSVFile(filePath);
+      memberDataArray = await parseCSVBuffer(fileBuffer);
     } else if (fileExtension === '.xlsx') {
-      memberDataArray = await parseExcelFile(filePath);
+      memberDataArray = await parseExcelBuffer(fileBuffer);
     } else {
-      // Clean up uploaded file
-      fs.unlinkSync(filePath);
       return res.status(400).json({
         success: false,
         message: 'Unsupported file type'
@@ -126,7 +113,6 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
     // Validate that we have data
     if (!memberDataArray || memberDataArray.length === 0) {
-      fs.unlinkSync(filePath);
       return res.status(400).json({
         success: false,
         message: 'No data found in file'
@@ -144,13 +130,6 @@ router.post('/import', upload.single('file'), async (req, res) => {
     // Import members
     const result = await importMembers(memberDataArray, userInfo);
 
-    // Clean up uploaded file
-    try {
-      fs.unlinkSync(filePath);
-    } catch (cleanupError) {
-      console.error('Error cleaning up file:', cleanupError);
-    }
-
     res.status(200).json({
       success: true,
       message: result.message,
@@ -159,15 +138,6 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
   } catch (error) {
     console.error('Error importing members:', error);
-
-    // Clean up uploaded file if it exists
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up file after error:', cleanupError);
-      }
-    }
 
     res.status(500).json({
       success: false,
@@ -710,14 +680,19 @@ router.delete('/deleteMember/:id', async (req, res) => {
   }
 });
 
-// Helper function to parse CSV file
-async function parseCSVFile(filePath) {
+// Helper function to parse CSV buffer
+async function parseCSVBuffer(buffer) {
   return new Promise((resolve, reject) => {
     const results = [];
     let rowIndex = 1; // Start from 1 (header is 0)
     let isFirstRow = true;
 
-    fs.createReadStream(filePath)
+    // Convert buffer to readable stream
+    const stream = require('stream');
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(buffer);
+
+    bufferStream
       .pipe(csv())
       .on('data', (data) => {
         // Skip header row
@@ -738,10 +713,10 @@ async function parseCSVFile(filePath) {
   });
 }
 
-// Helper function to parse Excel file
-async function parseExcelFile(filePath) {
+// Helper function to parse Excel buffer
+async function parseExcelBuffer(buffer) {
   try {
-    const workbook = XLSX.readFile(filePath);
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
