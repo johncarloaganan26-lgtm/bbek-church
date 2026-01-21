@@ -1024,10 +1024,13 @@ async function getTransactionsByMemberId(memberId, options = {}) {
       const limitValue = Math.max(1, parseInt(finalLimit) || 10);
       const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
 
+      // Use parameterized queries to prevent SQL injection
       if (offsetValue > 0) {
-        sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
+        sql += ` LIMIT ? OFFSET ?`;
+        params.push(limitValue, offsetValue);
       } else {
-        sql += ` LIMIT ${limitValue}`;
+        sql += ` LIMIT ?`;
+        params.push(limitValue);
       }
     }
 

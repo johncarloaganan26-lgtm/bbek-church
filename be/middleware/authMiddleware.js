@@ -48,10 +48,10 @@ const publicRoutes = [
   '/api/church-records/burial-services/getBurialServiceById',
   '/api/church-records/burial-services/check-duplicate',
   '/api/church-records/burial-services/check-member-burial',
-  // Notification routes (temporary for testing)
-  '/api/notifications/unified',
-  '/api/notifications/mark-as-read',
-  '/api/notifications/mark-all-as-read',
+  // Notification routes (require authentication)
+  // '/api/notifications/unified',  // Commented out - should require auth
+  // '/api/notifications/mark-as-read',  // Commented out - should require auth
+  // '/api/notifications/mark-all-as-read',  // Commented out - should require auth
   '/api/church-records/burial-services/exportExcel',
   '/api/church-records/burial-services/searchFulltext',
   '/api/church-records/burial-services/analyzeAvailability',
