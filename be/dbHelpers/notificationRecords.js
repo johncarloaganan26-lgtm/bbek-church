@@ -84,7 +84,7 @@ async function getFormNotifications(memberId, lastFetch) {
 
   // Add last fetch filter
   if (lastFetch) {
-    sql += ' AND date_created > ?';
+    sql += ' AND created_at > ?';
     params.push(lastFetch);
   }
 
@@ -340,9 +340,9 @@ async function getMarriageServiceNotifications(memberId, lastFetch) {
  */
 async function getChildDedicationNotifications(memberId, lastFetch) {
   let sql = `
-    SELECT 
+    SELECT
       child_id as id,
-      member_id,
+      requested_by as member_id,
       preferred_dedication_date as service_date,
       status,
       date_created,
@@ -356,7 +356,7 @@ async function getChildDedicationNotifications(memberId, lastFetch) {
   const params = [];
 
   if (memberId) {
-    sql += ' AND member_id = ?';
+    sql += ' AND requested_by = ?';
     params.push(memberId);
   }
 
