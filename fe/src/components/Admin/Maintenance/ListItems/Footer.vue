@@ -244,6 +244,102 @@
     </div>
     <el-divider />
 
+    <!-- Bible Verse -->
+    <div class="list-item">
+      <div class="item-label">Bible Verse</div>
+      <div class="item-preview">
+        <div class="bible-verse-preview">
+          <span class="text-grey">"{{ footerData.bibleVerse || 'Loading...' }}"</span>
+          <span class="text-grey text-sm">- {{ footerData.bibleReference || 'Loading...' }}</span>
+        </div>
+      </div>
+      <div class="item-action">
+        <div class="bible-verse-inputs">
+          <el-input
+            v-model="footerData.bibleVerse"
+            size="small"
+            placeholder="Enter Bible verse text"
+            style="max-width: 400px; margin-bottom: 8px;"
+          ></el-input>
+          <el-input
+            v-model="footerData.bibleReference"
+            size="small"
+            placeholder="Enter Bible reference (e.g., Matthew 18:20)"
+            style="max-width: 300px;"
+          ></el-input>
+        </div>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Worship Section Title -->
+    <div class="list-item">
+      <div class="item-label">Worship Section Title</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ footerData.worshipSectionTitle || 'Loading...' }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="footerData.worshipSectionTitle"
+          size="small"
+          placeholder="Enter worship section title"
+          style="max-width: 300px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Connect Section Title -->
+    <div class="list-item">
+      <div class="item-label">Connect Section Title</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ footerData.connectSectionTitle || 'Loading...' }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="footerData.connectSectionTitle"
+          size="small"
+          placeholder="Enter connect section title"
+          style="max-width: 300px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Ministries Title -->
+    <div class="list-item">
+      <div class="item-label">Ministries Title</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ footerData.ministriesTitle || 'Loading...' }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="footerData.ministriesTitle"
+          size="small"
+          placeholder="Enter ministries section title"
+          style="max-width: 300px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Ministries List -->
+    <div class="list-item">
+      <div class="item-label">Ministries List</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ footerData.ministriesList || 'Loading...' }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="footerData.ministriesList"
+          size="small"
+          placeholder="Enter ministries list (e.g., Youth • Worship • Outreach • Children)"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
+    <el-divider />
+
     <!-- Facebook URL -->
     <div class="list-item">
       <div class="item-label">Facebook URL</div>

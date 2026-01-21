@@ -20,7 +20,7 @@
     <div class="navigation-container">
       <div class="navigation-content">
         <!-- Logo and Church Name -->
-        <router-link to="/" class="logo-section">
+        <div class="logo-section" @click="scrollToHero">
           <el-avatar :size="64" class="logo-avatar" :src="headerData.logo">
             <img v-if="!headerData.logo" src="/img/logobbek.png" alt="BBEK Logo" />
           </el-avatar>
@@ -30,7 +30,7 @@
               {{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}
             </p>
           </div>
-        </router-link>
+        </div>
 
         <!-- Desktop Menu -->
         <div class="desktop-menu">
@@ -614,6 +614,40 @@ const redirectToChildrenPage = (child) => {
   } else {
     console.warn('Child menu item has no route:', child)
   }
+}
+
+// Scroll to hero section when logo is clicked
+const scrollToHero = () => {
+  // If we're not on the home page, navigate there first
+  if (router.currentRoute.value.name !== 'LandingPage') {
+    router.push('/')
+    // Wait for navigation and page load to complete, then scroll
+    setTimeout(() => {
+      scrollToHeroSection()
+    }, 300) // Increased timeout to ensure page is fully loaded
+  } else {
+    // Already on home page, just scroll
+    scrollToHeroSection()
+  }
+}
+
+const scrollToHeroSection = () => {
+  // Small delay to ensure DOM is ready
+  setTimeout(() => {
+    const heroSection = document.getElementById('hero-section')
+    if (heroSection) {
+      heroSection.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      })
+    } else {
+      // Fallback: scroll to top if hero section not found
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      })
+    }
+  }, 50)
 }
 
 onUnmounted(() => {

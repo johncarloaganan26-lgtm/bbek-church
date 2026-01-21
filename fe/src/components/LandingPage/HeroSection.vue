@@ -1,5 +1,5 @@
 u<template>
-  <section class="hero-section" style="position: relative;">
+  <section id="hero-section" class="hero-section" style="position: relative;">
     <!-- Loading overlay -->
     <v-overlay :model-value="isLoadingHome" contained class="align-center justify-center" style="z-index: 10;">
       <v-progress-circular indeterminate color="white" size="64"></v-progress-circular>

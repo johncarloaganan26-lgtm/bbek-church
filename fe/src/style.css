@@ -15,6 +15,17 @@ body {
   min-height: 100vh;
 }
 
+/* Ensure all pages start at the top */
+html, body {
+  scroll-behavior: smooth;
+}
+
+/* Reset scroll position for route changes */
+.router-view-enter-active,
+.router-view-leave-active {
+  scroll-behavior: auto;
+}
+
 /* Custom v-alert error styling - force red with highest specificity */
 div.v-alert.v-alert--error {
   background-color: #ffebee !important;

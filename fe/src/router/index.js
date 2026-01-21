@@ -404,7 +404,21 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // If there's a saved position (like from browser back/forward), use it
+    if (savedPosition) {
+      return savedPosition
+    }
+
+    // For home page, don't auto-scroll (let the navigation component handle hero scrolling)
+    if (to.name === 'LandingPage') {
+      return false
+    }
+
+    // For all other pages, scroll to top
+    return { top: 0, behavior: 'smooth' }
+  }
 })
 
 // Navigation guard to check authentication
