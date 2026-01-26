@@ -307,16 +307,20 @@
                         <label for="relationship">
                           Relationship to Deceased <span class="required-text">Required</span>
                         </label>
-                        <v-text-field
-                          id="relationship"
+                        <el-select
                           v-model="relationship"
-                          placeholder="e.g., Spouse, Child, Parent"
-                          variant="outlined"
-                          density="compact"
-                          required
-                          hide-details
-                        :disabled="burialServiceStore.loading"
-                        ></v-text-field>
+                          placeholder="Select relationship"
+                          size="large"
+                          style="width: 100%"
+                          :disabled="burialServiceStore.loading"
+                        >
+                          <el-option
+                            v-for="rel in relationshipOptions"
+                            :key="rel"
+                            :label="rel"
+                            :value="rel"
+                          />
+                        </el-select>
                       </div>
                       <div class="form-group">
                         <label for="deceased-name">
@@ -505,6 +509,20 @@ const deceasedAge = ref(0)
 const deceasedDeathDate = ref('')
 const civilStatus = ref('')
 
+// Relationship options for dropdown
+const relationshipOptions = [
+  'Parent',
+  'Child',
+  'Sibling',
+  'Spouse',
+  'Grandparent',
+  'Grandchild',
+  'Relative',
+  'Friend',
+  'Church Member',
+  'Other'
+]
+
 // Form state
 const submitMessage = ref('')
 const submitError = ref('')
@@ -618,8 +636,8 @@ const handleSubmit = async (e) => {
 
   // Basic validation
   if (!firstname.value.trim() || !lastname.value.trim() || !birthdate.value || 
-      !age.value || !gender.value || !address.value.trim() || !email.value.trim() || 
-      !phoneNumber.value || !relationship.value.trim() || !deceasedName.value.trim() || 
+      !age.value || !gender.value || !address.value.trim() || !email.value.trim() ||
+      !phoneNumber.value || !relationship.value || !deceasedName.value.trim() ||
       !deceasedBirthDate.value || !deceasedDeathDate.value) {
     submitError.value = 'Please fill in all required fields.'
     ElMessage.error('Please fill in all required fields.')
@@ -657,7 +675,7 @@ const handleSubmit = async (e) => {
     const payload = {
       requester_name: `${firstname.value.trim()} ${middleName.value.trim() || ''} ${lastname.value.trim()}`.trim(),
       requester_email: email.value.trim().toLowerCase(),
-      relationship: relationship.value.trim(),
+      relationship: relationship.value,
       location: 'To be determined',
       pastor_name: null,
       service_date: null,

@@ -240,9 +240,10 @@
                   v-model="child.age"
                   :min="0"
                   :max="100"
-                  placeholder="Enter age"
+                  :placeholder="child.birthday ? 'Age will be calculated from birthday' : 'Enter age'"
                   size="large"
                   style="width: 100%;"
+                  :disabled="!!child.birthday"
                 />
               </el-form-item>
               
@@ -270,6 +271,7 @@
                   value-format="YYYY-MM-DD"
                   style="width: 100%;"
                   :max-date="new Date()"
+                  @change="calculateChildAge(index)"
                 />
               </el-form-item>
             </div>
@@ -627,6 +629,32 @@ const removeChild = (index) => {
   formData.children.splice(index, 1)
 }
 
+// Calculate child age from birthday
+const calculateChildAge = (index) => {
+  const child = formData.children[index]
+  if (!child || !child.birthday) {
+    child.age = null
+    return
+  }
+
+  const birthDate = new Date(child.birthday)
+  const today = new Date()
+
+  if (birthDate >= today) {
+    child.age = null
+    return
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+
+  child.age = age >= 0 ? age : null
+}
+
 // Watch for memberData changes to populate form in edit mode
 watch(() => props.memberData, (newData) => {
   if (newData && props.modelValue) {
@@ -691,6 +719,13 @@ watch(() => props.modelValue, (isOpen) => {
     if (formData.birthdate) {
       calculateAge()
     }
+
+    // Calculate ages for children that have birthdays but no ages
+    formData.children.forEach((child, index) => {
+      if (child.birthday && !child.age) {
+        calculateChildAge(index)
+      }
+    })
   } else {
     // Reset form for add mode
     resetForm()

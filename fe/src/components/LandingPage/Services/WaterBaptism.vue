@@ -434,6 +434,17 @@
                               <el-option label="Female" value="F" />
                             </el-select>
                           </el-form-item>
+                          <el-form-item :label="`Child ${index + 1} Age`" :prop="`children.${index}.age`" class="form-group">
+                            <el-input-number
+                              v-model="child.age"
+                              :min="0"
+                              :max="18"
+                              :placeholder="child.birthday ? 'Age will be calculated from birthday' : 'Enter age'"
+                              size="large"
+                              style="width: 100%"
+                              :disabled="!!child.birthday || memberRegistrationStore.loading"
+                            />
+                          </el-form-item>
                           <el-form-item :label="`Child ${index + 1} Birthday`" :prop="`children.${index}.birthday`" class="form-group">
                             <el-date-picker
                               v-model="child.birthday"
@@ -444,6 +455,7 @@
                               value-format="YYYY-MM-DD"
                               style="width: 100%"
                               :disabled="memberRegistrationStore.loading"
+                              @change="calculateChildAge(index)"
                             />
                           </el-form-item>
                         </div>
@@ -1000,6 +1012,32 @@ const addChild = () => {
 
 const removeChild = (index) => {
   formData.children.splice(index, 1)
+}
+
+// Calculate child age from birthday
+const calculateChildAge = (index) => {
+  const child = formData.children[index]
+  if (!child || !child.birthday) {
+    child.age = null
+    return
+  }
+
+  const birthDate = new Date(child.birthday)
+  const today = new Date()
+
+  if (birthDate >= today) {
+    child.age = null
+    return
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+
+  child.age = age >= 0 ? age : null
 }
 
 const resetForm = () => {

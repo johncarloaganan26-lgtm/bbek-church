@@ -237,6 +237,17 @@
               </el-form-item>
             </div>
 
+            <el-form-item label="Age" class="child-form-item">
+              <el-input-number
+                v-model="child.age"
+                :min="0"
+                :max="18"
+                :placeholder="child.birthday ? 'Age will be calculated from birthday' : 'Enter age'"
+                size="large"
+                :disabled="!!child.birthday || loading"
+              />
+            </el-form-item>
+
             <el-form-item label="Birthday" class="child-form-item">
               <el-date-picker
                 v-model="child.birthday"
@@ -246,6 +257,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 :disabled="loading"
+                @change="calculateChildAge(index)"
               />
             </el-form-item>
           </div>
@@ -919,6 +931,32 @@ const addChild = () => {
 // Remove child
 const removeChild = (index) => {
   formData.children.splice(index, 1)
+}
+
+// Calculate child age from birthday
+const calculateChildAge = (index) => {
+  const child = formData.children[index]
+  if (!child || !child.birthday) {
+    child.age = null
+    return
+  }
+
+  const birthDate = new Date(child.birthday)
+  const today = new Date()
+
+  if (birthDate >= today) {
+    child.age = null
+    return
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+
+  child.age = age >= 0 ? age : null
 }
 
 // Watch for birthdate changes to auto-calculate age
