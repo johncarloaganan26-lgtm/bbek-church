@@ -3,6 +3,28 @@ const moment = require('moment');
 const { sendFormSubmissionNotification, sendFormStatusUpdate } = require('./emailHelper');
 
 /**
+ * Convert all Buffer fields in a form row to text (for reading data)
+ * @param {Object} row - Database row
+ * @returns {Object} Row with all Buffers converted to text
+ */
+function convertFormBuffersToText(row) {
+  if (!row || typeof row !== 'object') {
+    return row;
+  }
+
+  const converted = {};
+  for (const [key, value] of Object.entries(row)) {
+    // Convert admin_notes from Buffer to text
+    if (key === 'admin_notes' && Buffer.isBuffer(value)) {
+      converted[key] = value.toString('utf8');
+    } else {
+      converted[key] = value;
+    }
+  }
+  return converted;
+}
+
+/**
  * CREATE - Create a new form submission
  * @param {Object} formData - Form submission data
  * @returns {Promise<Object>} Created form submission
@@ -368,11 +390,14 @@ async function getAllForms(options = {}) {
     // Execute query to get paginated results
     const [rows] = await query(sql, params);
 
-    // Parse JSON form_data for each row
-    const parsedRows = rows.map(row => ({
-      ...row,
-      form_data: typeof row.form_data === 'string' ? JSON.parse(row.form_data) : row.form_data
-    }));
+    // Convert Buffer fields to text and parse JSON form_data for each row
+    const parsedRows = rows.map(row => {
+      const convertedRow = convertFormBuffersToText(row);
+      return {
+        ...convertedRow,
+        form_data: typeof convertedRow.form_data === 'string' ? JSON.parse(convertedRow.form_data) : convertedRow.form_data
+      };
+    });
 
     // Calculate pagination metadata
     const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
@@ -439,10 +464,11 @@ async function getFormById(formId) {
       };
     }
 
-    // Parse JSON form_data
+    // Convert Buffer fields to text and parse JSON form_data
+    const convertedRow = convertFormBuffersToText(rows[0]);
     const form = {
-      ...rows[0],
-      form_data: typeof rows[0].form_data === 'string' ? JSON.parse(rows[0].form_data) : rows[0].form_data
+      ...convertedRow,
+      form_data: typeof convertedRow.form_data === 'string' ? JSON.parse(convertedRow.form_data) : convertedRow.form_data
     };
 
     return {
@@ -489,11 +515,14 @@ async function getFormsByUser(userId, formType = null) {
     console.log(sql);
     const [rows] = await query(sql, params);
 
-    // Parse JSON form_data for each row
-    const parsedRows = rows.map(row => ({
-      ...row,
-      form_data: typeof row.form_data === 'string' ? JSON.parse(row.form_data) : row.form_data
-    }));
+    // Convert Buffer fields to text and parse JSON form_data for each row
+    const parsedRows = rows.map(row => {
+      const convertedRow = convertFormBuffersToText(row);
+      return {
+        ...convertedRow,
+        form_data: typeof convertedRow.form_data === 'string' ? JSON.parse(convertedRow.form_data) : convertedRow.form_data
+      };
+    });
 
     return {
       success: true,
