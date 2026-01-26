@@ -69,6 +69,11 @@ const auditTrailMiddleware = async (req, res, next) => {
     return next();
   }
 
+  // Skip audit trail if explicitly requested (for performance-critical bulk operations)
+  if (req.skipAuditTrail) {
+    return next();
+  }
+
   // For DELETE and UPDATE operations, try to capture the record data before it's modified/deleted
   if (req.method === 'DELETE' || req.method === 'PUT') {
     // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123 or /updateMember/123

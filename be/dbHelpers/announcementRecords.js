@@ -486,6 +486,65 @@ async function deleteAnnouncement(announcementId, archivedBy = null) {
 }
 
 /**
+ * Bulk delete announcements with archiving
+ * @param {Array<number>} announcementIds - Array of announcement IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteAnnouncements(announcementIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(announcementIds) || announcementIds.length === 0) {
+      throw new Error('Announcement IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = announcementIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid announcement IDs provided');
+    }
+
+    // Archive announcements before bulk delete
+    const announcementsToDelete = [];
+
+    // Get announcement data for archiving
+    for (const announcementId of validIds) {
+      try {
+        const announcement = await getAnnouncementById(announcementId);
+        if (announcement.success && announcement.data) {
+          announcementsToDelete.push(announcement.data);
+          await archiveBeforeDelete('tbl_announcements', announcementId.toString(), announcement.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive announcement ${announcementId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_announcements WHERE announcement_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_announcements: announcementsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting announcements:', error);
+    throw error;
+  }
+}
+
+/**
  * Get active announcements for all users (simplified - no audience filtering)
  * @param {String} userId - User ID (for view tracking)
  * @returns {Promise<Array>} Array of active announcements
@@ -612,6 +671,7 @@ module.exports = {
   getAnnouncementById,
   updateAnnouncement,
   deleteAnnouncement,
+  bulkDeleteAnnouncements,
   getActiveAnnouncementsForUser,
   markAnnouncementAsViewed,
   getAnnouncementSummary

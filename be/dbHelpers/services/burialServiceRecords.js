@@ -930,6 +930,65 @@ async function deleteBurialService(burialId, archivedBy = null) {
   }
 }
 
+/**
+ * Bulk delete burial services with archiving
+ * @param {Array<string>} burialIds - Array of burial IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteBurialServices(burialIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(burialIds) || burialIds.length === 0) {
+      throw new Error('Burial IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are provided
+    const validIds = burialIds.filter(id => typeof id === 'string' && id.trim().length > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid burial IDs provided');
+    }
+
+    // Archive burial services before bulk delete
+    const burialServicesToDelete = [];
+
+    // Get burial service data for archiving
+    for (const burialId of validIds) {
+      try {
+        const burialService = await getBurialServiceById(burialId);
+        if (burialService.success && burialService.data) {
+          burialServicesToDelete.push(burialService.data);
+          await archiveBeforeDelete('tbl_burialservice', String(burialId), burialService.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive burial service ${burialId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_burialservice WHERE burial_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_burial_services: burialServicesToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting burial services:', error);
+    throw error;
+  }
+}
+
 async function searchBurialServicesFulltext(options = {}) {
   try {
     const search = options.search || options.q || null;
@@ -1168,6 +1227,7 @@ module.exports = {
   getBurialServicesByMemberId,
   updateBurialService,
   deleteBurialService,
+  bulkDeleteBurialServices,
   exportBurialServicesToExcel,
   searchBurialServicesFulltext,
   analyzeBurialServiceAvailability,

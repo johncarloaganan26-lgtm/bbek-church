@@ -4,7 +4,8 @@ const {
   getArchiveById,
   restoreArchive,
   getArchiveSummary,
-  deleteArchivePermanently
+  deleteArchivePermanently,
+  bulkDeleteArchivesPermanently
 } = require('../dbHelpers/archiveRecords');
 
 const router = express.Router();
@@ -205,6 +206,66 @@ router.delete('/deleteArchive/:id', requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to permanently delete archive'
+    });
+  }
+});
+
+/**
+ * BULK DELETE PERMANENTLY - Permanently delete multiple archive records
+ * DELETE /api/archives/bulkDeleteArchives
+ * Body: { archive_ids: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteArchives', requireAdmin, async (req, res) => {
+  // Skip audit trail middleware for bulk operations to improve performance
+  req.skipAuditTrail = true;
+  try {
+    const { archive_ids } = req.body;
+
+    if (!archive_ids || !Array.isArray(archive_ids) || archive_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Archive IDs array is required and cannot be empty',
+        message: 'Please provide an array of archive IDs to delete'
+      });
+    }
+
+    // Convert string IDs to numbers and validate
+    const archiveIds = archive_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+
+    if (archiveIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid archive IDs provided',
+        message: 'All provided archive IDs must be valid numbers'
+      });
+    }
+
+    // Add archive details to request for audit trail middleware
+    req.bulk_delete_data = {
+      archive_ids: archiveIds,
+      count: archiveIds.length
+    };
+
+    const result = await bulkDeleteArchivesPermanently(archiveIds);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting archives:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete archives'
     });
   }
 });

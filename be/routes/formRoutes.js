@@ -6,6 +6,7 @@ const {
   getFormsByUser,
   updateForm,
   deleteForm,
+  bulkDeleteForms,
   getMemberServices
 } = require('../dbHelpers/formRecords');
 
@@ -224,6 +225,61 @@ router.delete('/deleteForm/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete form'
+    });
+  }
+});
+
+/**
+ * BULK DELETE FORMS - Permanently delete multiple forms
+ * DELETE /api/forms/bulkDeleteForms
+ * Body: { form_ids: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteForms', async (req, res) => {
+  try {
+    const { form_ids } = req.body;
+
+    if (!form_ids || !Array.isArray(form_ids) || form_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Form IDs array is required and cannot be empty',
+        message: 'Please provide an array of form IDs to delete'
+      });
+    }
+
+    // Convert string IDs to numbers and validate
+    const formIds = form_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+
+    if (formIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid form IDs provided',
+        message: 'All provided form IDs must be valid numbers'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteForms(formIds, req.user?.acc_id);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting forms:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete forms'
     });
   }
 });

@@ -307,6 +307,42 @@ export const useMemberRecordStore = defineStore('memberRecord', {
       }
     },
 
+    async bulkDeleteMembers(memberIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+
+      try {
+        const response = await axios.delete('/church-records/members/bulkDeleteMembers', {
+          data: {
+            member_ids: memberIds
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data && response.status === 200) {
+          await this.fetchMembers()
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete members'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete members'
+        console.error('Error bulk deleting members:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updateMemberActiveStatus(id, active) {
       this.loading = true
       this.error = null

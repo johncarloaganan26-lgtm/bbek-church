@@ -533,24 +533,25 @@ const bulkDeleteDedications = async () => {
       }
     )
 
-    const deletePromises = selectedDedications.value.map(dedication =>
-      childDedicationStore.deleteDedication(dedication.child_id)
-    )
+    // Extract child IDs
+    const childIds = selectedDedications.value.map(dedication => dedication.child_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await childDedicationStore.bulkDeleteChildDedications(childIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} child dedication${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} child dedication${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} child dedication${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} child dedication${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await childDedicationStore.fetchDedications()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting dedications:', error)

@@ -7,6 +7,7 @@ const {
   getDepartmentByName,
   updateDepartment,
   deleteDepartment,
+  bulkDeleteDepartments,
   exportDepartmentsToExcel,
   getAllDepartmentsForSelect
 } = require('../../dbHelpers/church_records/departmentRecords');
@@ -265,6 +266,61 @@ router.delete('/deleteDepartment/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete department'
+    });
+  }
+});
+
+/**
+ * BULK DELETE DEPARTMENTS - Permanently delete multiple department records
+ * DELETE /api/church-records/departments/bulkDeleteDepartments
+ * Body: { department_ids: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteDepartments', async (req, res) => {
+  try {
+    const { department_ids } = req.body;
+
+    if (!department_ids || !Array.isArray(department_ids) || department_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Department IDs array is required and cannot be empty',
+        message: 'Please provide an array of department IDs to delete'
+      });
+    }
+
+    // Convert string IDs to numbers and validate
+    const departmentIds = department_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+
+    if (departmentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid department IDs provided',
+        message: 'All provided department IDs must be valid numbers'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteDepartments(departmentIds, req.user?.acc_id);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting departments:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete departments'
     });
   }
 });

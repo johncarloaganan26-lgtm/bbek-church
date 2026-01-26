@@ -1172,6 +1172,65 @@ async function deleteWaterBaptism(baptismId, archivedBy = null) {
 }
 
 /**
+ * Bulk delete water baptisms with archiving
+ * @param {Array<string>} baptismIds - Array of baptism IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteWaterBaptisms(baptismIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
+      throw new Error('Baptism IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are provided
+    const validIds = baptismIds.filter(id => typeof id === 'string' && id.trim().length > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid baptism IDs provided');
+    }
+
+    // Archive baptisms before bulk delete
+    const baptismsToDelete = [];
+
+    // Get baptism data for archiving
+    for (const baptismId of validIds) {
+      try {
+        const baptism = await getWaterBaptismById(baptismId);
+        if (baptism.success && baptism.data) {
+          baptismsToDelete.push(baptism.data);
+          await archiveBeforeDelete('tbl_waterbaptism', String(baptismId), baptism.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive water baptism ${baptismId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_waterbaptism WHERE baptism_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_baptisms: baptismsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting water baptisms:', error);
+    throw error;
+  }
+}
+
+/**
  * EXPORT - Export water baptism records to Excel
  * @param {Object} options - Optional query parameters (same as getAllWaterBaptisms: search, status, sortBy, dateRange)
  * @returns {Promise<Buffer>} Excel file buffer
@@ -1301,6 +1360,7 @@ module.exports = {
   getWaterBaptismByMemberId,
   updateWaterBaptism,
   deleteWaterBaptism,
+  bulkDeleteWaterBaptisms,
   exportWaterBaptismsToExcel,
   getSpecificWaterBaptismDataByMemberIdIfBaptized,
   checkTimeSlotAvailability

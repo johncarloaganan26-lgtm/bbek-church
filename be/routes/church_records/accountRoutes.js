@@ -10,6 +10,7 @@ const {
   getAccountByEmail,
   updateAccount,
   deleteAccount,
+  bulkDeleteAccounts,
   verifyAccountCredentials,
   exportAccountsToExcel,
   getSpecificMemberByEmailAndPassword,
@@ -314,6 +315,61 @@ router.delete('/deleteAccount/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete account'
+    });
+  }
+});
+
+/**
+ * BULK DELETE ACCOUNTS - Permanently delete multiple account records
+ * DELETE /api/church-records/accounts/bulkDeleteAccounts
+ * Body: { account_ids: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteAccounts', async (req, res) => {
+  try {
+    const { account_ids } = req.body;
+
+    if (!account_ids || !Array.isArray(account_ids) || account_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Account IDs array is required and cannot be empty',
+        message: 'Please provide an array of account IDs to delete'
+      });
+    }
+
+    // Convert string IDs to numbers and validate
+    const accountIds = account_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+
+    if (accountIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid account IDs provided',
+        message: 'All provided account IDs must be valid numbers'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteAccounts(accountIds, req.user?.acc_id);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting accounts:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete accounts'
     });
   }
 });

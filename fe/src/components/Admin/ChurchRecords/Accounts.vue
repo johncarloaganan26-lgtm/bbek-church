@@ -640,47 +640,47 @@ const clearSelection = () => {
 }
 
 const handleBulkDelete = async () => {
- if (selectedAccounts.value.length === 0) return
+  if (selectedAccounts.value.length === 0) return
 
- try {
-   await ElMessageBox.confirm(
-     `Are you sure you want to delete ${selectedAccounts.value.length} selected account(s)? This action cannot be undone.`,
-     'Confirm Bulk Delete',
-     {
-       confirmButtonText: 'Delete All',
-       cancelButtonText: 'Cancel',
-       type: 'warning',
-     }
-   )
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to delete ${selectedAccounts.value.length} selected account(s)? This action cannot be undone.`,
+      'Confirm Bulk Delete',
+      {
+        confirmButtonText: 'Delete All',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
 
-   // Delete accounts one by one
-   const deletePromises = selectedAccounts.value.map(account =>
-     accountsStore.deleteAccount(account.acc_id || account.id)
-   )
+    // Extract account IDs
+    const accountIds = selectedAccounts.value.map(account => account.acc_id || account.id)
 
-   const results = await Promise.allSettled(deletePromises)
+    // Use the new bulk delete endpoint
+    const result = await accountsStore.bulkDeleteAccounts(accountIds)
 
-   const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-   const failed = results.length - successful
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-   if (successful > 0) {
-     ElMessage.success(`Successfully deleted ${successful} account(s)`)
-   }
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} account${deleted > 1 ? 's' : ''}`)
+      }
 
-   if (failed > 0) {
-     ElMessage.error(`Failed to delete ${failed} account(s)`)
-   }
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} account${failed > 1 ? 's' : ''}`)
+      }
+    }
 
-   // Clear selection and refresh data
-   selectedAccounts.value = []
-   await accountsStore.fetchAccounts()
+    // Clear selection
+    selectedAccounts.value = []
+    // fetchAccounts() is already called in the store method
 
- } catch (error) {
-   if (error !== 'cancel') {
-     console.error('Error in bulk delete:', error)
-     ElMessage.error('Bulk delete operation failed')
-   }
- }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error in bulk delete:', error)
+      ElMessage.error('Bulk delete operation failed')
+    }
+  }
 }
 
 // Initialize on mount

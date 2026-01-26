@@ -632,6 +632,65 @@ async function getAllChurchLeadersForSelect() {
   }
 }
 
+/**
+ * BULK DELETE CHURCH LEADERS - Permanently delete multiple church leader records in a single operation
+ * @param {Array<Number>} leaderIds - Array of Leader IDs to delete
+ * @param {String} archivedBy - User ID who is archiving the records
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteChurchLeaders(leaderIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(leaderIds) || leaderIds.length === 0) {
+      throw new Error('Leader IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = leaderIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid leader IDs provided');
+    }
+
+    // Archive church leaders before bulk delete
+    const leadersToDelete = [];
+
+    // Get leader data for archiving
+    for (const leaderId of validIds) {
+      try {
+        const leader = await getChurchLeaderById(leaderId);
+        if (leader.success && leader.data) {
+          leadersToDelete.push(leader.data);
+          await archiveBeforeDelete('tbl_churchleaders', String(leaderId), leader.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive church leader ${leaderId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_churchleaders WHERE leader_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_leaders: leadersToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting church leaders:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createChurchLeader,
   getAllChurchLeaders,
@@ -639,6 +698,7 @@ module.exports = {
   getChurchLeaderByMemberId,
   updateChurchLeader,
   deleteChurchLeader,
+  bulkDeleteChurchLeaders,
   exportChurchLeadersToExcel,
   getAllChurchLeadersForSelect
 };

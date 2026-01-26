@@ -8,6 +8,7 @@ const {
   getMinistriesByMemberId,
   updateMinistry,
   deleteMinistry,
+  bulkDeleteMinistries,
   getPublicMinistries,
   getAllMinistriesForSelect,
   exportMinistriesToExcel
@@ -327,6 +328,51 @@ router.delete('/deleteMinistry/:id', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * BULK DELETE - Delete multiple ministry records
+ * DELETE /api/church-records/ministries/bulkDeleteMinistries
+ * REQUIRES AUTHENTICATION - Only authorized users can bulk delete ministries
+ * Body: { ministryIds: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteMinistries', authenticateToken, async (req, res) => {
+  try {
+    const { ministryIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(ministryIds) || ministryIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'ministryIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteMinistries(ministryIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting ministries:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete ministries'
+    });
+  }
+});
+
 router.get('/getPublicMinistries', async (req, res) => {
   try {
     const result = await getPublicMinistries();
@@ -506,4 +552,5 @@ router.get('/exportExcel', async (req, res) => {
 });
 
 module.exports = router;
+
 

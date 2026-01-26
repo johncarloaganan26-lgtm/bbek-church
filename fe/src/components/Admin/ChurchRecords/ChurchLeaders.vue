@@ -323,25 +323,27 @@ const handleBulkDelete = async () => {
       }
     )
 
-    const results = []
-    for (const leader of selectedLeaders.value) {
-      const result = await churchLeadersStore.deleteLeader(leader.leader_id)
-      results.push(result)
+    // Extract leader IDs
+    const leaderIds = selectedLeaders.value.map(leader => leader.leader_id)
+
+    // Use the new bulk delete endpoint
+    const result = await churchLeadersStore.bulkDeleteLeaders(leaderIds)
+
+    if (result.success) {
+      const { deleted, failed } = result.data
+
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} leader${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} leader${failed > 1 ? 's' : ''}`)
+      }
     }
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.length - successCount
-
-    if (successCount > 0) {
-      ElMessage.success(`${successCount} leader(s) deleted successfully`)
-    }
-    if (failCount > 0) {
-      ElMessage.error(`Failed to delete ${failCount} leader(s)`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedLeaders.value = []
-    await churchLeadersStore.fetchLeaders()
+    // fetchLeaders() is already called in the store method
 
   } catch (error) {
     if (error !== 'cancel') {

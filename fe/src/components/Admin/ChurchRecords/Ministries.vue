@@ -457,25 +457,26 @@ const handleBulkDelete = async () => {
       }
     )
 
-    const results = []
-    for (const ministry of selectedMinistries.value) {
-      const result = await ministriesStore.deleteMinistry(ministry.ministry_id)
-      results.push(result)
+    // Extract ministry IDs
+    const ministryIds = selectedMinistries.value.map(ministry => ministry.ministry_id)
+
+    // Use the new bulk delete endpoint
+    const result = await ministriesStore.bulkDeleteMinistries(ministryIds)
+
+    if (result.success) {
+      const { deleted, failed } = result.data
+
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} ministry${deleted > 1 ? 'ies' : 'y'}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} ministry${failed > 1 ? 'ies' : 'y'}`)
+      }
     }
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.length - successCount
-
-    if (successCount > 0) {
-      ElMessage.success(`${successCount} ministry/ministries deleted successfully`)
-    }
-    if (failCount > 0) {
-      ElMessage.error(`Failed to delete ${failCount} ministry/ministries`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedMinistries.value = []
-    await ministriesStore.fetchMinistries()
 
   } catch (error) {
     if (error !== 'cancel') {

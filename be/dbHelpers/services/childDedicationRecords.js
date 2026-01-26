@@ -1676,6 +1676,65 @@ async function deleteChildDedication(childId, archivedBy = null) {
 }
 
 /**
+ * Bulk delete child dedications with archiving
+ * @param {Array<string>} childIds - Array of child IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteChildDedications(childIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(childIds) || childIds.length === 0) {
+      throw new Error('Child IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are provided
+    const validIds = childIds.filter(id => typeof id === 'string' && id.trim().length > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid child IDs provided');
+    }
+
+    // Archive dedications before bulk delete
+    const dedicationsToDelete = [];
+
+    // Get dedication data for archiving
+    for (const childId of validIds) {
+      try {
+        const dedication = await getChildDedicationById(childId);
+        if (dedication.success && dedication.data) {
+          dedicationsToDelete.push(dedication.data);
+          await archiveBeforeDelete('tbl_childdedications', String(childId), dedication.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive child dedication ${childId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_childdedications WHERE child_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_dedications: dedicationsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting child dedications:', error);
+    throw error;
+  }
+}
+
+/**
  * EXPORT - Export child dedication records to Excel
  * @param {Object} options - Optional query parameters (same as getAllChildDedications: search, status, sortBy)
  * @returns {Promise<Buffer>} Excel file buffer
@@ -1841,5 +1900,6 @@ module.exports = {
   getChildDedicationsByRequester,
   updateChildDedication,
   deleteChildDedication,
+  bulkDeleteChildDedications,
   exportChildDedicationsToExcel
 };

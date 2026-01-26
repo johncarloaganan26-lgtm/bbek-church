@@ -569,6 +569,65 @@ async function deleteTithe(tithesId, archivedBy = null) {
 }
 
 /**
+ * Bulk delete tithes with archiving
+ * @param {Array<number>} tithesIds - Array of tithes IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteTithes(tithesIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(tithesIds) || tithesIds.length === 0) {
+      throw new Error('Tithes IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = tithesIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid tithes IDs provided');
+    }
+
+    // Archive tithes before bulk delete
+    const tithesToDelete = [];
+
+    // Get tithe data for archiving
+    for (const tithesId of validIds) {
+      try {
+        const tithe = await getTitheById(tithesId);
+        if (tithe.success && tithe.data) {
+          tithesToDelete.push(tithe.data);
+          await archiveBeforeDelete('tbl_tithes', String(tithesId), tithe.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive tithe ${tithesId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_tithes WHERE tithes_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_tithes: tithesToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting tithes:', error);
+    throw error;
+  }
+}
+
+/**
  * EXPORT - Export donation records to Excel
  * @param {Object} options - Optional query parameters
  * @returns {Promise<Buffer>} Excel file buffer
@@ -663,5 +722,6 @@ module.exports = {
   getTitheById,
   updateTithe,
   deleteTithe,
+  bulkDeleteTithes,
   exportTithesToExcel
 };

@@ -255,6 +255,42 @@ export const useDepartmentsStore = defineStore('departments', {
       }
     },
 
+    async bulkDeleteDepartments(departmentIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+
+      try {
+        const response = await axios.delete('/church-records/departments/bulkDeleteDepartments', {
+          data: {
+            department_ids: departmentIds
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data && response.status === 200) {
+          await this.fetchDepartments()
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete departments'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete departments'
+        console.error('Error bulk deleting departments:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1

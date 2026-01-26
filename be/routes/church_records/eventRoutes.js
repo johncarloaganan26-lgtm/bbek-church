@@ -7,6 +7,7 @@ const {
   getEventById,
   updateEvent,
   deleteEvent,
+  bulkDeleteEvents,
   exportEventsToExcel,
   getEventsByMemberId,
   getSermonEvents,
@@ -253,7 +254,7 @@ router.delete('/deleteEvent/:id', async (req, res) => {
     }
 
     const result = await deleteEvent(eventId, archivedBy);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -272,6 +273,50 @@ router.delete('/deleteEvent/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete event'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple event records
+ * DELETE /api/church-records/events/bulkDeleteEvents
+ * Body: { eventIds: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteEvents', async (req, res) => {
+  try {
+    const { eventIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(eventIds) || eventIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteEvents(eventIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting events:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete events'
     });
   }
 });

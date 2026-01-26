@@ -547,24 +547,26 @@ const bulkDeleteForms = async () => {
       }
     )
 
-    const deletePromises = selectedForms.value.map(form =>
-      formsStore.deleteForm(form.form_id)
-    )
+    // Extract form IDs
+    const formIds = selectedForms.value.map(form => form.form_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await formsStore.bulkDeleteForms(formIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} message${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} message${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} message${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} message${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await fetchForms()
+    // fetchForms() is already called in the store method
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting forms:', error)

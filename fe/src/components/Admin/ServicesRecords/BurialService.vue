@@ -527,24 +527,25 @@ const bulkDeleteServices = async () => {
       }
     )
 
-    const deletePromises = selectedServices.value.map(service =>
-      burialServiceStore.deleteService(service.burial_id)
-    )
+    // Extract burial IDs
+    const burialIds = selectedServices.value.map(service => service.burial_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await burialServiceStore.bulkDeleteBurialServices(burialIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} burial service${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} burial service${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} burial service${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} burial service${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await burialServiceStore.fetchServices()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting services:', error)

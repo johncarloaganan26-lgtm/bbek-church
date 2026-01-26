@@ -650,6 +650,42 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
       } finally {
         this.loading = false
       }
+    },
+
+    async bulkDeleteEvents(eventIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        const response = await axios.delete('/church-records/events/bulkDeleteEvents', {
+          data: { eventIds },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (response.data.success) {
+          await this.fetchEvents({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete events'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete events'
+        console.error('Error bulk deleting events:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

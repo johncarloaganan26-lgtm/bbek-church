@@ -1071,6 +1071,65 @@ async function deleteMinistry(ministryId, archivedBy = null) {
 }
 
 /**
+ * Bulk delete ministries with archiving
+ * @param {Array<number>} ministryIds - Array of ministry IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteMinistries(ministryIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(ministryIds) || ministryIds.length === 0) {
+      throw new Error('Ministry IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = ministryIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid ministry IDs provided');
+    }
+
+    // Archive ministries before bulk delete
+    const ministriesToDelete = [];
+
+    // Get ministry data for archiving
+    for (const ministryId of validIds) {
+      try {
+        const ministry = await getMinistryById(ministryId);
+        if (ministry.success && ministry.data) {
+          ministriesToDelete.push(ministry.data);
+          await archiveBeforeDelete('tbl_ministry', String(ministryId), ministry.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive ministry ${ministryId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_ministry WHERE ministry_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_ministries: ministriesToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting ministries:', error);
+    throw error;
+  }
+}
+
+/**
  * GET ALL FOR SELECT - Get all ministries for select dropdown (simplified)
  * @returns {Promise<Object>} Object with simplified ministry records
  */
@@ -1195,6 +1254,7 @@ module.exports = {
   getMinistriesByMemberId,
   updateMinistry,
   deleteMinistry,
+  bulkDeleteMinistries,
   getPublicMinistries,
   getAllMinistriesForSelect,
   exportMinistriesToExcel

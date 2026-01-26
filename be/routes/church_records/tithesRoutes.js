@@ -7,6 +7,7 @@ const {
   getTitheByMemberId,
   updateTithe,
   deleteTithe,
+  bulkDeleteTithes,
   exportTithesToExcel
 } = require('../../dbHelpers/church_records/tithesRecords');
 
@@ -268,6 +269,50 @@ router.delete('/deleteTithe/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete tithe'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple tithe records
+ * DELETE /api/church-records/tithes/bulkDeleteTithes
+ * Body: { tithesIds: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteTithes', async (req, res) => {
+  try {
+    const { tithesIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(tithesIds) || tithesIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'tithesIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteTithes(tithesIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting tithes:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete tithes'
     });
   }
 });

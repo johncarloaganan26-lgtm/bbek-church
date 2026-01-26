@@ -592,25 +592,25 @@ const bulkDeleteAnnouncements = async () => {
       }
     )
 
-    const deletePromises = selectedAnnouncements.value.map(announcement =>
-      announcementStore.deleteAnnouncement(announcement.announcement_id)
-    )
+    // Extract announcement IDs
+    const announcementIds = selectedAnnouncements.value.map(announcement => announcement.announcement_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled').length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await announcementStore.bulkDeleteAnnouncements(announcementIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} announcement${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} announcement${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} announcement${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} announcement${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await fetchAnnouncements()
-    await fetchSummaryStats()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting announcements:', error)

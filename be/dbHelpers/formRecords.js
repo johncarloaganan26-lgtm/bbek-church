@@ -923,6 +923,66 @@ async function deleteForm(formId, archivedBy = null) {
   }
 }
 
+/**
+ * BULK DELETE FORMS - Permanently delete multiple forms in a single operation
+ * @param {Array<Number>} formIds - Array of Form IDs to delete
+ * @param {String} archivedBy - User ID who is archiving the records
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteForms(formIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(formIds) || formIds.length === 0) {
+      throw new Error('Form IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = formIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid form IDs provided');
+    }
+
+    // Archive forms before bulk delete
+    const { archiveBeforeDelete } = require('./archiveHelper');
+    const formsToDelete = [];
+
+    // Get form data for archiving
+    for (const formId of validIds) {
+      try {
+        const form = await getFormById(formId);
+        if (form.success && form.data) {
+          formsToDelete.push(form.data);
+          await archiveBeforeDelete('tbl_forms', formId, form.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive form ${formId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_forms WHERE form_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_forms: formsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting forms:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createForm,
   getAllForms,
@@ -930,6 +990,7 @@ module.exports = {
   getFormsByUser,
   updateForm,
   deleteForm,
+  bulkDeleteForms,
   getMemberServices
 };
 

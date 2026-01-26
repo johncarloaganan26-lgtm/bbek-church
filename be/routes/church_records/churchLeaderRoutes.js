@@ -7,6 +7,7 @@ const {
   getChurchLeaderByMemberId,
   updateChurchLeader,
   deleteChurchLeader,
+  bulkDeleteChurchLeaders,
   exportChurchLeadersToExcel
 } = require('../../dbHelpers/church_records/churchLeaderRecords');
 
@@ -270,6 +271,61 @@ router.delete('/deleteChurchLeader/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete church leader'
+    });
+  }
+});
+
+/**
+ * BULK DELETE CHURCH LEADERS - Permanently delete multiple church leader records
+ * DELETE /api/church-records/church-leaders/bulkDeleteChurchLeaders
+ * Body: { leader_ids: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteChurchLeaders', async (req, res) => {
+  try {
+    const { leader_ids } = req.body;
+
+    if (!leader_ids || !Array.isArray(leader_ids) || leader_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Leader IDs array is required and cannot be empty',
+        message: 'Please provide an array of leader IDs to delete'
+      });
+    }
+
+    // Convert string IDs to numbers and validate
+    const leaderIds = leader_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+
+    if (leaderIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid leader IDs provided',
+        message: 'All provided leader IDs must be valid numbers'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteChurchLeaders(leaderIds, req.user?.acc_id);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting church leaders:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete church leaders'
     });
   }
 });

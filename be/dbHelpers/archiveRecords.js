@@ -967,6 +967,51 @@ async function deleteArchivePermanently(archiveId) {
   }
 }
 
+/**
+ * BULK DELETE PERMANENTLY - Permanently delete multiple archive records in a single operation
+ * @param {Array<Number>} archiveIds - Array of Archive IDs to delete
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteArchivesPermanently(archiveIds) {
+  try {
+    if (!Array.isArray(archiveIds) || archiveIds.length === 0) {
+      throw new Error('Archive IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = archiveIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid archive IDs provided');
+    }
+
+    // Get archive records info before deletion for audit trail
+    const placeholders = validIds.map(() => '?').join(',');
+    const selectSql = `SELECT archive_id, original_table, original_id FROM tbl_archives WHERE archive_id IN (${placeholders})`;
+    const [archivesToDelete] = await query(selectSql, validIds);
+
+    // Perform bulk delete
+    const deleteSql = `DELETE FROM tbl_archives WHERE archive_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        deleted_archives: archivesToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting archives:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   archiveRecord,
   getAllArchives,
@@ -974,6 +1019,7 @@ module.exports = {
   restoreArchive,
   getArchiveSummary,
   getArchivesByDateRange,
-  deleteArchivePermanently
+  deleteArchivePermanently,
+  bulkDeleteArchivesPermanently
 };
 

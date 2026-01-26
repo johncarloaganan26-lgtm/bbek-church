@@ -604,6 +604,42 @@ export const useMinistriesStore = defineStore('ministries', {
       } finally {
         this.loading = false
       }
+    },
+
+    async bulkDeleteMinistries(ministryIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        const response = await axios.delete('/church-records/ministries/bulkDeleteMinistries', {
+          data: { ministryIds },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (response.data.success) {
+          await this.fetchMinistries({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete ministries'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete ministries'
+        console.error('Error bulk deleting ministries:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

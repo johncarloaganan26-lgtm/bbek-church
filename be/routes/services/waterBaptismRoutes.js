@@ -7,6 +7,7 @@ const {
   getWaterBaptismByMemberId,
   updateWaterBaptism,
   deleteWaterBaptism,
+  bulkDeleteWaterBaptisms,
   exportWaterBaptismsToExcel
 } = require('../../dbHelpers/services/waterBaptismRecords');
 const { getMemberById, createMember, getSpecificMemberByEmailAndStatus } = require('../../dbHelpers/church_records/memberRecords');
@@ -723,6 +724,50 @@ router.delete('/deleteWaterBaptism/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete water baptism'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple water baptism records
+ * DELETE /api/services/water-baptisms/bulkDeleteWaterBaptisms
+ * Body: { baptismIds: ["id1", "id2", "id3"] }
+ */
+router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
+  try {
+    const { baptismIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'baptismIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteWaterBaptisms(baptismIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting water baptisms:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete water baptisms'
     });
   }
 });

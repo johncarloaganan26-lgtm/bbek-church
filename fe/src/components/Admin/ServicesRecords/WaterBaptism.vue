@@ -522,24 +522,25 @@ const bulkDeleteBaptisms = async () => {
       }
     )
 
-    const deletePromises = selectedBaptisms.value.map(baptism =>
-      waterBaptismStore.deleteBaptism(baptism.baptism_id)
-    )
+    // Extract baptism IDs
+    const baptismIds = selectedBaptisms.value.map(baptism => baptism.baptism_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await waterBaptismStore.bulkDeleteWaterBaptisms(baptismIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} water baptism record${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} water baptism record${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} water baptism record${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} water baptism record${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await waterBaptismStore.fetchBaptisms()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting baptisms:', error)

@@ -654,6 +654,65 @@ async function deleteEvent(eventId, archivedBy = null) {
   }
 }
 
+/**
+ * Bulk delete events with archiving
+ * @param {Array<number>} eventIds - Array of event IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteEvents(eventIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(eventIds) || eventIds.length === 0) {
+      throw new Error('Event IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = eventIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid event IDs provided');
+    }
+
+    // Archive events before bulk delete
+    const eventsToDelete = [];
+
+    // Get event data for archiving
+    for (const eventId of validIds) {
+      try {
+        const event = await getEventById(eventId);
+        if (event.success && event.data) {
+          eventsToDelete.push(event.data);
+          await archiveBeforeDelete('tbl_events', String(eventId), event.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive event ${eventId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_events WHERE event_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_events: eventsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting events:', error);
+    throw error;
+  }
+}
+
 async function exportEventsToExcel(options = {}) {
   try {
     const exportOptions = { ...options };
@@ -1073,6 +1132,7 @@ module.exports = {
   getEventById,
   updateEvent,
   deleteEvent,
+  bulkDeleteEvents,
   exportEventsToExcel,
   getEventsByMemberId,
   getSermonEvents,

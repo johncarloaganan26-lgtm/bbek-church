@@ -885,6 +885,65 @@ async function forgotPasswordByEmail(email) {
   }
 }
 
+/**
+ * BULK DELETE ACCOUNTS - Permanently delete multiple account records in a single operation
+ * @param {Array<Number>} accountIds - Array of Account IDs to delete
+ * @param {String} archivedBy - User ID who is archiving the records
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteAccounts(accountIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(accountIds) || accountIds.length === 0) {
+      throw new Error('Account IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = accountIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid account IDs provided');
+    }
+
+    // Archive accounts before bulk delete
+    const accountsToDelete = [];
+
+    // Get account data for archiving
+    for (const accountId of validIds) {
+      try {
+        const account = await getAccountById(accountId);
+        if (account.success && account.data) {
+          accountsToDelete.push(account.data);
+          await archiveBeforeDelete('tbl_accounts', String(accountId), account.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive account ${accountId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_accounts WHERE acc_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_accounts: accountsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting accounts:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createAccount,
   getAllAccounts,
@@ -892,6 +951,7 @@ module.exports = {
   getAccountByEmail,
   updateAccount,
   deleteAccount,
+  bulkDeleteAccounts,
   verifyAccountCredentials,
   hashPassword,
   comparePassword,

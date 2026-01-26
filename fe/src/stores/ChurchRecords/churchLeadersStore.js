@@ -218,6 +218,42 @@ export const useChurchLeadersStore = defineStore('churchLeaders', {
       }
     },
 
+    async bulkDeleteLeaders(leaderIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+
+      try {
+        const response = await axios.delete('/church-records/church-leaders/bulkDeleteChurchLeaders', {
+          data: {
+            leader_ids: leaderIds
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data && response.status === 200) {
+          await this.fetchLeaders()
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete leaders'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete leaders'
+        console.error('Error bulk deleting leaders:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchMemberOptions() {
       try {
         const response = await axios.get('/church-records/members/getAllPastorsForSelect')

@@ -7,6 +7,7 @@ const {
   getBurialServicesByMemberId,
   updateBurialService,
   deleteBurialService,
+  bulkDeleteBurialServices,
   exportBurialServicesToExcel,
   searchBurialServicesFulltext,
   analyzeBurialServiceAvailability
@@ -482,6 +483,50 @@ router.delete('/deleteBurialService/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete burial service'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple burial service records
+ * DELETE /api/church-records/burial-services/bulkDeleteBurialServices
+ * Body: { burialIds: ["id1", "id2", "id3"] }
+ */
+router.delete('/bulkDeleteBurialServices', async (req, res) => {
+  try {
+    const { burialIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(burialIds) || burialIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'burialIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteBurialServices(burialIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting burial services:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete burial services'
     });
   }
 });

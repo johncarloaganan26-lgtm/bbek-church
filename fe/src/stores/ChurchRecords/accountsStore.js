@@ -245,6 +245,42 @@ export const useAccountsStore = defineStore('accounts', {
       }
     },
 
+    async bulkDeleteAccounts(accountIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+
+      try {
+        const response = await axios.delete('/church-records/accounts/bulkDeleteAccounts', {
+          data: {
+            account_ids: accountIds
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data && response.status === 200) {
+          await this.fetchAccounts()
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete accounts'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete accounts'
+        console.error('Error bulk deleting accounts:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchEmailOptions() {
       try {
         const response = await axios.get('/church-records/members/getAllMembersForSelect')

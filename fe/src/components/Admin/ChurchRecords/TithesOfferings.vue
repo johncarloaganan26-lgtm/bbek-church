@@ -527,25 +527,26 @@ const handleBulkDelete = async () => {
       }
     )
 
-    const results = []
-    for (const tithe of selectedTithes.value) {
-      const result = await tithesOfferingsStore.deleteDonation(tithe.tithes_id)
-      results.push(result)
+    // Extract tithes IDs
+    const tithesIds = selectedTithes.value.map(tithe => tithe.tithes_id)
+
+    // Use the new bulk delete endpoint
+    const result = await tithesOfferingsStore.bulkDeleteTithes(tithesIds)
+
+    if (result.success) {
+      const { deleted, failed } = result.data
+
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} donation${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} donation${failed > 1 ? 's' : ''}`)
+      }
     }
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.length - successCount
-
-    if (successCount > 0) {
-      ElMessage.success(`${successCount} donation(s) deleted successfully`)
-    }
-    if (failCount > 0) {
-      ElMessage.error(`Failed to delete ${failCount} donation(s)`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedTithes.value = []
-    await tithesOfferingsStore.fetchDonations()
 
   } catch (error) {
     if (error !== 'cancel') {

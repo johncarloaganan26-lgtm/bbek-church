@@ -303,6 +303,51 @@ export const useFormsStore = defineStore('forms', {
     },
 
     /**
+     * Bulk delete forms
+     */
+    async bulkDeleteForms(formIds) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await axios.delete('/forms/bulkDeleteForms', {
+          data: {
+            form_ids: formIds
+          }
+        })
+
+        if (response.data.success) {
+          // Remove deleted forms from the list
+          this.forms = this.forms.filter(f => !formIds.includes(f.form_id))
+
+          // Refresh forms list
+          await this.fetchForms({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery,
+            status: this.filters.status,
+            form_type: this.filters.form_type
+          })
+
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          throw new Error(response.data.message || 'Failed to bulk delete forms')
+        }
+      } catch (error) {
+        console.error('Error bulk deleting forms:', error)
+        const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to bulk delete forms'
+        this.error = errorMessage
+        throw new Error(errorMessage)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
      * Set search query
      */
     setSearchQuery(query) {

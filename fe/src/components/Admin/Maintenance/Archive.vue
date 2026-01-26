@@ -621,24 +621,26 @@ const bulkDeleteArchives = async () => {
       }
     )
 
-    const deletePromises = selectedArchives.value.map(archive =>
-      archiveStore.deleteArchivePermanently(archive.archive_id)
-    )
+    // Extract archive IDs
+    const archiveIds = selectedArchives.value.map(archive => archive.archive_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await archiveStore.bulkDeleteArchivesPermanently(archiveIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} archive${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} archive${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} archive${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} archive${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()
-    await fetchArchives()
+    // fetchArchives() is already called in the store method
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Error bulk deleting archives:', error)

@@ -735,12 +735,131 @@ async function deleteApproval(id, archivedBy = null) {
   };
 }
 
+/**
+ * Bulk delete approvals with archiving
+ * @param {Array<number>} approvalIds - Array of approval IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteApprovals(approvalIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(approvalIds) || approvalIds.length === 0) {
+      throw new Error('Approval IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = approvalIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid approval IDs provided');
+    }
+
+    // Archive approvals before bulk delete
+    const approvalsToDelete = [];
+
+    // Get approval data for archiving
+    for (const approvalId of validIds) {
+      try {
+        const approval = await getApprovalById(approvalId);
+        if (approval.success && approval.data) {
+          approvalsToDelete.push(approval.data);
+          await archiveBeforeDelete('tbl_approval', String(approvalId), approval.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive approval ${approvalId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_approval WHERE approval_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_approvals: approvalsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting approvals:', error);
+    throw error;
+  }
+}
+
+/**
+ * Bulk delete approvals with archiving
+ * @param {Array<number>} approvalIds - Array of approval IDs to delete
+ * @param {number|null} archivedBy - User ID who performed the deletion
+ * @returns {Object} Result object with success status and details
+ */
+async function bulkDeleteApprovals(approvalIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(approvalIds) || approvalIds.length === 0) {
+      throw new Error('Approval IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = approvalIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid approval IDs provided');
+    }
+
+    // Archive approvals before bulk delete
+    const approvalsToDelete = [];
+
+    // Get approval data for archiving
+    for (const approvalId of validIds) {
+      try {
+        const approval = await getApprovalById(approvalId);
+        if (approval.success && approval.data) {
+          approvalsToDelete.push(approval.data);
+          await archiveBeforeDelete('tbl_approval', String(approvalId), approval.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive approval ${approvalId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_approval WHERE approval_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_approvals: approvalsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting approvals:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createApproval,
   getAllApprovals,
   getApprovalById,
   updateApprovalStatus,
   deleteApproval,
+  bulkDeleteApprovals,
   checkMemberApprovalExists,
   checkMemberApprovalStatus
 };
@@ -816,4 +935,5 @@ async function checkMemberApprovalStatus(email, type, request_id) {
     };
   }
 }
+
 

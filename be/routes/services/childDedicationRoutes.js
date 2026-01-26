@@ -7,6 +7,7 @@ const {
   getChildDedicationsByRequester,
   updateChildDedication,
   deleteChildDedication,
+  bulkDeleteChildDedications,
   exportChildDedicationsToExcel,
   checkDuplicateChildDedication,
   checkTimeSlotAvailability
@@ -405,6 +406,50 @@ router.delete('/deleteChildDedication/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete child dedication'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple child dedication records
+ * DELETE /api/church-records/child-dedications/bulkDeleteChildDedications
+ * Body: { childIds: ["id1", "id2", "id3"] }
+ */
+router.delete('/bulkDeleteChildDedications', async (req, res) => {
+  try {
+    const { childIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(childIds) || childIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'childIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteChildDedications(childIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting child dedications:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete child dedications'
     });
   }
 });

@@ -392,7 +392,81 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
         this.currentPage = 1
         this.fetchBaptisms({ page: 1, pageSize, search: this.searchQuery })
       }
+    },
+
+    async bulkDeleteWaterBaptisms(baptismIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        const response = await axios.delete('/services/water-baptisms/bulkDeleteWaterBaptisms', {
+          data: { baptismIds },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (response.data.success) {
+          await this.fetchBaptisms({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete water baptisms'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete water baptisms'
+        console.error('Error bulk deleting water baptisms:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async bulkDeleteWaterBaptisms(baptismIds) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        const response = await axios.delete('/services/water-baptisms/bulkDeleteWaterBaptisms', {
+          data: { baptismIds },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (response.data.success) {
+          await this.fetchBaptisms({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          this.error = response.data.message || 'Failed to bulk delete water baptisms'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to bulk delete water baptisms'
+        console.error('Error bulk deleting water baptisms:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })
+
+
 

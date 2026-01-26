@@ -186,6 +186,45 @@ export const useArchiveStore = defineStore('archive', {
       }
     },
 
+    async bulkDeleteArchivesPermanently(archiveIds) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const accessToken = localStorage.getItem('accessToken')
+        const response = await axios.delete('/archives/bulkDeleteArchives', {
+          data: {
+            archive_ids: archiveIds
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        })
+
+        if (response.data.success) {
+          // Refresh the archives list and summary stats
+          await this.fetchArchives()
+          await this.fetchSummaryStats()
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message
+          }
+        } else {
+          throw new Error(response.data.message || 'Failed to bulk delete archives')
+        }
+      } catch (error) {
+        console.error('Error bulk deleting archives:', error)
+        const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to bulk delete archives'
+        this.error = errorMessage
+        const bulkDeleteError = new Error(errorMessage)
+        bulkDeleteError.response = error.response
+        throw bulkDeleteError
+      } finally {
+        this.loading = false
+      }
+    },
+
     setSearchQuery(query) {
       this.searchQuery = query
       this.currentPage = 1

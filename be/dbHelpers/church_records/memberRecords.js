@@ -1538,12 +1538,72 @@ async function checkExistingMember(memberData) {
   }
 }
 
+/**
+ * BULK DELETE MEMBERS - Permanently delete multiple member records in a single operation
+ * @param {Array<Number>} memberIds - Array of Member IDs to delete
+ * @param {String} archivedBy - User ID who is archiving the records
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteMembers(memberIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(memberIds) || memberIds.length === 0) {
+      throw new Error('Member IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = memberIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid member IDs provided');
+    }
+
+    // Archive members before bulk delete
+    const membersToDelete = [];
+
+    // Get member data for archiving
+    for (const memberId of validIds) {
+      try {
+        const member = await getMemberById(memberId);
+        if (member.success && member.data) {
+          membersToDelete.push(member.data);
+          await archiveRecord('tbl_members', String(memberId), member.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive member ${memberId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_members WHERE member_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_members: membersToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting members:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createMember,
   getAllMembers,
   getMemberById,
   updateMember,
   deleteMember,
+  bulkDeleteMembers,
   getNextMemberId,
   exportMembersToExcel,
   exportMembersToCSV,

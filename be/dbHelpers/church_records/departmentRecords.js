@@ -758,6 +758,65 @@ async function getAllDepartmentsForSelect() {
   }
 }
 
+/**
+ * BULK DELETE DEPARTMENTS - Permanently delete multiple department records in a single operation
+ * @param {Array<Number>} departmentIds - Array of Department IDs to delete
+ * @param {String} archivedBy - User ID who is archiving the records
+ * @returns {Promise<Object>} Result object with success/failure counts
+ */
+async function bulkDeleteDepartments(departmentIds, archivedBy = null) {
+  try {
+    if (!Array.isArray(departmentIds) || departmentIds.length === 0) {
+      throw new Error('Department IDs array is required and cannot be empty');
+    }
+
+    // Validate all IDs are numbers
+    const validIds = departmentIds.filter(id => typeof id === 'number' && id > 0);
+    if (validIds.length === 0) {
+      throw new Error('No valid department IDs provided');
+    }
+
+    // Archive departments before bulk delete
+    const departmentsToDelete = [];
+
+    // Get department data for archiving
+    for (const departmentId of validIds) {
+      try {
+        const department = await getDepartmentById(departmentId);
+        if (department.success && department.data) {
+          departmentsToDelete.push(department.data);
+          await archiveBeforeDelete('tbl_departments', String(departmentId), department.data, archivedBy);
+        }
+      } catch (error) {
+        console.warn(`Failed to archive department ${departmentId}:`, error.message);
+        // Continue with deletion even if archiving fails
+      }
+    }
+
+    // Perform bulk delete
+    const placeholders = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_departments WHERE department_id IN (${placeholders})`;
+    const [deleteResult] = await query(deleteSql, validIds);
+
+    const deletedCount = deleteResult.affectedRows || 0;
+    const failedCount = validIds.length - deletedCount;
+
+    return {
+      success: true,
+      message: `Bulk delete completed: ${deletedCount} deleted, ${failedCount} failed`,
+      data: {
+        requested: validIds.length,
+        deleted: deletedCount,
+        failed: failedCount,
+        archived_departments: departmentsToDelete
+      }
+    };
+  } catch (error) {
+    console.error('Error bulk deleting departments:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createDepartment,
   getAllDepartments,
@@ -765,6 +824,7 @@ module.exports = {
   getDepartmentByName,
   updateDepartment,
   deleteDepartment,
+  bulkDeleteDepartments,
   checkDuplicateDepartment,
   exportDepartmentsToExcel,
   getAllDepartmentsForSelect

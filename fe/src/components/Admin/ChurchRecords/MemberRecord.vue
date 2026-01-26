@@ -798,25 +798,27 @@ const handleBulkDelete = async () => {
       }
     )
 
-    const results = []
-    for (const member of selectedMembers.value) {
-      const result = await memberStore.deleteMember(member.member_id)
-      results.push(result)
+    // Extract member IDs
+    const memberIds = selectedMembers.value.map(member => member.member_id)
+
+    // Use the new bulk delete endpoint
+    const result = await memberStore.bulkDeleteMembers(memberIds)
+
+    if (result.success) {
+      const { deleted, failed } = result.data
+
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} member${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} member${failed > 1 ? 's' : ''}`)
+      }
     }
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.length - successCount
-
-    if (successCount > 0) {
-      ElMessage.success(`${successCount} member(s) deleted successfully`)
-    }
-    if (failCount > 0) {
-      ElMessage.error(`Failed to delete ${failCount} member(s)`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedMembers.value = []
-    handleMemberSuccess()
+    // handleMemberSuccess() is already called in the store method
 
   } catch (error) {
     if (error !== 'cancel') {

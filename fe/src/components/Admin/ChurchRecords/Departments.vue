@@ -751,27 +751,27 @@ const handleBulkDelete = async () => {
       }
     )
 
-    // Delete departments one by one
-    const deletePromises = selectedDepartments.value.map(department =>
-      departmentsStore.deleteDepartment(department.department_id)
-    )
+    // Extract department IDs
+    const departmentIds = selectedDepartments.value.map(department => department.department_id)
 
-    const results = await Promise.allSettled(deletePromises)
+    // Use the new bulk delete endpoint
+    const result = await departmentsStore.bulkDeleteDepartments(departmentIds)
 
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} department(s)`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} department${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} department${failed > 1 ? 's' : ''}`)
+      }
     }
 
-    if (failed > 0) {
-      ElMessage.error(`Failed to delete ${failed} department(s)`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedDepartments.value = []
-    await departmentsStore.fetchDepartments()
+    // fetchDepartments() is already called in the store method
 
   } catch (error) {
     if (error !== 'cancel') {

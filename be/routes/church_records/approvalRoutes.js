@@ -5,6 +5,7 @@ const {
   getApprovalById,
   updateApprovalStatus,
   deleteApproval,
+  bulkDeleteApprovals,
   checkMemberApprovalExists,
   checkMemberApprovalStatus
 } = require('../../dbHelpers/church_records/approvalRecord');
@@ -295,6 +296,50 @@ router.delete('/deleteApproval/:id', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Failed to delete approval'
+    });
+  }
+});
+
+/**
+ * BULK DELETE - Delete multiple approval records
+ * DELETE /api/church-records/approvals/bulkDeleteApprovals
+ * Body: { approvalIds: [1, 2, 3] }
+ */
+router.delete('/bulkDeleteApprovals', async (req, res) => {
+  try {
+    const { approvalIds } = req.body;
+    const archivedBy = req.user?.acc_id || null;
+
+    if (!Array.isArray(approvalIds) || approvalIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'approvalIds array is required and cannot be empty'
+      });
+    }
+
+    // Skip audit trail for bulk operations to improve performance
+    req.skipAuditTrail = true;
+
+    const result = await bulkDeleteApprovals(approvalIds, archivedBy);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error bulk deleting approvals:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to bulk delete approvals'
     });
   }
 });

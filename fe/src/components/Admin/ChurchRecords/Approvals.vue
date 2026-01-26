@@ -631,20 +631,22 @@ const bulkDeleteApprovals = async () => {
       }
     )
 
-    const deletePromises = selectedApprovals.value.map(approval =>
-      approvalsStore.deleteApproval(approval.approval_id)
-    )
+    // Extract approval IDs
+    const approvalIds = selectedApprovals.value.map(approval => approval.approval_id)
 
-    const results = await Promise.allSettled(deletePromises)
-    const successful = results.filter(result => result.status === 'fulfilled' && result.value.success).length
-    const failed = results.length - successful
+    // Use the new bulk delete endpoint
+    const result = await approvalsStore.bulkDeleteApprovals(approvalIds)
 
-    if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} approval${successful > 1 ? 's' : ''}`)
-    }
+    if (result.success) {
+      const { deleted, failed } = result.data
 
-    if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} approval${failed > 1 ? 's' : ''}`)
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} approval${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} approval${failed > 1 ? 's' : ''}`)
+      }
     }
 
     clearSelection()

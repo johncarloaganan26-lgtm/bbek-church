@@ -392,25 +392,26 @@ const handleBulkDelete = async () => {
       }
     )
 
-    const results = []
-    for (const event of selectedEvents.value) {
-      const result = await eventsRecordsStore.deleteEvent(event.event_id)
-      results.push(result)
+    // Extract event IDs
+    const eventIds = selectedEvents.value.map(event => event.event_id)
+
+    // Use the new bulk delete endpoint
+    const result = await eventsRecordsStore.bulkDeleteEvents(eventIds)
+
+    if (result.success) {
+      const { deleted, failed } = result.data
+
+      if (deleted > 0) {
+        ElMessage.success(`Successfully deleted ${deleted} event${deleted > 1 ? 's' : ''}`)
+      }
+
+      if (failed > 0) {
+        ElMessage.warning(`Failed to delete ${failed} event${failed > 1 ? 's' : ''}`)
+      }
     }
 
-    const successCount = results.filter(r => r.success).length
-    const failCount = results.length - successCount
-
-    if (successCount > 0) {
-      ElMessage.success(`${successCount} event(s) deleted successfully`)
-    }
-    if (failCount > 0) {
-      ElMessage.error(`Failed to delete ${failCount} event(s)`)
-    }
-
-    // Clear selection and refresh data
+    // Clear selection
     selectedEvents.value = []
-    await eventsRecordsStore.fetchEvents()
 
   } catch (error) {
     if (error !== 'cancel') {
