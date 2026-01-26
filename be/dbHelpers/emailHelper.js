@@ -391,15 +391,13 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
               <h3 style="color: #2c3e50; margin-top: 0;">Baptism Service Details</h3>
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Member Name:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${status === 'completed' ? 'Member Name:' : 'Name:'}</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${memberName}</td>
                 </tr>
-                ${status === 'approved' ? `
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
                 </tr>
-                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Baptism Date:</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${baptismDate}</td>
