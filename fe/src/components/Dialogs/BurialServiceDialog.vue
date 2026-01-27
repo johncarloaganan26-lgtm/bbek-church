@@ -176,19 +176,6 @@
        />
      </el-form-item>
 
-     <!-- Deceased Age (auto-calculated) -->
-     <el-form-item label="Deceased Age">
-       <el-input-number
-         v-model="formData.deceased_age"
-         :min="0"
-         :max="150"
-         placeholder="Age will be calculated from birth and death dates"
-         size="large"
-         style="width: 100%"
-         :disabled="true"
-       />
-     </el-form-item>
-
      <!-- Relationship -->
      <el-form-item prop="relationship">
        <template #label>
@@ -500,7 +487,6 @@ const formData = reactive({
   deceased_name: '',
   deceased_birthdate: null,
   date_death: null,
-  deceased_age: null,
   relationship: '',
   location: '',
   pastor_name: null,
@@ -679,7 +665,6 @@ watch(
       formData.deceased_name = newData.deceased_name || ''
       formData.deceased_birthdate = newData.deceased_birthdate || null
       formData.date_death = newData.date_death ? new Date(newData.date_death.replace(' ', 'T')) : null
-      formData.deceased_age = newData.deceased_age || null
       // Calculate age if both dates are available
       if (formData.deceased_birthdate && formData.date_death) {
         calculateDeceasedAge()
@@ -721,7 +706,6 @@ watch(
         formData.deceased_name = data.deceased_name || ''
         formData.deceased_birthdate = data.deceased_birthdate || null
         formData.date_death = data.date_death ? new Date(data.date_death.replace(' ', 'T')) : null
-        formData.deceased_age = data.deceased_age || null
         // Calculate age if both dates are available
         if (formData.deceased_birthdate && formData.date_death) {
           calculateDeceasedAge()
@@ -783,7 +767,6 @@ const resetForm = () => {
   formData.deceased_name = ''
   formData.deceased_birthdate = null
   formData.date_death = null
-  formData.deceased_age = null
   formData.relationship = ''
   formData.location = ''
   formData.pastor_name = null
@@ -970,10 +953,11 @@ const handleSubmit = async () => {
 }
 
 
-// Calculate deceased age based on birthdate and date of death
+// Calculate deceased age based on birthdate and date of death (for validation only)
 const calculateDeceasedAge = () => {
+  // Age calculation kept for potential future validation use
+  // Currently not displayed or stored since table doesn't have age field
   if (!formData.deceased_birthdate || !formData.date_death) {
-    formData.deceased_age = null
     return
   }
 
@@ -981,7 +965,6 @@ const calculateDeceasedAge = () => {
   const deathDate = new Date(formData.date_death)
 
   if (birthDate >= deathDate) {
-    formData.deceased_age = null
     return
   }
 
@@ -992,7 +975,8 @@ const calculateDeceasedAge = () => {
     age--
   }
 
-  formData.deceased_age = age >= 0 ? age : null
+  // Age calculated but not stored/displayed
+  return age >= 0 ? age : null
 }
 
 // Expose method to reset loading (can be called by parent component on API error)

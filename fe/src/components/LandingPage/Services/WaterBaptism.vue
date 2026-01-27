@@ -434,17 +434,6 @@
                               <el-option label="Female" value="F" />
                             </el-select>
                           </el-form-item>
-                          <el-form-item :label="`Child ${index + 1} Age`" :prop="`children.${index}.age`" class="form-group">
-                            <el-input-number
-                              v-model="child.age"
-                              :min="0"
-                              :max="18"
-                              :placeholder="child.birthday ? 'Age will be calculated from birthday' : 'Enter age'"
-                              size="large"
-                              style="width: 100%"
-                              :disabled="!!child.birthday || memberRegistrationStore.loading"
-                            />
-                          </el-form-item>
                           <el-form-item :label="`Child ${index + 1} Birthday`" :prop="`children.${index}.birthday`" class="form-group">
                             <el-date-picker
                               v-model="child.birthday"
