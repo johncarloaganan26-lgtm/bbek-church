@@ -160,11 +160,20 @@
         </thead>
         <tbody>
           <tr v-if="!loading && sortedEvents.length === 0">
-            <td colspan="9" class="text-center py-12">
+            <td colspan="10" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-for="event in sortedEvents" :key="event.event_id">
+            <td class="text-center">
+              <v-checkbox
+                :model-value="isEventSelected(event)"
+                @update:model-value="(selected) => toggleEventSelection(event, selected)"
+                :disabled="loading"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>{{ event.title }}</td>
             <td>{{ formatDateTime(event.start_date) }}</td>
             <td>{{ formatDateTime(event.end_date) }}</td>
