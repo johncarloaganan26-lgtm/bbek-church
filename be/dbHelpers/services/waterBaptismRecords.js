@@ -1092,6 +1092,66 @@ async function updateWaterBaptism(baptismId, baptismData) {
       };
     }
 
+    // Check if status changed from 'approved' to 'completed' - create account and send setup email
+    const previousStatus = baptismCheck.data.status;
+    const newStatus = status !== undefined ? status : previousStatus;
+
+    if (previousStatus === 'approved' && newStatus === 'completed') {
+      console.log(`=== Status changed from 'approved' to 'completed' for baptism ${baptismId} ===`);
+
+      const baptism = baptismCheck.data;
+
+      if (baptism.email) {
+        console.log(`✅ Creating account for ${baptism.email}...`);
+
+        const name = `${baptism.firstname || ''} ${baptism.middle_name ? baptism.middle_name + ' ' : ''}${baptism.lastname || ''}`.trim();
+        const tempPassword = Math.random().toString(36).slice(-12);
+
+        // Create account
+        let accountId = null;
+        try {
+          const bcrypt = require('bcrypt');
+          const SALT_ROUNDS = 10;
+          const salt = await bcrypt.genSalt(SALT_ROUNDS);
+          const hashedPassword = await bcrypt.hash(tempPassword, salt);
+
+          const [existingAccounts] = await query(
+            'SELECT acc_id FROM tbl_accounts WHERE email = ?',
+            [baptism.email.toLowerCase()]
+          );
+
+          if (existingAccounts.length === 0) {
+            const [insertResult] = await query(
+              `INSERT INTO tbl_accounts (email, password, position, acc_name, status, date_created) 
+               VALUES (?, ?, 'Member', ?, 'active', NOW())`,
+              [baptism.email.toLowerCase(), hashedPassword, name || 'Water Baptism Member']
+            );
+            accountId = insertResult.insertId;
+            console.log(`✅ Account created with ID: ${accountId}`);
+          } else {
+            accountId = existingAccounts[0].acc_id;
+            console.log(`ℹ️ Account already exists with ID: ${accountId}`);
+          }
+        } catch (accountError) {
+          console.error(`❌ Account creation failed: ${accountError.message}`);
+        }
+
+        // Send account setup email
+        try {
+          await sendAccountDetails({
+            acc_id: accountId || 0,
+            email: baptism.email,
+            name: name || 'Water Baptism Member',
+            type: 'new_account',
+            temporaryPassword: tempPassword
+          });
+          console.log(`✅ Account setup email sent to ${baptism.email}`);
+        } catch (emailError) {
+          console.error(`❌ Failed to send account setup email: ${emailError.message}`);
+        }
+      }
+    }
+
     // Fetch updated baptism
     const updatedBaptism = await getWaterBaptismById(baptismId);
 
