@@ -3,8 +3,9 @@ const bcrypt = require('bcrypt');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { archiveBeforeDelete } = require('../archiveHelper');
-const  {getSpecificWaterBaptismDataByMemberIdIfBaptized} = require('../services/waterBaptismRecords');
+const { getSpecificWaterBaptismDataByMemberIdIfBaptized } = require('../services/waterBaptismRecords');
 const { getSpecificMemberByEmailAndStatus } = require('../church_records/memberRecords');
 const { sendAccountDetails } = require('../emailHelper');
 
@@ -71,41 +72,41 @@ async function getSpecificMemberByEmailAndPassword(email, password) {
     // First, get the account by email only (don't check password in SQL)
     const sql = 'SELECT * FROM tbl_accounts WHERE email = ? AND status = "active"';
     const [rows] = await query(sql, [email]);
-    
+
     // If no account found, return null
-    if(rows.length === 0) {
+    if (rows.length === 0) {
       return null;
     }
-    
+
     let account = rows[0];
-    
+
     // Verify account is active (double check)
-    if(account.status !== 'active') {
+    if (account.status !== 'active') {
       return {
         success: false,
         message: 'Account is not active',
         data: null
       };
     }
-    
+
     // Now compare the provided password with the stored hashed password
     const isPasswordValid = await comparePassword(password, account.password);
-    
+
     // If password doesn't match, return null
     if (!isPasswordValid) {
       return null;
     }
-    
+
     // Password is valid, proceed with authentication
     // Insert access token to the account
     account.accessToken = jwt.sign({ email: account.email, position: account.position, acc_id: account.acc_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    
-    if(account.position === 'member') {
+
+    if (account.position === 'member') {
       // Find the member by email
       let member = await getSpecificMemberByEmailAndStatus(account.email);
-      if(member) {
+      if (member) {
         let waterBaptism = await getSpecificWaterBaptismDataByMemberIdIfBaptized(member.member_id);
-        if(waterBaptism) {
+        if (waterBaptism) {
           return {
             success: true,
             message: 'Account retrieved successfully',
@@ -139,7 +140,7 @@ async function getSpecificMemberByEmailAndPassword(email, password) {
         }
       };
     }
-    
+
   } catch (error) {
     console.error('Error getting specific member by email and password:', error);
     throw error;
@@ -228,7 +229,7 @@ async function createAccount(accountData) {
     ];
 
     const [result] = await query(sql, params);
-    
+
     // Fetch the created account (without password)
     const createdAccount = await getAccountById(result.insertId);
 
@@ -445,10 +446,10 @@ async function getAccountById(accId, includePassword = false) {
       throw new Error('Account ID is required');
     }
 
-    const fields = includePassword 
+    const fields = includePassword
       ? 'acc_id, email, password, position, status, date_created'
       : 'acc_id, email, position, status, date_created';
-    
+
     const sql = `SELECT ${fields} FROM tbl_accounts WHERE acc_id = ?`;
     const [rows] = await query(sql, [accId]);
 
@@ -486,7 +487,7 @@ async function getAccountByEmail(email, includePassword = false) {
     const fields = includePassword
       ? 'acc_id, email, password, position, status, date_created, reset_token, reset_token_expires'
       : 'acc_id, email, position, status, date_created';
-    
+
     const sql = `SELECT ${fields} FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))`;
     const [rows] = await query(sql, [email]);
 
@@ -695,7 +696,7 @@ async function verifyAccountCredentials(email, password) {
 
     // Get account with password
     const accountResult = await getAccountByEmail(email, true);
-    
+
     if (!accountResult.success) {
       return {
         success: false,
@@ -756,7 +757,7 @@ async function exportAccountsToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllAccounts(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No accounts found to export');
     }
@@ -798,8 +799,8 @@ async function exportAccountsToExcel(options = {}) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Accounts');
 
     // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });
@@ -810,6 +811,19 @@ async function exportAccountsToExcel(options = {}) {
     throw error;
   }
 }
+
+/**
+ * FORGOT PASSWORD - Send a password reset link to the email address
+ * @param {String} email - Email address
+ * @returns {Promise<Object>} Result object
+ */
+
+const crypto = require('crypto');
+
+/**
+ * Generate a secure reset token
+ */
+const generateResetToken = () => crypto.randomBytes(32).toString('hex');
 
 /**
  * FORGOT PASSWORD - Send a password reset link to the email address
@@ -831,6 +845,13 @@ async function forgotPasswordByEmail(email) {
 
     const accountData = account.data;
 
+    // Generate a reset token
+    const token = generateResetToken();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Store the token in the database
+    await createResetToken(accountData.acc_id, token, expiresAt);
+
     // Try to get member information for personalized email
     let recipientName = 'User';
     try {
@@ -846,12 +867,13 @@ async function forgotPasswordByEmail(email) {
       console.log('Could not retrieve member name for email:', error.message);
     }
 
-    // Prepare account details for email
+    // Prepare account details for email - pass the token!
     const accountDetails = {
       acc_id: accountData.acc_id,
       email: accountData.email,
       name: recipientName,
-      type: 'forgot_password'
+      type: 'forgot_password',
+      token: token  // IMPORTANT: Pass the token to the email function
     };
 
     // Send password reset email
@@ -882,6 +904,133 @@ async function forgotPasswordByEmail(email) {
       error: error.message,
       data: null
     };
+  }
+}
+
+/**
+ * CREATE RESET TOKEN - Store a password reset token in the database
+ * @param {Number} accId - Account ID
+ * @param {String} token - Reset token
+ * @param {DateTime} expiresAt - Token expiration time
+ * @returns {Promise<Object>} Result object
+ */
+async function createResetToken(accId, token, expiresAt) {
+  try {
+    // Delete any existing tokens for this account
+    await query('DELETE FROM tbl_password_reset_tokens WHERE acc_id = ?', [accId]);
+
+    // Insert new token
+    const sql = `
+      INSERT INTO tbl_password_reset_tokens (acc_id, token, expires_at, created_at)
+      VALUES (?, ?, ?, NOW())
+    `;
+    await query(sql, [accId, token, expiresAt]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating reset token:', error);
+    throw error;
+  }
+}
+
+/**
+ * VERIFY RESET TOKEN - Check if a reset token is valid and not expired
+ * @param {String} token - Reset token
+ * @returns {Promise<Object>} Result object with account data if valid
+ */
+async function verifyResetToken(token) {
+  try {
+    const sql = `
+      SELECT t.*, a.email, a.position, a.status
+      FROM tbl_password_reset_tokens t
+      INNER JOIN tbl_accounts a ON t.acc_id = a.acc_id
+      WHERE t.token = ? 
+        AND t.expires_at > NOW()
+        AND t.used_at IS NULL
+    `;
+    const [rows] = await query(sql, [token]);
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return {
+      success: true,
+      data: rows[0]
+    };
+  } catch (error) {
+    console.error('Error verifying reset token:', error);
+    return null;
+  }
+}
+
+/**
+ * RESET PASSWORD WITH TOKEN - Reset password using a valid token
+ * @param {String} token - Reset token
+ * @param {String} newPassword - New password
+ * @returns {Promise<Object>} Result object
+ */
+async function resetPasswordWithToken(token, newPassword) {
+  try {
+    // First verify the token
+    const verifyResult = await verifyResetToken(token);
+
+    if (!verifyResult || !verifyResult.data) {
+      return {
+        success: false,
+        message: 'Token is invalid or has expired'
+      };
+    }
+
+    const tokenData = verifyResult.data;
+    const accId = tokenData.acc_id;
+
+    // Hash the new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update the account password
+    await query(
+      'UPDATE tbl_accounts SET password = ? WHERE acc_id = ?',
+      [hashedPassword, accId]
+    );
+
+    // Mark the token as used
+    await query(
+      'UPDATE tbl_password_reset_tokens SET used_at = NOW() WHERE token = ?',
+      [token]
+    );
+
+    return {
+      success: true,
+      message: 'Password reset successfully'
+    };
+  } catch (error) {
+    console.error('Error resetting password with token:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to reset password'
+    };
+  }
+}
+
+/**
+ * UPDATE ACCOUNT PASSWORD - Update password for an account
+ * @param {Number} accId - Account ID
+ * @param {String} newPassword - New password
+ * @returns {Promise<Object>} Result object
+ */
+async function updateAccountPassword(accId, newPassword) {
+  try {
+    const hashedPassword = await hashPassword(newPassword);
+    await query(
+      'UPDATE tbl_accounts SET password = ? WHERE acc_id = ?',
+      [hashedPassword, accId]
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating account password:', error);
+    throw error;
   }
 }
 
@@ -944,6 +1093,38 @@ async function bulkDeleteAccounts(accountIds, archivedBy = null) {
   }
 }
 
+/**
+ * CREATE RESET TOKENS TABLE - Create the password reset tokens table if it doesn't exist
+ * @returns {Promise<Object>} Result object
+ */
+async function createResetTokensTable() {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS tbl_password_reset_tokens (
+      id INT NOT NULL AUTO_INCREMENT,
+      acc_id INT NOT NULL COMMENT 'Account ID from tbl_accounts',
+      token VARCHAR(255) NOT NULL COMMENT 'Reset token',
+      expires_at DATETIME NOT NULL COMMENT 'Token expiration time',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      used_at DATETIME NULL COMMENT 'Timestamp when token was used',
+      PRIMARY KEY (id),
+      UNIQUE KEY unique_token (token),
+      UNIQUE KEY unique_account (acc_id),
+      INDEX idx_expires_at (expires_at),
+      INDEX idx_acc_id (acc_id),
+      INDEX idx_used_at (used_at),
+      CONSTRAINT fk_reset_token_account FOREIGN KEY (acc_id) REFERENCES tbl_accounts (acc_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `;
+
+  try {
+    await query(sql);
+    return { success: true, message: 'Password reset tokens table created successfully' };
+  } catch (error) {
+    console.error('Error creating reset tokens table:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createAccount,
   getAllAccounts,
@@ -958,6 +1139,11 @@ module.exports = {
   checkDuplicateAccount,
   exportAccountsToExcel,
   getSpecificMemberByEmailAndPassword,
-  forgotPasswordByEmail
+  forgotPasswordByEmail,
+  createResetToken,
+  verifyResetToken,
+  resetPasswordWithToken,
+  updateAccountPassword,
+  createResetTokensTable
 };
 
