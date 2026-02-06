@@ -1122,8 +1122,8 @@ async function updateWaterBaptism(baptismId, baptismData) {
 
           if (existingAccounts.length === 0) {
             const [insertResult] = await query(
-              `INSERT INTO tbl_accounts (email, password, position, acc_name, status, date_created) 
-               VALUES (?, ?, 'Member', ?, 'active', NOW())`,
+              `INSERT INTO tbl_accounts (email, password, position, status, date_created) 
+               VALUES (?, ?, 'Member', 'active', NOW())`,
               [baptism.email.toLowerCase(), hashedPassword, name || 'Water Baptism Member']
             );
             accountId = insertResult.insertId;
@@ -1554,8 +1554,8 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
             if (existingAccounts.length === 0) {
               // Insert new account
               const [insertResult] = await query(
-                `INSERT INTO tbl_accounts (email, password, position, acc_name, status, date_created) 
-                 VALUES (?, ?, 'Member', ?, 'active', NOW())`,
+                `INSERT INTO tbl_accounts (email, password, position, status, date_created) 
+                 VALUES (?, ?, 'Member', 'active', NOW())`,
                 [baptism.email.toLowerCase(), hashedPassword, name || 'Water Baptism Member']
               );
               accountId = insertResult.insertId;
