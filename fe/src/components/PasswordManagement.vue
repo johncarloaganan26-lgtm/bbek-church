@@ -31,11 +31,17 @@
             <div v-else-if="!isValidToken" class="text-center py-8">
               <v-icon icon="mdi-alert-circle" size="64" color="error" class="mb-4"></v-icon>
               <h2 class="text-h6 font-weight-bold mb-2">Invalid Link</h2>
-              <p class="text-body-2 text-grey mb-4">
+              <p class="text-body-2 text-grey mb-4" v-if="urlType === 'new_account'">
+                This account setup link is invalid or the account was not found. Please contact the church administration for assistance.
+              </p>
+              <p class="text-body-2 text-grey mb-4" v-else>
                 This password reset link is invalid. Please request a new one.
               </p>
-              <v-btn color="primary" @click="requestNewLink">
+              <v-btn color="primary" @click="requestNewLink" v-if="urlType !== 'new_account'">
                 Request New Link
+              </v-btn>
+              <v-btn color="primary" to="/" v-else>
+                Go to Homepage
               </v-btn>
             </div>
 
@@ -331,7 +337,12 @@ async function fetchAccountById(accountId) {
     } else {
       console.log('❌ Account not found or fetch failed')
       isValidToken.value = false
-      errorMessage.value = 'Account not found. Please request a new password reset link.'
+      // Different error message for new_account vs forgot_password
+      if (urlType === 'new_account') {
+        errorMessage.value = 'Account not found. The account may not have been created yet, or the link may be invalid. Please contact the church administration.'
+      } else {
+        errorMessage.value = 'Account not found. Please request a new password reset link.'
+      }
     }
   } catch (error) {
     console.error('❌ Error fetching account:', error)
