@@ -1124,7 +1124,7 @@ async function updateWaterBaptism(baptismId, baptismData) {
             const [insertResult] = await query(
               `INSERT INTO tbl_accounts (email, password, position, status, date_created) 
                VALUES (?, ?, 'Member', 'active', NOW())`,
-              [baptism.email.toLowerCase(), hashedPassword, name || 'Water Baptism Member']
+              [baptism.email.toLowerCase(), hashedPassword]
             );
             accountId = insertResult.insertId;
             console.log(`✅ Account created with ID: ${accountId}`);
@@ -1136,18 +1136,22 @@ async function updateWaterBaptism(baptismId, baptismData) {
           console.error(`❌ Account creation failed: ${accountError.message}`);
         }
 
-        // Send account setup email
-        try {
-          await sendAccountDetails({
-            acc_id: accountId || 0,
-            email: baptism.email,
-            name: name || 'Water Baptism Member',
-            type: 'new_account',
-            temporaryPassword: tempPassword
-          });
-          console.log(`✅ Account setup email sent to ${baptism.email}`);
-        } catch (emailError) {
-          console.error(`❌ Failed to send account setup email: ${emailError.message}`);
+        // Send account setup email only if account was created/fetched successfully
+        if (!accountId) {
+          console.log(`⚠️ Skipping account setup email - account creation failed`);
+        } else {
+          try {
+            await sendAccountDetails({
+              acc_id: accountId,
+              email: baptism.email,
+              name: name || 'Water Baptism Member',
+              type: 'new_account',
+              temporaryPassword: tempPassword
+            });
+            console.log(`✅ Account setup email sent to ${baptism.email}`);
+          } catch (emailError) {
+            console.error(`❌ Failed to send account setup email: ${emailError.message}`);
+          }
         }
       }
     }

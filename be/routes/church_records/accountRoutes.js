@@ -25,7 +25,7 @@ const {
   createResetTokensTable,
   updateAccountPassword
 } = require('../../dbHelpers/church_records/accountRecords');
-const { auditTrailRecords } = require('../../dbHelpers/auditTrailRecords');
+const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const { getMemberById } = require('../../dbHelpers/church_records/memberRecords');
 const { getAllAccountsByMemberId } = require('../../dbHelpers/church_records/accountRecords');
 
@@ -268,18 +268,27 @@ router.post('/createAccount', async (req, res) => {
 router.put('/updateAccount/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, position, status, member_id } = req.body;
+    const { email, password, position, status, member_id } = req.body;
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required',
-        error: 'Email is required'
-      });
+    // Check if email is provided - if not, we'll get it from the database
+    let emailToUse = email;
+    if (!emailToUse) {
+      // Fetch current account to get email
+      const account = await getAccountById(id);
+      if (account && account.data) {
+        emailToUse = account.data.email;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Account not found',
+          error: 'Account not found'
+        });
+      }
     }
 
     const result = await updateAccount(id, {
-      email,
+      email: emailToUse,
+      password: password,
       position,
       status,
       member_id
@@ -718,25 +727,27 @@ router.post('/login', async (req, res) => {
 
     // Check if result is null (invalid credentials)
     if (!result) {
-      // Log failed login attempt
-      try {
-        await auditTrailRecords.createAuditLog({
-          user_id: null,
-          user_email: email,
-          user_name: 'Unknown User',
-          user_position: 'unknown',
-          action_type: 'LOGIN_FAILED',
-          module: 'Authentication',
-          description: `Failed login attempt for email: ${email}`,
-          entity_type: null,
-          entity_id: null,
-          ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
-          user_agent: null, // Hidden for privacy
-          status: 'failed',
-          error_message: 'Invalid credentials'
-        });
-      } catch (auditError) {
-        console.error('Error logging failed login:', auditError);
+      // Log failed login attempt (but don't fail the request if audit log fails)
+      if (typeof auditTrailRecords?.createAuditLog === 'function') {
+        try {
+          await auditTrailRecords.createAuditLog({
+            user_id: null,
+            user_email: email,
+            user_name: 'Unknown User',
+            user_position: 'unknown',
+            action_type: 'LOGIN_FAILED',
+            module: 'Authentication',
+            description: `Failed login attempt for email: ${email}`,
+            entity_type: null,
+            entity_id: null,
+            ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+            user_agent: null,
+            status: 'failed',
+            error_message: 'Invalid credentials'
+          });
+        } catch (auditError) {
+          console.error('Error logging failed login:', auditError);
+        }
       }
 
       return res.status(401).json({
@@ -885,19 +896,23 @@ router.post('/forgotPassword', async (req, res) => {
       });
     }
 
+    console.log('🔐 Processing forgot password for:', email);
+
     const result = await forgotPasswordByEmail(email);
 
-    if (result) {
+    console.log('🔐 Forgot password result:', result);
+
+    if (result && result.success) {
       return res.status(200).json({
         success: true,
         data: result,
-        message: 'Password reset email sent successfully'
+        message: result.message || 'Password reset email sent successfully'
       });
     } else {
       return res.status(404).json({
         success: false,
-        message: 'Account not found',
-        error: 'Account not found'
+        message: result?.message || 'Account not found',
+        error: result?.message || 'Account not found'
       });
     }
   } catch (error) {

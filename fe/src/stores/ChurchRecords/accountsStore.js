@@ -156,15 +156,22 @@ export const useAccountsStore = defineStore('accounts', {
     async fetchAccountById(id) {
       this.loading = true
       this.error = null
+      console.log('📡 accountsStore.fetchAccountById called with id:', id);
       try {
-        const response = await axios.get(`/church-records/accounts/getAccountById/${id}`)
+        console.log('📡 Calling API: /church-records/accounts/getAccountById/' + id);
+        const response = await axios.get(`/church-records/accounts/getAccountById/${id}`);
+        console.log('📡 API response status:', response.status);
+        console.log('📡 API response data:', response.data);
         if (response.status === 200) {
+          console.log('📡 Account found:', response.data.data);
           return response.data.data
         } else {
+          console.log('📡 API returned non-200 status:', response.status);
           return null
         }
       } catch (error) {
-        console.error('Error fetching account:', error)
+        console.error('📡 Error fetching account:', error);
+        console.error('📡 Error response:', error.response);
         return null
       }
     },
