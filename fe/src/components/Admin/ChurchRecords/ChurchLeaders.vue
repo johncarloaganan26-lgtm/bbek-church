@@ -18,30 +18,11 @@
     <v-card class="mb-4" elevation="2">
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="3">
-            <div class="d-flex gap-2" v-if="selectedLeaders.length > 0">
-              <v-btn
-                color="error"
-                variant="flat"
-                prepend-icon="mdi-delete-multiple"
-                :disabled="loading"
-                @click="handleBulkDelete"
-              >
-                Delete Selected ({{ selectedLeaders.length }})
-              </v-btn>
-              <v-btn
-                variant="text"
-                @click="clearSelection"
-              >
-                Clear Selection
-              </v-btn>
-            </div>
-          </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="4">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
-              placeholder="Search by member ID or name..."
+              placeholder="Search members..."
               variant="outlined"
               density="compact"
               :disabled="loading"
@@ -53,8 +34,8 @@
               v-model="localDateRange"
               type="daterange"
               range-separator="to"
-              start-placeholder="Start date"
-              end-placeholder="End date"
+              start-placeholder="Start"
+              end-placeholder="End"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
               class="w-100"
@@ -133,6 +114,8 @@
             <th class="text-left font-weight-bold">Leader ID</th>
             <th class="text-left font-weight-bold">Member ID</th>
             <th class="text-left font-weight-bold">Full Name</th>
+            <th class="text-left font-weight-bold">Status</th>
+            <th class="text-left font-weight-bold">Position</th>
             <th class="text-left font-weight-bold">Joined Date</th>
             <th class="text-left font-weight-bold">Date Created</th>
             <th class="text-left font-weight-bold">Actions</th>
@@ -140,12 +123,12 @@
         </thead>
         <tbody>
           <tr v-if="!loading && leaders.length === 0">
-            <td colspan="7" class="text-center py-12">
+            <td colspan="9" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="7" class="text-center py-12">
+            <td colspan="9" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -166,6 +149,16 @@
             <td>{{ leader.leader_id }}</td>
             <td>{{ leader.member_id }}</td>
             <td>{{ leader.fullname || 'N/A' }}</td>
+            <td>
+              <v-chip
+                :color="leader.status === 'active' ? 'success' : 'error'"
+                size="small"
+                variant="flat"
+              >
+                {{ leader.status || 'active' }}
+              </v-chip>
+            </td>
+            <td>{{ leader.position || '-' }}</td>
             <td>{{ leader.joined_date }}</td>
             <td>{{ leader.date_created }}</td>
             <td>

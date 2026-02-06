@@ -50,6 +50,7 @@ async function createChurchLeader(leaderData) {
     const {
       member_id,
       joined_date,
+      status = 'active',
       date_created = new Date()
     } = leaderData;
 
@@ -59,6 +60,12 @@ async function createChurchLeader(leaderData) {
     }
     if (!joined_date) {
       throw new Error('Missing required field: joined_date');
+    }
+
+    // Validate status
+    const validStatuses = ['active', 'inactive'];
+    if (status && !validStatuses.includes(status)) {
+      throw new Error('Invalid status. Must be active or inactive');
     }
 
     // Check for duplicate member_id
@@ -84,18 +91,19 @@ async function createChurchLeader(leaderData) {
 
     const sql = `
       INSERT INTO tbl_churchleaders 
-        (member_id, joined_date, date_created)
-      VALUES (?, ?, ?)
+        (member_id, joined_date, status, date_created)
+      VALUES (?, ?, ?, ?)
     `;
 
     const params = [
       member_id.trim(),
       formattedJoinedDate,
+      status,
       formattedDateCreated
     ];
 
     const [result] = await query(sql, params);
-    
+
     // Fetch the created church leader using the auto-generated ID
     const createdLeader = await getChurchLeaderById(result.insertId);
 
@@ -145,10 +153,12 @@ async function getAllChurchLeaders(options = {}) {
       cl.leader_id,
       cl.member_id,
       cl.joined_date,
+      cl.status,
       cl.date_created,
       m.firstname,
       m.lastname,
       m.middle_name,
+      m.position,
       CONCAT(
         m.firstname,
         IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
@@ -393,8 +403,19 @@ async function updateChurchLeader(leaderId, leaderData) {
     const {
       member_id,
       joined_date,
+      status,
       date_created
     } = leaderData;
+
+    // Validate status
+    const validStatuses = ['active', 'inactive'];
+    if (status !== undefined && !validStatuses.includes(status)) {
+      return {
+        success: false,
+        message: 'Invalid status. Must be active or inactive',
+        data: null
+      };
+    }
 
     // Build dynamic update query based on provided fields
     const fields = [];
@@ -424,6 +445,11 @@ async function updateChurchLeader(leaderId, leaderData) {
       const formattedJoinedDate = moment(joined_date).format('YYYY-MM-DD HH:mm:ss');
       fields.push('joined_date = ?');
       params.push(formattedJoinedDate);
+    }
+
+    if (status !== undefined) {
+      fields.push('status = ?');
+      params.push(status);
     }
 
     if (date_created !== undefined) {
@@ -541,7 +567,7 @@ async function exportChurchLeadersToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllChurchLeaders(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No church leaders found to export');
     }
@@ -554,6 +580,9 @@ async function exportChurchLeadersToExcel(options = {}) {
         'No.': index + 1,
         'Leader ID': leader.leader_id || '',
         'Member ID': leader.member_id || '',
+        'Full Name': leader.fullname || `${leader.firstname} ${leader.lastname}`.trim(),
+        'Status': leader.status || 'active',
+        'Position': leader.position || '',
         'Joined Date': leader.joined_date ? moment(leader.joined_date).format('YYYY-MM-DD HH:mm:ss') : '',
         'Date Created': leader.date_created ? moment(leader.date_created).format('YYYY-MM-DD HH:mm:ss') : '',
         'Created Date': leader.date_created ? moment(leader.date_created).format('YYYY-MM-DD') : ''
@@ -571,6 +600,9 @@ async function exportChurchLeadersToExcel(options = {}) {
       { wch: 5 },   // No.
       { wch: 12 },  // Leader ID
       { wch: 15 },  // Member ID
+      { wch: 30 },  // Full Name
+      { wch: 12 },  // Status
+      { wch: 20 },  // Position
       { wch: 20 },  // Joined Date
       { wch: 20 },  // Date Created
       { wch: 12 }   // Created Date
@@ -581,8 +613,8 @@ async function exportChurchLeadersToExcel(options = {}) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Church Leaders');
 
     // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });

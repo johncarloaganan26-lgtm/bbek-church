@@ -57,6 +57,19 @@
           style="width: 100%"
         />
       </el-form-item>
+
+      <!-- Status -->
+      <el-form-item label="Status" prop="status">
+        <el-select
+          v-model="formData.status"
+          placeholder="Select status"
+          size="large"
+          style="width: 100%"
+        >
+          <el-option label="Active" value="active" />
+          <el-option label="Inactive" value="inactive" />
+        </el-select>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -110,7 +123,8 @@ const isEditMode = computed(() => !!props.leaderData)
 // Form data
 const formData = reactive({
   member_id: null,
-  joined_date: ''
+  joined_date: '',
+  status: 'active'
 })
 
 // Validation rules
@@ -140,6 +154,9 @@ const rules = {
       },
       trigger: 'change'
     }
+  ],
+  status: [
+    { required: true, message: 'Status is required', trigger: 'change' }
   ]
 }
 
@@ -150,6 +167,7 @@ watch(() => props.leaderData, (newData) => {
   if (newData && props.modelValue) {
     formData.member_id = newData.member_id ?? null
     formData.joined_date = newData.joined_date || ''
+    formData.status = newData.status || 'active'
   }
 }, { immediate: true })
 
@@ -163,6 +181,7 @@ watch(() => props.modelValue, (isOpen) => {
     const data = props.leaderData
     formData.member_id = data.member_id ?? null
     formData.joined_date = data.joined_date || ''
+    formData.status = data.status || 'active'
   } else {
     // Reset form for add mode
     resetForm()
@@ -173,6 +192,7 @@ watch(() => props.modelValue, (isOpen) => {
 const resetForm = () => {
   formData.member_id = null
   formData.joined_date = ''
+  formData.status = 'active'
   
   // Clear validation
   if (formRef.value) {
@@ -214,7 +234,8 @@ const handleSubmit = async () => {
       // Prepare data for submission
       const submitData = {
         member_id: formData.member_id,
-        joined_date: formData.joined_date
+        joined_date: formData.joined_date,
+        status: formData.status
       }
 
       // Emit submit event with data
