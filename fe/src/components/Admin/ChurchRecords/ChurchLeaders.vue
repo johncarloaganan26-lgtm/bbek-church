@@ -1,7 +1,12 @@
 <template>
   <div class="church-leaders">
     <div class="d-flex justify-space-between align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">Church Leaders</h1>
+      <div class="d-flex align-center gap-3">
+        <h1 class="text-h4 font-weight-bold">Church Leaders</h1>
+        <v-chip v-if="selectedLeaders.length > 0" color="error" size="small">
+          {{ selectedLeaders.length }} selected
+        </v-chip>
+      </div>
       <v-btn 
         color="success" 
         prepend-icon="mdi-account-plus" 
@@ -55,6 +60,19 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="2" class="d-flex align-center gap-2">
+            <v-tooltip text="Bulk Delete" location="top" v-if="selectedLeaders.length > 0">
+              <template v-slot:activator="{ props }">
+                <v-btn 
+                  icon="mdi-delete-sweep"
+                  variant="outlined"
+                  color="error"
+                  v-bind="props"
+                  :loading="loading"
+                  :disabled="loading || selectedLeaders.length === 0"
+                  @click="handleBulkDelete"
+                ></v-btn>
+              </template>
+            </v-tooltip>
             <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
