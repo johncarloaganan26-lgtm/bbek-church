@@ -45,20 +45,30 @@ async function getTableColumns(tableName) {
   }
 }
 
+// Schema cache to avoid redundant database queries during bulk operations
+const schemaCache = new Map();
+
 /**
  * Get column types for a table
  * This function queries the database to get the current schema with types
+ * Now includes simple caching for performance optimization
  */
-async function getTableColumnsWithTypes(tableName) {
+async function getTableColumnsWithTypes(tableName, useCache = true) {
   const { query } = require('../database/db');
+
+  // Return from cache if available and requested
+  if (useCache && schemaCache.has(tableName)) {
+    return schemaCache.get(tableName);
+  }
+
   try {
     // First, check if table exists and get database name
     const dbNameSql = `SELECT DATABASE() as db_name`;
     const [dbResult] = await query(dbNameSql);
     const dbName = dbResult[0]?.db_name;
-    
+
     console.log(`Checking for table ${tableName} in database ${dbName}`);
-    
+
     // Check if table exists (case-insensitive check)
     const checkTableSql = `
       SELECT TABLE_NAME 
@@ -67,7 +77,7 @@ async function getTableColumnsWithTypes(tableName) {
       AND LOWER(TABLE_NAME) = LOWER(?)
     `;
     const [tableCheck] = await query(checkTableSql, [dbName, tableName]);
-    
+
     if (!tableCheck || tableCheck.length === 0) {
       // List all tables to help debug
       const allTablesSql = `
@@ -82,23 +92,23 @@ async function getTableColumnsWithTypes(tableName) {
       console.error(`Found burial-related tables:`, allTables.map(t => t.TABLE_NAME));
       return [];
     }
-    
+
     // Use the actual table name from INFORMATION_SCHEMA (case-sensitive)
     const actualTableName = tableCheck[0].TABLE_NAME;
     console.log(`Found table: ${actualTableName} (requested: ${tableName})`);
-    
+
     // Escape table name with backticks to handle special characters
     const sql = `DESCRIBE \`${actualTableName}\``;
     const [rows] = await query(sql);
-    
+
     if (!rows || rows.length === 0) {
       console.error(`No columns found for table ${actualTableName}.`);
       return [];
     }
-    
+
     console.log(`Successfully retrieved ${rows.length} columns for table ${actualTableName}`);
-    
-    return rows.map(row => {
+
+    const columns = rows.map(row => {
       const typeValue = row.Type;
       return {
         name: row.Field,
@@ -107,6 +117,10 @@ async function getTableColumnsWithTypes(tableName) {
         default: row.Default
       };
     });
+
+    // Save to cache before returning
+    schemaCache.set(tableName, columns);
+    return columns;
   } catch (error) {
     console.error(`Error getting columns with types for ${tableName}:`, error);
     console.error('Error details:', {
@@ -128,7 +142,7 @@ async function getTableColumnsWithTypes(tableName) {
  * @returns {*} Converted value
  */
 function convertValueForMySQL(value, columnType) {
-  if (value === null || value === undefined) {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
 
@@ -137,18 +151,18 @@ function convertValueForMySQL(value, columnType) {
     if (typeof value === 'string') {
       // Remove extra quotes if present (e.g., '"2026-01-05T12:10:34.000Z"' -> '2026-01-05T12:10:34.000Z')
       let cleanedValue = value.trim();
-      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) || 
-          (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
+      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) ||
+        (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
         cleanedValue = cleanedValue.slice(1, -1);
       }
-      
+
       const moment = require('moment');
       const date = moment(cleanedValue);
       if (date.isValid()) {
         return date.format('YYYY-MM-DD HH:mm:ss');
       }
-      // If it's already in MySQL format, return as is
-      return cleanedValue;
+      // If date is invalid, return null
+      return null;
     } else if (value instanceof Date) {
       // Convert Date object to MySQL format
       const moment = require('moment');
@@ -161,20 +175,46 @@ function convertValueForMySQL(value, columnType) {
     if (typeof value === 'string') {
       // Remove extra quotes if present
       let cleanedValue = value.trim();
-      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) || 
-          (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
+      if ((cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) ||
+        (cleanedValue.startsWith("'") && cleanedValue.endsWith("'"))) {
         cleanedValue = cleanedValue.slice(1, -1);
       }
-      
+
       const moment = require('moment');
       const date = moment(cleanedValue);
       if (date.isValid()) {
         return date.format('YYYY-MM-DD');
       }
-      return cleanedValue;
+      // If date is invalid, return null
+      return null;
     } else if (value instanceof Date) {
       const moment = require('moment');
       return moment(value).format('YYYY-MM-DD');
+    }
+  }
+
+  // Handle JSON fields
+  if (columnType.includes('JSON')) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      // Check for empty JSON strings like '' or '{}' or '[]'
+      if (trimmed === '' || trimmed === '{}' || trimmed === '[]') {
+        return null;
+      }
+      // Try to parse to ensure it's valid JSON
+      try {
+        JSON.parse(trimmed);
+        return trimmed;
+      } catch (e) {
+        return null;
+      }
+    } else if (typeof value === 'object') {
+      // Convert object to JSON string
+      try {
+        return JSON.stringify(value);
+      } catch (e) {
+        return null;
+      }
     }
   }
 
@@ -192,7 +232,7 @@ async function mapArchivedDataToCurrentSchema(tableName, archivedData) {
   try {
     // Get current table columns with types
     const columnsWithTypes = await getTableColumnsWithTypes(tableName);
-    
+
     if (columnsWithTypes.length === 0) {
       // Try alternative: use INFORMATION_SCHEMA as fallback
       console.warn(`DESCRIBE failed for ${tableName}, trying INFORMATION_SCHEMA...`);
@@ -206,7 +246,7 @@ async function mapArchivedDataToCurrentSchema(tableName, archivedData) {
           ORDER BY ORDINAL_POSITION
         `;
         const [infoRows] = await query(infoSchemaSql, [tableName]);
-        
+
         if (infoRows && infoRows.length > 0) {
           const mappedColumns = infoRows.map(row => {
             const typeValue = row.Type;
@@ -218,11 +258,11 @@ async function mapArchivedDataToCurrentSchema(tableName, archivedData) {
             };
           });
           console.log(`Successfully retrieved ${mappedColumns.length} columns for ${tableName} via INFORMATION_SCHEMA`);
-          
+
           // Continue with mapped columns
           const validColumns = new Set(mappedColumns.map(col => col.name));
           const columnTypeMap = new Map(mappedColumns.map(col => [col.name, col.type]));
-          
+
           const mappedData = {};
           for (const [key, value] of Object.entries(archivedData)) {
             if (validColumns.has(key)) {
@@ -243,17 +283,17 @@ async function mapArchivedDataToCurrentSchema(tableName, archivedData) {
       } catch (infoSchemaError) {
         console.error(`INFORMATION_SCHEMA query also failed for ${tableName}:`, infoSchemaError);
       }
-      
+
       throw new Error(`Could not retrieve columns for table ${tableName}. Table may not exist or you may not have permission to access it.`);
     }
 
     // Create maps for fast lookup
     const validColumns = new Set(columnsWithTypes.map(col => col.name));
     const columnTypeMap = new Map(columnsWithTypes.map(col => [col.name, col.type]));
-    
+
     // Filter and map the archived data
     const mappedData = {};
-    
+
     for (const [key, value] of Object.entries(archivedData)) {
       // Check if the column exists in current schema
       if (validColumns.has(key)) {

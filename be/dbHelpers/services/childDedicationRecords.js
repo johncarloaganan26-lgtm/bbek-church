@@ -168,6 +168,11 @@ async function createChildDedication(dedicationData) {
       date_of_birth,
       place_of_birth,
       gender,
+      status = 'pending',
+      date_created = new Date()
+    } = dedicationData;
+
+    let {
       preferred_dedication_date,
       preferred_dedication_time = null,
       date_completed = null,
@@ -188,10 +193,16 @@ async function createChildDedication(dedicationData) {
       mother_address = null,
       sponsors = null,
       pastor = null,
-      location = null,
-      status = 'pending',
-      date_created = new Date()
+      location = null
     } = dedicationData;
+
+    // Auto-set completion dates if created as 'completed'
+    if (status === 'completed') {
+      const now = moment();
+      if (!date_completed) date_completed = now.format('YYYY-MM-DD');
+      if (!preferred_dedication_date) preferred_dedication_date = now.format('YYYY-MM-DD');
+      if (!preferred_dedication_time) preferred_dedication_time = now.format('HH:mm');
+    }
 
     // Validate required fields
     if (!requested_by) {
@@ -1130,6 +1141,19 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
       };
     }
 
+    // Auto-set completion date/time if status is changing TO 'completed'
+    const isNowCompleted = status === 'completed' && currentData.status !== 'completed';
+    let finalDedicationDate = preferred_dedication_date;
+    let finalDedicationTime = preferred_dedication_time;
+    let finalDateCompleted = date_completed;
+
+    if (isNowCompleted) {
+      const now = moment();
+      if (finalDateCompleted === undefined) finalDateCompleted = now.format('YYYY-MM-DD');
+      if (finalDedicationDate === undefined) finalDedicationDate = now.format('YYYY-MM-DD');
+      if (finalDedicationTime === undefined) finalDedicationTime = now.format('HH:mm');
+    }
+
     // Build dynamic update query based on provided fields
     const fields = [];
     const params = [];
@@ -1236,13 +1260,13 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
       params.push(location !== null ? location.trim() : null);
     }
 
-    if (preferred_dedication_date !== undefined) {
+    if (finalDedicationDate !== undefined) {
       // Check for time slot conflicts before updating
-      const finalPreferredDate = preferred_dedication_date;
-      const finalPreferredTime = preferred_dedication_time !== undefined ? preferred_dedication_time : currentData.preferred_dedication_time;
+      const finalPreferredDate = finalDedicationDate;
+      const finalPreferredTime = finalDedicationTime !== undefined ? finalDedicationTime : currentData.preferred_dedication_time;
 
       // Only check conflicts if preferred_dedication_date or preferred_dedication_time is being updated
-      if (preferred_dedication_date !== undefined || preferred_dedication_time !== undefined) {
+      if (finalDedicationDate !== undefined || finalDedicationTime !== undefined) {
         const timeSlotCheck = await checkTimeSlotAvailability(
           finalPreferredDate,
           finalPreferredTime,
@@ -1254,14 +1278,14 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
         }
       }
 
-      const formattedPreferredDate = moment(preferred_dedication_date).format('YYYY-MM-DD');
+      const formattedPreferredDate = moment(finalDedicationDate).format('YYYY-MM-DD');
       fields.push('preferred_dedication_date = ?');
       params.push(formattedPreferredDate);
     }
 
-    if (preferred_dedication_time !== undefined) {
-      // Format preferred dedication time to HH:mm:ss
-      let formattedPreferredTime = preferred_dedication_time;
+    if (finalDedicationTime !== undefined) {
+      // Format preferred dedication time to HH:mm
+      let formattedPreferredTime = finalDedicationTime;
       if (formattedPreferredTime) {
         // Handle various time formats
         let timeMoment;
@@ -1275,7 +1299,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
         }
 
         if (timeMoment && timeMoment.isValid()) {
-          formattedPreferredTime = timeMoment.format('HH:mm:ss');
+          formattedPreferredTime = timeMoment.format('HH:mm');
         }
       }
 
@@ -1283,8 +1307,8 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
       params.push(formattedPreferredTime);
     }
 
-    if (date_completed !== undefined) {
-      const formattedDateCompleted = date_completed ? moment(date_completed).format('YYYY-MM-DD') : null;
+    if (finalDateCompleted !== undefined) {
+      const formattedDateCompleted = finalDateCompleted ? moment(finalDateCompleted).format('YYYY-MM-DD') : null;
       fields.push('date_completed = ?');
       params.push(formattedDateCompleted);
     }
@@ -2022,9 +2046,13 @@ async function bulkCompleteChildDedications(childIds) {
           continue;
         }
 
-        // Update the child dedication to completed status with date_completed
-        const updateSql = `UPDATE tbl_childdedications SET status = 'completed', date_completed = CURDATE() WHERE child_id = ?`;
-        await query(updateSql, [childId]);
+        // Update the child dedication to completed status with date_completed and current time
+        const now = moment();
+        const completionDate = now.format('YYYY-MM-DD');
+        const completionTime = now.format('HH:mm');
+
+        const updateSql = `UPDATE tbl_childdedications SET status = 'completed', date_completed = ?, preferred_dedication_date = ?, preferred_dedication_time = ? WHERE child_id = ?`;
+        await query(updateSql, [completionDate, completionDate, completionTime, childId]);
 
         console.log(`✅ Child dedication ${childId} marked as completed. Sending email notification...`);
 
@@ -2050,8 +2078,8 @@ async function bulkCompleteChildDedications(childIds) {
               childBirthdate: dedication.date_of_birth ? moment(dedication.date_of_birth).format('YYYY-MM-DD') : '',
               childGender: dedication.gender ? (dedication.gender.toUpperCase() === 'M' ? 'Male' : 'Female') : '',
               placeOfBirth: dedication.place_of_birth || '',
-              dedicationDate: dedication.preferred_dedication_date ? moment(dedication.preferred_dedication_date).format('YYYY-MM-DD') : 'Completed',
-              dedicationTime: dedication.preferred_dedication_time || null,
+              dedicationDate: completionDate,
+              dedicationTime: completionTime,
               phoneNumber: dedication.contact_phone_number || '',
               address: dedication.contact_address || '',
               fatherName: dedication.father_firstname ? `${dedication.father_firstname} ${dedication.father_lastname || ''}`.trim() : '',

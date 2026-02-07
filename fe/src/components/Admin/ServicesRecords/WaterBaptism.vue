@@ -249,7 +249,12 @@
             </td>
             <!-- <td>{{ baptism.baptism_id }}</td> -->
             <td>{{ baptism.fullname || baptism.member_id }}</td>
-            <td>{{ formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time) }}</td>
+            <td>
+              <div v-if="baptism.status === 'completed'" class="text-success font-weight-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">DATE GOT SAVED:</div>
+              <div :class="{'font-weight-medium': baptism.status === 'completed'}">
+                {{ formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time, baptism.status) }}
+              </div>
+            </td>
             <td>
               <v-chip :color="getStatusColor(baptism.status)" size="small">
                 {{ formatStatus(baptism.status) }}
@@ -701,21 +706,48 @@ const formatDateTime = (dateString) => {
   })
 }
 
-const formatBaptismDateTime = (dateString, timeString) => {
+const formatBaptismDateTime = (dateString, timeString, status) => {
   if (!dateString) return 'Not scheduled'
 
   const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
+
   const datePart = date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
   })
 
+  // If status is completed, we want to show the full timestamp
+  if (status === 'completed') {
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+  // If explicit time string exists, use it
   if (timeString) {
     return `${datePart} at ${timeString}`
   }
 
-  // If no time specified, just show the date
+  // Check if date has a time component (not midnight)
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0
+  if (hasTime) {
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
   return datePart
 }
 
@@ -756,7 +788,10 @@ const handlePrint = () => {
     tableRows += `
       <tr>
         <td>${baptism.fullname || baptism.member_id || 'N/A'}</td>
-        <td>${formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time)}</td>
+        <td>
+          ${baptism.status === 'completed' ? '<div style="font-size: 10px; color: #4CAF50; font-weight: bold; margin-bottom: 2px;">DATE GOT SAVED:</div>' : ''}
+          ${formatBaptismDateTime(baptism.baptism_date, baptism.baptism_time, baptism.status)}
+        </td>
         <td>${formatStatus(baptism.status)}</td>
         <td>${formatDateTime(baptism.date_created)}</td>
       </tr>

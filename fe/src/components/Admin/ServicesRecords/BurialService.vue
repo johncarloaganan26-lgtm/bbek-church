@@ -274,7 +274,12 @@
             <td>{{ service.relationship }}</td>
             <td>{{ service.location }}</td>
             <td>{{ service.pastor_name }}</td>
-            <td>{{ service.service_date ? formatDateTime(service.service_date) : 'Not scheduled' }}</td>
+            <td>
+              <div v-if="service.status === 'completed'" class="text-success font-weight-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">DATE GOT COMPLETED:</div>
+              <div :class="{'font-weight-medium': service.status === 'completed'}">
+                {{ service.service_date ? formatDateTime(service.service_date) : 'Not scheduled' }}
+              </div>
+            </td>
             <td>
               <v-chip :color="getStatusColor(service.status)" size="small">
                 {{ formatStatus(service.status) }}
@@ -864,7 +869,12 @@ const handlePrint = () => {
         <td>${service.relationship || 'N/A'}</td>
         <td>${service.location || 'N/A'}</td>
         <td>${service.pastor_name || 'N/A'}</td>
-        <td>${service.service_date ? formatDateTime(service.service_date) : 'Not scheduled'}</td>
+        <td>
+          ${service.status === 'completed' ? '<div style="color: #27ae60; font-weight: bold; font-size: 10px;">DATE GOT COMPLETED:</div>' : ''}
+          <span style="${service.status === 'completed' ? 'font-weight: bold;' : ''}">
+            ${service.service_date ? formatDateTime(service.service_date) : 'Not scheduled'}
+          </span>
+        </td>
         <td>${formatStatus(service.status)}</td>
         <td>${formatDateTime(service.date_created)}</td>
       </tr>

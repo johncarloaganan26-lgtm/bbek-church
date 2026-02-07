@@ -86,7 +86,7 @@
           <div class="personal-info-section">
             <div class="info-column left-column">
               <div class="info-field-row">
-                <span class="label">Date of Baptism:</span>
+                <span class="label">{{ status === 'completed' ? 'Date Got Saved:' : 'Date of Baptism:' }}</span>
                 <span class="value">{{ formattedBaptismDate }}</span>
               </div>
               <div class="info-field-row">
@@ -295,15 +295,42 @@ const formattedBaptismDate = computed(() => {
     const date = new Date(props.baptismDate)
     if (isNaN(date.getTime())) return 'N/A'
 
+    // Check if date has a time component (not midnight)
+    const hasTimeInDate = date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0
+
     const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
+    // If status is completed, show the full timestamp from baptismDate
+    if (props.status === 'completed' && hasTimeInDate) {
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
+    }
+
+    // Otherwise use explicit baptismTime if available
     if (props.baptismTime) {
-      // Convert time to AM/PM format
       const timeStr = formatTimeToAMPM(props.baptismTime)
       return `${dateStr} at ${timeStr}`
-    } else {
-      return dateStr
+    } 
+    
+    // Fallback: If date itself has time, use it
+    if (hasTimeInDate) {
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      })
     }
+
+    return dateStr
   } catch {
     return 'N/A'
   }

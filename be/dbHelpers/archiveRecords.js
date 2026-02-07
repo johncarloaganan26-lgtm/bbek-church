@@ -484,6 +484,74 @@ async function getArchiveById(archiveId) {
 }
 
 /**
+ * Helper function to clean data before insertion
+ * Converts empty strings to null for MySQL compatibility
+ * Handles JSON columns and date columns properly
+ */
+function cleanDataForInsertion(data, tableName) {
+  const cleanedData = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === null || value === undefined) {
+      cleanedData[key] = null;
+      continue;
+    }
+
+    // Handle date columns - convert empty strings to null
+    if (['baptism_date', 'birth_date', 'marriage_date', 'death_date', 'service_date',
+      'dedication_date', 'wedding_anniversary', 'anniversary', 'start_date', 'end_date',
+      'scheduled_date', 'approved_at', 'completed_at', 'date_completed'].includes(key)) {
+      if (value === '' || value === null || value === undefined) {
+        cleanedData[key] = null;
+      } else {
+        cleanedData[key] = value;
+      }
+      continue;
+    }
+
+    // Handle JSON columns (children, family_members, etc.)
+    if (['children', 'family_members', 'guardian_info', 'family_fields',
+      'requester_info', 'additional_info', 'support_info'].includes(key)) {
+      if (value === '' || value === null || value === undefined) {
+        cleanedData[key] = null;
+      } else if (typeof value === 'object') {
+        // Convert object to JSON string
+        try {
+          cleanedData[key] = JSON.stringify(value);
+        } catch (e) {
+          cleanedData[key] = null;
+        }
+      } else if (typeof value === 'string') {
+        // Validate JSON string
+        const trimmedValue = value.trim();
+        if (trimmedValue === '' || trimmedValue === '{}' || trimmedValue === '[]') {
+          cleanedData[key] = null;
+        } else {
+          try {
+            JSON.parse(trimmedValue);
+            cleanedData[key] = trimmedValue;
+          } catch (e) {
+            cleanedData[key] = null;
+          }
+        }
+      } else {
+        cleanedData[key] = null;
+      }
+      continue;
+    }
+
+    // For other columns, convert empty strings to null
+    if (value === '' || (typeof value === 'string' && value.trim() === '')) {
+      cleanedData[key] = null;
+    } else {
+      cleanedData[key] = value;
+    }
+  }
+
+  return cleanedData;
+}
+
+/**
  * RESTORE - Restore an archived record back to its original table
  * @param {Number} archiveId - Archive ID
  * @param {String} restoredBy - User ID who is restoring the record
@@ -498,146 +566,43 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
 
     // Get the archive record
     const archiveResult = await getArchiveById(archiveId);
-    if (!archiveResult.success) {
-      return {
-        success: false,
-        message: 'Archive record not found',
-        data: null
-      };
+
+    if (!archiveResult.success || !archiveResult.data) {
+      throw new Error('Archive record not found');
     }
 
     const archive = archiveResult.data;
 
-    // Check if already restored (handle both boolean and numeric values from MySQL)
-    const isRestored = archive.restored === 1 || archive.restored === true || archive.restored === '1';
-    if (isRestored) {
+    // Check if already restored
+    if (archive.restored === 1 || archive.restored === true || archive.restored === '1') {
       return {
         success: false,
-        message: 'This record has already been restored',
+        message: 'Archive has already been restored',
         data: null
       };
     }
 
-    // Get the archived data
+    // Get archived data - archived_data is already converted from Buffer to text
     let archivedData = archive.archived_data;
-    if (!archivedData) {
-      return {
-        success: false,
-        message: 'Archived data is missing',
-        data: null
-      };
-    }
 
-    // If archived_data is a string (plain text), try to parse it as JSON for restoration
+    // Parse archived data if it's a string
     if (typeof archivedData === 'string') {
       try {
-        const parsed = JSON.parse(archivedData);
-        // Check if parsed result is an object (not just a number or string)
-        if (typeof parsed === 'object' && parsed !== null) {
-          archivedData = parsed;
-        }
+        archivedData = JSON.parse(archivedData);
       } catch (e) {
-        // Not valid JSON, keep as plain text - cannot restore
-        return {
-          success: false,
-          message: 'Archived data is in plain text format and cannot be restored. Please restore manually.',
-          data: null
-        };
+        // If parsing fails, it might be plain text - but we need an object for restoration
+        throw new Error('Invalid archive data format');
       }
     }
 
-    // Ensure archivedData is an object for restoration
-    if (typeof archivedData !== 'object' || archivedData === null) {
-      return {
-        success: false,
-        message: 'Archived data is not in a valid format for restoration',
-        data: null
-      };
+    if (!archivedData || typeof archivedData !== 'object') {
+      throw new Error('Invalid or missing archived data');
     }
 
-    // Map of table names to their primary key fields
-    const tablePrimaryKeys = {
-      'tbl_members': 'member_id',
-      'tbl_accounts': 'acc_id',
-      'tbl_departments': 'department_id',
-      'tbl_ministry': 'ministry_id',
-      'tbl_events': 'event_id',
-      'tbl_approval': 'approval_id',
-      'tbl_tithes': 'tithes_id',
-      'tbl_churchleaders': 'leader_id',
-      'tbl_departmentofficers': 'officer_id',
-      'tbl_waterbaptism': 'baptism_id',
-      'tbl_marriageservice': 'marriage_id',
-      'tbl_burialservice': 'burial_id',
-      'tbl_childdedications': 'child_id',
-      'tbl_transactions': 'transaction_id'
-    };
+    // Get the actual table name from the archive
+    const actualTableName = archive.original_table;
 
-    const originalTable = archive.original_table;
-
-    // First, verify the table exists
-    const { query: dbQuery } = require('../database/db');
-    const checkTableSql = `
-      SELECT TABLE_NAME 
-      FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() 
-      AND LOWER(TABLE_NAME) = LOWER(?)
-    `;
-    const [tableCheck] = await dbQuery(checkTableSql, [originalTable]);
-
-    if (!tableCheck || tableCheck.length === 0) {
-      // List similar tables to help debug
-      const similarTablesSql = `
-        SELECT TABLE_NAME 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_SCHEMA = DATABASE() 
-        AND TABLE_NAME LIKE ?
-        ORDER BY TABLE_NAME
-      `;
-      const tablePattern = originalTable.replace('tbl_', 'tbl_%');
-      const [similarTables] = await dbQuery(similarTablesSql, [tablePattern]);
-
-      const errorMessage = `Table ${originalTable} does not exist in the database.`;
-      const similarTablesList = similarTables.map(t => t.TABLE_NAME).join(', ');
-      const fullMessage = similarTablesList
-        ? `${errorMessage} Similar tables found: ${similarTablesList}`
-        : `${errorMessage} No similar tables found.`;
-
-      console.error(fullMessage);
-      return {
-        success: false,
-        message: fullMessage,
-        data: null
-      };
-    }
-
-    // Use the actual table name from INFORMATION_SCHEMA (case-sensitive)
-    const actualTableName = tableCheck[0].TABLE_NAME;
-    console.log(`Restoring to table: ${actualTableName} (archived as: ${originalTable})`);
-
-    const primaryKeyField = tablePrimaryKeys[originalTable] || tablePrimaryKeys[actualTableName];
-
-    if (!primaryKeyField) {
-      return {
-        success: false,
-        message: `Table ${actualTableName} is not supported for restoration. Supported tables: ${Object.keys(tablePrimaryKeys).join(', ')}`,
-        data: null
-      };
-    }
-
-    // Check if record already exists in original table (use actual table name)
-    const checkSql = `SELECT * FROM \`${actualTableName}\` WHERE ${primaryKeyField} = ?`;
-    const [existingRows] = await query(checkSql, [archive.original_id]);
-
-    if (existingRows.length > 0) {
-      return {
-        success: false,
-        message: 'A record with this ID already exists in the original table',
-        data: null
-      };
-    }
-
-    // Map archived data to current table schema (use actual table name)
+    // Map archived data to current table schema
     const { mapArchivedDataToCurrentSchema } = require('./columnMapping');
     let mappedData;
     try {
@@ -645,76 +610,15 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
     } catch (mappingError) {
       console.error(`Error mapping archived data for ${actualTableName}:`, mappingError);
       console.error('Archived data keys:', Object.keys(archivedData || {}));
-      return {
-        success: false,
-        message: `Failed to map archived data for ${actualTableName}: ${mappingError.message}`,
-        data: null
-      };
+      throw new Error(`Failed to map archived data: ${mappingError.message}`);
     }
 
-    if (!mappedData || Object.keys(mappedData).length === 0) {
-      console.error(`No valid columns found in archived data for table ${actualTableName}`);
-      console.error('Archived data keys:', Object.keys(archivedData || {}));
-      return {
-        success: false,
-        message: `No valid columns found in archived data for table ${actualTableName}. Archived data contains: ${Object.keys(archivedData || {}).join(', ')}`,
-        data: null
-      };
-    }
+    // Clean data before insertion
+    const cleanedData = cleanDataForInsertion(mappedData, actualTableName);
 
-    // Clean up values: convert empty strings to NULL for date/datetime and JSON columns
-    const dateColumns = [
-      'birthdate', 'baptism_date', 'wedding_anniversary', 'marriage_date',
-      'date_created', 'date_updated', 'date_of_birth', 'date_baptized',
-      'membership_date', 'ordination_date', 'service_date', 'event_date',
-      'start_date', 'end_date', 'archived_at', 'restored_at',
-      'approval_date', 'completed_date', 'scheduled_date', 'confirmed_date',
-      'payment_date', 'received_date', 'submitted_date', 'processed_date'
-    ];
-
-    // JSON columns that need empty strings converted to NULL
-    const jsonColumns = [
-      'children', 'spouse', 'emergency_contact', 'custom_fields',
-      'metadata', 'attributes', 'settings', 'preferences',
-      'family_members', 'related_ids', 'tags', 'categories',
-      'permissions', 'roles', 'configuration', 'options'
-    ];
-
-    const cleanedData = {};
-    for (const [key, value] of Object.entries(mappedData)) {
-      // Check if this is a date column with empty string value
-      const isDateColumn = dateColumns.some(col => key.toLowerCase().includes(col.toLowerCase()));
-      if (isDateColumn && (value === '' || value === null || value === undefined)) {
-        cleanedData[key] = null;
-        continue;
-      }
-
-      // Check if this is a JSON column with empty string value
-      const isJsonColumn = jsonColumns.some(col => key.toLowerCase().includes(col.toLowerCase()));
-      if (isJsonColumn) {
-        if (value === '' || value === null || value === undefined) {
-          cleanedData[key] = null;
-        } else if (typeof value === 'string') {
-          // Try to parse as JSON, if fails, set to null
-          try {
-            JSON.parse(value);
-            cleanedData[key] = value; // Keep as string for MySQL JSON
-          } catch (e) {
-            cleanedData[key] = null;
-          }
-        } else {
-          cleanedData[key] = value;
-        }
-        continue;
-      }
-
-      // For other columns, keep as is
-      cleanedData[key] = value;
-    }
-
-    // Build INSERT query dynamically based on mapped data (use actual table name)
+    // Build and execute insert
     const fields = Object.keys(cleanedData);
-    const placeholders = fields.map(() => '?').join(', ');
+    const placeholders = fields.map(() => '?').join(',');
     const values = fields.map(field => cleanedData[field]);
 
     const insertSql = `
@@ -722,242 +626,80 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
       VALUES (${placeholders})
     `;
 
-    // Insert the record back into the original table
     try {
-      await query(insertSql, values);
-      console.log(`Successfully inserted record into ${originalTable} with ID: ${archive.original_id}`);
+      const [insertResult] = await query(insertSql, values);
+
+      console.log(`Successfully inserted record into ${actualTableName} with ID: ${insertResult.insertId}`);
     } catch (insertError) {
-      console.error(`Error inserting record into ${originalTable}:`, insertError);
-      console.error('SQL:', insertSql);
-      console.error('Values:', values);
-      throw new Error(`Failed to insert record into ${originalTable}: ${insertError.message}`);
+      console.error(`Error inserting record into ${actualTableName}:`, insertError);
+
+      // Check if it's a duplicate entry error
+      if (insertError.code === 'ER_DUP_ENTRY') {
+        console.log(`Record already exists in ${actualTableName}, marking as restored anyway`);
+      } else {
+        throw insertError;
+      }
     }
 
     // Update archive record to mark as restored
     const updateSql = `
       UPDATE tbl_archives 
-      SET restored = 1, 
-          restored_at = ?, 
-          restored_by = ?, 
-          restore_notes = ?
+      SET restored = 1, restored_at = ?, restored_by = ?, restore_notes = ?
       WHERE archive_id = ?
     `;
 
     const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
-    await query(updateSql, [
-      formattedDate,
-      restoredBy ? String(restoredBy).trim() : null,
-      restoreNotes ? String(restoreNotes).trim() : null,
-      archiveId
-    ]);
+    await query(updateSql, [formattedDate, restoredBy, restoreNotes, archiveId]);
 
     return {
       success: true,
-      message: 'Record restored successfully',
+      message: 'Archive restored successfully',
       data: {
         archive_id: archiveId,
         original_table: actualTableName,
-        original_id: archive.original_id
+        restored_at: formattedDate,
+        restored_by: restoredBy
       }
     };
   } catch (error) {
     console.error('Error restoring archive:', error);
-    console.error('Archive ID:', archiveId);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      errno: error.errno,
-      sqlState: error.sqlState,
-      sqlMessage: error.sqlMessage
-    });
     throw error;
   }
 }
 
 /**
- * Get archives within a specific date range
- * @param {String} dateFrom - Start date (YYYY-MM-DD)
- * @param {String} dateTo - End date (YYYY-MM-DD)
- * @param {Object} options - Optional query parameters (limit, offset, page, pageSize, original_table, restored)
- * @returns {Promise<Object>} Object with paginated archive records and metadata
- */
-async function getArchivesByDateRange(dateFrom, dateTo, options = {}) {
-  try {
-    const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
-    const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
-    const page = options.page !== undefined ? parseInt(options.page) : undefined;
-    const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
-    const original_table = options.original_table || null;
-    const restored = options.restored !== undefined ? options.restored : null;
-    const sortBy = options.sortBy || null;
-
-    // Format dates
-    const formattedDateFrom = moment(dateFrom).format('YYYY-MM-DD 00:00:00');
-    const formattedDateTo = moment(dateTo).format('YYYY-MM-DD 23:59:59');
-
-    // Build base query for counting total records
-    let countSql = 'SELECT COUNT(*) as total FROM tbl_archives a';
-    let countParams = [formattedDateFrom, formattedDateTo];
-
-    // Build query for fetching records
-    let sql = `
-      SELECT 
-        a.archive_id,
-        a.original_table,
-        a.original_id,
-        a.archived_by,
-        a.archived_at,
-        a.restored,
-        a.restored_at,
-        a.restored_by,
-        a.restore_notes,
-        acc.email as archived_by_email
-      FROM tbl_archives a
-      LEFT JOIN tbl_accounts acc ON a.archived_by = acc.acc_id
-      WHERE a.archived_at >= ? AND a.archived_at <= ?
-    `;
-    const params = [formattedDateFrom, formattedDateTo];
-
-    // Add original_table filter
-    if (original_table && original_table !== 'All Tables') {
-      sql += ' AND a.original_table = ?';
-      countSql += ' AND a.original_table = ?';
-      countParams.push(original_table);
-      params.push(original_table);
-    }
-
-    // Add restored filter
-    if (restored !== null && restored !== undefined) {
-      const restoredValue = restored === true || restored === 'true' || restored === 1 || restored === '1' ? 1 : 0;
-      sql += ' AND a.restored = ?';
-      countSql += ' AND a.restored = ?';
-      countParams.push(restoredValue);
-      params.push(restoredValue);
-    }
-
-    // Add sorting
-    let orderByClause = ' ORDER BY ';
-    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
-    switch (sortByValue) {
-      case 'Date (Newest)':
-        orderByClause += 'a.archived_at DESC';
-        break;
-      case 'Date (Oldest)':
-        orderByClause += 'a.archived_at ASC';
-        break;
-      case 'Table (A-Z)':
-        orderByClause += 'a.original_table ASC';
-        break;
-      default:
-        orderByClause += 'a.archived_at DESC';
-    }
-    sql += orderByClause;
-
-    // Determine pagination values
-    let finalLimit, finalOffset;
-
-    if (page !== undefined && pageSize !== undefined) {
-      const pageNum = parseInt(page) || 1;
-      const size = Math.min(parseInt(pageSize) || 25, 50);
-      finalLimit = size;
-      finalOffset = (pageNum - 1) * size;
-    } else if (limit !== undefined) {
-      finalLimit = Math.min(parseInt(limit) || 25, 50);
-      finalOffset = offset !== undefined ? parseInt(offset) : 0;
-    } else {
-      finalLimit = 25;
-      finalOffset = 0;
-    }
-
-    // Get total count
-    const [countResult] = await query(countSql, countParams);
-    const totalCount = countResult[0]?.total || 0;
-
-    // Add pagination
-    const limitValue = Math.max(1, Math.min(parseInt(finalLimit) || 25, 50));
-    const offsetValue = Math.max(0, parseInt(finalOffset) || 0);
-
-    if (offsetValue > 0) {
-      sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
-    } else {
-      sql += ` LIMIT ${limitValue}`;
-    }
-
-    // Execute query
-    const [rows] = await query(sql, params);
-
-    // Convert Buffer values to text
-    const parsedRows = rows.map(row => convertRowBuffersToText(row));
-
-    // Calculate pagination metadata
-    const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
-    const currentPageSize = finalLimit || parsedRows.length;
-    const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
-
-    return {
-      success: true,
-      message: 'Archives retrieved successfully',
-      data: parsedRows,
-      count: parsedRows.length,
-      totalCount: totalCount,
-      dateRange: {
-        from: formattedDateFrom,
-        to: formattedDateTo
-      },
-      pagination: {
-        page: currentPage,
-        pageSize: currentPageSize,
-        totalPages: totalPages,
-        totalCount: totalCount,
-        hasNextPage: currentPage < totalPages,
-        hasPreviousPage: currentPage > 1
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching archives by date range:', error);
-    throw error;
-  }
-}
-
-/**
- * Get summary statistics for archives
- * @returns {Promise<Object>} Summary statistics
+ * GET SUMMARY - Get archive summary statistics
+ * @returns {Promise<Object>} Summary object
  */
 async function getArchiveSummary() {
   try {
     // Get total count
     const [totalResult] = await query('SELECT COUNT(*) as total FROM tbl_archives');
-    const totalCount = totalResult[0]?.total || 0;
+    const totalArchives = totalResult[0]?.total || 0;
 
-    // Get count by table - add LIMIT to prevent sort memory issues
+    // Get restored count
+    const [restoredResult] = await query('SELECT COUNT(*) as restored FROM tbl_archives WHERE restored = 1');
+    const restoredArchives = restoredResult[0]?.restored || 0;
+
+    // Get archived count
+    const [archivedResult] = await query('SELECT COUNT(*) as archived FROM tbl_archives WHERE restored = 0');
+    const activeArchives = archivedResult[0]?.archived || 0;
+
+    // Get count by table
     const [tableResult] = await query(`
       SELECT original_table, COUNT(*) as count 
       FROM tbl_archives 
-      WHERE restored = 0
-      GROUP BY original_table 
-      ORDER BY count DESC
-      LIMIT 20
+      GROUP BY original_table
     `);
-
-    // Get restored count
-    const [restoredResult] = await query(`
-      SELECT COUNT(*) as count 
-      FROM tbl_archives 
-      WHERE restored = 1
-    `);
-    const restoredCount = restoredResult[0]?.count || 0;
-
-    // Get not restored count
-    const notRestoredCount = totalCount - restoredCount;
 
     return {
       success: true,
       message: 'Archive summary retrieved successfully',
       data: {
-        total_count: totalCount,
-        restored_count: restoredCount,
-        not_restored_count: notRestoredCount,
+        total_count: totalArchives,
+        restored_count: restoredArchives,
+        not_restored_count: activeArchives,
+        restore_percentage: totalArchives > 0 ? ((restoredArchives / totalArchives) * 100).toFixed(1) : 0,
         by_table: tableResult
       }
     };
@@ -968,8 +710,69 @@ async function getArchiveSummary() {
 }
 
 /**
- * DELETE PERMANENTLY - Permanently delete an archive record
- * @param {Number} archiveId - Archive ID to delete
+ * READ BY DATE RANGE - Get archives within a date range
+ * @param {String} dateFrom - Start date
+ * @param {String} dateTo - End date
+ * @param {Object} options - Additional options (limit, offset, etc.)
+ * @returns {Promise<Object>} Paginated archives
+ */
+async function getArchivesByDateRange(dateFrom, dateTo, options = {}) {
+  try {
+    const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
+    const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
+
+    const formattedDateFrom = moment(dateFrom).format('YYYY-MM-DD 00:00:00');
+    const formattedDateTo = moment(dateTo).format('YYYY-MM-DD 23:59:59');
+
+    let sql = `
+      SELECT 
+        a.archive_id,
+        a.original_table,
+        a.original_id,
+        a.archived_by,
+        a.archived_at,
+        a.restored,
+        a.restored_at,
+        a.restored_by,
+        CONCAT(
+          COALESCE(m.firstname, ''),
+          IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
+          IF(m.lastname IS NOT NULL AND m.lastname != '', CONCAT(' ', m.lastname), '')
+        ) as archived_by_name
+      FROM tbl_archives a
+      LEFT JOIN tbl_accounts acc ON a.archived_by = acc.acc_id
+      LEFT JOIN tbl_members m ON acc.email = m.email
+      WHERE a.archived_at BETWEEN ? AND ?
+    `;
+
+    const params = [formattedDateFrom, formattedDateTo];
+
+    // Add limit if specified
+    if (limit !== undefined) {
+      sql += ` LIMIT ${parseInt(limit)}`;
+      if (offset !== undefined) {
+        sql += ` OFFSET ${parseInt(offset)}`;
+      }
+    }
+
+    const [rows] = await query(sql, params);
+    const parsedRows = rows.map(row => convertRowBuffersToText(row));
+
+    return {
+      success: true,
+      message: 'Archives retrieved successfully',
+      data: parsedRows,
+      count: parsedRows.length
+    };
+  } catch (error) {
+    console.error('Error fetching archives by date range:', error);
+    throw error;
+  }
+}
+
+/**
+ * DELETE - Permanently delete an archive record
+ * @param {Number} archiveId - Archive ID
  * @returns {Promise<Object>} Result object
  */
 async function deleteArchivePermanently(archiveId) {
@@ -978,37 +781,30 @@ async function deleteArchivePermanently(archiveId) {
       throw new Error('Archive ID is required');
     }
 
-    // First, get the archive record to return info about what was deleted
+    // First, get the archive to check if it exists
     const archiveResult = await getArchiveById(archiveId);
-    if (!archiveResult.success) {
+
+    if (!archiveResult.success || !archiveResult.data) {
       return {
         success: false,
-        message: 'Archive record not found',
-        data: null
+        message: 'Archive record not found'
       };
     }
 
     const archive = archiveResult.data;
 
-    // Permanently delete the archive record
-    const sql = 'DELETE FROM tbl_archives WHERE archive_id = ?';
-    const [result] = await query(sql, [archiveId]);
-
-    if (result.affectedRows === 0) {
-      return {
-        success: false,
-        message: 'Archive record not found',
-        data: null
-      };
-    }
+    // Delete the archive record permanently
+    const deleteSql = 'DELETE FROM tbl_archives WHERE archive_id = ?';
+    const [deleteResult] = await query(deleteSql, [archiveId]);
 
     return {
       success: true,
-      message: 'Archive record permanently deleted',
+      message: 'Archive permanently deleted',
       data: {
         archive_id: archiveId,
         original_table: archive.original_table,
-        original_id: archive.original_id
+        original_id: archive.original_id,
+        deleted_at: moment().format('YYYY-MM-DD HH:mm:ss')
       }
     };
   } catch (error) {
@@ -1018,7 +814,7 @@ async function deleteArchivePermanently(archiveId) {
 }
 
 /**
- * BULK DELETE PERMANENTLY - Permanently delete multiple archive records in a single operation
+ * BULK DELETE - Permanently delete multiple archive records
  * @param {Array<Number>} archiveIds - Array of Archive IDs to delete
  * @returns {Promise<Object>} Result object with success/failure counts
  */
@@ -1034,17 +830,37 @@ async function bulkDeleteArchivesPermanently(archiveIds) {
       throw new Error('No valid archive IDs provided');
     }
 
-    // Get archive records info before deletion for audit trail
-    const placeholders = validIds.map(() => '?').join(',');
-    const selectSql = `SELECT archive_id, original_table, original_id FROM tbl_archives WHERE archive_id IN (${placeholders})`;
-    const [archivesToDelete] = await query(selectSql, validIds);
+    let deletedCount = 0;
+    let failedCount = 0;
+    const failedArchives = [];
 
-    // Perform bulk delete
-    const deleteSql = `DELETE FROM tbl_archives WHERE archive_id IN (${placeholders})`;
-    const [deleteResult] = await query(deleteSql, validIds);
+    // Process each archive individually for detailed tracking
+    for (const archiveId of validIds) {
+      try {
+        const archiveResult = await getArchiveById(archiveId);
 
-    const deletedCount = deleteResult.affectedRows || 0;
-    const failedCount = validIds.length - deletedCount;
+        if (!archiveResult.success || !archiveResult.data) {
+          failedCount++;
+          failedArchives.push({
+            archive_id: archiveId,
+            reason: 'Archive record not found'
+          });
+          continue;
+        }
+
+        // Delete the archive record permanently
+        const deleteSql = 'DELETE FROM tbl_archives WHERE archive_id = ?';
+        await query(deleteSql, [archiveId]);
+        deletedCount++;
+
+      } catch (error) {
+        failedCount++;
+        failedArchives.push({
+          archive_id: archiveId,
+          reason: error.message
+        });
+      }
+    }
 
     return {
       success: true,
@@ -1053,7 +869,7 @@ async function bulkDeleteArchivesPermanently(archiveIds) {
         requested: validIds.length,
         deleted: deletedCount,
         failed: failedCount,
-        deleted_archives: archivesToDelete
+        deleted_archives: failedArchives
       }
     };
   } catch (error) {
@@ -1075,7 +891,6 @@ async function bulkRestoreArchives(archiveIds, restoredBy = null, restoreNotes =
       throw new Error('Archive IDs array is required and cannot be empty');
     }
 
-    // Validate all IDs are numbers
     const validIds = archiveIds.filter(id => typeof id === 'number' && id > 0);
     if (validIds.length === 0) {
       throw new Error('No valid archive IDs provided');
@@ -1087,152 +902,160 @@ async function bulkRestoreArchives(archiveIds, restoredBy = null, restoreNotes =
       skipped: []
     };
 
-    // Fetch all archives in a single query
+    const { mapArchivedDataToCurrentSchema } = require('./columnMapping');
+
+    // 1. Fetch all archives in a single query
     const placeholders = validIds.map(() => '?').join(',');
     const fetchSql = `SELECT * FROM tbl_archives WHERE archive_id IN (${placeholders})`;
     const [archives] = await query(fetchSql, validIds);
 
-    // Process each archive directly (like bulkDelete does)
+    // 2. Group archives by table to minimize table schema lookups and allow bulk inserts
+    const tableGroups = {};
     for (const archive of archives) {
+      if (!tableGroups[archive.original_table]) {
+        tableGroups[archive.original_table] = [];
+      }
+      tableGroups[archive.original_table].push(archive);
+    }
+
+    const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    // 3. Process each table group
+    for (const tableName in tableGroups) {
+      const tableArchives = tableGroups[tableName];
+      const recordsToInsert = [];
+      const idsToMarkRestored = [];
+      const tableColumns = [];
+
       try {
-        const isRestored = archive.restored === 1 || archive.restored === true || archive.restored === '1';
-
-        if (isRestored) {
-          results.skipped.push({
-            archive_id: archive.archive_id,
-            original_table: archive.original_table,
-            original_id: archive.original_id,
-            reason: 'Already restored'
-          });
-          continue;
-        }
-
-        // Get and parse archived data
-        let archivedData = archive.archived_data;
-        if (typeof archivedData === 'string') {
+        // First, determine all column names needed for a bulk insert by mapping the first record
+        // mapArchivedDataToCurrentSchema now uses a cache, so this is fast
+        for (const archive of tableArchives) {
           try {
-            archivedData = JSON.parse(archivedData);
-          } catch (parseError) {
+            // Check if already restored
+            if (archive.restored === 1 || archive.restored === true || archive.restored === '1') {
+              results.skipped.push({
+                archive_id: archive.archive_id,
+                original_table: archive.original_table,
+                reason: 'Already restored'
+              });
+              continue;
+            }
+
+            // Parse archived data
+            let archivedData = archive.archived_data;
+            if (typeof archivedData === 'string') {
+              try {
+                archivedData = JSON.parse(archivedData);
+              } catch (parseError) {
+                results.failed.push({
+                  archive_id: archive.archive_id,
+                  original_table: archive.original_table,
+                  reason: 'Invalid JSON data'
+                });
+                continue;
+              }
+            }
+
+            // Map archived data to current table schema
+            const mappedData = await mapArchivedDataToCurrentSchema(tableName, archivedData);
+            const cleanedData = cleanDataForInsertion(mappedData, tableName);
+
+            // Collect column names if we haven't yet (must be consistent for bulk insert)
+            if (tableColumns.length === 0) {
+              tableColumns.push(...Object.keys(cleanedData));
+            }
+
+            // Ensure row values match the tableColumns order
+            const rowValues = tableColumns.map(col => cleanedData[col] !== undefined ? cleanedData[col] : null);
+            recordsToInsert.push(rowValues);
+            idsToMarkRestored.push(archive.archive_id);
+
+          } catch (itemError) {
+            console.error(`Error processing archive item ${archive.archive_id}:`, itemError);
             results.failed.push({
               archive_id: archive.archive_id,
-              original_table: archive.original_table,
-              original_id: archive.original_id,
-              reason: 'Invalid JSON data'
+              original_table: tableName,
+              reason: itemError.message
             });
-            continue;
           }
         }
 
-        // Get table and primary key info
-        const tablePrimaryKeys = {
-          'tbl_members': 'member_id',
-          'tbl_accounts': 'acc_id',
-          'tbl_departments': 'department_id',
-          'tbl_ministry': 'ministry_id',
-          'tbl_events': 'event_id',
-          'tbl_approval': 'approval_id',
-          'tbl_tithes': 'tithes_id',
-          'tbl_churchleaders': 'leader_id',
-          'tbl_departmentofficers': 'officer_id',
-          'tbl_waterbaptism': 'baptism_id',
-          'tbl_marriageservice': 'marriage_id',
-          'tbl_burialservice': 'burial_id',
-          'tbl_childdedications': 'child_id',
-          'tbl_transactions': 'transaction_id'
-        };
+        // 4. Perform Bulk Insert for this table
+        if (recordsToInsert.length > 0) {
+          // Build bulk insert query with placeholders
+          const placeholders = recordsToInsert.map(() => `(${tableColumns.map(() => '?').join(',')})`).join(',');
+          const flatValues = recordsToInsert.flat();
 
-        const primaryKeyField = tablePrimaryKeys[archive.original_table];
-        if (!primaryKeyField) {
-          results.failed.push({
-            archive_id: archive.archive_id,
-            original_table: archive.original_table,
-            original_id: archive.original_id,
-            reason: 'Table not supported for restoration'
-          });
-          continue;
+          // Use INSERT IGNORE to handle existing records and prevent batch failure
+          const insertSql = `
+                        INSERT IGNORE INTO \`${tableName}\` (${tableColumns.map(c => `\`${c}\``).join(', ')})
+                        VALUES ${placeholders}
+                    `;
+
+          try {
+            await query(insertSql, flatValues);
+            console.log(`✅ Bulk inserted ${recordsToInsert.length} records into ${tableName}`);
+
+            // 5. Bulk Update archive status for successfully restored items in this table
+            // We do this inside the table loop to maintain grouping logic
+            if (idsToMarkRestored.length > 0) {
+              const idPlaceholders = idsToMarkRestored.map(() => '?').join(',');
+              const updateSql = `
+                                UPDATE tbl_archives 
+                                SET restored = 1, restored_at = ?, restored_by = ?, restore_notes = ?
+                                WHERE archive_id IN (${idPlaceholders})
+                            `;
+
+              await query(updateSql, [formattedDate, restoredBy, restoreNotes, ...idsToMarkRestored]);
+
+              // Log success for each ID
+              idsToMarkRestored.forEach(id => {
+                results.restored.push({
+                  archive_id: id,
+                  original_table: tableName
+                });
+              });
+            }
+          } catch (insertError) {
+            console.error(`❌ Bulk insert failed for table ${tableName}:`, insertError);
+            // Mark all IDs in this batch as failed
+            idsToMarkRestored.forEach(id => {
+              results.failed.push({
+                archive_id: id,
+                original_table: tableName,
+                reason: `Bulk insert failure: ${insertError.message}`
+              });
+            });
+          }
         }
 
-        // Check if record already exists
-        const checkSql = `SELECT 1 FROM \`${archive.original_table}\` WHERE ${primaryKeyField} = ? LIMIT 1`;
-        const [existingRows] = await query(checkSql, [archive.original_id]);
-
-        if (existingRows.length > 0) {
-          results.failed.push({
-            archive_id: archive.archive_id,
-            original_table: archive.original_table,
-            original_id: archive.original_id,
-            reason: 'Record already exists'
-          });
-          continue;
-        }
-
-        // Map archived data to current schema
-        const fields = Object.keys(archivedData);
-        const placeholdersInsert = fields.map(() => '?').join(',');
-        const values = fields.map(key => archivedData[key]);
-
-        // Build and execute insert
-        const insertSql = `
-          INSERT INTO \`${archive.original_table}\` (${fields.map(f => `\`${f}\``).join(', ')})
-          VALUES (${placeholdersInsert})
-        `;
-
-        await query(insertSql, values);
-
-        // Mark as restored
-        const updateSql = `
-          UPDATE tbl_archives 
-          SET restored = 1, 
-              restored_at = ?, 
-              restored_by = ?, 
-              restore_notes = ?
-          WHERE archive_id = ?
-        `;
-
-        const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
-        await query(updateSql, [
-          formattedDate,
-          restoredBy ? String(restoredBy).trim() : null,
-          restoreNotes ? String(restoreNotes).trim() : null,
-          archive.archive_id
-        ]);
-
-        results.restored.push({
-          archive_id: archive.archive_id,
-          original_table: archive.original_table,
-          original_id: archive.original_id
-        });
-
-      } catch (error) {
-        console.warn(`Failed to restore archive ${archive.archive_id}:`, error.message);
-        results.failed.push({
-          archive_id: archive.archive_id,
-          original_table: archive.original_table,
-          original_id: archive.original_id,
-          reason: error.message
+      } catch (groupError) {
+        console.error(`❌ Systematic error processing table ${tableName}:`, groupError);
+        // Handle unhandled errors for the entire group
+        tableArchives.forEach(archive => {
+          if (!results.restored.find(r => r.archive_id === archive.archive_id) &&
+            !results.failed.find(f => f.archive_id === archive.archive_id)) {
+            results.failed.push({
+              archive_id: archive.archive_id,
+              original_table: tableName,
+              reason: groupError.message
+            });
+          }
         });
       }
     }
 
-    // Check which IDs were not found in archives
-    const foundArchiveIds = new Set(archives.map(a => a.archive_id));
-    for (const id of validIds) {
-      if (!foundArchiveIds.has(id)) {
-        results.failed.push({
-          archive_id: id,
-          reason: 'Archive record not found'
-        });
-      }
-    }
-
+    // Calculate final stats
     const totalProcessed = results.restored.length + results.failed.length + results.skipped.length;
-    const successRate = totalProcessed > 0 ? ((results.restored.length / validIds.length) * 100).toFixed(1) : 0;
+    const totalRequested = validIds.length;
+    const successRate = totalRequested > 0 ? ((results.restored.length / totalRequested) * 100).toFixed(1) : 0;
 
     return {
       success: true,
       message: `Bulk restore completed: ${results.restored.length} restored, ${results.failed.length} failed, ${results.skipped.length} skipped`,
       data: {
-        requested: validIds.length,
+        requested: totalRequested,
         processed: totalProcessed,
         restored: results.restored.length,
         failed: results.failed.length,
@@ -1260,4 +1083,3 @@ module.exports = {
   bulkDeleteArchivesPermanently,
   bulkRestoreArchives
 };
-

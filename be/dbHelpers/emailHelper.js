@@ -1,6 +1,10 @@
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const moment = require('moment-timezone');
 require('dotenv').config();
+
+// Set default timezone to Philippines (Asia/Manila, UTC+8)
+moment.tz.setDefault('Asia/Manila');
 
 // Lightweight token generator until JWT routes are available
 const generateResetToken = () => crypto.randomBytes(32).toString('hex');
@@ -24,8 +28,8 @@ const createTransporter = () => {
       pass: process.env.EMAIL_PASS,
     },
   });
-  
-  
+
+
 };
 
 /**
@@ -59,7 +63,7 @@ const sendAccountDetails = async (accountDetails) => {
         message: 'Account ID and email are required',
       };
     }
-    
+
     const emailType = accountDetails.type || 'forgot_password'; // 'new_account' or 'forgot_password'
     const transporter = createTransporter();
     const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173' || 'http://localhost:5174';
@@ -165,7 +169,7 @@ const sendAccountDetails = async (accountDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: `Account details email sent successfully (${emailType === 'new_account' ? 'new account' : 'password reset'})`,
@@ -282,7 +286,7 @@ const sendMarriageDetails = async (marriageDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Marriage details email sent successfully',
@@ -362,86 +366,48 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
     // Format baptism date with time (if available) for all statuses
     let baptismDate = baptismDetails.baptismDate || 'To be determined';
     let baptismTime = baptismDetails.baptismTime || '';
-    
+
     console.log('EMAIL DEBUG: baptismDate input:', baptismDate);
     console.log('EMAIL DEBUG: baptismTime input:', baptismTime);
-    
+
     if (baptismDate !== 'To be determined' && baptismDate) {
-      // Try to parse the date with time
-      let date;
-      // Handle various date formats
-      if (baptismDate.includes(' at ')) {
-        // Format: "Feb 12, 2026 at 20:43:34"
-        const parts = baptismDate.split(' at ');
-        date = new Date(parts[0]);
-        if (parts[1]) {
-          const timeParts = parts[1].split(':');
-          if (timeParts.length >= 2) {
-            date.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), timeParts[2] ? parseInt(timeParts[2]) : 0);
+      // Use moment-timezone to parse and format with Philippines timezone
+      let parsedMoment = moment.tz(baptismDate, 'Asia/Manila');
+
+      if (parsedMoment.isValid()) {
+        console.log('EMAIL DEBUG: Parsed moment (Philippines time):', parsedMoment.format('YYYY-MM-DD HH:mm:ss'));
+
+        // Check if the time component is meaningful (not midnight 00:00)
+        const hasTime = parsedMoment.hours() !== 0 || parsedMoment.minutes() !== 0;
+
+        // PRIORITY 1: If baptismTime is provided separately, use it
+        if (baptismTime) {
+          // Parse the time and apply it to the date
+          const timeMoment = moment(baptismTime, ['HH:mm', 'HH:mm:ss', 'h:mm A', 'h:mm:ss A']);
+          if (timeMoment.isValid()) {
+            parsedMoment.set({
+              hour: timeMoment.hours(),
+              minute: timeMoment.minutes(),
+              second: timeMoment.seconds()
+            });
           }
+          // Format with date and time in Philippines timezone
+          baptismDate = parsedMoment.tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
+          console.log('EMAIL DEBUG: baptismDate with baptismTime (PH timezone):', baptismDate);
+        }
+        // PRIORITY 2: If the date has a time component, include it
+        else if (hasTime) {
+          // Format with date and time in Philippines timezone
+          baptismDate = parsedMoment.tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
+          console.log('EMAIL DEBUG: baptismDate with time (PH timezone):', baptismDate);
+        }
+        // PRIORITY 3: Date only
+        else {
+          baptismDate = parsedMoment.tz('Asia/Manila').format('MMMM D, YYYY');
+          console.log('EMAIL DEBUG: baptismDate (date only, PH timezone):', baptismDate);
         }
       } else {
-        date = new Date(baptismDate);
-      }
-      
-      if (!isNaN(date.getTime())) {
-        // Check if the original string has a time component
-        const hasTime = baptismDate.includes(':') && 
-          (baptismDate.match(/\d{2}:\d{2}:\d{2}/) || baptismDate.match(/\d{2}:\d{2}/));
-        console.log('EMAIL DEBUG: hasTime:', hasTime, 'date:', date);
-        
-        // Format the date part
-        const formattedDate = date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        
-        // PRIORITY 1: If baptismTime is provided, use it (it's the actual selected time)
-        if (baptismTime) {
-          let timeDate = new Date(`2000-01-01 ${baptismTime}`);
-          if (!isNaN(timeDate.getTime())) {
-            const formattedTime = timeDate.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            });
-            baptismDate = `${formattedDate} at ${formattedTime}`;
-            console.log('EMAIL DEBUG: baptismDate with baptismTime:', baptismDate);
-          } else {
-            baptismDate = formattedDate;
-          }
-        }
-        // PRIORITY 2: Only use time from baptismDate if no baptismTime and has real time (not 00:00:00)
-        else if ((hasTime || baptismDate.includes(' at ')) && !isNaN(date.getTime())) {
-          // Check if the time is not the default midnight
-          const hours = date.getHours();
-          const minutes = date.getMinutes();
-          const seconds = date.getSeconds() || 0;
-          const isDefaultMidnight = hours === 0 && minutes === 0 && seconds === 0;
-          
-          if (!isDefaultMidnight) {
-            // Format with time including AM/PM
-            baptismDate = date.toLocaleString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true
-            });
-            console.log('EMAIL DEBUG: baptismDate with time from baptismDate:', baptismDate);
-          } else {
-            // Default midnight - no time available
-            baptismDate = formattedDate;
-            console.log('EMAIL DEBUG: baptismDate (no time, default midnight):', baptismDate);
-          }
-        } else {
-          // No time available
-          baptismDate = formattedDate;
-          console.log('EMAIL DEBUG: baptismDate (no time):', baptismDate);
-        }
+        console.log('EMAIL DEBUG: Could not parse baptismDate, keeping as-is:', baptismDate);
       }
     }
 
@@ -481,7 +447,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
               <h3 style="color: #2c3e50; margin-top: 0;">Baptism Service Details</h3>
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Baptism Date:</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${status === 'completed' ? 'Date Got Saved:' : 'Baptism Date:'}</strong></td>
                   <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${baptismDate}</td>
                 </tr>
                 <tr>
@@ -595,7 +561,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
 
     const info = await transporter.sendMail(mailOptions);
     console.log('EMAIL DEBUG: Water baptism email sent successfully to:', baptismDetails.email);
-    
+
     return {
       success: true,
       message: 'Water baptism details email sent successfully',
@@ -653,36 +619,29 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     const childName = dedicationDetails.childName || 'N/A';
     const pastorName = dedicationDetails.pastorName || 'N/A';
     const isMember = dedicationDetails.isMember || false;
-    
-    // Format the dedication date and time
+
+    // Format the dedication date and time using moment for accuracy and timezone consistency
     let formattedDedicationDate = 'To be determined';
     let formattedDedicationTime = '';
-    
+
     if (dedicationDetails.dedicationDate) {
-      const date = new Date(dedicationDetails.dedicationDate);
-      if (!isNaN(date.getTime())) {
-        formattedDedicationDate = date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        
+      const dateMoment = moment(dedicationDetails.dedicationDate);
+      if (dateMoment.isValid()) {
+        formattedDedicationDate = dateMoment.format('MMMM D, YYYY');
+
         // If dedicationTime is provided, use it to format the time
         if (dedicationDetails.dedicationTime) {
-          const timeDate = new Date(`2000-01-01 ${dedicationDetails.dedicationTime}`);
-          if (!isNaN(timeDate.getTime())) {
-            formattedDedicationTime = timeDate.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            });
+          // Combine date and time if possible, or just parse time
+          const timeMoment = moment(dedicationDetails.dedicationTime, ['HH:mm:ss', 'HH:mm', 'h:mm A']);
+          if (timeMoment.isValid()) {
+            formattedDedicationTime = timeMoment.format('h:mm A');
           }
         }
       }
     }
 
-    const fullDedicationDateTime = (formattedDedicationTime && formattedDedicationDate !== 'To be determined') 
-      ? `${formattedDedicationDate} at ${formattedDedicationTime}` 
+    const fullDedicationDateTime = (formattedDedicationTime && formattedDedicationDate !== 'To be determined')
+      ? `${formattedDedicationDate} at ${formattedDedicationTime}`
       : (formattedDedicationDate !== 'To be determined' ? formattedDedicationDate : 'To be determined');
 
     const location = dedicationDetails.location || 'To be determined';
@@ -807,7 +766,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Child dedication details email sent successfully',
@@ -922,19 +881,14 @@ const sendBurialDetails = async (burialDetails) => {
     const pastorName = burialDetails.pastorName || 'N/A';
     const isMember = burialDetails.isMember || false;
 
-    // Format burial date
+    // Format burial date using moment for accuracy and timezone consistency
     let burialDate = burialDetails.burialDate || 'To be determined';
-    if (burialDate !== 'To be determined' && status === 'approved') {
-      // Format with AM/PM for approved status
-      const date = new Date(burialDate);
-      burialDate = date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
+    if (burialDate !== 'To be determined' && (status === 'approved' || status === 'completed')) {
+      const dateMoment = moment(burialDate);
+      if (dateMoment.isValid()) {
+        // Format with AM/PM
+        burialDate = dateMoment.tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
+      }
     }
 
     // Handle location for non-members in pending status
@@ -1014,7 +968,7 @@ const sendBurialDetails = async (burialDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Burial details email sent successfully',
@@ -1122,7 +1076,7 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Approval request notification email sent successfully',
@@ -1244,7 +1198,7 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Approval status update email sent successfully',
@@ -1283,14 +1237,14 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
     const serviceId = transactionDetails.service_id || 'N/A';
     const totalAmount = transactionDetails.total || 0;
     const serviceType = transactionDetails.type_of_service.toLowerCase();
-    
+
     const serviceTypeLabels = {
       'marriage': 'Marriage Service',
       'burial': 'Burial Service',
       'child_dedication': 'Child Dedication Service',
       'water_baptism': 'Water Baptism Service'
     };
-    
+
     const serviceTypeLabel = serviceTypeLabels[serviceType] || 'Service';
     const serviceName = transactionDetails.serviceName || serviceTypeLabel;
 
@@ -1376,7 +1330,7 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Transaction completion notification email sent successfully',
@@ -1411,17 +1365,17 @@ const sendFormSubmissionNotification = async (formDetails) => {
     const recipientName = formDetails.recipientName || 'Valued Member';
     const formId = formDetails.formId || 'N/A';
     const formType = formDetails.formType || 'form';
-    
+
     const formTypeLabels = {
       'schedule_change': 'Schedule Change Request',
       'prayer_request': 'Prayer Request'
     };
-    
+
     const formTypeLabel = formTypeLabels[formType] || 'Form Submission';
-    
+
     // Build form details HTML based on form type
     let formDetailsHtml = '';
-    
+
     if (formType === 'schedule_change' && formDetails.formData) {
       const serviceTypeLabels = {
         'water-baptism': 'Water Baptism',
@@ -1431,22 +1385,22 @@ const sendFormSubmissionNotification = async (formDetails) => {
       };
       const serviceType = formDetails.formData.serviceType || 'N/A';
       const serviceTypeLabel = serviceTypeLabels[serviceType] || serviceType;
-      const originalDate = formDetails.formData.originalDate 
-        ? new Date(formDetails.formData.originalDate).toLocaleString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })
+      const originalDate = formDetails.formData.originalDate
+        ? new Date(formDetails.formData.originalDate).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
         : 'N/A';
       const requestedDate = formDetails.formData.requestedDate
-        ? new Date(formDetails.formData.requestedDate).toLocaleString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })
+        ? new Date(formDetails.formData.requestedDate).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
         : 'N/A';
       const reason = formDetails.formData.reason || 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Schedule Change Request Details</h3>
@@ -1473,7 +1427,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     } else if (formType === 'prayer_request' && formDetails.formData) {
       const request = formDetails.formData.request || 'N/A';
       const isAnonymous = formDetails.formData.anonymous || false;
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Prayer Request Details</h3>
@@ -1545,7 +1499,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Form submission notification email sent successfully',
@@ -1594,17 +1548,17 @@ const sendFormStatusUpdate = async (formDetails) => {
     const recipientName = formDetails.recipientName || 'Valued Member';
     const formId = formDetails.formId || 'N/A';
     const formType = formDetails.formType || 'form';
-    
+
     const formTypeLabels = {
       'schedule_change': 'Schedule Change Request',
       'prayer_request': 'Prayer Request'
     };
-    
+
     const formTypeLabel = formTypeLabels[formType] || 'Form Submission';
-    
+
     // Build form details HTML based on form type
     let formDetailsHtml = '';
-    
+
     if (formType === 'schedule_change' && formDetails.formData) {
       const serviceTypeLabels = {
         'water-baptism': 'Water Baptism',
@@ -1614,21 +1568,21 @@ const sendFormStatusUpdate = async (formDetails) => {
       };
       const serviceType = formDetails.formData.serviceType || 'N/A';
       const serviceTypeLabel = serviceTypeLabels[serviceType] || serviceType;
-      const originalDate = formDetails.formData.originalDate 
-        ? new Date(formDetails.formData.originalDate).toLocaleString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })
+      const originalDate = formDetails.formData.originalDate
+        ? new Date(formDetails.formData.originalDate).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
         : 'N/A';
       const requestedDate = formDetails.formData.requestedDate
-        ? new Date(formDetails.formData.requestedDate).toLocaleString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })
+        ? new Date(formDetails.formData.requestedDate).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
         : 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Schedule Change Request Details</h3>
@@ -1650,7 +1604,7 @@ const sendFormStatusUpdate = async (formDetails) => {
       `;
     } else if (formType === 'prayer_request' && formDetails.formData) {
       const request = formDetails.formData.request || 'N/A';
-      
+
       formDetailsHtml = `
         <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
           <h3 style="color: #2c3e50; margin-top: 0;">Prayer Request Details</h3>
@@ -1735,7 +1689,7 @@ const sendFormStatusUpdate = async (formDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Form status update email sent successfully',

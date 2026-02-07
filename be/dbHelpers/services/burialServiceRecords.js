@@ -147,6 +147,12 @@ async function createBurialService(burialData) {
       reason_of_death = null
     } = burialData;
 
+    let finalServiceDate = service_date;
+    // Auto-set service date if created as 'completed'
+    if (status === 'completed' && !finalServiceDate) {
+      finalServiceDate = moment().format('YYYY-MM-DD HH:mm:ss');
+    }
+
     // Member ID is now optional for non-member requests
     if (!requester_name && !member_id) {
       throw new Error('Either member_id or requester_name is required');
@@ -218,9 +224,9 @@ async function createBurialService(burialData) {
     const final_requester_email = requester_email ? String(requester_email).trim() : null;
     const final_pastor_name = pastor_name ? String(pastor_name).trim() : null;
 
-    const formattedServiceDate = (service_date === null || service_date === '' || !service_date)
+    const formattedServiceDate = (finalServiceDate === null || finalServiceDate === '' || !finalServiceDate)
       ? null
-      : moment(service_date).format('YYYY-MM-DD HH:mm:ss');
+      : moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment.utc(date_created).format('YYYY-MM-DD HH:mm:ss');
     const formattedBirthdate = deceased_birthdate ? (moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
       ? deceased_birthdate
@@ -694,7 +700,13 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       // Silently ignore attempts to change requester info for member records
       // This preserves the original requester information
     }
-    const finalServiceDate = service_date !== undefined ? service_date : currentData.service_date;
+    let finalServiceDate = service_date !== undefined ? service_date : currentData.service_date;
+
+    // Auto-set completion date/time if status is changing TO 'completed'
+    const isNowCompleted = status === 'completed' && currentData.status !== 'completed';
+    if (isNowCompleted && service_date === undefined) {
+      finalServiceDate = moment().format('YYYY-MM-DD HH:mm:ss');
+    }
 
     // Only check conflicts if service_date is being updated
     if (service_date !== undefined && finalServiceDate) {
@@ -758,12 +770,12 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       params.push(String(pastor_name).trim());
     }
 
-    if (service_date !== undefined) {
-      if (service_date === null || service_date === '' || !service_date) {
+    if (service_date !== undefined || isNowCompleted) {
+      if (finalServiceDate === null || finalServiceDate === '' || !finalServiceDate) {
         fields.push('service_date = ?');
         params.push(null);
       } else {
-        const formattedServiceDate = moment(service_date).format('YYYY-MM-DD HH:mm:ss');
+        const formattedServiceDate = moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
         fields.push('service_date = ?');
         params.push(formattedServiceDate);
       }
@@ -1273,9 +1285,10 @@ async function bulkCompleteBurialServices(burialIds) {
           continue;
         }
 
-        // Update the burial service to completed status
-        const updateSql = `UPDATE tbl_burialservice SET status = 'completed' WHERE burial_id = ?`;
-        await query(updateSql, [burialId]);
+        // Update the burial service to completed status with current datetime as service_date
+        const completionTimestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+        const updateSql = `UPDATE tbl_burialservice SET status = 'completed', service_date = ? WHERE burial_id = ?`;
+        await query(updateSql, [completionTimestamp, burialId]);
 
         console.log(`✅ Burial service ${burialId} marked as completed. Sending email notification...`);
 
@@ -1295,9 +1308,7 @@ async function bulkCompleteBurialServices(burialIds) {
               status: 'completed',
               deceasedName: burial.deceased_name,
               familyContact: recipientName,
-              burialDate: burial.service_date
-                ? moment(burial.service_date).format('YYYY-MM-DD HH:mm:ss')
-                : 'Completed',
+              burialDate: completionTimestamp,
               location: burial.location || 'Church',
               recipientName,
               pastorName: burial.pastor_name,

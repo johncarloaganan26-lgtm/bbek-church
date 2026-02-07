@@ -303,7 +303,7 @@
 
       <!-- Baptism Date and Time -->
       <div class="baptism-datetime-row">
-        <el-form-item label="Baptism Date" prop="baptism_date" class="baptism-date-item">
+        <el-form-item :label="formData.status === 'completed' ? 'Date Got Saved' : 'Baptism Date'" prop="baptism_date" class="baptism-date-item">
           <el-date-picker
             v-model="formData.baptism_date"
             type="date"
@@ -313,7 +313,7 @@
             value-format="YYYY-MM-DD"
             style="width: 100%"
             :disabled="loading"
-            :disabled-date="(date) => date < new Date()"
+            :disabled-date="(date) => isEditMode ? false : date < new Date().setHours(0,0,0,0)"
             @change="onDateTimeChange"
           />
         </el-form-item>
@@ -977,8 +977,36 @@ watch(() => formData.birthdate, () => {
 watch(() => props.baptismData, async (newData) => {
   if (newData && props.modelValue) {
     formData.baptism_id = newData.baptism_id || ''
-    formData.baptism_date = newData.baptism_date || null
-    formData.baptism_time = newData.baptism_time || null
+    
+    // Extract date and time from baptism_date string
+    if (newData.baptism_date) {
+      const dateObj = new Date(newData.baptism_date)
+      if (!isNaN(dateObj.getTime())) {
+        // Set date part (YYYY-MM-DD)
+        formData.baptism_date = newData.baptism_date.split(' ')[0] || newData.baptism_date
+        
+        // Handle time extraction
+        if (newData.baptism_time) {
+          formData.baptism_time = newData.baptism_time
+        } else {
+          const hours = dateObj.getHours()
+          const mins = dateObj.getMinutes()
+          // Check if it's not midnight
+          if (hours !== 0 || mins !== 0) {
+            formData.baptism_time = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+          } else {
+            formData.baptism_time = null
+          }
+        }
+      } else {
+        formData.baptism_date = newData.baptism_date
+        formData.baptism_time = newData.baptism_time || null
+      }
+    } else {
+      formData.baptism_date = null
+      formData.baptism_time = newData.baptism_time || null
+    }
+
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
     formData.status = newData.status || 'pending'

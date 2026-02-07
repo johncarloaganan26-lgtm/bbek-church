@@ -11,32 +11,40 @@ function determineModule(reqPath, reqBaseUrl) {
     return 'Accounts';
   } else if (fullPath.includes('/events') || fullPath.includes('/church-records/events')) {
     return 'Events';
-  } else if (fullPath.includes('/ministries') || fullPath.includes('/church-records/ministries')) {
+  } else if (fullPath.includes('/ministries') || fullPath.includes('/church-records/ministries') || fullPath.includes('/ministry')) {
     return 'Ministries';
   } else if (fullPath.includes('/departments') || fullPath.includes('/church-records/departments')) {
     return 'Departments';
-  } else if (fullPath.includes('/department-officers') || fullPath.includes('/church-records/department-officers')) {
+  } else if (fullPath.includes('/department-officers') || fullPath.includes('/church-records/department-officers') || fullPath.includes('/departmentofficers')) {
     return 'Department Officers';
-  } else if (fullPath.includes('/church-leaders') || fullPath.includes('/church-records/church-leaders')) {
+  } else if (fullPath.includes('/church-leaders') || fullPath.includes('/church-records/church-leaders') || fullPath.includes('/churchleaders')) {
     return 'Church Leaders';
   } else if (fullPath.includes('/tithes') || fullPath.includes('/church-records/tithes')) {
     return 'Tithes & Offerings';
   } else if (fullPath.includes('/transactions')) {
     return 'Transactions';
-  } else if (fullPath.includes('/water-baptisms') || fullPath.includes('/services/water-baptisms')) {
+  } else if (fullPath.includes('/water-baptisms') || fullPath.includes('/services/water-baptisms') || fullPath.includes('/waterbaptism')) {
     return 'Water Baptism';
-  } else if (fullPath.includes('/burial-services') || fullPath.includes('/church-records/burial-services')) {
+  } else if (fullPath.includes('/burial-services') || fullPath.includes('/church-records/burial-services') || fullPath.includes('/burialservice')) {
     return 'Burial Service';
-  } else if (fullPath.includes('/child-dedications') || fullPath.includes('/church-records/child-dedications')) {
+  } else if (fullPath.includes('/child-dedications') || fullPath.includes('/church-records/child-dedications') || fullPath.includes('/childdedication')) {
     return 'Child Dedication';
-  } else if (fullPath.includes('/marriage-services') || fullPath.includes('/services/marriage-services')) {
+  } else if (fullPath.includes('/marriage-services') || fullPath.includes('/services/marriage-services') || fullPath.includes('/marriageservice')) {
     return 'Marriage Service';
-  } else if (fullPath.includes('/approvals') || fullPath.includes('/church-records/approvals')) {
+  } else if (fullPath.includes('/approvals') || fullPath.includes('/church-records/approvals') || fullPath.includes('/approval')) {
     return 'Approvals';
   } else if (fullPath.includes('/archives')) {
     return 'Archives';
+  } else if (fullPath.includes('/announcements')) {
+    return 'Announcements';
+  } else if (fullPath.includes('/cms')) {
+    return 'Content Management';
+  } else if (fullPath.includes('/dashboard')) {
+    return 'Dashboard';
+  } else if (fullPath.includes('/forms')) {
+    return 'Forms';
   }
-  return 'Unknown Module';
+  return 'System';
 }
 
 // Helper function to truncate description if too long (max 5000 chars)
@@ -301,17 +309,18 @@ const auditTrailMiddleware = async (req, res, next) => {
       }
 
 
+      // Use explicit overrides if provided in the request object
       const logData = {
         user_id: userInfo.account?.acc_id || userInfo.acc_id,
         user_email: userInfo.account?.email || userInfo.email,
-        user_name: `${memberInfo.firstname || ''} ${memberInfo.lastname || ''}`.trim() || userInfo.email,
+        user_name: req.auditUserDisplayName || `${memberInfo.firstname || ''} ${memberInfo.lastname || ''}`.trim() || userInfo.name || userInfo.email,
         user_position: userInfo.account?.position || userInfo.position || 'member',
-        action_type: actionData.action_type,
-        module: actionData.module,
-        description: truncateDescription(enhancedDescription),
-        entity_type: actionData.entity_type,
-        entity_id: actionData.entity_id,
-        ip_address: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown',
+        action_type: req.auditAction || actionData.action_type,
+        module: req.auditModule || actionData.module,
+        description: truncateDescription(req.auditDescription || enhancedDescription),
+        entity_type: req.auditEntityType || actionData.entity_type,
+        entity_id: req.auditEntityId || actionData.entity_id,
+        ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown',
         user_agent: null, // Hidden for privacy
         status: res.statusCode >= 400 ? 'failed' : 'success',
         error_message: res.statusCode >= 400 ? `HTTP ${res.statusCode}` : null,
@@ -418,8 +427,8 @@ const auditTrailMiddleware = async (req, res, next) => {
         case 'CREATE':
           // Try to get meaningful name from request body
           const createName = data.name || data.title || data.firstname || data.email ||
-                    (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-                    (entityId ? `#${entityId}` : '');
+            (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+            (entityId ? `#${entityId}` : '');
 
           // Add more context based on module
           let createContext = '';
@@ -472,8 +481,8 @@ const auditTrailMiddleware = async (req, res, next) => {
             updateName = data.title || (entityId ? `#${entityId}` : '');
           } else {
             updateName = data.name || data.title || data.firstname || data.email ||
-                      (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-                      (entityId ? `#${entityId}` : '');
+              (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
+              (entityId ? `#${entityId}` : '');
           }
 
           // Add more context based on module
@@ -707,22 +716,22 @@ const auditTrailMiddleware = async (req, res, next) => {
       } else {
         // Enhanced view logging for specific modules
         if (fullPath.includes('/ministries/getAllMinistries') ||
-            fullPath.includes('/ministries/getMinistryById') ||
-            fullPath.includes('/ministries/getMinistriesByMemberId')) {
+          fullPath.includes('/ministries/getMinistryById') ||
+          fullPath.includes('/ministries/getMinistriesByMemberId')) {
           actionType = 'VIEW_MINISTRY';
           module = 'Ministries';
           description = generateDescription('VIEW', entityType, entityId, 'Ministries', body);
         } else if (fullPath.includes('/accounts/getAllAccounts') ||
-                   fullPath.includes('/accounts/getAccountById') ||
-                   fullPath.includes('/accounts/me')) {
+          fullPath.includes('/accounts/getAccountById') ||
+          fullPath.includes('/accounts/me')) {
           actionType = 'VIEW_ACCOUNT';
           module = 'Accounts';
           description = generateDescription('VIEW', entityType, entityId, 'Accounts', body);
         } else if (fullPath.includes('/events/getAllEvents') ||
-                   fullPath.includes('/events/getEventById') ||
-                   fullPath.includes('/events/getEventsByMemberId') ||
-                   fullPath.includes('/events/getSermonEvents') ||
-                   fullPath.includes('/events/getCompletedSermonEvents')) {
+          fullPath.includes('/events/getEventById') ||
+          fullPath.includes('/events/getEventsByMemberId') ||
+          fullPath.includes('/events/getSermonEvents') ||
+          fullPath.includes('/events/getCompletedSermonEvents')) {
           actionType = 'VIEW_EVENT';
           module = 'Events';
           description = generateDescription('VIEW', entityType, entityId, 'Events', body);
@@ -752,19 +761,19 @@ const auditTrailMiddleware = async (req, res, next) => {
   };
 
   // Intercept response methods to log after response is sent
-  res.json = function(data) {
+  res.json = function (data) {
     const actionDetails = determineActionDetails();
     logAction(actionDetails);
     return originalJson.call(this, data);
   };
 
-  res.send = function(data) {
+  res.send = function (data) {
     const actionDetails = determineActionDetails();
     logAction(actionDetails);
     return originalSend.call(this, data);
   };
 
-  res.end = function(data) {
+  res.end = function (data) {
     const actionDetails = determineActionDetails();
     logAction(actionDetails);
     return originalEnd.call(this, data);

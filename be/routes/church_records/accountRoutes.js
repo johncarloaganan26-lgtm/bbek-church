@@ -145,6 +145,9 @@ router.get('/getAccountById/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await getAccountById(id);
+    if (result && result.data) {
+      req.auditDescription = `Viewed details of account for user: ${result.data.email} (${result.data.position})`;
+    }
     res.json({
       success: true,
       data: result
@@ -208,7 +211,7 @@ router.post('/createAccount', async (req, res) => {
       await auditTrailRecords.createAuditLog({
         user_id: req.user?.acc_id || null,
         user_email: req.user?.email || 'system',
-        user_name: req.user?.email || 'System',
+        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
         user_position: req.user?.position || 'system',
         action_type: 'CREATE',
         module: 'Account Management',
@@ -237,7 +240,7 @@ router.post('/createAccount', async (req, res) => {
       await auditTrailRecords.createAuditLog({
         user_id: req.user?.acc_id || null,
         user_email: req.user?.email || 'unknown',
-        user_name: req.user?.email || 'Unknown',
+        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'Unknown'),
         user_position: req.user?.position || 'unknown',
         action_type: 'CREATE',
         module: 'Account Management',
@@ -299,11 +302,11 @@ router.put('/updateAccount/:id', async (req, res) => {
       await auditTrailRecords.createAuditLog({
         user_id: req.user?.acc_id || null,
         user_email: req.user?.email || 'system',
-        user_name: req.user?.email || 'System',
+        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
         user_position: req.user?.position || 'system',
         action_type: 'UPDATE',
         module: 'Account Management',
-        description: `Updated account ID: ${id}`,
+        description: `Updated account for email: ${emailToUse} (ID: ${id})`,
         entity_type: 'account',
         entity_id: id,
         ip_address: req.ip || req.connection?.remoteAddress,
@@ -344,7 +347,7 @@ router.delete('/deleteAccount/:id', async (req, res) => {
       await auditTrailRecords.createAuditLog({
         user_id: req.user?.acc_id || null,
         user_email: req.user?.email || 'system',
-        user_name: req.user?.email || 'System',
+        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
         user_position: req.user?.position || 'system',
         action_type: 'DELETE',
         module: 'Account Management',
@@ -397,7 +400,7 @@ router.delete('/bulkDeleteAccounts', async (req, res) => {
       await auditTrailRecords.createAuditLog({
         user_id: req.user?.acc_id || null,
         user_email: req.user?.email || 'system',
-        user_name: req.user?.email || 'System',
+        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
         user_position: req.user?.position || 'system',
         action_type: 'BULK_DELETE',
         module: 'Account Management',

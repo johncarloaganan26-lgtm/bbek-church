@@ -88,8 +88,23 @@ const getAllowedOrigins = () => {
     return origins;
   }
 
-  // Default: localhost for development
-  return ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+  // Default: localhost for development OR add production domain
+  const defaultOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'https://biblebaptistekklesiaofkawit.xyz'  // Production domain
+  ];
+
+  // Check for production domains in environment variables
+  if (process.env.FRONTEND_URL1 || process.env.FRONTEND_URL2) {
+    const origins = [...defaultOrigins];
+    if (process.env.FRONTEND_URL1) origins.push(process.env.FRONTEND_URL1.trim());
+    if (process.env.FRONTEND_URL2) origins.push(process.env.FRONTEND_URL2.trim());
+    return origins;
+  }
+
+  return defaultOrigins;
 };
 
 const allowedOrigins = getAllowedOrigins();

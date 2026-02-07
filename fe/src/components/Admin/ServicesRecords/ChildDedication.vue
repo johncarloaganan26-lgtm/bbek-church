@@ -255,7 +255,12 @@
             <!-- <td>{{ dedication.child_id }}</td> -->
             <td>{{ dedication.child_fullname || `${dedication.child_firstname || ''} ${dedication.child_lastname || ''}`.trim() }}</td>
             <td>{{ dedication.requester_fullname || dedication.requested_by }}</td>
-            <td>{{ formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time) }}</td>
+            <td>
+              <div v-if="dedication.status === 'completed'" class="text-success font-weight-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">DATE GOT DEDICATED:</div>
+              <div :class="{'font-weight-medium': dedication.status === 'completed'}">
+                {{ formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time, dedication.status) }}
+              </div>
+            </td>
             <td>{{ dedication.pastor || 'N/A' }}</td>
             <td>{{ dedication.location || 'N/A' }}</td>
             <td>{{ getFatherDisplayName(dedication) }}</td>
@@ -706,7 +711,7 @@ const formatDateTime = (dateString) => {
   })
 }
 
-const formatDateTimeWithTime = (dateString, timeString) => {
+const formatDateTimeWithTime = (dateString, timeString, status) => {
   if (!dateString) return ''
   const date = new Date(dateString)
   const formattedDate = date.toLocaleString('en-US', {
@@ -716,11 +721,12 @@ const formatDateTimeWithTime = (dateString, timeString) => {
   })
   
   if (timeString) {
-    // Convert 24-hour format to 12-hour format with AM/PM
-    const [hours, minutes] = timeString.split(':')
-    const hour = parseInt(hours, 10)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour % 12 || 12
+    // Convert 24-hour format to 12-hour format with AM/PM (ignoring seconds)
+    const parts = timeString.split(':')
+    const hours = parseInt(parts[0], 10)
+    const minutes = parts[1] || '00'
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const displayHour = hours % 12 || 12
     const formattedTime = `${displayHour}:${minutes} ${ampm}`
     return `${formattedDate} • ${formattedTime}`
   }
@@ -813,7 +819,10 @@ const handlePrint = () => {
       <tr>
         <td>${childName}</td>
         <td>${requesterName}</td>
-        <td>${formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time)}</td>
+        <td>
+          ${dedication.status === 'completed' ? '<div style="font-size: 10px; color: #4CAF50; font-weight: bold; margin-bottom: 2px;">DATE GOT DEDICATED:</div>' : ''}
+          ${formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time, dedication.status)}
+        </td>
         <td>${pastorName}</td>
         <td>${locationName}</td>
         <td>${getFatherDisplayName(dedication)}</td>
