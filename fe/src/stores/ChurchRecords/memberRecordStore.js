@@ -21,83 +21,9 @@ export const useMemberRecordStore = defineStore('memberRecord', {
   }),
 
   getters: {
-    filteredMembers: (state) => {
-      let filtered = [...state.members]
-
-      // Search filter
-      if (state.searchQuery) {
-        const query = state.searchQuery.toLowerCase()
-        filtered = filtered.filter(member =>
-          member.name?.toLowerCase().includes(query) ||
-          member.address?.toLowerCase().includes(query) ||
-          member.email?.toLowerCase().includes(query)
-        )
-      }
-
-      // Age range filter
-      if (state.filters.ageRange !== 'All Ages') {
-        const [min, max] = state.filters.ageRange.split('-').map(Number)
-        filtered = filtered.filter(member => {
-          const age = member.age
-          if (state.filters.ageRange === '51+') {
-            return age >= 51
-          }
-          return age >= min && age <= max
-        })
-      }
-
-      // Gender filter
-      if (state.filters.gender !== 'All Genders') {
-        filtered = filtered.filter(member => {
-          return member.gender === state.filters.gender
-        })
-      }
-
-      // Join month filter
-      if (state.filters.joinMonth !== 'All Months') {
-        filtered = filtered.filter(member => {
-          if (!member.date_created) return false
-          const memberDate = new Date(member.date_created)
-          const memberMonth = memberDate.toLocaleString('en-US', { month: 'long' })
-          return memberMonth === state.filters.joinMonth
-        })
-      }
-
-      // Sort by join date (using date_created field)
-      filtered.sort((a, b) => {
-        switch (state.filters.sortBy) {
-          case 'Name (A-Z)':
-            return (a.name || '').localeCompare(b.name || '')
-          case 'Name (Z-A)':
-            return (b.name || '').localeCompare(a.name || '')
-          case 'Join Date (Newest)':
-            return new Date(b.date_created || 0) - new Date(a.date_created || 0)
-          case 'Join Date (Oldest)':
-            return new Date(a.date_created || 0) - new Date(b.date_created || 0)
-          case 'Age (Low to High)':
-            return (a.age || 0) - (b.age || 0)
-          case 'Age (High to Low)':
-            return (b.age || 0) - (a.age || 0)
-          case 'Gender (Male First)':
-            // Sort by gender: Male first
-            const genderOrder = { 'Male': 1, 'Female': 2 }
-            return (genderOrder[a.gender] || 3) - (genderOrder[b.gender] || 3)
-          case 'Gender (Female First)':
-            // Sort by gender: Female first
-            const genderOrder2 = { 'Female': 1, 'Male': 2 }
-            return (genderOrder2[a.gender] || 3) - (genderOrder2[b.gender] || 3)
-          default:
-            return 0
-        }
-      })
-
-      return filtered
-    },
-
     paginatedMembers: (state) => {
-      const start = (state.currentPage - 1) * state.itemsPerPage
-      const end = start + state.itemsPerPage
-      return state.filteredMembers.slice(start, end)
+      // The backend already handles pagination, filtering, and sorting, so we just return the current page's data
+      return state.members
     }
   },
 
@@ -125,7 +51,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
         params.append('offset', offset.toString())
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         // Add filter parameters (only if not default values)
         if (ageRange && ageRange !== 'All Ages') {
           params.append('ageRange', ageRange)
@@ -146,14 +72,14 @@ export const useMemberRecordStore = defineStore('memberRecord', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data && response.data.success) {
           this.members = response.data.data || []
-          
+
           // Update pagination state
           this.currentPage = page
           this.itemsPerPage = pageSize
-          
+
           // Use backend pagination data if available
           if (response.data.pagination) {
             this.totalPages = response.data.pagination.totalPages || 1
@@ -164,7 +90,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
             this.totalCount = totalCount
             this.totalPages = Math.ceil(totalCount / pageSize) || 1
           }
-          
+
           // Update search query and filters if provided
           if (options.search !== undefined) {
             this.searchQuery = search
@@ -230,8 +156,8 @@ export const useMemberRecordStore = defineStore('memberRecord', {
           }
         })
         console.log('Create member response:', response)
-        
-        if (response.data && response.status===201) {
+
+        if (response.data && response.status === 201) {
           await this.fetchMembers()
           return { success: true, data: response.data.data }
         } else {
@@ -261,8 +187,8 @@ export const useMemberRecordStore = defineStore('memberRecord', {
           }
         })
         console.log('Update member response:', response)
-        
-        if (response.data && response.status===200) {
+
+        if (response.data && response.status === 200) {
           await this.fetchMembers()
           return { success: true, data: response.data.data }
         } else {
@@ -291,7 +217,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
             'Content-Type': 'application/json'
           }
         })
-        if (response.data && response.status===200) {
+        if (response.data && response.status === 200) {
           await this.fetchMembers()
           return { success: true }
         } else {
@@ -384,11 +310,11 @@ export const useMemberRecordStore = defineStore('memberRecord', {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
       // Refetch with new filters
-      this.fetchMembers({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchMembers({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
