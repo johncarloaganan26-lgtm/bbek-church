@@ -11,11 +11,11 @@ function safeToString(value, defaultValue = '') {
   if (value === null || value === undefined) {
     return defaultValue;
   }
-  
+
   if (Buffer.isBuffer(value)) {
     return value.toString('utf8');
   }
-  
+
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value, null, 2);
@@ -23,7 +23,7 @@ function safeToString(value, defaultValue = '') {
       return defaultValue;
     }
   }
-  
+
   return String(value);
 }
 
@@ -37,12 +37,12 @@ function toPlainText(value, defaultValue = '') {
   if (value === null || value === undefined) {
     return defaultValue;
   }
-  
+
   // Handle Buffer - convert to UTF-8 string
   if (Buffer.isBuffer(value)) {
     return value.toString('utf8').trim();
   }
-  
+
   // Handle objects - convert to readable text
   if (typeof value === 'object') {
     try {
@@ -51,17 +51,17 @@ function toPlainText(value, defaultValue = '') {
       return defaultValue;
     }
   }
-  
+
   // Handle numbers - convert to string
   if (typeof value === 'number') {
     return String(value);
   }
-  
+
   // Handle booleans - convert to string
   if (typeof value === 'boolean') {
     return value ? 'true' : 'false';
   }
-  
+
   // Handle strings - trim and return
   return String(value).trim();
 }
@@ -76,7 +76,7 @@ function convertRowBuffersToText(row) {
   if (!row || typeof row !== 'object') {
     return row;
   }
-  
+
   const converted = {};
   for (const [key, value] of Object.entries(row)) {
     // Preserve date fields as-is for frontend formatting
@@ -330,11 +330,11 @@ async function getAllArchives(options = {}) {
       // Get total count first
       const [countResult] = await query(countSql, countParams);
       const totalCount = countResult[0]?.total || 0;
-      
+
       // Execute query without limit
       const [rows] = await query(sql, params);
       const parsedRows = rows.map(row => convertRowBuffersToText(row));
-      
+
       return {
         success: true,
         message: 'All archived records retrieved successfully',
@@ -451,10 +451,10 @@ async function getArchiveById(archiveId) {
     }
 
     const row = rows[0];
-    
+
     // Convert any Buffer values to text first
     const convertedRow = convertRowBuffersToText(row);
-    
+
     // archived_data is now stored as plain text, no need to parse JSON
     // If it's a string representation of an object, try to parse it for restoration
     let archivedData = convertedRow.archived_data;
@@ -574,7 +574,7 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
     };
 
     const originalTable = archive.original_table;
-    
+
     // First, verify the table exists
     const { query: dbQuery } = require('../database/db');
     const checkTableSql = `
@@ -584,7 +584,7 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
       AND LOWER(TABLE_NAME) = LOWER(?)
     `;
     const [tableCheck] = await dbQuery(checkTableSql, [originalTable]);
-    
+
     if (!tableCheck || tableCheck.length === 0) {
       // List similar tables to help debug
       const similarTablesSql = `
@@ -596,13 +596,13 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
       `;
       const tablePattern = originalTable.replace('tbl_', 'tbl_%');
       const [similarTables] = await dbQuery(similarTablesSql, [tablePattern]);
-      
+
       const errorMessage = `Table ${originalTable} does not exist in the database.`;
       const similarTablesList = similarTables.map(t => t.TABLE_NAME).join(', ');
-      const fullMessage = similarTablesList 
+      const fullMessage = similarTablesList
         ? `${errorMessage} Similar tables found: ${similarTablesList}`
         : `${errorMessage} No similar tables found.`;
-      
+
       console.error(fullMessage);
       return {
         success: false,
@@ -610,11 +610,11 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
         data: null
       };
     }
-    
+
     // Use the actual table name from INFORMATION_SCHEMA (case-sensitive)
     const actualTableName = tableCheck[0].TABLE_NAME;
     console.log(`Restoring to table: ${actualTableName} (archived as: ${originalTable})`);
-    
+
     const primaryKeyField = tablePrimaryKeys[originalTable] || tablePrimaryKeys[actualTableName];
 
     if (!primaryKeyField) {
@@ -1087,86 +1087,140 @@ async function bulkRestoreArchives(archiveIds, restoredBy = null, restoreNotes =
       skipped: []
     };
 
-    // Process all archive records in parallel for faster performance
-    const restorePromises = validIds.map(async (archiveId) => {
-      try {
-        // Check if archive exists and not already restored
-        const archiveResult = await getArchiveById(archiveId);
-        
-        if (!archiveResult.success) {
-          return {
-            status: 'failed',
-            archive_id: archiveId,
-            reason: 'Archive record not found'
-          };
-        }
+    // Fetch all archives in a single query
+    const placeholders = validIds.map(() => '?').join(',');
+    const fetchSql = `SELECT * FROM tbl_archives WHERE archive_id IN (${placeholders})`;
+    const [archives] = await query(fetchSql, validIds);
 
-        const archive = archiveResult.data;
+    // Process each archive directly (like bulkDelete does)
+    for (const archive of archives) {
+      try {
         const isRestored = archive.restored === 1 || archive.restored === true || archive.restored === '1';
-        
+
         if (isRestored) {
-          return {
-            status: 'skipped',
-            archive_id: archiveId,
+          results.skipped.push({
+            archive_id: archive.archive_id,
             original_table: archive.original_table,
             original_id: archive.original_id,
             reason: 'Already restored'
-          };
+          });
+          continue;
         }
 
-        // Attempt to restore the archive
-        const restoreResult = await restoreArchive(archiveId, restoredBy, restoreNotes);
-        
-        if (restoreResult.success) {
-          return {
-            status: 'restored',
-            archive_id: archiveId,
-            original_table: archive.original_table,
-            original_id: archive.original_id
-          };
-        } else {
-          return {
-            status: 'failed',
-            archive_id: archiveId,
+        // Get and parse archived data
+        let archivedData = archive.archived_data;
+        if (typeof archivedData === 'string') {
+          try {
+            archivedData = JSON.parse(archivedData);
+          } catch (parseError) {
+            results.failed.push({
+              archive_id: archive.archive_id,
+              original_table: archive.original_table,
+              original_id: archive.original_id,
+              reason: 'Invalid JSON data'
+            });
+            continue;
+          }
+        }
+
+        // Get table and primary key info
+        const tablePrimaryKeys = {
+          'tbl_members': 'member_id',
+          'tbl_accounts': 'acc_id',
+          'tbl_departments': 'department_id',
+          'tbl_ministry': 'ministry_id',
+          'tbl_events': 'event_id',
+          'tbl_approval': 'approval_id',
+          'tbl_tithes': 'tithes_id',
+          'tbl_churchleaders': 'leader_id',
+          'tbl_departmentofficers': 'officer_id',
+          'tbl_waterbaptism': 'baptism_id',
+          'tbl_marriageservice': 'marriage_id',
+          'tbl_burialservice': 'burial_id',
+          'tbl_childdedications': 'child_id',
+          'tbl_transactions': 'transaction_id'
+        };
+
+        const primaryKeyField = tablePrimaryKeys[archive.original_table];
+        if (!primaryKeyField) {
+          results.failed.push({
+            archive_id: archive.archive_id,
             original_table: archive.original_table,
             original_id: archive.original_id,
-            reason: restoreResult.message
-          };
+            reason: 'Table not supported for restoration'
+          });
+          continue;
         }
-      } catch (error) {
-        console.warn(`Failed to restore archive ${archiveId}:`, error.message);
-        return {
-          status: 'failed',
-          archive_id: archiveId,
-          reason: error.message
-        };
-      }
-    });
 
-    // Wait for all restores to complete in parallel
-    const restoreResults = await Promise.all(restorePromises);
+        // Check if record already exists
+        const checkSql = `SELECT 1 FROM \`${archive.original_table}\` WHERE ${primaryKeyField} = ? LIMIT 1`;
+        const [existingRows] = await query(checkSql, [archive.original_id]);
 
-    // Categorize results
-    for (const result of restoreResults) {
-      if (result.status === 'restored') {
+        if (existingRows.length > 0) {
+          results.failed.push({
+            archive_id: archive.archive_id,
+            original_table: archive.original_table,
+            original_id: archive.original_id,
+            reason: 'Record already exists'
+          });
+          continue;
+        }
+
+        // Map archived data to current schema
+        const fields = Object.keys(archivedData);
+        const placeholdersInsert = fields.map(() => '?').join(',');
+        const values = fields.map(key => archivedData[key]);
+
+        // Build and execute insert
+        const insertSql = `
+          INSERT INTO \`${archive.original_table}\` (${fields.map(f => `\`${f}\``).join(', ')})
+          VALUES (${placeholdersInsert})
+        `;
+
+        await query(insertSql, values);
+
+        // Mark as restored
+        const updateSql = `
+          UPDATE tbl_archives 
+          SET restored = 1, 
+              restored_at = ?, 
+              restored_by = ?, 
+              restore_notes = ?
+          WHERE archive_id = ?
+        `;
+
+        const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
+        await query(updateSql, [
+          formattedDate,
+          restoredBy ? String(restoredBy).trim() : null,
+          restoreNotes ? String(restoreNotes).trim() : null,
+          archive.archive_id
+        ]);
+
         results.restored.push({
-          archive_id: result.archive_id,
-          original_table: result.original_table,
-          original_id: result.original_id
+          archive_id: archive.archive_id,
+          original_table: archive.original_table,
+          original_id: archive.original_id
         });
-      } else if (result.status === 'failed') {
+
+      } catch (error) {
+        console.warn(`Failed to restore archive ${archive.archive_id}:`, error.message);
         results.failed.push({
-          archive_id: result.archive_id,
-          original_table: result.original_table,
-          original_id: result.original_id,
-          reason: result.reason
+          archive_id: archive.archive_id,
+          original_table: archive.original_table,
+          original_id: archive.original_id,
+          reason: error.message
         });
-      } else if (result.status === 'skipped') {
-        results.skipped.push({
-          archive_id: result.archive_id,
-          original_table: result.original_table,
-          original_id: result.original_id,
-          reason: result.reason
+      }
+    }
+
+    // Check which IDs were not found in archives
+    const foundArchiveIds = new Set(archives.map(a => a.archive_id));
+    for (const id of validIds) {
+      if (!foundArchiveIds.has(id)) {
+        results.failed.push({
+          archive_id: id,
+          reason: 'Archive record not found'
         });
       }
     }
