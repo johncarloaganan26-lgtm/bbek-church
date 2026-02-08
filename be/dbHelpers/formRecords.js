@@ -38,7 +38,7 @@ async function createForm(formData) {
       name = null,
       email = null,
       phone = null,
-      form_data,                    
+      form_data,
       admin_notes = null,
       reviewed_by = null,
       submitted_at = null,
@@ -567,8 +567,8 @@ async function getMemberServices(memberId) {
     const [wbRows] = await query(waterBaptismSql, [memberId]);
     console.log(`[getMemberServices] Found ${wbRows.length} water baptism services for member ${memberId}`);
     services['water-baptism'] = wbRows.map(row => {
-      const formattedDate = row.service_date 
-        ? moment(row.service_date).format('YYYY-MM-DD') 
+      const formattedDate = row.service_date
+        ? moment(row.service_date).format('YYYY-MM-DD')
         : null;
       console.log(`[getMemberServices] Water baptism ${row.service_id}: service_date=${row.service_date}, formatted=${formattedDate}`);
       return {
@@ -590,8 +590,8 @@ async function getMemberServices(memberId) {
     const [marriageRows] = await query(marriageSql, [memberId, memberId]);
     console.log(`[getMemberServices] Found ${marriageRows.length} marriage services for member ${memberId}`);
     services['marriage'] = marriageRows.map(row => {
-      const formattedDate = row.service_date 
-        ? moment(row.service_date).format('YYYY-MM-DD') 
+      const formattedDate = row.service_date
+        ? moment(row.service_date).format('YYYY-MM-DD')
         : null;
       console.log(`[getMemberServices] Marriage service ${row.service_id}: service_date=${row.service_date}, formatted=${formattedDate}`);
       return {
@@ -611,8 +611,8 @@ async function getMemberServices(memberId) {
     const [burialRows] = await query(burialSql, [memberId]);
     console.log(`[getMemberServices] Found ${burialRows.length} burial services for member ${memberId}`);
     services['burial'] = burialRows.map(row => {
-      const formattedDate = row.service_date 
-        ? moment(row.service_date).format('YYYY-MM-DD') 
+      const formattedDate = row.service_date
+        ? moment(row.service_date).format('YYYY-MM-DD')
         : null;
       console.log(`[getMemberServices] Burial service ${row.service_id}: service_date=${row.service_date}, formatted=${formattedDate}`);
       return {
@@ -633,8 +633,8 @@ async function getMemberServices(memberId) {
     const [cdRows] = await query(childDedicationSql, [memberId]);
     console.log(`[getMemberServices] Found ${cdRows.length} child dedication services for member ${memberId}`);
     services['child-dedication'] = cdRows.map(row => {
-      const formattedDate = row.service_date 
-        ? moment(row.service_date).format('YYYY-MM-DD') 
+      const formattedDate = row.service_date
+        ? moment(row.service_date).format('YYYY-MM-DD')
         : null;
       console.log(`[getMemberServices] Child dedication ${row.service_id}: service_date=${row.service_date}, formatted=${formattedDate}`);
       return {
@@ -678,13 +678,13 @@ async function getMemberServices(memberId) {
 async function updateServiceDateForScheduleChange(formData) {
   try {
     const { form_type, form_data } = formData;
-    
+
     if (form_type !== 'schedule_change') {
       return { success: false, message: 'Not a schedule change form' };
     }
 
     const { serviceType, serviceId, requestedDate } = form_data;
-    
+
     // Use serviceId if provided, otherwise fall back to original date search
     if (!serviceType || !requestedDate) {
       return { success: false, message: 'Missing required schedule change data' };
@@ -934,7 +934,7 @@ async function deleteForm(formId, archivedBy = null) {
     // Archive before delete
     const { archiveBeforeDelete } = require('./archiveHelper');
     const form = await getFormById(formId);
-    
+
     if (form.success && form.data) {
       await archiveBeforeDelete('tbl_forms', formId, form.data, archivedBy);
     }
@@ -1013,7 +1013,7 @@ async function bulkDeleteForms(formIds, archivedBy = null) {
 }
 
 /**
- * BULK APPROVE FORMS - Approve multiple pending forms at once
+ * BULK APPROVE FORMS - Approve multiple pending forms at once with email notifications
  * @param {Array<Number>} formIds - Array of Form IDs to approve
  * @param {String} reviewedBy - User ID who is reviewing the forms
  * @returns {Promise<Object>} Result object with success/failure counts
@@ -1030,9 +1030,21 @@ async function bulkApproveForms(formIds, reviewedBy = null) {
       throw new Error('No valid form IDs provided');
     }
 
-    // Only approve forms that are currently 'pending'
+    // Fetch details for all forms to be approved, including member names for emails
     const placeholders = validIds.map(() => '?').join(',');
-    const selectSql = `SELECT form_id, form_type, form_data FROM tbl_forms WHERE form_id IN (${placeholders}) AND status = 'pending'`;
+    const selectSql = `
+      SELECT 
+        f.form_id, f.form_type, f.form_data, f.email, f.name, f.submitted_by,
+        CONCAT(
+          COALESCE(m.firstname, ''),
+          IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
+          IF(m.lastname IS NOT NULL AND m.lastname != '', CONCAT(' ', m.lastname), '')
+        ) as member_full_name
+      FROM tbl_forms f
+      LEFT JOIN tbl_accounts acc ON f.submitted_by = acc.acc_id
+      LEFT JOIN tbl_members m ON acc.email = m.email
+      WHERE f.form_id IN (${placeholders}) AND f.status = 'pending'
+    `;
     const [formsToApprove] = await query(selectSql, validIds);
 
     if (formsToApprove.length === 0) {
@@ -1049,8 +1061,9 @@ async function bulkApproveForms(formIds, reviewedBy = null) {
 
     const approvedFormIds = formsToApprove.map(f => f.form_id);
     let scheduleChangeCount = 0;
+    let emailsSentCount = 0;
 
-    // Update all pending forms to 'approved'
+    // 1. Perform Bulk Update in DB
     const updateSql = `
       UPDATE tbl_forms
       SET status = 'approved',
@@ -1061,20 +1074,44 @@ async function bulkApproveForms(formIds, reviewedBy = null) {
     `;
     const [updateResult] = await query(updateSql, [reviewedBy, ...approvedFormIds]);
 
-    // Handle schedule changes - update service dates
+    // 2. Process side effects (Service Date Updates & Email Notifications)
     for (const form of formsToApprove) {
+      const parsedFormData = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
+
+      // Update service dates if it's a schedule change
       if (form.form_type === 'schedule_change') {
         try {
-          const formData = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
           const serviceUpdateResult = await updateServiceDateForScheduleChange({
             form_type: form.form_type,
-            form_data: formData
+            form_data: parsedFormData
           });
           if (serviceUpdateResult.success) {
             scheduleChangeCount++;
           }
         } catch (err) {
-          console.warn(`Failed to update service date for form ${form.form_id}:`, err.message);
+          console.warn(`⚠️ Failed to update service date for form ${form.form_id}:`, err.message);
+        }
+      }
+
+      // Send status update email
+      if (form.email) {
+        try {
+          const recipientName = (form.member_full_name && form.member_full_name.trim())
+            ? form.member_full_name
+            : (form.name || 'Valued Member');
+
+          await sendFormStatusUpdate({
+            email: form.email,
+            formType: form.form_type,
+            status: 'approved',
+            recipientName: recipientName,
+            formId: form.form_id,
+            formData: parsedFormData,
+            adminNotes: null // Bulk approve doesn't typically include individual admin notes
+          });
+          emailsSentCount++;
+        } catch (emailError) {
+          console.error(`❌ Error sending bulk approval email for form ${form.form_id}:`, emailError);
         }
       }
     }
@@ -1084,11 +1121,12 @@ async function bulkApproveForms(formIds, reviewedBy = null) {
 
     return {
       success: true,
-      message: `Bulk approve completed: ${approvedCount} approved, ${skippedCount} skipped${scheduleChangeCount > 0 ? ` (${scheduleChangeCount} schedule changes updated)` : ''}`,
+      message: `Bulk approve completed: ${approvedCount} approved, ${emailsSentCount} emails sent`,
       data: {
         requested: validIds.length,
         approved: approvedCount,
         skipped: skippedCount,
+        emails_sent: emailsSentCount,
         schedule_changes_updated: scheduleChangeCount
       }
     };
