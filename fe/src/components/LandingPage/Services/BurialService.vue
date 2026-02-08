@@ -342,6 +342,7 @@
                           density="compact"
                           required
                           hide-details
+                          :max="new Date().toISOString().split('T')[0]"
                         :disabled="burialServiceStore.loading"
                         ></v-text-field>
                       </div>
@@ -512,6 +513,7 @@
                         placeholder="Select date and time of death"
                         format="YYYY-MM-DD HH:mm"
                         style="width: 100%"
+                        :disabled-date="disabledDate"
                       />
                     </el-form-item>
 
@@ -753,6 +755,11 @@ watch([deceasedBirthDate, deceasedDeathDate], ([birthDate, deathDate]) => {
 
   deceasedAge.value = calculatedAge
 })
+
+// Disable future dates for date pickers
+const disabledDate = (time) => {
+  return time.getTime() > Date.now() - 8.64e7
+}
 
 // Format phone number (remove non-digit characters)
 const formatPhoneNumber = (phone) => {

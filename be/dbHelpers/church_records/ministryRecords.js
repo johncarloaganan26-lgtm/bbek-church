@@ -16,6 +16,8 @@ const { archiveBeforeDelete, bulkArchiveBeforeDelete } = require('../archiveHelp
  * - date_created (DATETIME, NN)
  * - image (LONGBLOB, nullable)
  * - description (VARCHAR(1000), nullable)
+ * - link (VARCHAR(500), nullable) - Live streaming URL
+ * - tags (VARCHAR(500), nullable) - Tags for filtering (e.g., "Ministry", "Worship")
  */
 
 /**
@@ -147,7 +149,9 @@ async function createMinistry(ministryData) {
       status = 'active',
       date_created = new Date(),
       image = null,
-      description = null
+      description = null,
+      link = null,
+      tags = null
     } = ministryData;
 
     // Validate required fields
@@ -211,6 +215,24 @@ async function createMinistry(ministryData) {
       };
     }
 
+    // Validate link length (max 500 characters)
+    if (link && link.trim().length > 500) {
+      return {
+        success: false,
+        message: 'Link exceeds maximum length of 500 characters',
+        error: 'Link too long'
+      };
+    }
+
+    // Validate tags length (max 500 characters)
+    if (tags && tags.trim().length > 500) {
+      return {
+        success: false,
+        message: 'Tags exceeds maximum length of 500 characters',
+        error: 'Tags too long'
+      };
+    }
+
     // Format date
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
 
@@ -221,8 +243,8 @@ async function createMinistry(ministryData) {
 
     const sql = `
       INSERT INTO tbl_ministry 
-        (ministry_name, schedule, leader_id, department_id, members, status, date_created, image, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (ministry_name, schedule, leader_id, department_id, members, status, date_created, image, description, link, tags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -234,7 +256,9 @@ async function createMinistry(ministryData) {
       status,
       formattedDateCreated,
       imageBlob,
-      description ? description.trim() : null
+      description ? description.trim() : null,
+      link ? link.trim() : null,
+      tags ? tags.trim() : null
     ];
 
     const [result] = await query(sql, params);
@@ -335,6 +359,8 @@ async function getAllMinistries(options = {}) {
       m.date_created,
       m.image,
       m.description,
+      m.link,
+      m.tags,
       d.department_name,
       mem.firstname as leader_firstname,
       mem.lastname as leader_lastname,
@@ -590,6 +616,8 @@ async function getMinistryById(ministryId) {
       m.date_created,
       m.image,
       m.description,
+      m.link,
+      m.tags,
       d.department_name,
       mem.firstname as leader_firstname,
       mem.lastname as leader_lastname,
@@ -686,6 +714,8 @@ async function getMinistriesByMemberId(memberId, options = {}) {
       m.date_created,
       m.image,
       m.description,
+      m.link,
+      m.tags,
       d.department_name,
       mem.firstname as leader_firstname,
       mem.lastname as leader_lastname,
@@ -911,7 +941,9 @@ async function updateMinistry(ministryId, ministryData) {
       status,
       date_created,
       image,
-      description
+      description,
+      link,
+      tags
     } = ministryData;
 
     // Build dynamic update query based on provided fields
@@ -1023,6 +1055,32 @@ async function updateMinistry(ministryId, ministryData) {
       }
       fields.push('description = ?');
       params.push(description ? description.trim() : null);
+    }
+
+    if (link !== undefined) {
+      // Validate link length (max 500 characters)
+      if (link && link.trim().length > 500) {
+        return {
+          success: false,
+          message: 'Link exceeds maximum length of 500 characters',
+          error: 'Link too long'
+        };
+      }
+      fields.push('link = ?');
+      params.push(link ? link.trim() : null);
+    }
+
+    if (tags !== undefined) {
+      // Validate tags length (max 500 characters)
+      if (tags && tags.trim().length > 500) {
+        return {
+          success: false,
+          message: 'Tags exceeds maximum length of 500 characters',
+          error: 'Tags too long'
+        };
+      }
+      fields.push('tags = ?');
+      params.push(tags ? tags.trim() : null);
     }
 
     if (fields.length === 0) {
@@ -1295,6 +1353,132 @@ async function exportMinistriesToExcel(options = {}) {
   }
 }
 
+/**
+   * GET MINISTRY SERMON EVENTS - Get active ministries with live links for sermon page
+   * Returns ministries that have link field populated for live streaming
+   * GET /api/church-records/ministries/getMinistrySermonEvents
+   */
+async function getMinistrySermonEvents() {
+  try {
+    const sql = `
+      SELECT 
+        ministry_id,
+        ministry_name,
+        schedule,
+        description,
+        link,
+        tags,
+        image,
+        status,
+        date_created
+      FROM tbl_ministry
+      WHERE status = 'active'
+        AND link IS NOT NULL
+        AND link != ''
+      ORDER BY date_created DESC
+    `;
+
+    const [rows] = await query(sql);
+
+    const processedRows = rows.map(ministry => {
+      const processedMinistry = { ...ministry };
+
+      // Convert image blob to base64
+      let imageUrl = null;
+      if (ministry.image && Buffer.isBuffer(ministry.image)) {
+        const base64String = convertBlobToBase64(ministry.image);
+        if (base64String) {
+          imageUrl = `data:image/jpeg;base64,${base64String}`;
+        }
+      }
+      processedMinistry.imageUrl = imageUrl;
+      processedMinistry.image = ministry.image && Buffer.isBuffer(ministry.image)
+        ? convertBlobToBase64(ministry.image)
+        : null;
+
+      // Parse tags if string
+      if (ministry.tags && typeof ministry.tags === 'string') {
+        processedMinistry.tags = ministry.tags;
+      }
+
+      return processedMinistry;
+    });
+
+    return {
+      success: true,
+      message: 'Ministry sermon events retrieved successfully',
+      data: processedRows,
+      count: processedRows.length
+    };
+  } catch (error) {
+    console.error('Error fetching ministry sermon events:', error);
+    throw error;
+  }
+}
+
+/**
+ * GET COMPLETED MINISTRY SERMON EVENTS - Get ministries with links for archive
+ * Returns all ministries with links regardless of schedule (for archive display)
+ * GET /api/church-records/ministries/getCompletedMinistrySermonEvents
+ */
+async function getCompletedMinistrySermonEvents() {
+  try {
+    const sql = `
+      SELECT 
+        ministry_id,
+        ministry_name,
+        schedule,
+        description,
+        link,
+        tags,
+        image,
+        status,
+        date_created
+      FROM tbl_ministry
+      WHERE status = 'active'
+        AND link IS NOT NULL
+        AND link != ''
+      ORDER BY date_created DESC
+    `;
+
+    const [rows] = await query(sql);
+
+    const processedRows = rows.map(ministry => {
+      const processedMinistry = { ...ministry };
+
+      // Convert image blob to base64
+      let imageUrl = null;
+      if (ministry.image && Buffer.isBuffer(ministry.image)) {
+        const base64String = convertBlobToBase64(ministry.image);
+        if (base64String) {
+          imageUrl = `data:image/jpeg;base64,${base64String}`;
+        }
+      }
+      processedMinistry.imageUrl = imageUrl;
+      processedMinistry.image = ministry.image && Buffer.isBuffer(ministry.image)
+        ? convertBlobToBase64(ministry.image)
+        : null;
+
+      // Parse tags if string
+      if (ministry.tags && typeof ministry.tags === 'string') {
+        processedMinistry.tags = ministry.tags;
+      }
+
+      return processedMinistry;
+    });
+
+    return {
+      success: true,
+      message: 'Completed ministry sermon events retrieved successfully',
+      data: processedRows,
+      count: processedRows.length
+    };
+  } catch (error) {
+    console.error('Error fetching completed ministry sermon events:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createMinistry,
   getAllMinistries,
@@ -1305,6 +1489,8 @@ module.exports = {
   bulkDeleteMinistries,
   getPublicMinistries,
   getAllMinistriesForSelect,
-  exportMinistriesToExcel
+  exportMinistriesToExcel,
+  getMinistrySermonEvents,
+  getCompletedMinistrySermonEvents
 };
 

@@ -11,7 +11,9 @@ const {
   bulkDeleteMinistries,
   getPublicMinistries,
   getAllMinistriesForSelect,
-  exportMinistriesToExcel
+  exportMinistriesToExcel,
+  getMinistrySermonEvents,
+  getCompletedMinistrySermonEvents
 } = require('../../dbHelpers/church_records/ministryRecords');
 
 const router = express.Router();
@@ -56,7 +58,7 @@ router.post('/createMinistry', authenticateToken, async (req, res) => {
     // Debug: Log what was received
     console.log('Create Ministry - req.body keys:', req.body ? Object.keys(req.body) : 'undefined');
     console.log('Create Ministry - ministryData keys:', Object.keys(ministryData));
-    
+
     // Check if image is provided in body (base64 from JSON)
     if (req.body && req.body.image) {
       console.log('Image provided as base64 string, length:', req.body.image.length);
@@ -66,7 +68,7 @@ router.post('/createMinistry', authenticateToken, async (req, res) => {
     }
 
     const result = await createMinistry(ministryData);
-    
+
     if (result.success) {
       res.status(201).json({
         success: true,
@@ -217,7 +219,7 @@ router.get('/getMinistryById/:id', async (req, res) => {
     }
 
     const result = await getMinistryById(ministryId);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -267,7 +269,7 @@ router.put('/updateMinistry/:id', authenticateToken, async (req, res) => {
     // Debug: Log what was received
     console.log('Update Ministry - req.body keys:', req.body ? Object.keys(req.body) : 'undefined');
     console.log('Update Ministry - ministryData keys:', Object.keys(ministryData));
-    
+
     // Check if image is provided in body (base64 from JSON)
     if (req.body && req.body.image) {
       console.log('Image provided as base64 string for update, length:', req.body.image.length);
@@ -279,7 +281,7 @@ router.put('/updateMinistry/:id', authenticateToken, async (req, res) => {
     }
 
     const result = await updateMinistry(ministryId, ministryData);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -328,7 +330,7 @@ router.delete('/deleteMinistry/:id', authenticateToken, async (req, res) => {
     }
 
     const result = await deleteMinistry(ministryId, archivedBy);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -427,7 +429,7 @@ router.get('/getMinistriesByMemberId/:memberId', async (req, res) => {
     // Get parameters from query string
     const options = req.query;
     const result = await getMinistriesByMemberId(memberIdNum, options);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -467,7 +469,7 @@ router.post('/getMinistriesByMemberId/:memberId', async (req, res) => {
     // Get parameters from request body (payload)
     const options = req.body;
     const result = await getMinistriesByMemberId(memberIdNum, options);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -570,6 +572,68 @@ router.get('/exportExcel', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to export ministries to Excel'
+    });
+  }
+});
+
+/**
+ * GET MINISTRY SERMON EVENTS - Get active ministries with live links for sermon page
+ * GET /api/church-records/ministries/getMinistrySermonEvents
+ */
+router.get('/getMinistrySermonEvents', async (req, res) => {
+  try {
+    const result = await getMinistrySermonEvents();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data,
+        count: result.count
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching ministry sermon events:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch ministry sermon events'
+    });
+  }
+});
+
+/**
+ * GET COMPLETED MINISTRY SERMON EVENTS - Get ministries with links for archive
+ * GET /api/church-records/ministries/getCompletedMinistrySermonEvents
+ */
+router.get('/getCompletedMinistrySermonEvents', async (req, res) => {
+  try {
+    const result = await getCompletedMinistrySermonEvents();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data,
+        count: result.count
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching completed ministry sermon events:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch completed ministry sermon events'
     });
   }
 });

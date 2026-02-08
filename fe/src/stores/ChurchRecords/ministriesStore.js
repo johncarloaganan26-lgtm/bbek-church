@@ -7,7 +7,7 @@ function base64ToBlob(base64String, contentType = 'image/jpeg') {
   if (!base64String || typeof base64String !== 'string') {
     return null
   }
-  
+
   // Remove data URL prefix if present
   let base64 = base64String
   if (base64String.includes && base64String.includes(',')) {
@@ -19,7 +19,7 @@ function base64ToBlob(base64String, contentType = 'image/jpeg') {
       contentType = mimeMatch[1]
     }
   }
-  
+
   // Convert base64 to binary
   const byteCharacters = atob(base64)
   const byteNumbers = new Array(byteCharacters.length)
@@ -27,7 +27,7 @@ function base64ToBlob(base64String, contentType = 'image/jpeg') {
     byteNumbers[i] = byteCharacters.charCodeAt(i)
   }
   const byteArray = new Uint8Array(byteNumbers)
-  
+
   return new Blob([byteArray], { type: contentType })
 }
 
@@ -73,7 +73,7 @@ export const useMinistriesStore = defineStore('ministries', {
       this.error = null
       try {
         const response = await axios.get('/church-records/ministries/getPublicMinistries')
-        console.log(response , response.data , 'response.data')
+        console.log(response, response.data, 'response.data')
         if (response.status === 200) {
           // Ensure response.data is an array
           const data = response.data
@@ -169,6 +169,8 @@ export const useMinistriesStore = defineStore('ministries', {
           }
         })
         if (response.data.success) {
+          // Debug: Log the response to check if link and tags are present
+          console.log('fetchMinistryById response:', response.data.data)
           return response.data.data
         } else {
           this.error = response.data.message || 'Failed to fetch ministry'
@@ -195,7 +197,7 @@ export const useMinistriesStore = defineStore('ministries', {
           hasImage: !!ministryData.image,
           imageLength: ministryData.image?.length
         });
-        
+
         // Prepare data for JSON upload (Vercel compatible)
         const payload = {
           ministry_name: ministryData.ministry_name || '',
@@ -204,9 +206,11 @@ export const useMinistriesStore = defineStore('ministries', {
           department_id: ministryData.department_id || '',
           members: ministryData.members || [],
           status: ministryData.status || 'active',
-          description: ministryData.description || ''
+          description: ministryData.description || '',
+          link: ministryData.link || '',
+          tags: ministryData.tags || ''
         }
-        
+
         // Add image as base64 if provided (Vercel compatible - no multipart)
         if (ministryData.imageFile) {
           // Convert File to base64
@@ -222,16 +226,16 @@ export const useMinistriesStore = defineStore('ministries', {
           // Already base64
           payload.image = ministryData.image
         }
-        
+
         console.log('Sending ministry data as JSON to Vercel-compatible endpoint')
-        
+
         const response = await axios.post('/church-records/ministries/createMinistry', payload, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data.success) {
           await this.fetchMinistries({
             page: this.currentPage,
@@ -259,7 +263,7 @@ export const useMinistriesStore = defineStore('ministries', {
       try {
         // Prepare data for JSON upload (Vercel compatible)
         const payload = {}
-        
+
         // Add all fields to payload (only include defined fields)
         if (ministryData.ministry_name !== undefined) payload.ministry_name = ministryData.ministry_name
         if (ministryData.schedule !== undefined) payload.schedule = ministryData.schedule || ''
@@ -268,7 +272,9 @@ export const useMinistriesStore = defineStore('ministries', {
         if (ministryData.members !== undefined) payload.members = ministryData.members
         if (ministryData.status !== undefined) payload.status = ministryData.status
         if (ministryData.description !== undefined) payload.description = ministryData.description || ''
-        
+        if (ministryData.link !== undefined) payload.link = ministryData.link || ''
+        if (ministryData.tags !== undefined) payload.tags = ministryData.tags || ''
+
         // Add image as base64 if provided (Vercel compatible - no multipart)
         if (ministryData.imageFile) {
           // Convert File to base64
@@ -286,16 +292,16 @@ export const useMinistriesStore = defineStore('ministries', {
         } else {
           console.log('No image provided for update - keeping existing image')
         }
-        
+
         console.log('Sending ministry update data as JSON to Vercel-compatible endpoint')
-        
+
         const response = await axios.put(`/church-records/ministries/updateMinistry/${id}`, payload, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data.success) {
           await this.fetchMinistries({
             page: this.currentPage,
@@ -392,10 +398,10 @@ export const useMinistriesStore = defineStore('ministries', {
      */
     async fetchUserMinistries(memberId, options = {}) {
       const { page = 1, pageSize = 10, search = '', status = '', sortBy = 'Date Created (Newest)' } = options
-      
+
       this.loading = true
       this.error = null
-      
+
       try {
         if (!memberId) {
           throw new Error('Member ID is required')
@@ -405,22 +411,22 @@ export const useMinistriesStore = defineStore('ministries', {
         const params = new URLSearchParams()
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         if (search && search.trim()) {
           params.append('search', search.trim())
         }
-        
+
         if (status && status !== 'All Statuses') {
           params.append('status', status)
         }
-        
+
         if (sortBy) {
           params.append('sortBy', sortBy)
         }
-        
+
         // Call backend API
         const response = await axios.get(`/church-records/ministries/getMinistriesByMemberId/${memberId}?${params.toString()}`)
-        
+
         if (response.data.success) {
           // Map backend response to frontend format
           const ministries = response.data.data || []
@@ -429,11 +435,11 @@ export const useMinistriesStore = defineStore('ministries', {
             let imageUrl = ministry.imageUrl || null
             if (!imageUrl && ministry.image) {
               // Fallback: If imageUrl not provided, convert base64 image to data URL
-              imageUrl = ministry.image.startsWith && ministry.image.startsWith('data:') 
-                ? ministry.image 
+              imageUrl = ministry.image.startsWith && ministry.image.startsWith('data:')
+                ? ministry.image
                 : `data:image/jpeg;base64,${ministry.image}`
             }
-            
+
             return {
               ministry_id: ministry.ministry_id,
               ministry_name: ministry.ministry_name,
@@ -449,9 +455,9 @@ export const useMinistriesStore = defineStore('ministries', {
               ...ministry // Include all other fields
             }
           })
-          
+
           const totalPages = response.data.pagination?.totalPages || 1
-          
+
           return {
             success: true,
             data: formattedMinistries,
@@ -506,11 +512,11 @@ export const useMinistriesStore = defineStore('ministries', {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
       // Refetch with new filters
-      this.fetchMinistries({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchMinistries({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
@@ -551,7 +557,7 @@ export const useMinistriesStore = defineStore('ministries', {
         if (options.dateRange && options.dateRange.length === 2) {
           params.append('dateRange', JSON.stringify(options.dateRange))
         }
-        
+
         // Make request with responseType: 'blob' to handle binary data
         const response = await axios.get(`/church-records/ministries/exportExcel?${params}`, {
           responseType: 'blob',
@@ -560,7 +566,7 @@ export const useMinistriesStore = defineStore('ministries', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         // Extract filename from content-disposition header or use default
         const contentDisposition = response.headers['content-disposition']
         let filename = 'ministries_export.xlsx'
@@ -570,7 +576,7 @@ export const useMinistriesStore = defineStore('ministries', {
             filename = filenameMatch[1]
           }
         }
-        
+
         // Create download link and trigger download
         const url = window.URL.createObjectURL(new Blob([response.data]))
         const link = document.createElement('a')
@@ -578,11 +584,11 @@ export const useMinistriesStore = defineStore('ministries', {
         link.setAttribute('download', filename)
         document.body.appendChild(link)
         link.click()
-        
+
         // Cleanup
         link.parentNode.removeChild(link)
         window.URL.revokeObjectURL(url)
-        
+
         return { success: true, message: 'Excel file downloaded successfully' }
       } catch (error) {
         this.error = error.response?.data?.error || error.message || 'Failed to export ministries to Excel'

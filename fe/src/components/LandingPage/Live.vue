@@ -79,6 +79,11 @@
                   <span class="text-body-2 font-weight-semibold pl-2"
                     >LIVE</span
                   >
+                  <!-- Show Ministry badge for ministry sermons -->
+                  <v-chip v-if="ongoingEvent.isMinistry" size="small" color="teal" variant="flat">
+                    <v-icon start size="small">mdi-church</v-icon>
+                    Ministry
+                  </v-chip>
                 </div>
               </v-col>
             </v-row>
@@ -322,6 +327,11 @@
               <div class="sermon-content">
                 <h3 class="sermon-title">{{ sermon.title }}</h3>
                 <p class="sermon-date">{{ formatDate(sermon.start_date) }}</p>
+                <!-- Show Ministry badge if it's a ministry sermon -->
+                <v-chip v-if="sermon.isMinistry" size="small" color="teal" variant="flat" class="mt-1">
+                  <v-icon start size="small">mdi-church</v-icon>
+                  Ministry
+                </v-chip>
               </div>
             </v-card>
           </v-col>
@@ -443,6 +453,7 @@ const floatingElements = ref([
 const ongoingEvent = ref(null);
 const sermons = ref([]);
 const allSermons = ref([]); // Store all sermons for archive view
+const allMinistrySermons = ref([]); // Store all ministry sermons for archive view
 const showAllSermons = ref(false); // Toggle to show all sermons on same page
 const sortOrder = ref('recent'); // 'recent' for newest first, 'oldest' for oldest first
 const loading = ref(false);
@@ -458,7 +469,11 @@ const formatDate = (dateString) => {
   // Check if time is midnight (00:00) - likely means no time was set
   const hours = date.getHours();
   const minutes = date.getMinutes();
-  if (hours === 0 && minutes === 0) return "TBA";
+  if (hours === 0 && minutes === 0) return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
   return date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -671,11 +686,53 @@ const fetchSermonEvents = async () => {
   }
 };
 
+// Fetch ministry sermon events (ministries with live links)
+const fetchMinistrySermonEvents = async () => {
+  try {
+    const response = await axios.get("/church-records/ministries/getMinistrySermonEvents");
+
+    if (response.data.success && response.data.data) {
+      const ministries = response.data.data;
+
+      // Process ministry data to match sermon format
+      const processedMinistries = ministries.map(ministry => ({
+        ministry_id: ministry.ministry_id,
+        title: ministry.ministry_name,
+        description: ministry.description,
+        link: ministry.link,
+        tags: ministry.tags,
+        start_date: ministry.date_created,
+        end_date: null,
+        imageUrl: ministry.imageUrl,
+        image: ministry.image,
+        isMinistry: true // Flag to identify ministry sermons
+      }));
+
+      // Store all ministry sermons
+      allMinistrySermons.value = processedMinistries;
+
+      // If no ongoing event from regular events, try to use first ministry
+      if (!ongoingEvent.value && processedMinistries.length > 0) {
+        ongoingEvent.value = processedMinistries[0];
+        embedUrl.value = convertToEmbedUrl(processedMinistries[0].link);
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching ministry sermon events:", error);
+  }
+};
+
 // Apply sorting to sermons based on sortOrder
 const applySermonSorting = () => {
-  const sortedEvents = [...allSermons.value].sort((a, b) => {
-    const dateA = new Date(a.end_date || a.start_date);
-    const dateB = new Date(b.end_date || b.start_date);
+  // Combine regular sermons and ministry sermons
+  const combinedSermons = [
+    ...allSermons.value,
+    ...allMinistrySermons.value
+  ];
+  
+  const sortedEvents = combinedSermons.sort((a, b) => {
+    const dateA = new Date(a.end_date || a.start_date || a.date_created);
+    const dateB = new Date(b.end_date || b.start_date || b.date_created);
     if (sortOrder.value === 'recent') {
       return dateB - dateA; // Descending (newest first)
     } else {
@@ -751,6 +808,7 @@ watch(ongoingEvent, (newEvent) => {
 onMounted(async () => {
   await fetchSermonsData();
   await fetchSermonEvents();
+  await fetchMinistrySermonEvents(); // Fetch ministry sermon events
   await fetchCompletedSermonEvents();
 });
 </script>

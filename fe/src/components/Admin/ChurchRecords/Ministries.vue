@@ -502,7 +502,9 @@ const editMinistry = (ministry) => {
     members: Array.isArray(ministry.members) ? ministry.members : [],
     status: ministry.status,
     description: ministry.description || null,
-    image: ministry.image || null // Include image if available
+    image: ministry.image || null, // Include image if available
+    link: ministry.link || '', // Add link field
+    tags: ministry.tags || '' // Add tags field
   }
   ministryDialog.value = true
 }

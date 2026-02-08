@@ -138,6 +138,42 @@
         />
       </el-form-item>
 
+      <!-- Live Service Link -->
+      <el-form-item label="Live Service Link" prop="link">
+        <el-input
+          v-model="formData.link"
+          placeholder="Enter live streaming URL (YouTube Live, Facebook Live, etc.)"
+          size="large"
+          clearable
+          :disabled="loading"
+        >
+          <template #prefix>
+            <el-icon><VideoCamera /></el-icon>
+          </template>
+        </el-input>
+        <div class="form-item-hint">
+          Add a link to stream this ministry's live services (e.g., YouTube Live, Facebook Live)
+        </div>
+      </el-form-item>
+
+      <!-- Tags -->
+      <el-form-item label="Tags" prop="tags">
+        <el-input
+          v-model="formData.tags"
+          placeholder="Enter tags separated by commas (e.g., Ministry, Worship, Teaching)"
+          size="large"
+          clearable
+          :disabled="loading"
+        >
+          <template #prefix>
+            <el-icon><PriceTag /></el-icon>
+          </template>
+        </el-input>
+        <div class="form-item-hint">
+          Use tags like: Ministry, Worship, Teaching, Youth, Adult
+        </div>
+      </el-form-item>
+
       <!-- Image Upload -->
       <el-form-item label="Ministry Image" prop="image">
         <div class="image-upload-container">
@@ -206,7 +242,7 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
-import { Upload, Delete } from '@element-plus/icons-vue'
+import { Upload, Delete, VideoCamera, PriceTag } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -258,7 +294,9 @@ const formData = reactive({
   members: [],
   status: 'active',
   description: '',
-  image: null
+  image: null,
+  link: '',
+  tags: ''
 })
 
 // Validation rules
@@ -354,6 +392,39 @@ const rules = {
       },
       trigger: 'change'
     }
+  ],
+  link: [
+    {
+      validator: (rule, value, callback) => {
+        if (value && value.trim().length > 500) {
+          callback(new Error('Link must not exceed 500 characters'))
+          return
+        }
+        // Basic URL validation if provided
+        if (value && value.trim()) {
+          try {
+            new URL(value.trim())
+          } catch {
+            callback(new Error('Please enter a valid URL'))
+            return
+          }
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
+  ],
+  tags: [
+    {
+      validator: (rule, value, callback) => {
+        if (value && value.trim().length > 500) {
+          callback(new Error('Tags must not exceed 500 characters'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
   ]
 }
 
@@ -361,7 +432,9 @@ const rules = {
 watch(
   () => props.ministryData,
   (newData) => {
+    console.log('MinistryDialog - ministryData changed:', newData)
     if (newData && props.modelValue) {
+      console.log('MinistryDialog - Populating form with link:', newData.link, 'tags:', newData.tags)
       formData.ministry_name = newData.ministry_name || ''
       formData.schedule = newData.schedule || ''
       formData.leader_id = newData.leader_id ?? null
@@ -369,6 +442,8 @@ watch(
       formData.members = Array.isArray(newData.members) ? [...newData.members] : []
       formData.status = newData.status || 'active'
       formData.description = newData.description || ''
+      formData.link = newData.link || ''
+      formData.tags = newData.tags || ''
       
       // Handle existing image (base64 from API)
       if (newData && newData.image) {
@@ -405,6 +480,8 @@ watch(
       formData.members = Array.isArray(data.members) ? [...data.members] : []
       formData.status = data.status || 'active'
       formData.description = data.description || ''
+      formData.link = data.link || ''
+      formData.tags = data.tags || ''
       
       // Handle existing image (base64 from API)
       if (data && data.image) {
@@ -436,6 +513,8 @@ const resetForm = () => {
   formData.status = 'active'
   formData.description = ''
   formData.image = null
+  formData.link = ''
+  formData.tags = ''
   
   imageFile.value = null
   imagePreview.value = null
@@ -578,7 +657,9 @@ const handleSubmit = async () => {
       department_id: parseInt(formData.department_id), // Ensure department_id is an integer
       members: [...formData.members],
       status: formData.status,
-      description: formData.description ? formData.description.trim() : null
+      description: formData.description ? formData.description.trim() : null,
+      link: formData.link ? formData.link.trim() : null,
+      tags: formData.tags ? formData.tags.trim() : null
     }
 
     // Include image file if a new file is selected (for FormData)
@@ -781,6 +862,13 @@ defineExpose({
 .image-size {
   font-size: 12px;
   color: #909399;
+}
+
+.form-item-hint {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
 

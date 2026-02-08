@@ -26,7 +26,7 @@
       icon
       size="large"
       class="social-icon youtube-icon"
-      href="#"
+      href="https://www.youtube.com/@bbek4112"
       target="_blank"
       rel="noopener noreferrer"
     >

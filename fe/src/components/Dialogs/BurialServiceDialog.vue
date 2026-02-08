@@ -46,7 +46,7 @@
       <!-- Requester Section -->
       <div class="form-section">
         <div class="section-header">
-          <span class="section-title">Requester Information</span>
+          <span class="section-title">Requesder Information</span>
         </div>
 
         <!-- Requester Name (Required for Admin/Staff when no member selected) -->
@@ -236,6 +236,7 @@
             format="YYYY-MM-DD HH:mm"
             style="width: 100%"
             :disabled="loading"
+            :picker-options="{ disabledDate: time => time.getTime() > Date.now() }"
             @change="calculateDeceasedAge"
           />
         </el-form-item>
@@ -556,7 +557,25 @@ const rules = computed(() => {
       { required: true, message: 'Deceased birthdate is required', trigger: 'change' }
     ],
     date_death: [
-      { required: true, message: 'Date of death is required', trigger: 'change' }
+      { required: true, message: 'Date of death is required', trigger: 'change' },
+      {
+        validator: (rule, value, callback) => {
+          if (value) {
+            const selectedDate = new Date(value)
+            const now = new Date()
+            // Compare dates only (not time) to prevent future dates
+            const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+            const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            
+            if (selectedDateOnly > nowDateOnly) {
+              callback(new Error('Date of death cannot be in the future'))
+              return
+            }
+          }
+          callback()
+        },
+        trigger: 'change'
+      }
     ],
     reason_of_death: [
       { required: true, message: 'Reason of death is required', trigger: 'blur' }
