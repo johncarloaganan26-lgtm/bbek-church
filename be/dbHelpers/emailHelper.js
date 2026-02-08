@@ -6,6 +6,8 @@ require('dotenv').config();
 // Set default timezone to Philippines (Asia/Manila, UTC+8)
 moment.tz.setDefault('Asia/Manila');
 
+const CHURCH_EMAIL = 'biblebaptistekklesiaofkawit@gmail.com';
+
 // Lightweight token generator until JWT routes are available
 const generateResetToken = () => crypto.randomBytes(32).toString('hex');
 
@@ -119,7 +121,7 @@ const sendAccountDetails = async (accountDetails) => {
     }
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit Administrator"`,
+      from: `"Bible Baptist Ekklesia of Kawit Administrator" <${CHURCH_EMAIL}>`,
       to: accountDetails.email,
       subject: subject,
       html: `
@@ -222,7 +224,7 @@ const sendMarriageDetails = async (marriageDetails) => {
     const location = marriageDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: marriageDetails.email,
       subject: `Marriage Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -415,7 +417,7 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
     let location = baptismDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: baptismDetails.email,
       subject: `Water Baptism Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -441,6 +443,31 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
                 </span>
               </p>
             </div>
+            
+            ${status === 'pending' ? `
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0;"><strong>Next Steps:</strong></p>
+              <p style="margin: 10px 0 0 0;">Our team is reviewing your registration. You may be contacted for a brief pastoral interview to discuss your faith journey. Please wait for the official approval notification.</p>
+            </div>
+            ` : ''}
+
+            ${status === 'approved' ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>Preparation for Baptism:</strong></p>
+              <ul style="margin: 10px 0 0 20px; padding: 0;">
+                <li>Attend the pre-baptism orientation as scheduled</li>
+                <li>Please prepare a change of clothes and a towel</li>
+                <li>Arrive at the baptism venue at least 30 minutes before the ceremony</li>
+              </ul>
+            </div>
+            ` : ''}
+
+            ${status === 'completed' ? `
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
+              <p style="margin: 0;"><strong>Welcome to the Family!</strong></p>
+              <p style="margin: 10px 0 0 0;">You can now log in to the portal to view your <strong>digital Baptism Certificate</strong>. We also invite you to explore other modules and ministries as you grow in your faith journey.</p>
+            </div>
+            ` : ''}
             
             ${status === 'pending' || status !== 'pending' ? `
             <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -647,7 +674,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     const location = dedicationDetails.location || 'To be determined';
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: dedicationDetails.email,
       subject: `Child Dedication Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -673,6 +700,27 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
                 </span>
               </p>
             </div>
+            
+            ${status === 'pending' ? `
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0;"><strong>Next Steps:</strong></p>
+              <p style="margin: 10px 0 0 0;">Our team is currently coordinating with our Officiating Pastors to confirm their availability for your requested date. We will notify you once the schedule is confirmed.</p>
+            </div>
+            ` : ''}
+
+            ${status === 'approved' ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>Preparation:</strong></p>
+              <p style="margin: 10px 0 0 0;">Schedule confirmed! Please coordinate with the church office to finalize the names of godparents for the certificate and invite your loved ones to join this special occasion.</p>
+            </div>
+            ` : ''}
+
+            ${status === 'completed' ? `
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
+              <p style="margin: 0;"><strong>Congratulations!</strong></p>
+              <p style="margin: 10px 0 0 0;">Your child's dedication is now officially recorded. You may now log in to the portal to download the official <strong>Digital Certificate</strong> from your 'My Account' page.</p>
+            </div>
+            ` : ''}
             
             </div>
             
@@ -898,7 +946,7 @@ const sendBurialDetails = async (burialDetails) => {
     }
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: burialDetails.email,
       subject: `Burial Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
@@ -924,6 +972,31 @@ const sendBurialDetails = async (burialDetails) => {
                 </span>
               </p>
             </div>
+            
+            ${status === 'pending' ? `
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0;"><strong>What's Next:</strong></p>
+              <p style="margin: 10px 0 0 0;">Our pastoral team has been notified. A representative will reach out shortly for coordination and spiritual support during this time of mourning.</p>
+            </div>
+            ` : ''}
+
+            ${status === 'approved' ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>Service Preparation:</strong></p>
+              <ul style="margin: 10px 0 0 20px; padding: 0;">
+                <li>Please prepare a brief biography of the deceased for the officiating pastor</li>
+                <li>Coordinate any special service requirements (music, tributes) with the assigned pastor</li>
+                <li>Finalize venue arrangements and inform the family accordingly</li>
+              </ul>
+            </div>
+            ` : ''}
+
+            ${status === 'completed' ? `
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
+              <p style="margin: 0;"><strong>Continuing Support</strong></p>
+              <p style="margin: 10px 0 0 0;">We continue to join you in prayer. If your family needs follow-up counseling or any church support as you journey through grief, we are here for you.</p>
+            </div>
+            ` : ''}
             
             <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
               <h3 style="color: #2c3e50; margin-top: 0;">Burial Service Details</h3>
@@ -1006,7 +1079,7 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: approvalDetails.email,
       subject: `${typeLabel} Join Request Received - Bible Baptist Ekklesia of Kawit`,
       html: `
@@ -1127,7 +1200,7 @@ const sendApprovalStatusUpdate = async (approvalDetails) => {
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: approvalDetails.email,
       subject: `${typeLabel} Join Request ${status.charAt(0).toUpperCase() + status.slice(1)} - Bible Baptist Ekklesia of Kawit`,
       html: `
@@ -1256,7 +1329,7 @@ const sendTransactionCompletionNotification = async (transactionDetails) => {
     }).format(totalAmount);
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: transactionDetails.email,
       subject: `Transaction Completed - ${serviceTypeLabel} - Bible Baptist Ekklesia of Kawit`,
       html: `
@@ -1446,7 +1519,7 @@ const sendFormSubmissionNotification = async (formDetails) => {
     }
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: formDetails.email,
       subject: `${formTypeLabel} Received - Bible Baptist Ekklesia of Kawit`,
       html: `
@@ -1625,7 +1698,7 @@ const sendFormStatusUpdate = async (formDetails) => {
     }
 
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit" <${process.env.EMAIL_USER}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: formDetails.email,
       subject: `${formTypeLabel} ${status.charAt(0).toUpperCase() + status.slice(1)} - Bible Baptist Ekklesia of Kawit`,
       html: `
