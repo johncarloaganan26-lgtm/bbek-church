@@ -579,6 +579,25 @@
         <span v-if="!giveData.mayaQrImage" class="text-grey ml-2">No file chosen</span>
       </div>
     </div>
+    <el-divider />
+
+    <!-- Maya Instruction Text -->
+    <div class="list-item">
+      <div class="item-label">Maya Instruction Text</div>
+      <div class="item-preview">
+        <span class="text-grey">{{ giveData.mayaInstructionText }}</span>
+      </div>
+      <div class="item-action">
+        <el-input
+          v-model="giveData.mayaInstructionText"
+          type="textarea"
+          :rows="3"
+          size="small"
+          placeholder="Enter Maya instruction text"
+          style="max-width: 400px;"
+        ></el-input>
+      </div>
+    </div>
   </div>
 
   <!-- Fixed Actions Bar -->
@@ -636,6 +655,7 @@ const defaultGiveData = {
   mayaNumber: '',
   mayaLogoImage: '',
   mayaQrImage: '',
+  mayaInstructionText: 'Send your donation to this Maya account',
   backButtonText: 'Back to Home',
   backButtonColor: '#00bcd4',
   // Give In Person Card fields

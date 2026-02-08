@@ -89,6 +89,7 @@
                   :gcash-instruction-text="giveData.gcashInstructionText"
                   :maya-logo-image="giveData.mayaLogoImage"
                   :maya-qr-image="giveData.mayaQrImage"
+                  :maya-instruction-text="giveData.mayaInstructionText"
                 />
               </v-col>
               <v-col cols="12" md="6" class="give-in-person-col">
@@ -144,6 +145,7 @@ const giveData = ref({
   mayaNumber: '',
   mayaLogoImage: '',
   mayaQrImage: '',
+  mayaInstructionText: 'Send your donation to this Maya account',
   backButtonText: 'Back to Home',
   backButtonColor: '#00bcd4'
 })
@@ -197,6 +199,7 @@ const fetchGiveData = async () => {
       if (content.gcashInstructionText) giveData.value.gcashInstructionText = content.gcashInstructionText
       if (content.mayaText) giveData.value.mayaText = content.mayaText
       if (content.mayaNumber) giveData.value.mayaNumber = content.mayaNumber
+      if (content.mayaInstructionText) giveData.value.mayaInstructionText = content.mayaInstructionText
       if (content.backButtonText) giveData.value.backButtonText = content.backButtonText
       if (content.backButtonColor) {
         giveData.value.backButtonColor = content.backButtonColor

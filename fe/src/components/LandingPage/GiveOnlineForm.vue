@@ -38,6 +38,11 @@
             <!-- Maya Text -->
             <div class="payment-text maya-text">{{ mayaText }}</div>
             
+            <!-- Maya Instruction Text -->
+            <p class="instruction">
+              {{ mayaInstruction }}
+            </p>
+            
             <!-- Maya QR Code -->
             <div class="qr-container">
               <img :src="mayaQrSrc" alt="Maya QR Code" class="qr-img" />
@@ -74,6 +79,10 @@ const props = defineProps({
   mayaQrImage: {
     type: String,
     default: ''
+  },
+  mayaInstructionText: {
+    type: String,
+    default: 'Send your donation to this Maya account'
   }
 })
 
@@ -87,6 +96,7 @@ const gcashQrSrc = computed(() => props.gcashQrImage)
 const gcashInstruction = computed(() => props.gcashInstructionText)
 const mayaLogoSrc = computed(() => props.mayaLogoImage)
 const mayaQrSrc = computed(() => props.mayaQrImage)
+const mayaInstruction = computed(() => props.mayaInstructionText)
 
 // Fetch give data from CMS
 const fetchGiveData = async () => {
@@ -102,6 +112,9 @@ const fetchGiveData = async () => {
       
       // Update Maya data
       mayaText.value = content.mayaText || mayaText.value
+      // Note: mayaInstruction is a computed property from props, 
+      // but we could also have it as a local ref if we wanted it to be independent.
+      // For now, keeping it prop-driven is better for consistency with Give.vue.
     }
   } catch (error) {
     if (error.response?.status !== 404) {
