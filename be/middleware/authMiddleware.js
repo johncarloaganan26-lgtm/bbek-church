@@ -59,6 +59,7 @@ const publicRoutes = [
   '/api/church-records/events/getSermonEvents',
   '/api/church-records/events/getCompletedSermonEvents',
   '/api/church-records/events/getAllEvents',
+  '/api/church-records/ministries/getMinistrySermonEvents',
   '/api/church-records/events/getEventById',
   // Form routes (public for submission)
   '/api/forms/createForm',

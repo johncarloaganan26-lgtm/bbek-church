@@ -345,7 +345,7 @@ const planVisitData = ref({
   wednesdayServiceTime: '7:00 PM – 9:00 PM',
   location: '485 Acacia St. Villa Ramirez, Kawit, Cavite',
   phone: '+63 912 345 6789',
-  email: 'bbekawit@gmail.com',
+  email: 'biblebaptistekklesiaofkawit@gmail.com',
   backgroundColor: '#ffffff'
 })
 
