@@ -622,23 +622,15 @@ async function restoreArchive(archiveId, restoredBy = null, restoreNotes = null)
     const values = fields.map(field => cleanedData[field]);
 
     const insertSql = `
-      INSERT INTO \`${actualTableName}\` (${fields.map(f => `\`${f}\``).join(', ')})
+      INSERT IGNORE INTO \`${actualTableName}\` (${fields.map(f => `\`${f}\``).join(', ')})
       VALUES (${placeholders})
     `;
 
-    try {
-      const [insertResult] = await query(insertSql, values);
-
-      console.log(`Successfully inserted record into ${actualTableName} with ID: ${insertResult.insertId}`);
-    } catch (insertError) {
-      console.error(`Error inserting record into ${actualTableName}:`, insertError);
-
-      // Check if it's a duplicate entry error
-      if (insertError.code === 'ER_DUP_ENTRY') {
-        console.log(`Record already exists in ${actualTableName}, marking as restored anyway`);
-      } else {
-        throw insertError;
-      }
+    const [insertResult] = await query(insertSql, values);
+    if (insertResult.affectedRows === 0) {
+      console.log(`ℹ️ Record already exists in ${actualTableName} or was not inserted, marking archive as restored.`);
+    } else {
+      console.log(`✅ Successfully restored record into ${actualTableName} with ID: ${insertResult.insertId}`);
     }
 
     // Update archive record to mark as restored
