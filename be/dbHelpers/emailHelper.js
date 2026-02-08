@@ -1666,6 +1666,20 @@ const sendFormStatusUpdate = async (formDetails) => {
               </ul>
             </div>
             ` : ''}
+
+            ${status === 'approved' && formType === 'prayer_request' ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>What's Next:</strong></p>
+              <p style="margin: 10px 0 0 0;">Your prayer request has been shared with our ministry team. Please wait for a follow-up message or a personal outreach from our church staff shortly as we join you in prayer.</p>
+            </div>
+            ` : ''}
+
+            ${status === 'approved' && (formType === 'message' || formType === 'contact') ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>What's Next:</strong></p>
+              <p style="margin: 10px 0 0 0;">Our administration team has reviewed your inquiry. Please stay tuned as a staff member will be replying to your concerns via email within the next 24-48 hours.</p>
+            </div>
+            ` : ''}
             
             ${status === 'rejected' ? `
             <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #e74c3c;">
