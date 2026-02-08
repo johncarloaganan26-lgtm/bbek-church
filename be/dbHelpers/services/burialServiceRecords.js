@@ -160,6 +160,22 @@ async function createBurialService(burialData) {
     if (!requester_email && !member_id) {
       throw new Error('Either member_id or requester_email is required');
     }
+
+    // --- SMART RECOGNITION LOGIC ---
+    // If member_id is missing but requester_email is provided, check if they are a registered member
+    let linkedMemberId = member_id;
+    if (!linkedMemberId && requester_email) {
+      console.log('Searching for member with email:', requester_email);
+      const [memberMatch] = await query(
+        `SELECT member_id FROM tbl_members WHERE email = ? LIMIT 1`,
+        [String(requester_email).trim()]
+      );
+      if (memberMatch && memberMatch.length > 0) {
+        linkedMemberId = memberMatch[0].member_id;
+        console.log('✅ Smart Recognition: Automatically linked requester to member_id:', linkedMemberId);
+      }
+    }
+
     if (!relationship) {
       throw new Error('Missing required field: relationship');
     }
@@ -174,12 +190,12 @@ async function createBurialService(burialData) {
     const duplicateCheckSql = `
       SELECT burial_id
       FROM tbl_burialservice
-      WHERE ${member_id ? 'member_id = ?' : 'requester_email = ?'}
+      WHERE ${linkedMemberId ? 'member_id = ?' : 'requester_email = ?'}
         AND (${deceased_name ? 'deceased_name = ?' : '1=1'})
         AND (${deceased_birthdate ? 'deceased_birthdate = ?' : '1=1'})
       LIMIT 1
     `;
-    const duplicateParams = [member_id ? String(member_id).trim() : String(requester_email).trim()];
+    const duplicateParams = [linkedMemberId ? String(linkedMemberId).trim() : String(requester_email).trim()];
     if (deceased_name) duplicateParams.push(deceased_name.trim());
     if (deceased_birthdate) duplicateParams.push(moment(deceased_birthdate).format('YYYY-MM-DD'));
 
@@ -193,7 +209,7 @@ async function createBurialService(burialData) {
 
     // Check if member has a pending burial service approval
     const pendingApprovalCheck = await checkPendingBurialServiceApproval(
-      member_id ? String(member_id).trim() : null,
+      linkedMemberId ? String(linkedMemberId).trim() : null,
       requester_email ? String(requester_email).trim() : null
     );
     if (pendingApprovalCheck.hasPendingApproval) {
@@ -219,7 +235,7 @@ async function createBurialService(burialData) {
     }
 
     const final_burial_id = String(burial_id || new_burial_id).trim();
-    const final_member_id = member_id ? String(member_id).trim() : null;
+    const final_member_id = linkedMemberId ? String(linkedMemberId).trim() : null;
     const final_requester_name = requester_name ? String(requester_name).trim() : null;
     const final_requester_email = requester_email ? String(requester_email).trim() : null;
     const final_pastor_name = pastor_name ? String(pastor_name).trim() : null;
