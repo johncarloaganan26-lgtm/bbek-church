@@ -56,7 +56,32 @@ async function archiveBeforeDelete(tableName, recordId, recordData, archivedBy =
   }
 }
 
+/**
+ * Bulk Archive Helper Utility
+ *
+ * @param {String} tableName - Name of the table
+ * @param {Array<Object>} recordsToArchive - Array of { id, data } objects
+ * @param {String} archivedBy - User ID who is archiving (optional)
+ * @returns {Promise<Object>} Archive result
+ */
+async function bulkArchiveBeforeDelete(tableName, recordsToArchive, archivedBy = null) {
+  try {
+    if (!tableName || !Array.isArray(recordsToArchive) || recordsToArchive.length === 0) {
+      return { success: false, message: 'Missing required parameters for bulk archiving' };
+    }
+
+    const { bulkArchiveRecords } = require('./archiveRecords');
+    const result = await bulkArchiveRecords(tableName, recordsToArchive, archivedBy);
+
+    return result;
+  } catch (error) {
+    console.error(`Error bulk archiving ${tableName} records:`, error);
+    return { success: false, message: error.message };
+  }
+}
+
 module.exports = {
-  archiveBeforeDelete
+  archiveBeforeDelete,
+  bulkArchiveBeforeDelete
 };
 

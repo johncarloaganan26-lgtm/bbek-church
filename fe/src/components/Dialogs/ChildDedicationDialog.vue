@@ -199,11 +199,15 @@
       <el-form-item label="Father's Phone Number" prop="father_phone_number">
         <el-input
           v-model="formData.father_phone_number"
-          placeholder="Enter father's phone number (11 digits, optional)"
+          placeholder="9XXXXXXXXX"
           size="large"
+          maxlength="10"
           clearable
           :disabled="loading"
-        />
+          @input="formData.father_phone_number = formData.father_phone_number.replace(/\D/g, '')"
+        >
+          <template #prepend>+63</template>
+        </el-input>
       </el-form-item>
 
       <!-- Father Email -->
@@ -271,11 +275,15 @@
       <el-form-item label="Mother's Phone Number" prop="mother_phone_number">
         <el-input
           v-model="formData.mother_phone_number"
-          placeholder="Enter mother's phone number (11 digits, optional)"
+          placeholder="9XXXXXXXXX"
           size="large"
+          maxlength="10"
           clearable
           :disabled="loading"
-        />
+          @input="formData.mother_phone_number = formData.mother_phone_number.replace(/\D/g, '')"
+        >
+          <template #prepend>+63</template>
+        </el-input>
       </el-form-item>
 
       <!-- Mother Email -->
@@ -367,13 +375,16 @@
               <template #default="{ row }">
                 <el-input
                   v-model="row.phone_number"
-                  placeholder="Phone number"
+                  placeholder="9XXXXXXXXX"
                   size="small"
+                  maxlength="10"
                   clearable
                   :disabled="loading"
-                  @change="onSponsorsChange"
+                  @input="row.phone_number = row.phone_number.replace(/\D/g, ''); onSponsorsChange()"
                   @blur="onSponsorsChange"
-                />
+                >
+                  <template #prepend>+63</template>
+                </el-input>
               </template>
             </el-table-column>
 
@@ -429,11 +440,15 @@
       <el-form-item label="Contact Phone Number" prop="contact_phone_number">
         <el-input
           v-model="formData.contact_phone_number"
-          placeholder="Enter contact phone number (optional)"
+          placeholder="9XXXXXXXXX"
           size="large"
+          maxlength="10"
           clearable
           :disabled="loading"
-        />
+          @input="formData.contact_phone_number = formData.contact_phone_number.replace(/\D/g, '')"
+        >
+          <template #prepend>+63</template>
+        </el-input>
       </el-form-item>
 
       <!-- Contact Email -->
@@ -1121,7 +1136,22 @@ const rules = {
     }
   ],
   contact_phone_number: [
-    // Contact phone is optional - no validation required
+    {
+      validator: (rule, value, callback) => {
+        // Contact phone is optional
+        if (!value || !value.trim()) {
+          callback()
+          return
+        }
+        // Check if exactly 10 digits
+        if (value.length !== 10) {
+          callback(new Error('Contact phone number must be exactly 10 digits (9XXXXXXXXX)'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
   ],
   contact_email: [
     { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' },
@@ -1149,9 +1179,8 @@ const rules = {
             }
             // Validate phone number is exactly 11 digits
             if (s.phone_number && s.phone_number.trim()) {
-              const cleanPhone = s.phone_number.replace(/\D/g, '')
-              if (cleanPhone.length !== 11) {
-                callback(new Error(`Sponsor ${i + 1}: phone number must be exactly 11 digits`))
+              if (s.phone_number.length !== 10) {
+                callback(new Error(`Sponsor ${i + 1}: phone number must be exactly 10 digits (9XXXXXXXXX)`))
                 return
               }
             }
@@ -1218,11 +1247,9 @@ const rules = {
           callback()
           return
         }
-        // Remove any non-digit characters
-        const cleanPhone = value.replace(/\D/g, '')
-        // Check if exactly 11 digits (Philippines format)
-        if (cleanPhone.length !== 11) {
-          callback(new Error("Father's phone number must be exactly 11 digits"))
+        // Check if exactly 10 digits
+        if (value.length !== 10) {
+          callback(new Error("Father's phone number must be exactly 10 digits (9XXXXXXXXX)"))
           return
         }
         callback()
@@ -1238,11 +1265,9 @@ const rules = {
           callback()
           return
         }
-        // Remove any non-digit characters
-        const cleanPhone = value.replace(/\D/g, '')
-        // Check if exactly 11 digits (Philippines format)
-        if (cleanPhone.length !== 11) {
-          callback(new Error("Mother's phone number must be exactly 11 digits"))
+        // Check if exactly 10 digits
+        if (value.length !== 10) {
+          callback(new Error("Mother's phone number must be exactly 10 digits (9XXXXXXXXX)"))
           return
         }
         callback()
@@ -1258,11 +1283,9 @@ const rules = {
           callback()
           return
         }
-        // Remove any non-digit characters
-        const cleanPhone = value.replace(/\D/g, '')
-        // Check if exactly 11 digits (Philippines format)
-        if (cleanPhone.length !== 11) {
-          callback(new Error('Contact phone number must be exactly 11 digits'))
+        // Check if exactly 10 digits
+        if (value.length !== 10) {
+          callback(new Error('Contact phone number must be exactly 10 digits (9XXXXXXXXX)'))
           return
         }
         callback()
@@ -1470,7 +1493,7 @@ const resetForm = () => {
   formData.pastor = ''
   formData.location = ''
   formData.status = 'pending'
-
+  
   // Clear selected member data
   selectedMemberData.value = null
 
@@ -1649,7 +1672,7 @@ const handleSubmit = async () => {
 
     // Emit submit event with data
     console.log('Submitting child dedication data...')
-    emit('submit', submitData)
+    emit('submit', { data: submitData })
 
     // Reset form fields after submission
     // Parent component will handle API call and close dialog on success
@@ -1718,7 +1741,6 @@ const resetLoading = () => {
   }
 }
 
-// Expose methods for parent component
 defineExpose({
   resetLoading,
   resetForm,

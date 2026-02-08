@@ -65,9 +65,9 @@
       <el-form-item label="Age" prop="age">
         <el-input-number
           v-model="formData.age"
-          :min="0"
+          :min="12"
           :max="150"
-          placeholder="Age will be calculated from birthdate"
+          placeholder="Min 12 years old"
           size="large"
           style="width: 100%"
           :disabled="!!formData.birthdate"
@@ -117,8 +117,9 @@
       <el-form-item label="Phone Number" prop="phone_number">
         <el-input
           v-model="formData.phone_number"
-          placeholder="Enter phone number"
+          placeholder="9XXXXXXXXX"
           size="large"
+          maxlength="10"
           clearable
         >
           <template #prepend>+63</template>
@@ -493,6 +494,18 @@ const rules = {
           callback(new Error('Birthdate is too far in the past'))
           return
         }
+        
+        // Calculate age for validation
+        let age = today.getFullYear() - selectedDate.getFullYear()
+        const monthDiff = today.getMonth() - selectedDate.getMonth()
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < selectedDate.getDate())) {
+          age--
+        }
+        
+        if (age < 12) {
+          callback(new Error('Member must be at least 12 years old'))
+          return
+        }
         callback()
       },
       trigger: 'change'
@@ -500,7 +513,7 @@ const rules = {
   ],
   age: [
     { required: true, message: 'Age is required', trigger: 'blur' },
-    { type: 'number', min: 0, max: 150, message: 'Age must be between 0 and 150', trigger: 'blur' }
+    { type: 'number', min: 12, max: 150, message: 'Age must be at least 12 years old', trigger: 'blur' }
   ],
   gender: [
     { required: true, message: 'Gender is required', trigger: 'change' }
@@ -524,9 +537,9 @@ const rules = {
         }
         // Remove any non-digit characters
         const cleanPhone = value.replace(/\D/g, '')
-        // Check if exactly 11 digits (Philippines format)
-        if (cleanPhone.length !== 11) {
-          callback(new Error('Phone number must be exactly 11 digits'))
+        // Check if exactly 10 digits
+        if (cleanPhone.length !== 10) {
+          callback(new Error('Phone number must be exactly 10 digits (9XXXXXXXXX)'))
           return
         }
         callback()

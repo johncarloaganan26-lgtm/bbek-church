@@ -1,7 +1,7 @@
 const { query } = require('../../database/db');
 const moment = require('moment');
 const fs = require('fs');
-const { archiveBeforeDelete } = require('../archiveHelper');
+const { archiveBeforeDelete, bulkArchiveBeforeDelete } = require('../archiveHelper');
 
 /**
  * Ministry Records CRUD Operations
@@ -45,17 +45,17 @@ function convertImageToBlob(imageInput) {
     if (typeof imageInput === 'string' && imageInput.startsWith('data:')) {
       // Extract the base64 part from data URL
       const hasPrefix = imageInput.includes(',');
-      const base64Data = hasPrefix 
-        ? imageInput.split(',')[1] 
+      const base64Data = hasPrefix
+        ? imageInput.split(',')[1]
         : imageInput;
-      
+
       console.log('convertImageToBlob - data URL - base64Data length:', base64Data.length);
       console.log('convertImageToBlob - data URL - first 50 chars:', base64Data.substring(0, 50));
-      
+
       // Check if base64Data is valid
       const isValidBase64 = /^[A-Za-z0-9+/=]+$/.test(base64Data.trim());
       console.log('convertImageToBlob - isValidBase64:', isValidBase64);
-      
+
       try {
         // Convert base64 to Buffer
         const buffer = Buffer.from(base64Data, 'base64');
@@ -80,17 +80,17 @@ function convertImageToBlob(imageInput) {
     if (typeof imageInput === 'string') {
       // Remove any data URL prefix if present
       const hasPrefix = imageInput.includes(',');
-      const base64Data = hasPrefix 
-        ? imageInput.split(',')[1] 
+      const base64Data = hasPrefix
+        ? imageInput.split(',')[1]
         : imageInput;
-      
+
       console.log('convertImageToBlob - plain base64 - length:', base64Data.length);
       console.log('convertImageToBlob - first 50 chars:', base64Data.substring(0, 50));
-      
+
       // Check if base64Data is valid
       const isValidBase64 = /^[A-Za-z0-9+/=]+$/.test(base64Data.trim());
       console.log('convertImageToBlob - isValidBase64:', isValidBase64);
-      
+
       try {
         // Convert base64 to Buffer
         const buffer = Buffer.from(base64Data, 'base64');
@@ -119,11 +119,11 @@ function convertBlobToBase64(blob) {
     if (!blob) {
       return null;
     }
-    
+
     if (Buffer.isBuffer(blob)) {
       return blob.toString('base64');
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error converting blob to base64:', error);
@@ -238,7 +238,7 @@ async function createMinistry(ministryData) {
     ];
 
     const [result] = await query(sql, params);
-    
+
     // Fetch the created ministry using the auto-generated ID
     const createdMinistry = await getMinistryById(result.insertId);
 
@@ -259,7 +259,7 @@ async function getPublicMinistries() {
   try {
     const sql = `SELECT * FROM tbl_ministry WHERE status = 'active'`;
     const [result] = await query(sql);
-    
+
     // Process each ministry to convert image blob to base64 and create imageURL field
     const processedResult = result.map(row => {
       // Convert image blob to base64
@@ -272,15 +272,15 @@ async function getPublicMinistries() {
           imageUrl = `data:image/jpeg;base64,${base64String}`;
         }
       }
-      
+
       // Create new object with imageURL field and remove original image blob
       const processedRow = { ...row };
       processedRow.imageUrl = imageUrl;
       processedRow.image = null; // Remove blob to avoid sending large data
-      
+
       return processedRow;
     });
-    
+
     return processedResult;
   } catch (error) {
     console.error('Error fetching public ministries:', error);
@@ -466,13 +466,13 @@ async function getAllMinistries(options = {}) {
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as activeMinistries
       FROM tbl_ministry
     `);
-    
+
     // Get total members count across all ministries
     // Need to parse JSON members field and count
     const [allMinistriesResult] = await query(`
       SELECT members FROM tbl_ministry WHERE members IS NOT NULL AND members != ''
     `);
-    
+
     let totalMembers = 0;
     allMinistriesResult.forEach(row => {
       try {
@@ -487,7 +487,7 @@ async function getAllMinistries(options = {}) {
         console.warn('Failed to parse members JSON for summary stats');
       }
     });
-    
+
     const summaryStats = {
       totalMinistries: summaryStatsResult[0]?.totalMinistries || 0,
       activeMinistries: summaryStatsResult[0]?.activeMinistries || 0,
@@ -520,7 +520,7 @@ async function getAllMinistries(options = {}) {
         console.warn('Failed to parse members JSON for ministry_id:', row.ministry_id);
         row.members = [];
       }
-      
+
       // Convert image blob to base64 and create imageURL field for JSON response
       let imageUrl = null;
       if (row.image && Buffer.isBuffer(row.image)) {
@@ -537,7 +537,7 @@ async function getAllMinistries(options = {}) {
       } else {
         row.image = null;
       }
-      
+
       return row;
     });
 
@@ -624,7 +624,7 @@ async function getMinistryById(ministryId) {
       console.warn('Failed to parse members JSON for ministry_id:', ministryId);
       row.members = [];
     }
-    
+
     // Convert image blob to base64 and create imageUrl field for JSON response
     let imageUrl = null;
     if (row.image && Buffer.isBuffer(row.image)) {
@@ -774,7 +774,7 @@ async function getMinistriesByMemberId(memberId, options = {}) {
       try {
         // Parse the JSON string to array
         const membersArray = JSON.parse(ministry.members);
-        
+
         // Check if it's an array and contains the member_id
         if (Array.isArray(membersArray)) {
           // Compare as numbers to handle zero-padded strings
@@ -820,7 +820,7 @@ async function getMinistriesByMemberId(memberId, options = {}) {
     // Convert image blobs to base64 and create imageURL field, parse members JSON for JSON response
     const processedRows = rows.map(ministry => {
       const processedMinistry = { ...ministry };
-      
+
       // Convert image blob to base64 and create imageURL field
       let imageUrl = null;
       if (ministry.image && Buffer.isBuffer(ministry.image)) {
@@ -837,7 +837,7 @@ async function getMinistriesByMemberId(memberId, options = {}) {
       } else {
         processedMinistry.image = null;
       }
-      
+
       // Parse members JSON string back to array
       if (ministry.members) {
         try {
@@ -849,7 +849,7 @@ async function getMinistriesByMemberId(memberId, options = {}) {
       } else {
         processedMinistry.members = [];
       }
-      
+
       return processedMinistry;
     });
 
@@ -999,7 +999,7 @@ async function updateMinistry(ministryId, ministryData) {
       const imageBlob = convertImageToBlob(image);
       console.log('Update Ministry - Image input type:', typeof image, image ? (image.buffer ? 'multer file' : 'base64/string') : 'null');
       console.log('Update Ministry - Image blob:', imageBlob ? `${imageBlob.length} bytes` : 'null');
-      
+
       // Only update image if a valid blob was provided (not null/empty)
       // This prevents clearing the image when no new image is provided
       if (imageBlob && imageBlob.length > 0) {
@@ -1136,26 +1136,26 @@ async function bulkDeleteMinistries(ministryIds, archivedBy = null) {
       throw new Error('No valid ministry IDs provided');
     }
 
-    // Archive ministries before bulk delete
-    const ministriesToDelete = [];
+    // 1. Fetch all ministry data for archiving in a single query
+    const placeholdersFetch = validIds.map(() => '?').join(',');
+    const fetchSql = `SELECT * FROM tbl_ministry WHERE ministry_id IN (${placeholdersFetch})`;
+    const [ministries] = await query(fetchSql, validIds);
 
-    // Get ministry data for archiving
-    for (const ministryId of validIds) {
-      try {
-        const ministry = await getMinistryById(ministryId);
-        if (ministry.success && ministry.data) {
-          ministriesToDelete.push(ministry.data);
-          await archiveBeforeDelete('tbl_ministry', String(ministryId), ministry.data, archivedBy);
-        }
-      } catch (error) {
-        console.warn(`Failed to archive ministry ${ministryId}:`, error.message);
-        // Continue with deletion even if archiving fails
-      }
+    if (ministries.length === 0) {
+      return { success: true, message: 'No ministries found to delete', data: { deleted: 0 } };
     }
 
-    // Perform bulk delete
-    const placeholders = validIds.map(() => '?').join(',');
-    const deleteSql = `DELETE FROM tbl_ministry WHERE ministry_id IN (${placeholders})`;
+    // 2. Prepare and perform bulk archive
+    const recordsToArchive = ministries.map(m => ({
+      id: m.ministry_id,
+      data: m
+    }));
+
+    await bulkArchiveBeforeDelete('tbl_ministry', recordsToArchive, archivedBy);
+
+    // 3. Perform bulk delete
+    const placeholdersDelete = validIds.map(() => '?').join(',');
+    const deleteSql = `DELETE FROM tbl_ministry WHERE ministry_id IN (${placeholdersDelete})`;
     const [deleteResult] = await query(deleteSql, validIds);
 
     const deletedCount = deleteResult.affectedRows || 0;
@@ -1168,7 +1168,7 @@ async function bulkDeleteMinistries(ministryIds, archivedBy = null) {
         requested: validIds.length,
         deleted: deletedCount,
         failed: failedCount,
-        archived_ministries: ministriesToDelete
+        archived_ministries: ministries
       }
     };
   } catch (error) {

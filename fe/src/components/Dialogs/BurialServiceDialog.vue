@@ -52,7 +52,7 @@
         <!-- Requester Name (Required for Admin/Staff when no member selected) -->
         <el-form-item label="Requester Name" prop="requester_name" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
           <template #label>
-            <span>{{ isMemberSelected ? 'Member' : 'Requester Name' }}<span v-if="!isMemberSelected" class="required-text"></span></span>
+            <span>{{ isMemberSelected ? 'Member' : 'Requester Name' }}</span>
           </template>
           <el-input
             v-model="formData.requester_name"
@@ -66,7 +66,7 @@
         <!-- Requester Email (Required for Admin/Staff when no member selected) -->
         <el-form-item label="Requester Email" prop="requester_email" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
           <template #label>
-            <span>{{ isMemberSelected ? 'Member Email' : 'Requester Email' }}<span v-if="!isMemberSelected" class="required-text"></span></span>
+            <span>{{ isMemberSelected ? 'Member Email' : 'Requester Email' }}</span>
           </template>
           <el-input
             v-model="formData.requester_email"
@@ -81,7 +81,7 @@
         <!-- Requester Name (For Member Users) -->
         <el-form-item prop="requester_name" v-else-if="isMember">
           <template #label>
-            <span>Requester Name <span class="required-text">required</span></span>
+            <span>Requester Name</span>
           </template>
           <el-input
             v-model="formData.requester_name"
@@ -94,7 +94,7 @@
         <!-- Requester Email (For Member Users) -->
         <el-form-item prop="requester_email" v-else-if="isMember">
           <template #label>
-            <span>Requester Email <span class="required-text">required</span></span>
+            <span>Requester Email</span>
           </template>
           <el-input
             v-model="formData.requester_email"
@@ -108,7 +108,7 @@
         <!-- Requester Name (For Non-Member Users) -->
         <el-form-item prop="requester_name" v-else-if="!userInfo?.account?.member_id">
           <template #label>
-            <span>Requester Name <span class="required-text">required</span></span>
+            <span>Requester Name</span>
           </template>
           <el-input
             v-model="formData.requester_name"
@@ -122,7 +122,7 @@
         <!-- Requester Email (For Non-Member Users) -->
         <el-form-item prop="requester_email" v-else-if="!userInfo?.account?.member_id">
           <template #label>
-            <span>Requester Email <span class="required-text">required</span></span>
+            <span>Requester Email</span>
           </template>
           <el-input
             v-model="formData.requester_email"
@@ -137,7 +137,7 @@
         <!-- Relationship -->
         <el-form-item prop="relationship">
           <template #label>
-            <span>Relationship <span v-if="isMember" class="required-text">required</span></span>
+            <span>Relationship</span>
           </template>
           <el-select
             v-model="formData.relationship"
@@ -159,7 +159,7 @@
         <!-- Location -->
         <el-form-item prop="location">
           <template #label>
-            <span>Location <span v-if="isMember" class="required-text">required</span></span>
+            <span>Location</span>
           </template>
           <el-input
             v-model="formData.location"
@@ -180,7 +180,7 @@
         <!-- Deceased Name -->
         <el-form-item prop="deceased_name">
           <template #label>
-            <span>Deceased Name <span v-if="isMember" class="required-text">required</span></span>
+            <span>Deceased Name</span>
           </template>
           <el-input
             v-model="formData.deceased_name"
@@ -194,7 +194,7 @@
         <!-- Reason of Death -->
         <el-form-item prop="reason_of_death">
           <template #label>
-            <span>Reason of Death <span class="required-text">*</span></span>
+            <span>Reason of Death</span>
           </template>
           <el-input
             v-model="formData.reason_of_death"
@@ -209,7 +209,7 @@
         <!-- Deceased Birthdate -->
         <el-form-item prop="deceased_birthdate">
           <template #label>
-            <span>Deceased Birthdate <span v-if="isMember" class="required-text">required</span></span>
+            <span>Deceased Birthdate</span>
           </template>
           <el-date-picker
             v-model="formData.deceased_birthdate"
@@ -226,7 +226,7 @@
         <!-- Date of Death -->
         <el-form-item prop="date_death">
           <template #label>
-            <span>Date of Death <span v-if="isMember" class="required-text">required</span></span>
+            <span>Date of Death</span>
           </template>
           <el-date-picker
             v-model="formData.date_death"
@@ -569,8 +569,18 @@ const rules = computed(() => {
     ]
   }
 
-  // Additional rules for admin/staff when no member is selected
   if (userInfo.value?.account?.position === 'admin' || userInfo.value?.account?.position === 'staff') {
+    // Admin/Staff specific required fields
+    baseRules.pastor_name = [
+      { required: true, message: 'Pastor is required', trigger: 'change' }
+    ]
+    baseRules.service_date = [
+      { required: true, message: 'Service date and time is required', trigger: 'change' }
+    ]
+    baseRules.status = [
+      { required: true, message: 'Status is required', trigger: 'change' }
+    ]
+
     if (!formData.member_id) {
       baseRules.requester_name = [
         { required: true, message: 'Requester name is required', trigger: 'blur' }

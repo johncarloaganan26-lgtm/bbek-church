@@ -623,7 +623,8 @@ const bulkDeleteDedications = async () => {
   }
 }
 
-const handleSubmit = async (data) => {
+const handleSubmit = async (payload) => {
+  const { data, remember } = payload
   try {
     let result
     if (dedicationData.value && dedicationData.value.child_id) {
@@ -636,8 +637,15 @@ const handleSubmit = async (data) => {
 
     if (result.success) {
       ElMessage.success(dedicationData.value ? 'Child dedication updated successfully' : 'Child dedication created successfully')
-      childDedicationDialog.value = false
-      dedicationData.value = null
+      
+      // If remember is true, don't close the dialog and don't reset dedicationData (which would be null anyway for new)
+      if (!remember) {
+        childDedicationDialog.value = false
+        dedicationData.value = null
+      }
+      
+      // Refresh the list
+      await childDedicationStore.fetchDedications()
     } else {
       ElMessage.error(result.error || 'Failed to save child dedication')
     }

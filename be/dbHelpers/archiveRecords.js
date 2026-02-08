@@ -195,6 +195,63 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
 }
 
 /**
+ * BULK ARCHIVE - Archive multiple records in a single operation
+ * @param {String} originalTable - Original table name
+ * @param {Array<Object>} recordsToArchive - Array of { id, data } objects
+ * @param {String} archivedBy - User ID who archived the records
+ * @returns {Promise<Object>} Result object
+ */
+async function bulkArchiveRecords(originalTable, recordsToArchive, archivedBy = null) {
+  try {
+    if (!originalTable) {
+      throw new Error('Original table name is required');
+    }
+    if (!Array.isArray(recordsToArchive) || recordsToArchive.length === 0) {
+      return { success: true, message: 'No records to archive', data: [] };
+    }
+
+    const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
+    const placeholders = recordsToArchive.map(() => '(?, ?, ?, ?, ?)').join(',');
+    const sql = `
+      INSERT INTO tbl_archives 
+        (original_table, original_id, archived_data, archived_by, archived_at)
+      VALUES ${placeholders}
+    `;
+
+    const params = [];
+    recordsToArchive.forEach(item => {
+      let archivedDataText = '';
+      if (typeof item.data === 'string') {
+        archivedDataText = item.data;
+      } else if (typeof item.data === 'object') {
+        archivedDataText = convertToPlainTextObject(item.data);
+      } else {
+        archivedDataText = String(item.data);
+      }
+
+      params.push(
+        toPlainText(originalTable),
+        toPlainText(item.id),
+        archivedDataText,
+        toPlainText(archivedBy),
+        formattedDate
+      );
+    });
+
+    await query(sql, params);
+
+    return {
+      success: true,
+      message: `Successfully archived ${recordsToArchive.length} records`,
+      count: recordsToArchive.length
+    };
+  } catch (error) {
+    console.error('Error bulk archiving records:', error);
+    throw error;
+  }
+}
+
+/**
  * READ ALL - Get all archived records with pagination and filters
  * @param {Object} options - Optional query parameters (search, limit, offset, page, pageSize, original_table, restored, date_from, date_to, sortBy)
  * @returns {Promise<Object>} Object with paginated archive records and metadata
@@ -1066,6 +1123,7 @@ async function bulkRestoreArchives(archiveIds, restoredBy = null, restoreNotes =
 
 module.exports = {
   archiveRecord,
+  bulkArchiveRecords,
   getAllArchives,
   getArchiveById,
   restoreArchive,
