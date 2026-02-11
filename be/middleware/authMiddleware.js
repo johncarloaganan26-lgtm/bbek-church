@@ -136,6 +136,8 @@ const publicRoutes = [
   '/api/church-records/child-dedications/check-duplicate',
   '/api/church-records/child-dedications/check-member-dedication',
   // '/api/church-records/child-dedications/getAllChildDedications',  // Requires auth - uncomment to make public
+  // Online donation submission (public - allows anonymous users to submit donation proofs)
+  '/api/church-records/tithes/submitOnlineDonation',
 ];
 
 /**

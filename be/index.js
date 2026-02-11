@@ -178,6 +178,10 @@ app.use(
 app.use('/api/cms', bodyParser.json({ limit: '50mb' }));
 app.use('/api/cms', bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
+// Additional body parser for online donation proof images (base64 encoded)
+app.use('/api/church-records/tithes/submitOnlineDonation', bodyParser.json({ limit: '20mb' }));
+app.use('/api/church-records/tithes/submitOnlineDonation', bodyParser.urlencoded({ extended: true, limit: '20mb' }));
+
 // Request logging middleware
 // In development: log all requests
 // In production: log only errors (via error handler)

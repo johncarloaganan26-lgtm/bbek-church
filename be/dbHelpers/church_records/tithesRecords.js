@@ -13,11 +13,11 @@ function safeToString(value, defaultValue = '') {
   if (value === null || value === undefined) {
     return defaultValue;
   }
-  
+
   if (Buffer.isBuffer(value)) {
     return value.toString('utf8');
   }
-  
+
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value);
@@ -25,13 +25,13 @@ function safeToString(value, defaultValue = '') {
       return defaultValue;
     }
   }
-  
+
   return String(value);
 }
 
 /**
  * Tithes Records CRUD Operations
- * Based on tbl_tithes schema (no status field - simple CRUD record):
+ * Based on tbl_tithes schema:
  * - tithes_id (INT, PK, NN, AI) - auto-incrementing
  * - member_id (VARCHAR(45), nullable)
  * - member_name (VARCHAR(100), nullable) - for non-member donors
@@ -42,7 +42,17 @@ function safeToString(value, defaultValue = '') {
  * - payment_method (VARCHAR(45), nullable for in-kind)
  * - donation_items (TEXT, nullable) - description of in-kind items
  * - notes (VARCHAR(2000), nullable)
+ * - status (VARCHAR(20), default: 'confirmed') - pending, confirmed, rejected
  * - date_created (DATETIME, NN)
+ * - donation_date (DATE, nullable) - actual date of donation
+ * - source (VARCHAR(20), default: 'in-person') - 'online' or 'in-person'
+ * - proof_image (LONGBLOB, nullable) - receipt screenshot for online donations
+ * - proof_image_type (VARCHAR(50), nullable) - MIME type of proof image
+ * - donation_method (VARCHAR(50), nullable) - gcash, maya, others (for online)
+ * - donation_method_other (VARCHAR(100), nullable) - if method is 'others'
+ * - verified_by (INT, nullable) - admin who verified
+ * - verified_date (DATETIME, nullable) - when verified
+ * - rejection_reason (VARCHAR(500), nullable) - reason for rejection
  */
 
 /**
@@ -63,22 +73,27 @@ async function createTithe(titheData) {
       donation_items = null,
       notes = null,
       date_created = new Date(),
-      donation_date = null  // New field: actual date of donation (can be different from date_created)
+      donation_date = null,
+      source = 'in-person',
+      donation_method = null,
+      donation_method_other = null
     } = titheData;
 
     // Format dates
     const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
-    // If donation_date is provided, use it; otherwise use date_created
     const formattedDonationDate = donation_date ? moment(donation_date).format('YYYY-MM-DD') : moment(date_created).format('YYYY-MM-DD');
+
+    // In-person donations created by admin are auto-confirmed
+    const initialStatus = source === 'in-person' ? 'confirmed' : 'pending';
 
     // Build insert query based on donation type
     let sql, params;
-    
+
     if (donation_type === 'money') {
       sql = `
         INSERT INTO tbl_tithes 
-          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, notes, status, date_created, donation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, notes, status, date_created, donation_date, source, donation_method, donation_method_other)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       params = [
         member_id ? String(member_id).trim() : null,
@@ -89,35 +104,40 @@ async function createTithe(titheData) {
         String(type).trim() || 'donation',
         payment_method ? String(payment_method).trim() : null,
         notes ? String(notes).trim() : null,
-        'pending',
+        initialStatus,
         formattedDateCreated,
-        formattedDonationDate
+        formattedDonationDate,
+        source,
+        donation_method || null,
+        donation_method_other || null
       ];
     } else {
       sql = `
         INSERT INTO tbl_tithes 
-          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, donation_items, notes, status, date_created, donation_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (member_id, donation_type, member_name, is_anonymous, amount, type, payment_method, donation_items, notes, status, date_created, donation_date, source, donation_method, donation_method_other)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       params = [
         member_id ? String(member_id).trim() : null,
         donation_type,
         member_name || null,
         is_anonymous ? 1 : 0,
-        0,  // amount is 0 for in-kind donations
+        0,
         String(type).trim() || 'other',
-        null,  // payment_method is null for in-kind donations
+        null,
         safeToString(donation_items, ''),
         notes ? String(notes).trim() : null,
-        'pending',
+        initialStatus,
         formattedDateCreated,
-        formattedDonationDate
+        formattedDonationDate,
+        source,
+        donation_method || null,
+        donation_method_other || null
       ];
     }
 
     const [result] = await query(sql, params);
-    
-    // Build the created tithe data from insert data (avoid extra query)
+
     const createdTitheData = {
       tithes_id: result.insertId,
       member_id: member_id ? String(member_id).trim() : null,
@@ -129,9 +149,12 @@ async function createTithe(titheData) {
       payment_method: payment_method ? String(payment_method).trim() : null,
       donation_items: donation_type === 'inkind' ? safeToString(donation_items, '') : null,
       notes: notes ? String(notes).trim() : null,
-      status: 'pending',
+      status: initialStatus,
       date_created: formattedDateCreated,
-      donation_date: formattedDonationDate
+      donation_date: formattedDonationDate,
+      source: source,
+      donation_method: donation_method || null,
+      donation_method_other: donation_method_other || null
     };
 
     return {
@@ -141,6 +164,267 @@ async function createTithe(titheData) {
     };
   } catch (error) {
     console.error('Error creating donation:', error);
+    throw error;
+  }
+}
+
+/**
+ * CREATE ONLINE DONATION - Submit an online donation with proof image
+ * Called from the public Give page (no auth required)
+ * @param {Object} donationData - Online donation data
+ * @returns {Promise<Object>} Result object
+ */
+async function createOnlineDonation(donationData) {
+  try {
+    const {
+      donor_name = null,
+      is_anonymous = false,
+      email = null,
+      amount = 0,
+      type = 'donation',
+      donation_method = 'gcash',
+      donation_method_other = null,
+      proof_image = null,
+      proof_image_type = null,
+      notes = null,
+      donation_date = null
+    } = donationData;
+
+    const formattedDateCreated = moment().format('YYYY-MM-DD HH:mm:ss');
+    const formattedDonationDate = donation_date ? moment(donation_date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
+
+    // Convert base64 proof image to Buffer
+    let proofImageBuffer = null;
+    let proofImageMimeType = proof_image_type || null;
+
+    if (proof_image && typeof proof_image === 'string') {
+      // Handle base64 data URL format: data:image/png;base64,iVBOR...
+      if (proof_image.startsWith('data:')) {
+        const matches = proof_image.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          proofImageMimeType = matches[1];
+          proofImageBuffer = Buffer.from(matches[2], 'base64');
+        }
+      } else {
+        // Raw base64 string
+        proofImageBuffer = Buffer.from(proof_image, 'base64');
+      }
+    }
+
+    const finalDonorName = is_anonymous ? 'Anonymous' : (donor_name || 'Anonymous');
+    const finalPaymentMethod = donation_method === 'others'
+      ? (donation_method_other || 'other')
+      : donation_method;
+
+    const sql = `
+      INSERT INTO tbl_tithes 
+        (member_id, donation_type, member_name, donor_email, is_anonymous, amount, type, payment_method, 
+         notes, status, date_created, donation_date, source, proof_image, proof_image_type, 
+         donation_method, donation_method_other)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const params = [
+      null, // member_id - online donors are not members
+      'money',
+      finalDonorName,
+      email ? String(email).trim() : null,
+      is_anonymous ? 1 : 0,
+      parseFloat(amount) || 0,
+      String(type).trim() || 'donation',
+      finalPaymentMethod,
+      notes ? String(notes).trim() : null,
+      'pending', // Online donations always start as pending
+      formattedDateCreated,
+      formattedDonationDate,
+      'online', // source is always online
+      proofImageBuffer,
+      proofImageMimeType,
+      donation_method,
+      donation_method_other || null
+    ];
+
+    const [result] = await query(sql, params);
+
+    return {
+      success: true,
+      message: 'Online donation submitted successfully. It will be reviewed by the church admin.',
+      data: {
+        tithes_id: result.insertId,
+        donor_name: finalDonorName,
+        email: email,
+        is_anonymous: is_anonymous ? 1 : 0,
+        amount: parseFloat(amount) || 0,
+        type: String(type).trim() || 'donation',
+        donation_method: donation_method,
+        status: 'pending',
+        source: 'online',
+        donation_date: formattedDonationDate,
+        date_created: formattedDateCreated
+      }
+    };
+  } catch (error) {
+    console.error('Error creating online donation:', error);
+    throw error;
+  }
+}
+
+/**
+ * VERIFY DONATION - Admin confirms or rejects an online donation
+ * @param {Number} tithesId - Tithes ID
+ * @param {String} action - 'confirmed' or 'rejected'
+ * @param {Number} verifiedBy - Admin account ID
+ * @param {String} rejectionReason - Reason for rejection (optional)
+ * @param {String} adminProofImage - Base64 string of admin verification proof (optional)
+ * @returns {Promise<Object>} Result object
+ */
+async function verifyDonation(tithesId, action, verifiedBy, rejectionReason = null, adminProofImage = null) {
+  try {
+    if (!tithesId) throw new Error('Tithes ID is required');
+    if (!['confirmed', 'rejected'].includes(action)) throw new Error('Invalid action. Must be confirmed or rejected.');
+
+    const verifiedDate = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    // Process Admin Proof Image
+    let adminProofBuffer = null;
+    let adminProofMimeType = null;
+
+    if (adminProofImage && typeof adminProofImage === 'string') {
+      if (adminProofImage.startsWith('data:')) {
+        const matches = adminProofImage.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          adminProofMimeType = matches[1];
+          adminProofBuffer = Buffer.from(matches[2], 'base64');
+        }
+      } else {
+        adminProofBuffer = Buffer.from(adminProofImage, 'base64');
+      }
+    }
+
+    let sql, params;
+    if (action === 'rejected') {
+      sql = `
+        UPDATE tbl_tithes 
+        SET status = ?, verified_by = ?, verified_date = ?, rejection_reason = ?, 
+            admin_proof_image = ?, admin_proof_image_type = ?
+        WHERE tithes_id = ?
+      `;
+      params = [
+        action, verifiedBy, verifiedDate, rejectionReason || null,
+        adminProofBuffer, adminProofMimeType, tithesId
+      ];
+    } else {
+      sql = `
+        UPDATE tbl_tithes 
+        SET status = ?, verified_by = ?, verified_date = ?, rejection_reason = NULL,
+            admin_proof_image = ?, admin_proof_image_type = ?
+        WHERE tithes_id = ?
+      `;
+      params = [
+        action, verifiedBy, verifiedDate,
+        adminProofBuffer, adminProofMimeType, tithesId
+      ];
+    }
+
+    const [result] = await query(sql, params);
+
+    if (result.affectedRows === 0) {
+      return {
+        success: false,
+        message: 'Donation not found',
+        data: null
+      };
+    }
+
+    const updatedTithe = await getTitheById(tithesId);
+
+    return {
+      success: true,
+      message: `Donation ${action} successfully`,
+      data: updatedTithe.data
+    };
+  } catch (error) {
+    console.error('Error verifying donation:', error);
+    throw error;
+  }
+}
+
+/**
+ * GET ADMIN PROOF IMAGE - Retrieve the admin proof image for a donation
+ * @param {Number} tithesId - Tithes ID
+ * @returns {Promise<Object>} Object with image buffer and MIME type
+ */
+async function getAdminProofImage(tithesId) {
+  try {
+    if (!tithesId) throw new Error('Tithes ID is required');
+
+    const sql = 'SELECT admin_proof_image, admin_proof_image_type FROM tbl_tithes WHERE tithes_id = ?';
+    const [rows] = await query(sql, [tithesId]);
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Donation not found', data: null };
+    }
+
+    const row = rows[0];
+    if (!row.admin_proof_image) {
+      return { success: false, message: 'No admin proof image found for this donation', data: null };
+    }
+
+    const imageBuffer = row.admin_proof_image;
+    const mimeType = row.admin_proof_image_type || 'image/png';
+    const base64 = imageBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    return {
+      success: true,
+      message: 'Admin proof image retrieved successfully',
+      data: {
+        image: dataUrl,
+        mimeType: mimeType
+      }
+    };
+  } catch (error) {
+    console.error('Error getting admin proof image:', error);
+    throw error;
+  }
+}
+
+/**
+ * GET PROOF IMAGE - Retrieve the proof image for a donation
+ * @param {Number} tithesId - Tithes ID
+ * @returns {Promise<Object>} Object with image buffer and MIME type
+ */
+async function getProofImage(tithesId) {
+  try {
+    if (!tithesId) throw new Error('Tithes ID is required');
+
+    const sql = 'SELECT proof_image, proof_image_type FROM tbl_tithes WHERE tithes_id = ?';
+    const [rows] = await query(sql, [tithesId]);
+
+    if (rows.length === 0) {
+      return { success: false, message: 'Donation not found', data: null };
+    }
+
+    const row = rows[0];
+    if (!row.proof_image) {
+      return { success: false, message: 'No proof image found for this donation', data: null };
+    }
+
+    // Convert Buffer to base64 data URL
+    const imageBuffer = row.proof_image;
+    const mimeType = row.proof_image_type || 'image/png';
+    const base64 = imageBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    return {
+      success: true,
+      message: 'Proof image retrieved successfully',
+      data: {
+        image: dataUrl,
+        mimeType: mimeType
+      }
+    };
+  } catch (error) {
+    console.error('Error getting proof image:', error);
     throw error;
   }
 }
@@ -171,16 +455,21 @@ async function getAllTithes(options = {}) {
       }
     }
 
+    // Extract additional filter params
+    const source = options.source || null;
+    const status = options.status || null;
+
     // Build base query for counting total records
     let countSql = 'SELECT COUNT(*) as total FROM tbl_tithes t LEFT JOIN tbl_members m ON t.member_id = m.member_id';
     let countParams = [];
 
-    // Build query for fetching records with member data
+    // Build query for fetching records with member data (exclude proof_image BLOB from list queries)
     let sql = `SELECT 
       t.tithes_id,
       t.member_id,
       t.donation_type,
       t.member_name,
+      t.donor_email,
       t.is_anonymous,
       t.amount,
       t.type,
@@ -190,6 +479,16 @@ async function getAllTithes(options = {}) {
       t.status,
       t.date_created,
       t.donation_date,
+      t.source,
+      t.donation_method,
+      t.donation_method_other,
+      t.verified_by,
+      t.verified_date,
+      t.rejection_reason,
+      IF(t.proof_image IS NOT NULL, 1, 0) as has_proof_image,
+      t.proof_image_type,
+      IF(t.admin_proof_image IS NOT NULL, 1, 0) as has_admin_proof_image,
+      t.admin_proof_image_type,
       m.firstname,
       m.lastname,
       m.middle_name,
@@ -246,6 +545,22 @@ async function getAllTithes(options = {}) {
       hasWhere = true;
     }
 
+    // Add source filter (online / in-person)
+    if (source && source !== 'all') {
+      whereConditions.push('t.source = ?');
+      countParams.push(source);
+      params.push(source);
+      hasWhere = true;
+    }
+
+    // Add status filter (pending / confirmed / rejected)
+    if (status && status !== 'all') {
+      whereConditions.push('t.status = ?');
+      countParams.push(status);
+      params.push(status);
+      hasWhere = true;
+    }
+
     // Initialize sortByValue before using it
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
 
@@ -276,6 +591,12 @@ async function getAllTithes(options = {}) {
         break;
       case 'Date Created (Oldest)':
         orderByClause += 'COALESCE(STR_TO_DATE(t.date_created, \'%Y-%m-%d %H:%i:%s\'), STR_TO_DATE(t.date_created, \'%Y-%m-%d\'), CAST(\'9999-12-31\' AS DATE)) ASC';
+        break;
+      case 'Donation Date (Newest)':
+        orderByClause += 'COALESCE(t.donation_date, t.date_created) DESC';
+        break;
+      case 'Donation Date (Oldest)':
+        orderByClause += 'COALESCE(t.donation_date, t.date_created) ASC';
         break;
       case 'Type (A-Z)':
         orderByClause += 't.type ASC';
@@ -312,49 +633,64 @@ async function getAllTithes(options = {}) {
     const totalCount = countResult[0]?.total || 0;
 
     // Get summary statistics with the same filters as the main query
+    // Only count CONFIRMED donations in summary totals
     let summarySql = `
       SELECT 
-        COALESCE(SUM(amount), 0) as totalDonations,
-        COALESCE(SUM(CASE WHEN type = 'tithe' THEN amount ELSE 0 END), 0) as totalTithes,
-        COALESCE(SUM(CASE WHEN type = 'offering' THEN amount ELSE 0 END), 0) as totalOfferings,
-        COALESCE(SUM(CASE WHEN type IN ('missions', 'love_gift', 'building_fund', 'donation', 'other') THEN amount ELSE 0 END), 0) as totalSpecialOfferings
+        COALESCE(SUM(CASE WHEN status = 'confirmed' THEN amount ELSE 0 END), 0) as totalDonations,
+        COALESCE(SUM(CASE WHEN status = 'confirmed' AND type = 'tithe' THEN amount ELSE 0 END), 0) as totalTithes,
+        COALESCE(SUM(CASE WHEN status = 'confirmed' AND type = 'offering' THEN amount ELSE 0 END), 0) as totalOfferings,
+        COALESCE(SUM(CASE WHEN status = 'confirmed' AND type IN ('missions', 'love_gift', 'building_fund', 'donation', 'other') THEN amount ELSE 0 END), 0) as totalSpecialOfferings,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pendingCount
       FROM tbl_tithes
     `;
     const summaryParams = [];
-    
+
     // Build WHERE conditions for summary stats (same as main query)
     const summaryWhereConditions = [];
-    
+
     // Add type filter to summary
     if (type && type !== 'All Types') {
       summaryWhereConditions.push('type = ?');
       summaryParams.push(type);
     }
-    
+
     // Add donation_type filter to summary
     if (donationType && donationType !== 'all') {
       summaryWhereConditions.push('donation_type = ?');
       summaryParams.push(donationType);
     }
-    
+
     // Add date range filter to summary (using donation_date, fallback to date_created)
     if (dateRange && Array.isArray(dateRange) && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
       summaryWhereConditions.push('DATE(COALESCE(donation_date, date_created)) BETWEEN ? AND ?');
       summaryParams.push(dateRange[0], dateRange[1]);
     }
-    
+
+    // Add source filter to summary
+    if (source && source !== 'all') {
+      summaryWhereConditions.push('source = ?');
+      summaryParams.push(source);
+    }
+
+    // Add status filter to summary
+    if (status && status !== 'all') {
+      summaryWhereConditions.push('status = ?');
+      summaryParams.push(status);
+    }
+
     // Apply WHERE clause to summary query
     if (summaryWhereConditions.length > 0) {
       summarySql += ' WHERE ' + summaryWhereConditions.join(' AND ');
     }
-    
+
     const [summaryStatsResult] = await query(summarySql, summaryParams);
-    
+
     const summaryStats = {
       totalDonations: parseFloat(summaryStatsResult[0]?.totalDonations || 0),
       totalTithes: parseFloat(summaryStatsResult[0]?.totalTithes || 0),
       totalOfferings: parseFloat(summaryStatsResult[0]?.totalOfferings || 0),
-      totalSpecialOfferings: parseFloat(summaryStatsResult[0]?.totalSpecialOfferings || 0)
+      totalSpecialOfferings: parseFloat(summaryStatsResult[0]?.totalSpecialOfferings || 0),
+      pendingCount: parseInt(summaryStatsResult[0]?.pendingCount || 0)
     };
 
     // Add pagination to main query
@@ -689,7 +1025,7 @@ async function exportTithesToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllTithes(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No donations found to export');
     }
@@ -751,8 +1087,8 @@ async function exportTithesToExcel(options = {}) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Tithes & Offerings');
 
     // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });
@@ -766,10 +1102,14 @@ async function exportTithesToExcel(options = {}) {
 
 module.exports = {
   createTithe,
+  createOnlineDonation,
   getAllTithes,
   getTitheById,
   updateTithe,
   deleteTithe,
   bulkDeleteTithes,
-  exportTithesToExcel
+  exportTithesToExcel,
+  verifyDonation,
+  getProofImage,
+  getAdminProofImage
 };

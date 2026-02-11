@@ -97,6 +97,29 @@
                 <GiveInPersonCard :giveInPersonData="giveInPersonData" />
               </v-col>
             </v-row>
+
+            <!-- Submit Donation Proof Section -->
+            <div class="donation-proof-section">
+              <div class="donation-proof-divider">
+                <span class="divider-text">Already paid via GCash or Maya?</span>
+              </div>
+              <div class="donation-proof-cta">
+                <p class="cta-description">
+                  After completing your payment, submit your receipt screenshot so the church can verify and record your donation.
+                </p>
+                <v-btn
+                  color="#14b8a6"
+                  class="text-white donation-proof-btn"
+                  size="large"
+                  rounded
+                  elevation="3"
+                  @click="showDonationProofDialog = true"
+                >
+                  <v-icon start>mdi-receipt-text-outline</v-icon>
+                  Submit Donation Proof
+                </v-btn>
+              </div>
+            </div>
           </v-card>
         </div>
       </v-container>
@@ -115,6 +138,12 @@
         {{ giveData.backButtonText }}
       </v-btn>
     </section>
+
+    <!-- Donation Proof Dialog -->
+    <DonationProofDialog
+      v-model="showDonationProofDialog"
+      @submitted="handleDonationSubmitted"
+    />
     
   </div>
 </template>
@@ -123,7 +152,16 @@
 import { ref, onMounted } from 'vue'
 import GiveOnlineForm from './GiveOnlineForm.vue'
 import GiveInPersonCard from './GiveInPersonCard.vue'
+import DonationProofDialog from '../Dialogs/DonationProofDialog.vue'
 import axios from '@/api/axios'
+
+// Donation proof dialog state
+const showDonationProofDialog = ref(false)
+
+// Handle successful donation submission
+const handleDonationSubmitted = (data) => {
+  console.log('Donation submitted successfully:', data)
+}
 
 
 const giveData = ref({
@@ -405,6 +443,66 @@ onMounted(async () => {
   .hero-subtitle {
     font-size: 1rem;
   }
+}
+
+/* Donation Proof Section */
+.donation-proof-section {
+  margin-top: 32px;
+  padding-top: 0;
+}
+
+.donation-proof-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.donation-proof-divider::before,
+.donation-proof-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.divider-text {
+  padding: 0 16px;
+  color: #757575;
+  font-size: 14px;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.donation-proof-cta {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.cta-description {
+  color: #757575;
+  font-size: 14px;
+  margin-bottom: 16px;
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.donation-proof-btn {
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  letter-spacing: 0.5px;
+  padding: 12px 32px !important;
+  font-size: 15px !important;
+  transition: all 0.3s ease;
+}
+
+.donation-proof-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.35) !important;
 }
 </style>
 

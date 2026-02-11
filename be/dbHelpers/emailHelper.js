@@ -6,7 +6,7 @@ require('dotenv').config();
 // Set default timezone to Philippines (Asia/Manila, UTC+8)
 moment.tz.setDefault('Asia/Manila');
 
-const CHURCH_EMAIL = 'biblebaptistekklesiaofkawit@gmail.com';
+const CHURCH_EMAIL = process.env.EMAIL_USER || 'biblebaptistekklesiaofkawit@gmail.com';
 
 // Lightweight token generator until JWT routes are available
 const generateResetToken = () => crypto.randomBytes(32).toString('hex');
@@ -1787,6 +1787,294 @@ const sendFormStatusUpdate = async (formDetails) => {
     return buildErrorResult('Failed to send form status update email', error);
   }
 };
+/**
+ * Send donation notification email to church admin
+ * Called when a new online donation proof is submitted via the Give page
+ * @param {Object} donationData - Donation details
+ * @returns {Promise<Object>} - Result object with success status and message
+ */
+const sendDonationNotification = async (donationData) => {
+  try {
+    const transporter = createTransporter();
+
+    const {
+      tithes_id,
+      donor_name = 'Anonymous',
+      amount = 0,
+      type = 'donation',
+      donation_method = 'N/A',
+      donation_date,
+      date_created
+    } = donationData;
+
+    const formattedAmount = parseFloat(amount).toLocaleString('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    });
+
+    const formattedDate = donation_date
+      ? moment(donation_date).tz('Asia/Manila').format('MMMM DD, YYYY')
+      : moment(date_created).tz('Asia/Manila').format('MMMM DD, YYYY');
+
+    const methodLabel = {
+      gcash: 'GCash',
+      maya: 'Maya',
+      others: 'Other Method'
+    }[donation_method] || donation_method;
+
+    const typeLabel = {
+      tithe: 'Tithe',
+      offering: 'Offering',
+      missions: 'Missions',
+      love_gift: 'Love Gift',
+      building_fund: 'Building Fund',
+      donation: 'Donation',
+      other: 'Other'
+    }[type] || type;
+
+    const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: CHURCH_EMAIL,
+      subject: `🔔 New Online Donation Submitted - ${formattedAmount}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>New Online Donation</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); padding: 30px 20px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">New Online Donation</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">A new donation proof has been submitted for review</p>
+          </div>
+          
+          <div style="background-color: #f8fffe; padding: 24px; border: 1px solid #e0f2f1; border-top: none; border-radius: 0 0 12px 12px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #555; width: 140px;">Donation ID</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0;">#${tithes_id}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #555;">Donor Name</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0;">${donor_name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #555;">Amount</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-size: 18px; font-weight: 700; color: #0d9488;">${formattedAmount}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #555;">Type</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0;">${typeLabel}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0; font-weight: 600; color: #555;">Payment Method</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #e0e0e0;">${methodLabel}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; font-weight: 600; color: #555;">Donation Date</td>
+                <td style="padding: 10px 0;">${formattedDate}</td>
+              </tr>
+            </table>
+
+            <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 16px; margin-top: 20px;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                ⚠️ <strong>Action Required:</strong> Please review the donation proof and confirm or reject this donation in the admin panel.
+              </p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 24px 0;">
+            
+            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0; text-align: center;">
+              This is an automated notification from the Bible Baptist Ekklesia of Kawit system.<br>
+              Please do not reply to this email.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    return {
+      success: true,
+      message: 'Donation notification email sent successfully',
+      messageId: info.messageId,
+    };
+  } catch (error) {
+    console.error('Error sending donation notification email:', error);
+    return buildErrorResult('Failed to send donation notification email', error);
+  }
+};
+
+/**
+ * Send acknowledgement email to donor
+ * Called when a donor submits a donation with an email address
+ * @param {Object} donationData - Donation details
+ * @returns {Promise<Object>} - Result object
+ */
+const sendDonorAcknowledgementEmail = async (donationData) => {
+  console.log('📧 [Email Service] Preparing to send Donor Acknowledgement Email...');
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error('❌ [Email Service] Missing EMAIL_USER or EMAIL_PASS in .env configuration');
+      return { success: false, message: 'Email configuration missing' };
+    }
+
+    const transporter = createTransporter();
+
+    const {
+      tithes_id,
+      donor_name = 'Donor',
+      email,
+      amount = 0,
+      type = 'donation',
+      donation_date
+    } = donationData;
+
+    console.log(`📧 [Email Service] Recipient: ${email}, ID: ${tithes_id}`);
+
+    if (!email) {
+      console.warn('⚠️ [Email Service] No donor email provided, skipping email.');
+      return { success: false, message: 'No donor email provided' };
+    }
+
+    const formattedAmount = parseFloat(amount).toLocaleString('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    });
+
+    const formattedDate = donation_date
+      ? moment(donation_date).tz('Asia/Manila').format('MMMM DD, YYYY')
+      : moment().tz('Asia/Manila').format('MMMM DD, YYYY');
+
+    const mailOptions = {
+      from: `"BBEK Church" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: `Donation Received - Reference #${tithes_id}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1a365d;">Thank you for your generosity!</h2>
+          <p>Dear ${donor_name},</p>
+          <p>We have received your donation submission. Our team will review the details and verify your proof of payment shortly.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Reference ID:</strong> #${tithes_id}</p>
+            <p style="margin: 5px 0;"><strong>Amount:</strong> ${formattedAmount}</p>
+            <p style="margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
+            <p style="margin: 5px 0;"><strong>Type:</strong> ${type.toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Status:</strong> Pending Review</p>
+          </div>
+          
+          <p>You will receive another email once your donation has been confirmed.</p>
+          
+          <p>God bless you!</p>
+          <p>BBEK Church Administration</p>
+        </div>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ [Email Service] Acknowledgement Email sent successfully! Message ID: ${info.messageId}`);
+    return { success: true, message: 'Acknowledgement email sent' };
+  } catch (error) {
+    console.error('❌ [Email Service] Error sending acknowledgement email:', error);
+    return buildErrorResult('Failed to send acknowledgement email', error);
+  }
+};
+
+/**
+ * Send status update email to donor
+ * Called when admin confirms or rejects a donation
+ * @param {Object} donationData - Donation details
+ * @param {String} action - 'confirmed' or 'rejected'
+ * @param {String} reason - Rejection reason (optional)
+ * @returns {Promise<Object>} - Result object
+ */
+const sendDonorStatusUpdateEmail = async (donationData, action, reason = null) => {
+  console.log(`📧 [Email Service] Preparing to send Donor Status Update (${action})...`);
+  try {
+    const transporter = createTransporter();
+
+    const {
+      tithes_id,
+      donor_name = 'Donor',
+      donor_email, // Note: field name depends on object shape from DB or create result
+      member_name, // Fallback
+      email, // Fallback
+      amount = 0,
+      donation_date
+    } = donationData;
+
+    // Resolve email and name
+    const recipientEmail = donor_email || email;
+    const recipientName = donor_name || member_name || 'Donor';
+
+    console.log(`📧 [Email Service] Recipient: ${recipientEmail}, Action: ${action}`);
+
+    if (!recipientEmail) {
+      console.warn('⚠️ [Email Service] No donor email provided for status update.');
+      return { success: false, message: 'No donor email provided' };
+    }
+
+    const formattedAmount = parseFloat(amount).toLocaleString('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    });
+
+    const isConfirmed = action === 'confirmed';
+    const subjectStatus = isConfirmed ? 'Confirmed' : 'Update';
+    const color = isConfirmed ? '#059669' : '#dc2626'; // Green or Red
+
+    let messageBody = '';
+    if (isConfirmed) {
+      messageBody = `
+        <p>We are pleased to inform you that your donation has been <strong>successfully verified and confirmed</strong>.</p>
+        <p>Thank you for your support to the ministry.</p>
+      `;
+    } else {
+      messageBody = `
+        <p>Your donation submission has been <strong>marked as rejected</strong>.</p>
+        ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+        <p>If you believe this is an error, please contact the church administration.</p>
+      `;
+    }
+
+    const mailOptions = {
+      from: `"BBEK Church" <${CHURCH_EMAIL}>`,
+      to: recipientEmail,
+      subject: `Donation ${subjectStatus} - Reference #${tithes_id}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: ${color};">Donation ${action === 'confirmed' ? 'Confirmed' : 'Update'}</h2>
+          <p>Dear ${recipientName},</p>
+          
+          ${messageBody}
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Reference ID:</strong> #${tithes_id}</p>
+            <p style="margin: 5px 0;"><strong>Amount:</strong> ${formattedAmount}</p>
+            <p style="margin: 5px 0;"><strong>Status:</strong> ${action.toUpperCase()}</p>
+          </div>
+          
+          <p>God bless you!</p>
+          <p>BBEK Church Administration</p>
+        </div>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ [Email Service] Status Update Email sent successfully! Message ID: ${info.messageId}`);
+    return { success: true, message: 'Status update email sent' };
+  } catch (error) {
+    console.error('❌ [Email Service] Error sending status update email:', error);
+    return buildErrorResult('Failed to send status update email', error);
+  }
+};
 
 module.exports = {
   sendAccountDetails,
@@ -1799,6 +2087,9 @@ module.exports = {
   sendTransactionCompletionNotification,
   sendFormSubmissionNotification,
   sendFormStatusUpdate,
+  sendDonationNotification,
+  sendDonorAcknowledgementEmail,
+  sendDonorStatusUpdateEmail,
   generateResetToken,
 };
 

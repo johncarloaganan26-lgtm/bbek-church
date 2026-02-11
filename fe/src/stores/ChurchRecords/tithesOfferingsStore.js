@@ -11,7 +11,9 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
       sortBy: 'Date Created (Newest)',
       type: 'All Types',
       donationType: 'all',
-      dateRange: []
+      dateRange: [],
+      source: 'all',
+      status: 'all'
     },
     currentPage: 1,
     totalPages: 1,
@@ -24,7 +26,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
       totalDonations: 0,
       totalTithes: 0,
       totalOfferings: 0,
-      totalSpecialOfferings: 0
+      totalSpecialOfferings: 0,
+      pendingCount: 0
     }
   }),
 
@@ -42,7 +45,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
     totalDonations: (state) => state.summaryStats.totalDonations || 0,
     totalTithes: (state) => state.summaryStats.totalTithes || 0,
     totalOfferings: (state) => state.summaryStats.totalOfferings || 0,
-    totalSpecialOfferings: (state) => state.summaryStats.totalSpecialOfferings || 0
+    totalSpecialOfferings: (state) => state.summaryStats.totalSpecialOfferings || 0,
+    pendingCount: (state) => state.summaryStats.pendingCount || 0
   },
 
   actions: {
@@ -59,6 +63,8 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         const donationType = options.donationType !== undefined ? options.donationType : this.filters.donationType
         const sortBy = options.sortBy !== undefined ? options.sortBy : this.filters.sortBy
         const dateRange = options.dateRange !== undefined ? options.dateRange : this.filters.dateRange
+        const source = options.source !== undefined ? options.source : this.filters.source
+        const status = options.status !== undefined ? options.status : this.filters.status
 
         // Calculate offset from page and pageSize
         const offset = (page - 1) * pageSize
@@ -69,7 +75,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         params.append('offset', offset.toString())
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         // Add filter parameters
         if (type && type !== 'All Types') {
           params.append('type', type)
@@ -83,6 +89,12 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         if (dateRange && dateRange.length === 2) {
           params.append('dateRange', JSON.stringify(dateRange))
         }
+        if (source && source !== 'all') {
+          params.append('source', source)
+        }
+        if (status && status !== 'all') {
+          params.append('status', status)
+        }
 
         const response = await axios.get(`/church-records/tithes/getAllTithes?${params}`, {
           headers: {
@@ -90,14 +102,14 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data && response.data.success) {
           this.donations = response.data.data || []
-          
+
           // Update pagination state
           this.currentPage = page
           this.itemsPerPage = pageSize
-          
+
           // Use backend pagination data if available
           if (response.data.pagination) {
             this.totalPages = response.data.pagination.totalPages || 1
@@ -108,15 +120,16 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
             this.totalCount = totalCount
             this.totalPages = Math.ceil(totalCount / pageSize) || 1
           }
-          
+
           // Store summary statistics from API
           this.summaryStats = response.data.summaryStats || {
             totalDonations: 0,
             totalTithes: 0,
             totalOfferings: 0,
-            totalSpecialOfferings: 0
+            totalSpecialOfferings: 0,
+            pendingCount: 0
           }
-          
+
           // Update search query and filters if provided
           if (options.search !== undefined) {
             this.searchQuery = search
@@ -182,7 +195,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
           }
         })
         console.log('Create donation response:', response)
-        
+
         if (response.data && response.status === 201) {
           await this.fetchDonations()
           return { success: true, data: response.data.data }
@@ -213,7 +226,7 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
           }
         })
         console.log('Update donation response:', response)
-        
+
         if (response.data && response.status === 200) {
           await this.fetchDonations()
           return { success: true, data: response.data.data }
@@ -293,11 +306,11 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
       // Refetch with new filters
-      this.fetchDonations({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchDonations({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
@@ -414,6 +427,46 @@ export const useTithesOfferingsStore = defineStore('tithesOfferings', {
         this.error = error.response?.data?.error || error.message || 'Failed to bulk delete tithes'
         console.error('Error bulk deleting tithes:', error)
         return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async verifyDonation(tithesId, action, rejectionReason = null) {
+      this.loading = true
+      this.error = null
+      const accessToken = localStorage.getItem('accessToken')
+      try {
+        const payload = {
+          action: action,
+          rejection_reason: rejectionReason
+        }
+
+        const response = await axios.put(`/church-records/tithes/verifyDonation/${tithesId}`, payload, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.data && response.data.success) {
+          // Refresh donations list
+          await this.fetchDonations({
+            page: this.currentPage,
+            pageSize: this.itemsPerPage,
+            search: this.searchQuery
+          })
+          return { success: true, data: response.data.data }
+        } else {
+          const errorMsg = response.data?.message || `Failed to ${action} donation`
+          this.error = errorMsg
+          return { success: false, error: errorMsg }
+        }
+      } catch (error) {
+        console.error(`Error ${action} donation:`, error)
+        const errorMsg = error.response?.data?.error || error.message || `Failed to ${action} donation`
+        this.error = errorMsg
+        return { success: false, error: errorMsg }
       } finally {
         this.loading = false
       }

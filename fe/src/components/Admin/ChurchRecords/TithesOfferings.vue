@@ -22,6 +22,7 @@
             <div>
               <div class="text-caption grey--text mb-1">Total Donations</div>
               <div class="text-h5 font-weight-bold">P{{ totalDonations.toLocaleString() }}</div>
+              <div class="text-caption text-grey" style="font-size: 11px;">Confirmed only</div>
             </div>
             <v-avatar size="56" color="green lighten-5" class="d-flex align-center justify-center">
               <span style="color: white !important;" class="mdi mdi-gift icon-custom" aria-hidden="true"></span>
@@ -56,14 +57,15 @@
         </v-card>
       </v-col>
       <v-col cols="12" sm="6" md="3">
-        <v-card class="pa-4" elevation="2">
+        <v-card class="pa-4" elevation="2" :class="{ 'pending-card': pendingCount > 0 }">
           <div class="d-flex align-center justify-space-between">
             <div>
-              <div class="text-caption grey--text mb-1">Special Offerings</div>
-              <div class="text-h5 font-weight-bold">P{{ totalSpecialOfferings.toLocaleString() }}</div>
+              <div class="text-caption grey--text mb-1">Pending Review</div>
+              <div class="text-h5 font-weight-bold" :class="{ 'text-orange': pendingCount > 0 }">{{ pendingCount }}</div>
+              <div v-if="pendingCount > 0" class="text-caption text-orange" style="font-size: 11px;">Needs attention</div>
             </div>
-            <v-avatar size="56" color="yellow lighten-5" class="d-flex align-center justify-center">
-              <span style="color: green !important;" class="mdi mdi-gift icon-custom" aria-hidden="true"></span>
+            <v-avatar size="56" :color="pendingCount > 0 ? 'orange lighten-5' : 'grey lighten-3'" class="d-flex align-center justify-center">
+              <span :style="{ color: pendingCount > 0 ? 'orange' : 'grey' }" class="mdi mdi-clock-outline icon-custom" aria-hidden="true" style="color: white !important;"></span>
             </v-avatar>
           </div>
         </v-card>
@@ -127,6 +129,28 @@
               v-model="filters.sortBy"
               :items="sortByOptions"
               label="Sort By"
+              variant="outlined"
+              density="compact"
+              :disabled="loading"
+              hide-details
+            ></v-select>
+          </v-col>
+          <v-col cols="12" md="1">
+            <v-select
+              v-model="filters.source"
+              :items="sourceOptions"
+              label="Source"
+              variant="outlined"
+              density="compact"
+              :disabled="loading"
+              hide-details
+            ></v-select>
+          </v-col>
+          <v-col cols="12" md="1">
+            <v-select
+              v-model="filters.status"
+              :items="statusOptions"
+              label="Status"
               variant="outlined"
               density="compact"
               :disabled="loading"
@@ -232,7 +256,8 @@
             <th class="text-left font-weight-bold">Donation Type</th>
             <th class="text-left font-weight-bold">Amount/Items</th>
             <th class="text-left font-weight-bold">Donation Date</th>
-            <th class="text-left font-weight-bold">Recorded Date</th>
+            <th class="text-left font-weight-bold">Source</th>
+            <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Type</th>
             <th class="text-left font-weight-bold">Payment Method</th>
             <th class="text-left font-weight-bold">Actions</th>
@@ -240,12 +265,12 @@
         </thead>
         <tbody>
           <tr v-if="!loading && donations.length === 0">
-            <td colspan="9" class="text-center py-12">
+            <td colspan="11" class="text-center py-12">
               <div class="text-h6 font-weight-bold">No Record Found</div>
             </td>
           </tr>
           <tr v-if="loading">
-            <td colspan="9" class="text-center py-12">
+            <td colspan="11" class="text-center py-12">
               <v-progress-circular
                 indeterminate
                 color="primary"
@@ -291,7 +316,26 @@
               </div>
             </td>
             <td>{{ donation.donation_date || '-' }}</td>
-            <td>{{ donation.date_created }}</td>
+            <td>
+              <v-chip 
+                :color="donation.source === 'online' ? 'indigo' : 'grey'" 
+                size="small" 
+                variant="flat"
+              >
+                <v-icon start size="small">{{ donation.source === 'online' ? 'mdi-cloud-upload' : 'mdi-account' }}</v-icon>
+                {{ donation.source === 'online' ? 'Online' : 'In-Person' }}
+              </v-chip>
+            </td>
+            <td>
+              <v-chip 
+                :color="getStatusColor(donation.status)" 
+                size="small" 
+                variant="flat"
+              >
+                <v-icon start size="small">{{ getStatusIcon(donation.status) }}</v-icon>
+                {{ formatStatus(donation.status) }}
+              </v-chip>
+            </td>
             <td>
               <v-chip :color="getTypeColor(donation.type)" size="small" variant="flat">
                 {{ formatType(donation.type) }}
@@ -306,32 +350,64 @@
               </div>
             </td>
             <td>
-              <v-tooltip text="Edit Donation" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn 
-                    icon="mdi-pencil" 
-                    variant="text" 
-                    size="small" 
-                    class="mr-2" 
-                    :disabled="loading"
-                    v-bind="props"
-                    @click="editDonation(donation)"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
-              <v-tooltip text="Delete Donation" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn 
-                    icon="mdi-delete" 
-                    variant="text" 
-                    size="small" 
-                    color="error" 
-                    :disabled="loading"
-                    v-bind="props"
-                    @click="deleteDonation(donation)"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
+              <div class="d-flex align-center">
+                <!-- View Proof Button (for online donations with proof) -->
+                <v-tooltip v-if="donation.has_proof_image" text="View Proof" location="top">
+                  <template v-slot:activator="{ props }">
+                    <v-btn 
+                      icon="mdi-image-search" 
+                      variant="text" 
+                      size="small"
+                      color="info"
+                      class="mr-1" 
+                      :disabled="loading"
+                      v-bind="props"
+                      @click="viewProof(donation)"
+                    ></v-btn>
+                  </template>
+                </v-tooltip>
+                <!-- Quick Confirm (for pending online donations) -->
+                <v-tooltip v-if="donation.status === 'pending'" text="Confirm Donation" location="top">
+                  <template v-slot:activator="{ props }">
+                    <v-btn 
+                      icon="mdi-check-circle" 
+                      variant="text" 
+                      size="small"
+                      color="success"
+                      class="mr-1" 
+                      :disabled="loading"
+                      v-bind="props"
+                      @click="quickConfirm(donation)"
+                    ></v-btn>
+                  </template>
+                </v-tooltip>
+                <v-tooltip text="Edit Donation" location="top">
+                  <template v-slot:activator="{ props }">
+                    <v-btn 
+                      icon="mdi-pencil" 
+                      variant="text" 
+                      size="small" 
+                      class="mr-1" 
+                      :disabled="loading"
+                      v-bind="props"
+                      @click="editDonation(donation)"
+                    ></v-btn>
+                  </template>
+                </v-tooltip>
+                <v-tooltip text="Delete Donation" location="top">
+                  <template v-slot:activator="{ props }">
+                    <v-btn 
+                      icon="mdi-delete" 
+                      variant="text" 
+                      size="small" 
+                      color="error" 
+                      :disabled="loading"
+                      v-bind="props"
+                      @click="deleteDonation(donation)"
+                    ></v-btn>
+                  </template>
+                </v-tooltip>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -373,6 +449,13 @@
       @update:model-value="tithesOfferingsDialog = $event"
       @submit="handleSubmit"
     />
+
+    <!-- Donation Proof Viewer Dialog -->
+    <DonationProofViewer
+      v-model="proofViewerDialog"
+      :donation="selectedProofDonation"
+      @verified="handleVerified"
+    />
   </div>
 </template>
 
@@ -380,12 +463,17 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TithesOfferingsDialog from '@/components/Dialogs/TithesOfferingsDialog.vue'
+import DonationProofViewer from '@/components/Dialogs/DonationProofViewer.vue'
 import { useTithesOfferingsStore } from '@/stores/ChurchRecords/tithesOfferingsStore'
 
 const tithesOfferingsStore = useTithesOfferingsStore()
 
 const tithesOfferingsDialog = ref(false)
 const tithesOfferingsData = ref(null)
+
+// Proof viewer dialog state
+const proofViewerDialog = ref(false)
+const selectedProofDonation = ref(null)
 
 // Selection state
 const selectedTithes = ref([])
@@ -421,6 +509,7 @@ const totalDonations = computed(() => tithesOfferingsStore.totalDonations)
 const totalTithes = computed(() => tithesOfferingsStore.totalTithes)
 const totalOfferings = computed(() => tithesOfferingsStore.totalOfferings)
 const totalSpecialOfferings = computed(() => tithesOfferingsStore.totalSpecialOfferings)
+const pendingCount = computed(() => tithesOfferingsStore.pendingCount)
 
 // Selection computed properties
 const isAllSelected = computed(() => {
@@ -452,6 +541,8 @@ const typeOptions = [
 ]
 
 const donationTypeOptions = ['all', 'money', 'inkind']
+const sourceOptions = ['all', 'online', 'in-person']
+const statusOptions = ['all', 'pending', 'confirmed', 'rejected']
 
 // Watch for filter changes
 watch(() => filters.value.type, (newType) => {
@@ -464,6 +555,14 @@ watch(() => filters.value.donationType, (newDonationType) => {
 
 watch(() => filters.value.sortBy, (newSortBy) => {
   tithesOfferingsStore.setFilters({ sortBy: newSortBy })
+})
+
+watch(() => filters.value.source, (newSource) => {
+  tithesOfferingsStore.setFilters({ source: newSource })
+})
+
+watch(() => filters.value.status, (newStatus) => {
+  tithesOfferingsStore.setFilters({ status: newStatus })
 })
 
 // Clear selection when data changes
@@ -485,6 +584,14 @@ watch(() => filters.value.donationType, () => {
 })
 
 watch(() => filters.value.dateRange, () => {
+  selectedTithes.value = []
+})
+
+watch(() => filters.value.source, () => {
+  selectedTithes.value = []
+})
+
+watch(() => filters.value.status, () => {
   selectedTithes.value = []
 })
 
@@ -686,6 +793,74 @@ const formatType = (type) => {
     'household': 'Household Items'
   }
   return typeMap[type] || type
+}
+
+// Format donation status
+const formatStatus = (status) => {
+  const statusMap = {
+    'pending': 'Pending',
+    'confirmed': 'Confirmed',
+    'rejected': 'Rejected'
+  }
+  return statusMap[status] || status || 'Unknown'
+}
+
+// Get status color
+const getStatusColor = (status) => {
+  const statusColors = {
+    'pending': 'orange',
+    'confirmed': 'success',
+    'rejected': 'error'
+  }
+  return statusColors[status] || 'grey'
+}
+
+// Get status icon
+const getStatusIcon = (status) => {
+  const statusIcons = {
+    'pending': 'mdi-clock-outline',
+    'confirmed': 'mdi-check-circle',
+    'rejected': 'mdi-close-circle'
+  }
+  return statusIcons[status] || 'mdi-help-circle'
+}
+
+// View proof image
+const viewProof = (donation) => {
+  selectedProofDonation.value = donation
+  proofViewerDialog.value = true
+}
+
+// Quick confirm a pending donation
+const quickConfirm = async (donation) => {
+  try {
+    await ElMessageBox.confirm(
+      `Confirm this donation of P${parseFloat(donation.amount || 0).toLocaleString()} from ${donation.fullname || donation.member_name || 'Anonymous'}?`,
+      'Confirm Donation',
+      {
+        confirmButtonText: 'Confirm',
+        cancelButtonText: 'Cancel',
+        type: 'success',
+      }
+    )
+
+    const result = await tithesOfferingsStore.verifyDonation(donation.tithes_id, 'confirmed')
+    if (result.success) {
+      ElMessage.success('Donation confirmed successfully')
+    } else {
+      ElMessage.error(result.error || 'Failed to confirm donation')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error confirming donation:', error)
+      ElMessage.error('Failed to confirm donation')
+    }
+  }
+}
+
+// Handle verification from proof viewer
+const handleVerified = (data) => {
+  tithesOfferingsStore.fetchDonations()
 }
 
 // Safely format donation items (handle Buffer or object)
@@ -943,6 +1118,20 @@ onMounted(async () => {
   font-variant: normal;
   text-rendering: auto;
   -webkit-font-smoothing: antialiased;
+}
+
+.pending-card {
+  border-left: 4px solid #fb8c00 !important;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-left-color: #fb8c00; }
+  50% { border-left-color: #ff6d00; }
+}
+
+.text-orange {
+  color: #fb8c00 !important;
 }
 </style>
 
