@@ -91,14 +91,6 @@
             :active="$route.name === 'Ministries'"
             @click="closeDrawerOnMobile"
           ></v-list-item>
-          <v-list-item 
-            v-if="userInfo?.account?.position === 'admin'"
-            prepend-icon="mdi-check" 
-            title="Approvals"
-            :to="{ name: 'Approvals' }"
-            :active="$route.name === 'Approvals'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
         </v-list-group>
 
         <!-- Services -->

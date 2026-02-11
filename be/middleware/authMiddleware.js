@@ -137,6 +137,14 @@ const publicRoutes = [
   '/api/church-records/child-dedications/createChildDedication',
   '/api/church-records/child-dedications/check-duplicate',
   '/api/church-records/child-dedications/check-member-dedication',
+  // Online donation route (public - no auth required)
+  '/api/church-records/tithes/submitOnlineDonation',
+  // Discipleship routes (public for form submission)
+  '/api/services/discipleship-requests/submit',
+  '/api/services/discipleship-requests/registration-data',
+  // Give page recommendation/routes (public)
+  '/api/cms/give/recommendations',
+  '/api/cms/give/recommendations/create',
 ];
 
 /**

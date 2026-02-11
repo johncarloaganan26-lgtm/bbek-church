@@ -140,6 +140,23 @@
                       />
                     </el-form-item>
 
+                    <!-- Preferred Service Date & Time (Sunday only) -->
+                    <el-form-item label="Preferred Service Date & Time">
+                      <el-date-picker
+                        v-model="inlineFormData.preferred_dedication_date"
+                        type="datetime"
+                        placeholder="Select date and time"
+                        format="MM/DD/YYYY hh:mm A"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        size="large"
+                        style="width: 100%"
+                        :disabled-date="disabledSundayDates"
+                      />
+                      <div class="form-hint" style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+                        Please select a Sunday for the dedication ceremony.
+                      </div>
+                    </el-form-item>
+
                     <!-- Child's Information Section -->
                     <div class="form-section mb-4">
                       <div class="form-section-title">Child's Information</div>
@@ -589,6 +606,7 @@ const inlineFormLoading = ref(false)
 const inlineFormData = reactive({
   requested_by: '',
   requester_relationship: '',
+  preferred_dedication_date: null,
   child_firstname: '',
   child_lastname: '',
   child_middle_name: '',
@@ -758,6 +776,7 @@ const onInlineRelationshipChange = (relationship) => {
 const resetInlineForm = () => {
   inlineFormData.requested_by = ''
   inlineFormData.requester_relationship = ''
+  inlineFormData.preferred_dedication_date = null
   inlineFormData.child_firstname = ''
   inlineFormData.child_lastname = ''
   inlineFormData.child_middle_name = ''
@@ -784,6 +803,12 @@ const resetInlineForm = () => {
   if (inlineFormRef.value) {
     inlineFormRef.value.clearValidate()
   }
+}
+
+// Disable dates that are not Sundays (0 = Sunday in JavaScript)
+const disabledSundayDates = (date) => {
+  // Only allow Sundays (day 0)
+  return date.getDay() !== 0
 }
 
 // Handle inline form submission
@@ -861,6 +886,9 @@ const handleInlineFormSubmit = async () => {
     const submitData = {
       requested_by: inlineFormData.requested_by.trim(),
       requester_relationship: inlineFormData.requester_relationship,
+      preferred_dedication_date: inlineFormData.preferred_dedication_date 
+        ? inlineFormData.preferred_dedication_date.replace('T', ' ').substring(0, 19) 
+        : null,
       child_firstname: inlineFormData.child_firstname.trim(),
       child_lastname: inlineFormData.child_lastname.trim(),
       child_middle_name: inlineFormData.child_middle_name ? inlineFormData.child_middle_name.trim() : null,

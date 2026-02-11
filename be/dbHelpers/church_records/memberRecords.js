@@ -1173,11 +1173,13 @@ async function exportMembersToExcel(options = {}) {
   }
 }
 
-// Create a function to get  Members without pastors on Select Elements
-async function getAllMembersWithoutPastorsForSelect() {
+// Create a function to get Members without pastors on Select Elements
+async function getAllMembersWithoutPastorsForSelect(options = {}) {
   try {
-    // Build query to get all members with fullname (excluding pastors)
-    const sql = `SELECT 
+    const { limit = 100, offset = 0, search = '' } = options;
+    
+    // Build query with optional search and pagination
+    let sql = `SELECT 
       member_id,
       firstname,
       lastname,
@@ -1190,11 +1192,41 @@ async function getAllMembersWithoutPastorsForSelect() {
         lastname
       ) as fullname
     FROM tbl_members
-    WHERE LOWER(position) NOT LIKE ?
-    ORDER BY firstname ASC, lastname ASC`;
-
-    const [rows] = await query(sql, ['%pastor%']);
-
+    WHERE LOWER(position) NOT LIKE ?`;
+    
+    // Add search filter if provided
+    if (search && search.trim()) {
+      sql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+      )`;
+    }
+    
+    sql += ` ORDER BY firstname ASC, lastname ASC LIMIT ? OFFSET ?`;
+    
+    // Build params
+    const params = search && search.trim() 
+      ? ['%pastor%', `%${search}%`, `%${search}%`, `%${search}%`, limit, offset]
+      : ['%pastor%', limit, offset];
+    
+    const [rows] = await query(sql, params);
+    
+    // Get total count
+    let countSql = `SELECT COUNT(*) as total FROM tbl_members WHERE LOWER(position) NOT LIKE ?`;
+    if (search && search.trim()) {
+      countSql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+      )`;
+    }
+    const countParams = search && search.trim()
+      ? ['%pastor%', `%${search}%`, `%${search}%`, `%${search}%`]
+      : ['%pastor%'];
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+    
     // Format data for select elements: [{ id, name }]
     const memberOptions = rows.map(member => ({
       id: member.member_id,
@@ -1205,7 +1237,13 @@ async function getAllMembersWithoutPastorsForSelect() {
     return {
       success: true,
       message: 'Members retrieved successfully for select',
-      data: memberOptions
+      data: memberOptions,
+      pagination: {
+        limit,
+        offset,
+        totalCount,
+        hasMore: offset + memberOptions.length < totalCount
+      }
     };
   } catch (error) {
     console.error('Error fetching members for select:', error);
@@ -1214,14 +1252,17 @@ async function getAllMembersWithoutPastorsForSelect() {
 }
 /**
  * GET ALL FOR SELECT - Get all members for select/dropdown elements
- * Returns simplified member data (member_id and fullname) without pagination
+ * Returns simplified member data (member_id and fullname) with optional pagination
  * Excludes members with position containing 'pastor' (e.g., 'Senior Pastor', 'Junior Pastor')
+ * @param {Object} options - Optional parameters: limit, offset, search
  * @returns {Promise<Object>} Object with member options array
  */
-async function getAllMembersForSelect() {
+async function getAllMembersForSelect(options = {}) {
   try {
-    // Build query to get all members with fullname and position
-    const sql = `SELECT 
+    const { limit = 100, offset = 0, search = '' } = options;
+    
+    // Build query with optional search and pagination
+    let sql = `SELECT 
       member_id,
       firstname,
       lastname,
@@ -1235,11 +1276,43 @@ async function getAllMembersForSelect() {
         lastname
       ) as fullname
     FROM tbl_members
-    where position != 'none'
-    ORDER BY firstname ASC, lastname ASC`;
-
-    const [rows] = await query(sql);
-
+    WHERE position != 'none'`;
+    
+    // Add search filter if provided
+    if (search && search.trim()) {
+      sql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+        OR email LIKE ?
+      )`;
+    }
+    
+    sql += ` ORDER BY firstname ASC, lastname ASC LIMIT ? OFFSET ?`;
+    
+    // Build params
+    const params = search && search.trim() 
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, limit, offset]
+      : [limit, offset];
+    
+    const [rows] = await query(sql, params);
+    
+    // Get total count for pagination info
+    let countSql = `SELECT COUNT(*) as total FROM tbl_members WHERE position != 'none'`;
+    if (search && search.trim()) {
+      countSql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+        OR email LIKE ?
+      )`;
+    }
+    const countParams = search && search.trim()
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      : [];
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+    
     // Format data for select elements: [{ id, name, position }]
     const memberOptions = rows.map(member => ({
       id: member.member_id,
@@ -1251,7 +1324,13 @@ async function getAllMembersForSelect() {
     return {
       success: true,
       message: 'Members retrieved successfully for select',
-      data: memberOptions
+      data: memberOptions,
+      pagination: {
+        limit,
+        offset,
+        totalCount,
+        hasMore: offset + memberOptions.length < totalCount
+      }
     };
   } catch (error) {
     console.error('Error fetching members for select:', error);
@@ -1261,14 +1340,17 @@ async function getAllMembersForSelect() {
 
 /**
  * GET ALL PASTORS FOR SELECT - Get all members with position containing 'pastor' for select/dropdown elements
- * Returns simplified member data (member_id and fullname) without pagination
+ * Returns simplified member data (member_id and fullname) with optional pagination
  * Includes positions like 'Senior Pastor', 'Junior Pastor', etc.
+ * @param {Object} options - Optional parameters: limit, offset, search
  * @returns {Promise<Object>} Object with pastor options array
  */
-async function getAllPastorsForSelect() {
+async function getAllPastorsForSelect(options = {}) {
   try {
-    // Build query to get all pastors with fullname (including Senior Pastor, Junior Pastor, etc.)
-    const sql = `SELECT 
+    const { limit = 100, offset = 0, search = '' } = options;
+    
+    // Build query with optional search and pagination
+    let sql = `SELECT 
       member_id,
       firstname,
       lastname,
@@ -1280,11 +1362,42 @@ async function getAllPastorsForSelect() {
         lastname
       ) as fullname
     FROM tbl_members
-    WHERE LOWER(position) LIKE ?
-    ORDER BY firstname ASC, lastname ASC`;
-
-    const [rows] = await query(sql, ['%pastor%']);
-
+    WHERE LOWER(position) LIKE ?`;
+    
+    // Add search filter if provided
+    if (search && search.trim()) {
+      sql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+      )`;
+    }
+    
+    sql += ` ORDER BY firstname ASC, lastname ASC LIMIT ? OFFSET ?`;
+    
+    // Build params
+    const searchTerm = '%pastor%';
+    const params = search && search.trim() 
+      ? [searchTerm, `%${search}%`, `%${search}%`, `%${search}%`, limit, offset]
+      : [searchTerm, limit, offset];
+    
+    const [rows] = await query(sql, params);
+    
+    // Get total count
+    let countSql = `SELECT COUNT(*) as total FROM tbl_members WHERE LOWER(position) LIKE ?`;
+    if (search && search.trim()) {
+      countSql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+      )`;
+    }
+    const countParams = search && search.trim()
+      ? [searchTerm, `%${search}%`, `%${search}%`, `%${search}%`]
+      : [searchTerm];
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+    
     // Format data for select elements: [{ id, name }]
     const pastorOptions = rows.map(pastor => ({
       id: pastor.member_id,
@@ -1294,7 +1407,13 @@ async function getAllPastorsForSelect() {
     return {
       success: true,
       message: 'Pastors retrieved successfully for select',
-      data: pastorOptions
+      data: pastorOptions,
+      pagination: {
+        limit,
+        offset,
+        totalCount,
+        hasMore: offset + pastorOptions.length < totalCount
+      }
     };
   } catch (error) {
     console.error('Error fetching pastors for select:', error);
@@ -1326,14 +1445,17 @@ async function getSpecificMemberByEmailAndStatus(email) {
 }
 /**
  * GET ALL DEPARTMENT MEMBERS FOR SELECT - Get all members with position = 'department' for select/dropdown elements
- * Returns simplified member data (member_id and fullname) without pagination
- * Filters by member position = 'department' from tbl_members
+ * Returns simplified member data (member_id and fullname) with optional pagination
+ * Filters by member position != 'member' and != 'none'
+ * @param {Object} options - Optional parameters: limit, offset, search
  * @returns {Promise<Object>} Object with department member options array
  */
-async function getAllDepartmentMembersForSelect() {
+async function getAllDepartmentMembersForSelect(options = {}) {
   try {
-    // Build query to get all members with position = 'department'
-    const sql = `SELECT 
+    const { limit = 100, offset = 0, search = '' } = options;
+    
+    // Build query with optional search and pagination
+    let sql = `SELECT 
       member_id,
       firstname,
       lastname,
@@ -1346,11 +1468,43 @@ async function getAllDepartmentMembersForSelect() {
         lastname
       ) as fullname
     FROM tbl_members
-    WHERE LOWER(position) != 'member' AND LOWER(position) != 'none'
-    ORDER BY firstname ASC, lastname ASC`;
-
-    const [rows] = await query(sql);
-
+    WHERE LOWER(position) != 'member' AND LOWER(position) != 'none'`;
+    
+    // Add search filter if provided
+    if (search && search.trim()) {
+      sql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+        OR email LIKE ?
+      )`;
+    }
+    
+    sql += ` ORDER BY firstname ASC, lastname ASC LIMIT ? OFFSET ?`;
+    
+    // Build params
+    const params = search && search.trim() 
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, limit, offset]
+      : [limit, offset];
+    
+    const [rows] = await query(sql, params);
+    
+    // Get total count
+    let countSql = `SELECT COUNT(*) as total FROM tbl_members WHERE LOWER(position) != 'member' AND LOWER(position) != 'none'`;
+    if (search && search.trim()) {
+      countSql += ` AND (
+        firstname LIKE ? 
+        OR lastname LIKE ? 
+        OR middle_name LIKE ?
+        OR email LIKE ?
+      )`;
+    }
+    const countParams = search && search.trim()
+      ? [`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`]
+      : [];
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+    
     // Format data for select elements: [{ id, name }]
     const memberOptions = rows.map(member => ({
       id: member.member_id,
@@ -1361,7 +1515,13 @@ async function getAllDepartmentMembersForSelect() {
     return {
       success: true,
       message: 'Department members retrieved successfully for select',
-      data: memberOptions
+      data: memberOptions,
+      pagination: {
+        limit,
+        offset,
+        totalCount,
+        hasMore: offset + memberOptions.length < totalCount
+      }
     };
   } catch (error) {
     console.error('Error fetching department members for select:', error);

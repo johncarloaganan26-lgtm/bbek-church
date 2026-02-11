@@ -12,7 +12,6 @@ import TithesOfferings from '../components/Admin/ChurchRecords/TithesOfferings.v
 import Ministries from '../components/Admin/ChurchRecords/Ministries.vue'
 import Departments from '../components/Admin/ChurchRecords/Departments.vue'
 import Accounts from '../components/Admin/ChurchRecords/Accounts.vue'
-import Approvals from '../components/Admin/ChurchRecords/Approvals.vue'
 import Transactions from '../components/Admin/ChurchRecords/Transactions.vue'
 // Services (Admin)
 import WaterBaptismAdmin from '../components/Admin/ServicesRecords/WaterBaptism.vue'
@@ -52,14 +51,13 @@ import DepartmentOfficersAbout from '../components/LandingPage/About/DepartmentO
 // Events Pages
 import Event from '../components/LandingPage/Events/Event.vue'
 import AllEvents from '../components/LandingPage/Events/AllEvents.vue'
-import AllEventsOfUser from '../components/LandingPage/Events/AllEventsOfUser.vue'
 import LearnMoreEvent from '../components/LandingPage/Events/LearnMoreEvent.vue'
-import MyMinistry from '../components/LandingPage/Ministries/MyMinistry.vue'
+import MinistryData from '../components/LandingPage/Ministries/MinistryData.vue'
+import LearnMoreMinistry from '../components/LandingPage/Ministries/LearnMoreMinistries.vue'
+
 // Ministries Pages
 import Ministry from '../components/LandingPage/Ministries/Ministry.vue'
 import AllMinistries from '../components/LandingPage/Ministries/AllMinistries.vue'
-import MinistryData from '../components/LandingPage/Ministries/MinistryData.vue'
-import LearnMoreMinistry from '../components/LandingPage/Ministries/LearnMoreMinistries.vue'
 
 // Services Pages
 import ServicesWrapper from '../components/LandingPage/Services/ServicesWrapper.vue'
@@ -122,11 +120,6 @@ const routes = [
         name: 'AllEventsRoute',
         component: AllEvents
       },
-      {
-        path: 'my-events',
-        name: 'AllEventsOfUser',
-        component: AllEventsOfUser
-      },
       // Accept encoded event object for events 
       //encodeURIComponent(JSON.stringify(event))
       {
@@ -150,11 +143,6 @@ const routes = [
         path: '',
         name: 'AllMinistries',
         component: AllMinistries
-      },
-      {
-        path: 'my-ministry',
-        name: 'MyMinistry',
-        component: MyMinistry
       },
       {
         path: 'ministry-data',
@@ -375,11 +363,6 @@ const routes = [
         path: 'accounts',
         name: 'Accounts',
         component: Accounts
-      },
-      {
-        path: 'approvals',
-        name: 'Approvals',
-        component: Approvals
       },
       {
         path: 'transactions',

@@ -780,13 +780,14 @@ const validateTimeSlot = async (date, time, excludeId = null) => {
   return true
 }
 
-// Date analyzer function - only checks for past dates (same day allowed, only time slots blocked)
+// Date analyzer function - only allows Sundays (child dedication services are on Sundays)
 const isDateDisabled = (date) => {
   // Only check: date cannot be in the past
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  return date < today // Disable past dates only
+  // Disable if date is in the past OR not a Sunday
+  return date < today || date.getDay() !== 0
 }
 
 // Get disabled hours for time picker based on selected date
@@ -1973,3 +1974,5 @@ defineExpose({
   }
 }
 </style>
+
+

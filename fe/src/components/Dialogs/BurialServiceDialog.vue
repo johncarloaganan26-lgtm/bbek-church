@@ -1,4 +1,4 @@
-<template>
+e<template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -278,14 +278,45 @@
           <el-date-picker
             v-model="formData.service_date"
             type="datetime"
-            placeholder="Date/time"
+            placeholder="Select date and time"
             size="large"
-            format="YYYY-MM-DD HH:mm"
+            format="MM/DD/YYYY hh:mm A"
+            value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
             :disabled="loading"
             :disabled-date="(date) => date < new Date()"
+            :disabled-hours="disabledHours"
+            :default-value="defaultNightTime"
             @change="onServiceDateChange"
           />
+          <div class="form-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>Burial services are typically conducted in the evening (6:00 PM - 10:00 PM).</span>
+          </div>
+        </el-form-item>
+
+        <!-- Preferred Service Date & Time (For Members/Non-Members) -->
+        <el-form-item label="Preferred Service Date & Time" prop="preferred_service_date" v-if="userInfo?.account?.position !== 'admin' && userInfo?.account?.position !== 'staff'">
+          <template #label>
+            <span>Preferred Service Date & Time</span>
+          </template>
+          <el-date-picker
+            v-model="formData.preferred_service_date"
+            type="datetime"
+            placeholder="Select date and time"
+            size="large"
+            format="MM/DD/YYYY hh:mm A"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+            :disabled="loading"
+            :disabled-date="disabledFutureDate"
+            :disabled-hours="disabledHours"
+            :default-value="defaultNightTime"
+          />
+          <div class="form-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>Burial services are typically conducted in the evening. Default time is 6:00 PM.</span>
+          </div>
         </el-form-item>
 
         <!-- Status -->
@@ -331,6 +362,7 @@
 <script setup>
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
 import axios from '@/api/axios'
 
@@ -438,6 +470,28 @@ const isMemberSelected = computed(() => {
 // Unavailable time slots for scheduling
 const unavailableTimeSlots = ref([])
 
+// Default night time for burial services (6:00 PM)
+// Get tomorrow's date at 6:00 PM as default
+const getDefaultNightTime = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 1) // Tomorrow
+  date.setHours(18, 0, 0, 0) // 6:00 PM
+  return date
+}
+
+const defaultNightTime = computed(() => getDefaultNightTime())
+
+// Disable future dates (allow selecting today and future dates)
+const disabledFutureDate = (date) => {
+  // Allow all dates including past dates for scheduling
+  return false
+}
+
+// Disable hours - only allow night hours (6 PM - 10 PM)
+const disabledHours = () => {
+  return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23]
+}
+
 // Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
 const fetchUnavailableTimeSlots = async () => {
   try {
@@ -529,6 +583,7 @@ const formData = reactive({
   location: '',
   pastor_name: '',
   service_date: null,
+  preferred_service_date: defaultNightTime, // Default to 6:00 PM for night services
   status: 'pending'
 })
 
@@ -662,6 +717,7 @@ const resetForm = () => {
   formData.location = ''
   formData.pastor_name = ''
   formData.service_date = null
+  formData.preferred_service_date = getDefaultNightTime() // Default to tomorrow 6:00 PM
   formData.status = 'pending'
   
   // Clear validation
@@ -684,6 +740,12 @@ watch(() => props.burialServiceData, (newData) => {
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
     formData.service_date = newData.service_date ? new Date(newData.service_date) : null
+    // Convert preferred_service_time to datetime if available
+    if (newData.preferred_service_time) {
+      formData.preferred_service_date = new Date(newData.preferred_service_time) || getDefaultNightTime()
+    } else {
+      formData.preferred_service_date = getDefaultNightTime()
+    }
     formData.status = newData.status || 'pending'
   } else {
     // Reset form when dialog is opened for new request
@@ -736,6 +798,7 @@ const handleSubmit = async () => {
       location: formData.location,
       pastor_name: formData.pastor_name,
       service_date: formData.service_date ? new Date(formData.service_date).toISOString() : null,
+      preferred_service_time: formData.preferred_service_date ? new Date(formData.preferred_service_date).toISOString() : null,
       status: formData.status
     }
     

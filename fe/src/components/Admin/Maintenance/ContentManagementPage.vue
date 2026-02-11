@@ -3,10 +3,21 @@
     <div class="max-w-7xl mx-auto p-6">
       <!-- Section Navigation -->
       <div class="bg-white rounded-lg p-4 shadow-lg mb-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">Content Categories</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-gray-800">Content Categories</h3>
+          <v-btn
+            :prepend-icon="sortDirection === 'asc' ? 'mdi-sort-alphabetical-ascending' : 'mdi-sort-alphabetical-descending'"
+            @click="toggleSort"
+            variant="outlined"
+            size="small"
+            color="primary"
+          >
+            {{ sortDirection === 'asc' ? 'A-Z' : 'Z-A' }}
+          </v-btn>
+        </div>
         <div class="flex flex-nowrap gap-2 pb-2 overflow-x-auto">
           <v-chip rounded flat
-            v-for="section in contentSections"
+            v-for="section in sortedContentSections"
             :key="section.id"
             @click="handleSectionAction(section)"
             :class="[
@@ -53,7 +64,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import Header from './ListItems/Header.vue'
 import Footer from './ListItems/Footer.vue'
 import Home from './ListItems/Home.vue'
@@ -83,6 +94,7 @@ import Ministries from './ListItems/Ministries.vue'
 import DepartmentCategories from './ListItems/DepartmentCategories.vue'
 import Info from './ListItems/Info.vue'
 const activeSection = ref('header')
+const sortDirection = ref('asc') // 'asc' for A-Z, 'desc' for Z-A
 
 // Content sections array with action field
 const contentSections = ref([
@@ -276,6 +288,24 @@ const contentSections = ref([
     }
   }
 ])
+
+// Toggle sort direction
+const toggleSort = () => {
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+
+// Computed property for sorted content sections
+const sortedContentSections = computed(() => {
+  return [...contentSections.value].sort((a, b) => {
+    const labelA = a.label.toLowerCase()
+    const labelB = b.label.toLowerCase()
+    if (sortDirection.value === 'asc') {
+      return labelA.localeCompare(labelB)
+    } else {
+      return labelB.localeCompare(labelA)
+    }
+  })
+})
 
 // Handle section action
 const handleSectionAction = (section) => {

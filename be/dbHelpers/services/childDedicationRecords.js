@@ -204,6 +204,17 @@ async function createChildDedication(dedicationData) {
       if (!preferred_dedication_time) preferred_dedication_time = now.format('HH:mm');
     }
 
+    // Handle combined datetime format from frontend (YYYY-MM-DD HH:mm:ss)
+    // Frontend sends preferred_dedication_date as datetime string, we need to extract date and time
+    if (preferred_dedication_date && preferred_dedication_date.includes(' ')) {
+      // It's a combined datetime string, extract date and time
+      const dateTimeMoment = moment(preferred_dedication_date, 'YYYY-MM-DD HH:mm:ss');
+      if (dateTimeMoment.isValid()) {
+        preferred_dedication_date = dateTimeMoment.format('YYYY-MM-DD');
+        preferred_dedication_time = dateTimeMoment.format('HH:mm:ss');
+      }
+    }
+
     // Validate required fields
     if (!requested_by) {
       throw new Error('Missing required field: requested_by (member ID)');
@@ -282,6 +293,31 @@ async function createChildDedication(dedicationData) {
           success: false,
           message: 'Sponsors data exceeds maximum length of 1000 characters',
           error: 'Sponsors data too long'
+        };
+      }
+    }
+
+    // Validate that preferred dedication date is a Sunday (if provided)
+    if (preferred_dedication_date) {
+      let dateMoment;
+      
+      // Try parsing as datetime first (from frontend combined format)
+      if (preferred_dedication_date.includes(' ')) {
+        dateMoment = moment(preferred_dedication_date, 'YYYY-MM-DD HH:mm:ss');
+      } else {
+        dateMoment = moment(preferred_dedication_date, 'YYYY-MM-DD');
+      }
+
+      if (!dateMoment.isValid()) {
+        throw new Error('Invalid format for preferred_dedication_date. Expected YYYY-MM-DD or YYYY-MM-DD HH:mm:ss');
+      }
+
+      // Check if the date is a Sunday (0 = Sunday in moment.js)
+      const dayOfWeek = dateMoment.day();
+      if (dayOfWeek !== 0) {
+        return {
+          success: false,
+          message: 'Child dedication can only be scheduled on Sundays. Please select a Sunday date.'
         };
       }
     }

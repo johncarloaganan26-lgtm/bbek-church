@@ -1,7 +1,8 @@
 const { query } = require('../database/db');
 
 /**
- * Get dashboard statistics - all totals in one query
+ * Get dashboard statistics - OPTIMIZED with fewer queries
+ * Combines multiple count/sum queries into fewer database calls
  * Returns: members, events, transactions, and forms statistics
  */
 async function getDashboardStats() {
@@ -13,74 +14,60 @@ async function getDashboardStats() {
     const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     
     // Format dates for SQL queries (YYYY-MM-DD)
-    const currentMonthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-    const nextMonthStart = currentMonth === 11 
-      ? `${currentYear + 1}-01-01`
-      : `${currentYear}-${String(currentMonth + 2).padStart(2, '0')}-01`;
-    const lastMonthStart = `${lastMonthYear}-${String(lastMonth + 1).padStart(2, '0')}-01`;
+    const currentMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    const lastMonthStr = `${lastMonthYear}-${String(lastMonth + 1).padStart(2, '0')}`;
     
-    // Get total members count
-    const [memberCountResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_members'
-    );
-    const totalMembers = memberCountResult[0]?.total || 0;
+    // =========================================================================
+    // QUERY 1: Member counts (total, this month, men, women) - COMBINED
+    // =========================================================================
+    const [memberCounts] = await query(`
+      SELECT 
+        COUNT(*) as total_members,
+        SUM(CASE WHEN DATE_FORMAT(date_created, "%Y-%m") = ? THEN 1 ELSE 0 END) as this_month,
+        SUM(CASE WHEN UPPER(gender) = 'M' THEN 1 ELSE 0 END) as total_men,
+        SUM(CASE WHEN UPPER(gender) = 'F' THEN 1 ELSE 0 END) as total_women
+      FROM tbl_members
+    `, [currentMonthStr]);
     
-    // Get members added this month
-    const [membersThisMonthResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_members WHERE DATE_FORMAT(date_created, "%Y-%m") = ?',
-      [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
-    );
-    const membersThisMonth = membersThisMonthResult[0]?.total || 0;
+    const totalMembers = memberCounts[0]?.total_members || 0;
+    const membersThisMonth = memberCounts[0]?.this_month || 0;
+    const totalMen = memberCounts[0]?.total_men || 0;
+    const totalWomen = memberCounts[0]?.total_women || 0;
     
-    // Get total men count
-    const [totalMenResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_members WHERE UPPER(gender) = ?',
-      ['M']
-    );
-    const totalMen = totalMenResult[0]?.total || 0;
+    // =========================================================================
+    // QUERY 2: Event counts (active, upcoming) - COMBINED
+    // =========================================================================
+    const [eventCounts] = await query(`
+      SELECT 
+        SUM(CASE 
+          WHEN status = 'ongoing' AND start_date <= NOW() AND end_date >= NOW() 
+          THEN 1 ELSE 0 
+        END) as active_events,
+        SUM(CASE 
+          WHEN status = 'ongoing' AND start_date > NOW() 
+          THEN 1 ELSE 0 
+        END) as upcoming_events
+      FROM tbl_events
+    `);
     
-    // Get total women count
-    const [totalWomenResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_members WHERE UPPER(gender) = ?',
-      ['F']
-    );
-    const totalWomen = totalWomenResult[0]?.total || 0;
+    const activeEvents = eventCounts[0]?.active_events || 0;
+    const upcomingEvents = eventCounts[0]?.upcoming_events || 0;
     
-    // Get ongoing events today (ongoing events that are currently happening - started and not ended yet)
-    const [activeEventsResult] = await query(
-      `SELECT COUNT(*) as total FROM tbl_events 
-       WHERE status = 'ongoing' 
-       AND start_date <= NOW() 
-       AND end_date >= NOW()`
-    );
-    const activeEvents = activeEventsResult[0]?.total || 0;
+    // =========================================================================
+    // QUERY 3: Donation totals (current month, last month, all-time) - COMBINED
+    // =========================================================================
+    const [donationCounts] = await query(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN DATE_FORMAT(date_created, "%Y-%m") = ? THEN amount ELSE 0 END), 0) as current_month,
+        COALESCE(SUM(CASE WHEN DATE_FORMAT(date_created, "%Y-%m") = ? THEN amount ELSE 0 END), 0) as last_month,
+        COALESCE(SUM(amount), 0) as total_all
+      FROM tbl_tithes 
+      WHERE status = 'completed'
+    `, [currentMonthStr, lastMonthStr]);
     
-    // Get upcoming events (ongoing events with start_date > today)
-    const [upcomingEventsResult] = await query(
-      `SELECT COUNT(*) as total FROM tbl_events 
-       WHERE status = 'ongoing' AND start_date > NOW()`
-    );
-    const upcomingEvents = upcomingEventsResult[0]?.total || 0;
-    
-    // Get current month donations total from tbl_tithes where status is 'completed'
-    const [currentMonthDonationsResult] = await query(
-      `SELECT COALESCE(SUM(amount), 0) as total 
-       FROM tbl_tithes 
-       WHERE status = 'completed' 
-       AND DATE_FORMAT(date_created, "%Y-%m") = ?`,
-      [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
-    );
-    const currentMonthDonations = parseFloat(currentMonthDonationsResult[0]?.total || 0);
-    
-    // Get last month donations total for comparison from tbl_tithes where status is 'completed'
-    const [lastMonthDonationsResult] = await query(
-      `SELECT COALESCE(SUM(amount), 0) as total 
-       FROM tbl_tithes 
-       WHERE status = 'completed' 
-       AND DATE_FORMAT(date_created, "%Y-%m") = ?`,
-      [`${lastMonthYear}-${String(lastMonth + 1).padStart(2, '0')}`]
-    );
-    const lastMonthDonations = parseFloat(lastMonthDonationsResult[0]?.total || 0);
+    const currentMonthDonations = parseFloat(donationCounts[0]?.current_month || 0);
+    const lastMonthDonations = parseFloat(donationCounts[0]?.last_month || 0);
+    const totalAllDonations = parseFloat(donationCounts[0]?.total_all || 0);
     
     // Calculate percentage change
     let donationChangePercent = 0;
@@ -93,58 +80,39 @@ async function getDashboardStats() {
       donationChangeText = '+100% from last month';
     }
     
-    // Get total all-time donations from tbl_tithes where status is 'completed'
-    const [totalAllDonationsResult] = await query(
-      `SELECT COALESCE(SUM(amount), 0) as total 
-       FROM tbl_tithes 
-       WHERE status = 'completed'`
-    );
-    const totalAllDonations = parseFloat(totalAllDonationsResult[0]?.total || 0);
+    // =========================================================================
+    // QUERY 4: Form counts (total messages, unread) - COMBINED
+    // =========================================================================
+    const [messageCounts] = await query(`
+      SELECT 
+        COUNT(*) as total_messages,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as unread_messages
+      FROM tbl_forms 
+      WHERE form_type = 'prayer_request'
+    `);
     
-    // Get total prayer request forms
-    const [totalMessagesResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_forms WHERE form_type = ?',
-      ['prayer_request']
-    );
-    const totalMessages = totalMessagesResult[0]?.total || 0;
+    const totalMessages = messageCounts[0]?.total_messages || 0;
+    const unreadMessages = messageCounts[0]?.unread_messages || 0;
     
-    // Get unread (pending) prayer request forms
-    const [unreadMessagesResult] = await query(
-      'SELECT COUNT(*) as total FROM tbl_forms WHERE form_type = ? AND status = ?',
-      ['prayer_request', 'pending']
-    );
-    const unreadMessages = unreadMessagesResult[0]?.total || 0;
+    // =========================================================================
+    // QUERY 5: Church services this month (water baptism, child dedication, burial) - COMBINED
+    // =========================================================================
+    const [serviceCounts] = await query(`
+      SELECT 
+        (SELECT COUNT(*) FROM tbl_waterbaptism 
+         WHERE status IN ('approved', 'ongoing') 
+         AND (DATE_FORMAT(baptism_date, "%Y-%m") = ? OR baptism_date IS NULL)) as water_baptism,
+        (SELECT COUNT(*) FROM tbl_childdedications 
+         WHERE status IN ('approved', 'ongoing') 
+         AND (DATE_FORMAT(preferred_dedication_date, "%Y-%m") = ? OR preferred_dedication_date IS NULL)) as child_dedication,
+        (SELECT COUNT(*) FROM tbl_burialservice 
+         WHERE status IN ('approved', 'ongoing') 
+         AND (DATE_FORMAT(service_date, "%Y-%m") = ? OR service_date IS NULL)) as burial_service
+    `, [currentMonthStr, currentMonthStr, currentMonthStr]);
     
-    // Get water baptisms scheduled this month (approved or ongoing status)
-    // Count records with baptism_date this month OR approved/ongoing without a date
-    const [waterBaptismThisMonthResult] = await query(
-      `SELECT COUNT(*) as total FROM tbl_waterbaptism 
-       WHERE status IN ('approved', 'ongoing') 
-       AND (DATE_FORMAT(baptism_date, "%Y-%m") = ? OR baptism_date IS NULL)`,
-      [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
-    );
-    const waterBaptismThisMonth = waterBaptismThisMonthResult[0]?.total || 0;
-    
-    // Get child dedications scheduled this month (approved or ongoing status)
-    // Count records with preferred_dedication_date this month OR approved/ongoing without a date
-    const [childDedicationThisMonthResult] = await query(
-      `SELECT COUNT(*) as total FROM tbl_childdedications 
-       WHERE status IN ('approved', 'ongoing') 
-       AND (DATE_FORMAT(preferred_dedication_date, "%Y-%m") = ? 
-            OR preferred_dedication_date IS NULL)`,
-      [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
-    );
-    const childDedicationThisMonth = childDedicationThisMonthResult[0]?.total || 0;
-    
-    // Get burial services scheduled this month (approved or ongoing status)
-    // Count records with service_date this month OR approved/ongoing without a date
-    const [burialServiceThisMonthResult] = await query(
-      `SELECT COUNT(*) as total FROM tbl_burialservice 
-       WHERE status IN ('approved', 'ongoing') 
-       AND (DATE_FORMAT(service_date, "%Y-%m") = ? OR service_date IS NULL)`,
-      [`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`]
-    );
-    const burialServiceThisMonth = burialServiceThisMonthResult[0]?.total || 0;
+    const waterBaptismThisMonth = serviceCounts[0]?.water_baptism || 0;
+    const childDedicationThisMonth = serviceCounts[0]?.child_dedication || 0;
+    const burialServiceThisMonth = serviceCounts[0]?.burial_service || 0;
     
     return {
       success: true,
@@ -187,4 +155,3 @@ async function getDashboardStats() {
 module.exports = {
   getDashboardStats
 };
-

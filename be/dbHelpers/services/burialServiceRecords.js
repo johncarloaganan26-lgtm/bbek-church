@@ -82,6 +82,38 @@ async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
 }
 
 /**
+ * Validate that a service time is within night hours (6 PM - 10 PM)
+ * @param {String} serviceDateTime - Service date/time to validate
+ * @returns {Object} Object with isValid flag and error message
+ */
+function validateNightHours(serviceDateTime) {
+  if (!serviceDateTime) {
+    return { isValid: true, message: null }; // Allow null/undefined times
+  }
+
+  const momentTime = moment(serviceDateTime, 'YYYY-MM-DD HH:mm:ss', true);
+  if (!momentTime.isValid()) {
+    // Try parsing with just date format
+    const momentDate = moment(serviceDateTime);
+    if (!momentDate.isValid()) {
+      return { isValid: true, message: null }; // Allow if we can't parse
+    }
+  }
+
+  const hour = momentTime.hour();
+
+  // Night hours: 18:00 (6 PM) to 22:00 (10 PM)
+  if (hour < 18 || hour >= 22) {
+    return {
+      isValid: false,
+      message: 'Burial services can only be scheduled between 6:00 PM and 10:00 PM (night shift hours).'
+    };
+  }
+
+  return { isValid: true, message: null };
+}
+
+/**
  * Check if a member has a pending approval for burial service
  * @param {String} memberId - Member ID to check
  * @param {String} requesterEmail - Email address of requester (for non-members)
@@ -139,6 +171,7 @@ async function createBurialService(burialData) {
       location,
       pastor_name,
       service_date,
+      preferred_service_time,
       status = 'pending',
       date_created = new Date(),
       deceased_name = null,
@@ -220,6 +253,28 @@ async function createBurialService(burialData) {
       };
     }
 
+    // Validate that service date/time is within night hours (6 PM - 10 PM)
+    if (finalServiceDate) {
+      const nightHourValidation = validateNightHours(finalServiceDate);
+      if (!nightHourValidation.isValid) {
+        return {
+          success: false,
+          message: nightHourValidation.message
+        };
+      }
+    }
+
+    // Validate that preferred service time is within night hours (6 PM - 10 PM)
+    if (preferred_service_time) {
+      const preferredNightValidation = validateNightHours(preferred_service_time);
+      if (!preferredNightValidation.isValid) {
+        return {
+          success: false,
+          message: preferredNightValidation.message
+        };
+      }
+    }
+
     // Check for time slot conflicts - Only check time, not date
     // Multiple burial services are allowed on the same date, but not at the same time
     let timeSlotWarning = null;
@@ -243,6 +298,9 @@ async function createBurialService(burialData) {
     const formattedServiceDate = (finalServiceDate === null || finalServiceDate === '' || !finalServiceDate)
       ? null
       : moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
+    const formattedPreferredServiceTime = (preferred_service_time === null || preferred_service_time === '' || !preferred_service_time)
+      ? null
+      : moment(preferred_service_time).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment.utc(date_created).format('YYYY-MM-DD HH:mm:ss');
     const formattedBirthdate = deceased_birthdate ? (moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
       ? deceased_birthdate
@@ -251,8 +309,8 @@ async function createBurialService(burialData) {
 
     const sql = `
       INSERT INTO tbl_burialservice
-        (burial_id, member_id, requester_name, requester_email, relationship, location, pastor_name, service_date, status, date_created, deceased_name, deceased_birthdate, date_death, reason_of_death)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (burial_id, member_id, requester_name, requester_email, relationship, location, pastor_name, service_date, preferred_service_time, status, date_created, deceased_name, deceased_birthdate, date_death, reason_of_death)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -264,6 +322,7 @@ async function createBurialService(burialData) {
       location.trim(),
       final_pastor_name,
       formattedServiceDate,
+      formattedPreferredServiceTime,
       status,
       formattedDateCreated,
       deceased_name ? deceased_name.trim() : null,
@@ -690,6 +749,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       location,
       pastor_name,
       service_date,
+      preferred_service_time,
       status,
       date_created,
       deceased_name,
@@ -736,6 +796,26 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
           success: false,
           message: `Time slot conflict: ${finalServiceDate} is already booked.`,
           error: 'Time slot conflict'
+        };
+      }
+
+      // Validate that service date/time is within night hours (6 PM - 10 PM)
+      const nightHourValidation = validateNightHours(finalServiceDate);
+      if (!nightHourValidation.isValid) {
+        return {
+          success: false,
+          message: nightHourValidation.message
+        };
+      }
+    }
+
+    // Validate preferred_service_time if being updated
+    if (preferred_service_time !== undefined) {
+      const preferredNightValidation = validateNightHours(preferred_service_time);
+      if (!preferredNightValidation.isValid) {
+        return {
+          success: false,
+          message: preferredNightValidation.message
         };
       }
     }
@@ -794,6 +874,17 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
         const formattedServiceDate = moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
         fields.push('service_date = ?');
         params.push(formattedServiceDate);
+      }
+    }
+
+    if (preferred_service_time !== undefined) {
+      if (preferred_service_time === null || preferred_service_time === '' || !preferred_service_time) {
+        fields.push('preferred_service_time = ?');
+        params.push(null);
+      } else {
+        const formattedPreferredServiceTime = moment(preferred_service_time).format('YYYY-MM-DD HH:mm:ss');
+        fields.push('preferred_service_time = ?');
+        params.push(formattedPreferredServiceTime);
       }
     }
 

@@ -282,7 +282,6 @@ const defaultHeaderData = {
     ]},
     {label: 'Give', value: 'give',to:'/give'},
     {label: 'Events', value: 'events',to:'/events',children:[
-        { label:'My Events', value: 'my-events',to:'/events/my-events'},
         { label:'All Events', value: 'all-events',to:'/events/all-events'},
     ]},
     {label: 'Ministry', value: 'ministries',to:'/ministries'},

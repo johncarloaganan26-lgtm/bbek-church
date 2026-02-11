@@ -183,79 +183,209 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="7" class="text-center py-12">
-              <v-progress-circular indeterminate color="primary"></v-progress-circular>
-            </td>
-          </tr>
-          <tr v-else-if="forms.length === 0">
-            <td colspan="7" class="text-center py-12">
-              <div class="text-h6 font-weight-bold">No Record Found</div>
-            </td>
-          </tr>
-          <tr v-for="form in forms" :key="form.form_id">
-            <td>
-              <v-checkbox
-                :model-value="isFormSelected(form)"
-                @update:model-value="toggleFormSelection(form)"
-                density="compact"
-                hide-details
-                :disabled="loading"
-              ></v-checkbox>
-            </td>
-            <td>{{ form.name || form.submitted_by_name || 'Anonymous' }}</td>
-            <td>{{ form.email || form.submitted_by_email || '-' }}</td>
-            <td>
-              <v-chip :color="getCategoryColor(form.form_type)" size="small">
-                {{ getFormTypeLabel(form.form_type) }}
-              </v-chip>
-            </td>
-            <td>
-              <div v-if="form.form_type === 'prayer_request'">
-                {{ truncateText(form.form_data?.request || '', 50) }}
-              </div>
-              <div v-else-if="form.form_type === 'schedule_change'">
-                {{ getFormTypeLabel(form.form_data?.serviceType) }}: 
-                {{ formatDate(form.form_data?.originalDate) }} → 
-                {{ formatDate(form.form_data?.requestedDate) }}
-              </div>
-              <div v-else>-</div>
-            </td>
-            <td>{{ formatDate(form.created_at) }}</td>
-            <td>
-              <v-chip :color="getStatusColor(form.status)" size="small">
-                {{ formatStatus(form.status) }}
-              </v-chip>
-            </td>
-            <td>
-              <v-btn
-                icon="mdi-eye"
-                variant="text"
-                size="small"
-                class="mr-2"
-                @click="viewForm(form)"
-              ></v-btn>
-              <v-btn
-                v-if="form.status === 'pending'"
-                icon="mdi-check"
-                variant="text"
-                size="small"
-                color="success"
-                class="mr-2"
-                @click="approveForm(form.form_id)"
-                :loading="approvingId === form.form_id"
-              ></v-btn>
-              <v-btn
-                v-if="form.status === 'pending'"
-                icon="mdi-close"
-                variant="text"
-                size="small"
-                color="error"
-                @click="rejectForm(form.form_id)"
-                :loading="rejectingId === form.form_id"
-              ></v-btn>
-            </td>
-          </tr>
+          <template v-if="loading">
+            <tr>
+              <td colspan="8" class="text-center py-12">
+                <v-progress-circular indeterminate color="primary"></v-progress-circular>
+              </td>
+            </tr>
+          </template>
+          <template v-else-if="forms.length === 0">
+            <tr>
+              <td colspan="8" class="text-center py-12">
+                <div class="text-h6 font-weight-bold">No Record Found</div>
+              </td>
+            </tr>
+          </template>
+          <template v-else>
+            <!-- Message Group -->
+            <template v-if="groupedForms.message.length > 0">
+              <tr>
+                <td colspan="8" class="bg-blue-lighten-5 font-weight-bold text-blue-darken-3 py-2">
+                  Message ({{ groupedForms.message.length }})
+                </td>
+              </tr>
+              <tr v-for="form in groupedForms.message" :key="form.form_id">
+                <td>
+                  <v-checkbox
+                    :model-value="isFormSelected(form)"
+                    @update:model-value="toggleFormSelection(form)"
+                    density="compact"
+                    hide-details
+                    :disabled="loading"
+                  ></v-checkbox>
+                </td>
+                <td>{{ form.name || form.submitted_by_name || 'Anonymous' }}</td>
+                <td>{{ form.email || form.submitted_by_email || '-' }}</td>
+                <td>
+                  <v-chip :color="getCategoryColor(form.form_type)" size="small">
+                    {{ getFormTypeLabel(form.form_type) }}
+                  </v-chip>
+                </td>
+                <td>{{ form.form_data?.message || form.form_data?.subject || '-' }}</td>
+                <td>{{ formatDate(form.created_at) }}</td>
+                <td>
+                  <v-chip :color="getStatusColor(form.status)" size="small">
+                    {{ formatStatus(form.status) }}
+                  </v-chip>
+                </td>
+                <td>
+                  <v-btn
+                    icon="mdi-eye"
+                    variant="text"
+                    size="small"
+                    class="mr-2"
+                    @click="viewForm(form)"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-check"
+                    variant="text"
+                    size="small"
+                    color="success"
+                    class="mr-2"
+                    @click="approveForm(form.form_id)"
+                    :loading="approvingId === form.form_id"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-close"
+                    variant="text"
+                    size="small"
+                    color="error"
+                    @click="rejectForm(form.form_id)"
+                    :loading="rejectingId === form.form_id"
+                  ></v-btn>
+                </td>
+              </tr>
+            </template>
+            <!-- Prayer Request Group -->
+            <template v-if="groupedForms.prayer_request.length > 0">
+              <tr>
+                <td colspan="8" class="bg-green-lighten-5 font-weight-bold text-green-darken-3 py-2">
+                  Prayer Request ({{ groupedForms.prayer_request.length }})
+                </td>
+              </tr>
+              <tr v-for="form in groupedForms.prayer_request" :key="form.form_id">
+                <td>
+                  <v-checkbox
+                    :model-value="isFormSelected(form)"
+                    @update:model-value="toggleFormSelection(form)"
+                    density="compact"
+                    hide-details
+                    :disabled="loading"
+                  ></v-checkbox>
+                </td>
+                <td>{{ form.name || form.submitted_by_name || 'Anonymous' }}</td>
+                <td>{{ form.email || form.submitted_by_email || '-' }}</td>
+                <td>
+                  <v-chip :color="getCategoryColor(form.form_type)" size="small">
+                    {{ getFormTypeLabel(form.form_type) }}
+                  </v-chip>
+                </td>
+                <td>{{ truncateText(form.form_data?.request || '', 50) }}</td>
+                <td>{{ formatDate(form.created_at) }}</td>
+                <td>
+                  <v-chip :color="getStatusColor(form.status)" size="small">
+                    {{ formatStatus(form.status) }}
+                  </v-chip>
+                </td>
+                <td>
+                  <v-btn
+                    icon="mdi-eye"
+                    variant="text"
+                    size="small"
+                    class="mr-2"
+                    @click="viewForm(form)"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-check"
+                    variant="text"
+                    size="small"
+                    color="success"
+                    class="mr-2"
+                    @click="approveForm(form.form_id)"
+                    :loading="approvingId === form.form_id"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-close"
+                    variant="text"
+                    size="small"
+                    color="error"
+                    @click="rejectForm(form.form_id)"
+                    :loading="rejectingId === form.form_id"
+                  ></v-btn>
+                </td>
+              </tr>
+            </template>
+            <!-- Schedule Change Group -->
+            <template v-if="groupedForms.schedule_change.length > 0">
+              <tr>
+                <td colspan="8" class="bg-orange-lighten-5 font-weight-bold text-orange-darken-3 py-2">
+                  Schedule Change ({{ groupedForms.schedule_change.length }})
+                </td>
+              </tr>
+              <tr v-for="form in groupedForms.schedule_change" :key="form.form_id">
+                <td>
+                  <v-checkbox
+                    :model-value="isFormSelected(form)"
+                    @update:model-value="toggleFormSelection(form)"
+                    density="compact"
+                    hide-details
+                    :disabled="loading"
+                  ></v-checkbox>
+                </td>
+                <td>{{ form.name || form.submitted_by_name || 'Anonymous' }}</td>
+                <td>{{ form.email || form.submitted_by_email || '-' }}</td>
+                <td>
+                  <v-chip :color="getCategoryColor(form.form_type)" size="small">
+                    {{ getFormTypeLabel(form.form_type) }}
+                  </v-chip>
+                </td>
+                <td>
+                  {{ getFormTypeLabel(form.form_data?.serviceType) }}: 
+                  {{ formatDate(form.form_data?.originalDate) }} → 
+                  {{ formatDate(form.form_data?.requestedDate) }}
+                </td>
+                <td>{{ formatDate(form.created_at) }}</td>
+                <td>
+                  <v-chip :color="getStatusColor(form.status)" size="small">
+                    {{ formatStatus(form.status) }}
+                  </v-chip>
+                </td>
+                <td>
+                  <v-btn
+                    icon="mdi-eye"
+                    variant="text"
+                    size="small"
+                    class="mr-2"
+                    @click="viewForm(form)"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-check"
+                    variant="text"
+                    size="small"
+                    color="success"
+                    class="mr-2"
+                    @click="approveForm(form.form_id)"
+                    :loading="approvingId === form.form_id"
+                  ></v-btn>
+                  <v-btn
+                    v-if="form.status === 'pending'"
+                    icon="mdi-close"
+                    variant="text"
+                    size="small"
+                    color="error"
+                    @click="rejectForm(form.form_id)"
+                    :loading="rejectingId === form.form_id"
+                  ></v-btn>
+                </td>
+              </tr>
+            </template>
+          </template>
         </tbody>
       </v-table>
 
@@ -398,6 +528,23 @@ const pendingSelectedCount = computed(() => {
   return selectedForms.value.filter(form => form.status === 'pending').length
 })
 
+// Group forms by type (Message at top, then Prayer Request, then Schedule Change)
+const groupedForms = computed(() => {
+  const groups = {
+    message: [],
+    prayer_request: [],
+    schedule_change: []
+  }
+  
+  forms.value.forEach(form => {
+    if (form.form_type && groups[form.form_type]) {
+      groups[form.form_type].push(form)
+    }
+  })
+  
+  return groups
+})
+
 const approvingId = ref(null)
 const rejectingId = ref(null)
 const showViewDialog = ref(false)
@@ -429,6 +576,7 @@ const statusOptions = [
 ]
 
 const formTypeOptions = [
+  { title: 'Message', value: 'message' },
   { title: 'Prayer Request', value: 'prayer_request' },
   { title: 'Schedule Change', value: 'schedule_change' }
 ]
@@ -660,14 +808,16 @@ watch(() => currentPage.value, () => {
 
 const getCategoryColor = (formType) => {
   const colors = {
+    'message': 'blue',
     'prayer_request': 'purple',
-    'schedule_change': 'blue'
+    'schedule_change': 'orange'
   }
   return colors[formType] || 'grey'
 }
 
 const getFormTypeLabel = (formType) => {
   const labels = {
+    'message': 'Message',
     'prayer_request': 'Prayer Request',
     'schedule_change': 'Schedule Change',
     'water-baptism': 'Water Baptism',

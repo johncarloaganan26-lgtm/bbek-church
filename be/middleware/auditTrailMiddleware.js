@@ -92,7 +92,10 @@ const auditTrailMiddleware = async (req, res, next) => {
   }
 
   // For DELETE and UPDATE operations, try to capture the record data before it's modified/deleted
-  if (req.method === 'DELETE' || req.method === 'PUT') {
+  // Only capture data in development mode to avoid performance overhead in production
+  const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+  
+  if (!IS_PRODUCTION && (req.method === 'DELETE' || req.method === 'PUT')) {
     // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123 or /updateMember/123
     const path = req.path || '';
     const pathParts = path.split('/');
@@ -102,11 +105,9 @@ const auditTrailMiddleware = async (req, res, next) => {
     const id = req.params.id || (lastPart && /^\d+$/.test(lastPart) ? lastPart : null);
 
     if (id) {
-      console.log('DEBUG: Capturing data for', req.method, path, 'ID:', id);
       try {
         const { query } = require('../database/db');
         const module = determineModule(req.path, req.baseUrl);
-        console.log('DEBUG: Determined module:', module);
 
         if (module !== 'Archives') {
           const tableMap = {
@@ -129,39 +130,24 @@ const auditTrailMiddleware = async (req, res, next) => {
           };
 
           const tableName = tableMap[module];
-          console.log('DEBUG: Table name:', tableName);
           if (tableName) {
             const primaryKey = getPrimaryKeyField(tableName);
-            console.log('DEBUG: Primary key:', primaryKey);
             const recordSql = `SELECT * FROM \`${tableName}\` WHERE ${primaryKey} = ?`;
-            console.log('DEBUG: Executing query:', recordSql, 'with param:', id);
             const [recordRows] = await query(recordSql, [id]);
-            console.log('DEBUG: Query returned', recordRows.length, 'rows');
 
             if (recordRows.length > 0) {
               // Store the record data for later use in logging
               if (req.method === 'DELETE') {
                 req.record_to_delete = recordRows[0];
-                console.log('DEBUG: Stored complete record data for deletion logging');
               } else if (req.method === 'PUT') {
                 req.record_before_update = recordRows[0];
-                console.log('DEBUG: Stored complete record data for update logging');
               }
-            } else {
-              console.log('DEBUG: No record found with ID:', id);
             }
-          } else {
-            console.log('DEBUG: No table mapping found for module:', module);
           }
-        } else {
-          console.log('DEBUG: Skipping data capture for Archives module');
         }
       } catch (error) {
-        // Silently fail if we can't capture the data
-        console.error('Error capturing record data for audit:', error);
+        // Silently fail if we can't capture the data - audit logging should not block the request
       }
-    } else {
-      console.log('DEBUG: No ID found in', req.method, 'request path:', req.path);
     }
   }
 

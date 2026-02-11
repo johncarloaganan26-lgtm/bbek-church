@@ -404,6 +404,44 @@
                       ></v-text-field>
                     </div>
 
+                    <!-- Preferred Service Date & Time (Night Service Default) -->
+                    <div class="form-group">
+                      <label for="preferred-service-date">
+                        Preferred Service Date & Time
+                      </label>
+                      <p class="field-note">When would you like the pastor to conduct the burial service? (Night service: 6:00 PM - 10:00 PM)</p>
+                      <el-date-picker
+                        v-model="preferredServiceDate"
+                        type="datetime"
+                        placeholder="Select date and time"
+                        format="MM/DD/YYYY hh:mm A"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        :disabled="burialServiceStore.loading"
+                        style="width: 100%"
+                        :disabled-hours="disabledNightHours"
+                        :default-value="defaultNightTimeDate"
+                      />
+                    </div>
+
+                    <!-- Burial Location -->
+                    <div class="form-group">
+                      <label for="burial-location">
+                        Burial Location <span class="required-text">Required</span>
+                      </label>
+                      <p class="field-note">Where will the burial service take place? (cemetery, memorial park, etc.)</p>
+                      <v-text-field
+                        id="burial-location"
+                        v-model="burialLocation"
+                        placeholder="Enter burial location"
+                        variant="outlined"
+                        density="compact"
+                        required
+                        hide-details
+                        :disabled="burialServiceStore.loading"
+                        maxlength="255"
+                      ></v-text-field>
+                    </div>
+
                     <v-btn
                       type="submit"
                       color="teal"
@@ -466,15 +504,24 @@
                       </el-select>
                     </el-form-item>
 
+                    <!-- Preferred Service Date & Time (Night Service Default) -->
                     <el-form-item>
                       <template #label>
-                        <span>Location <span class="required-text">Required</span></span>
+                        <span>Preferred Service Date & Time</span>
                       </template>
-                      <el-input
-                        v-model="memberFormData.location"
-                        placeholder="Enter service location"
-                        clearable
+                      <el-date-picker
+                        v-model="memberFormData.preferred_service_date"
+                        type="datetime"
+                        placeholder="Select date and time"
+                        format="MM/DD/YYYY hh:mm A"
+                        value-format="YYYY-MM-DD HH:mm:ss"
+                        style="width: 100%"
+                        :disabled-hours="disabledNightHours"
+                        :default-value="defaultNightTimeDate"
                       />
+                      <div class="form-hint">
+                        <span>When would you like the pastor to conduct the burial service? (Night service: 6:00 PM - 10:00 PM)</span>
+                      </div>
                     </el-form-item>
 
                     <el-divider content-position="left">Deceased Information</el-divider>
@@ -488,6 +535,20 @@
                         placeholder="Enter deceased full name"
                         clearable
                       />
+                    </el-form-item>
+
+                    <el-form-item>
+                      <template #label>
+                        <span>Burial Location <span class="required-text">Required</span></span>
+                      </template>
+                      <el-input
+                        v-model="memberFormData.burial_location"
+                        placeholder="Enter burial location (cemetery, memorial park, etc.)"
+                        clearable
+                      />
+                      <div class="form-hint">
+                        <span>Where will the burial service take place?</span>
+                      </div>
                     </el-form-item>
 
                     <el-form-item>
@@ -632,7 +693,7 @@ const deceasedAge = ref(0)
 const deceasedDeathDate = ref('')
 const reasonOfDeath = ref('')
 const civilStatus = ref('')
-const location = ref('')
+const burialLocation = ref('')
 
 // Member form data (for inline member form)
 const memberFormData = reactive({
@@ -640,9 +701,26 @@ const memberFormData = reactive({
   deceased_birthdate: '',
   date_death: '',
   relationship: '',
-  location: '',
-  reason_of_death: ''
+  burial_location: '',
+  reason_of_death: '',
+  preferred_service_date: null
 })
+
+// Preferred service date/time (default to tomorrow 6:00 PM)
+const getDefaultNightTimeDate = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 1) // Tomorrow
+  date.setHours(18, 0, 0, 0) // 6:00 PM
+  return date
+}
+
+const preferredServiceDate = ref(getDefaultNightTimeDate())
+const defaultNightTimeDate = computed(() => getDefaultNightTimeDate())
+
+// Disable hours - only allow night hours (6 PM - 10 PM)
+const disabledNightHours = () => {
+  return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23]
+}
 
 // Relationship options for dropdown
 const relationshipOptions = [
@@ -778,7 +856,8 @@ const handleSubmit = async (e) => {
   if (!firstname.value.trim() || !lastname.value.trim() || !birthdate.value || 
       !age.value || !gender.value || !address.value.trim() || !email.value.trim() ||
       !phoneNumber.value || !relationship.value || !deceasedName.value.trim() ||
-      !deceasedBirthDate.value || !deceasedDeathDate.value || !reasonOfDeath.value.trim()) {
+      !deceasedBirthDate.value || !deceasedDeathDate.value || !reasonOfDeath.value.trim() ||
+      !burialLocation.value.trim()) {
     submitError.value = 'Please fill in all required fields.'
     ElMessage.error('Please fill in all required fields.')
     return
@@ -816,9 +895,10 @@ const handleSubmit = async (e) => {
       requester_name: `${firstname.value.trim()} ${middleName.value.trim() || ''} ${lastname.value.trim()}`.trim(),
       requester_email: email.value.trim().toLowerCase(),
       relationship: relationship.value,
-      location: 'To be determined',
+      location: burialLocation.value.trim(),
       pastor_name: null,
       service_date: null,
+      preferred_service_time: preferredServiceDate.value ? new Date(preferredServiceDate.value).toISOString() : null,
       status: 'pending',
       deceased_name: deceasedName.value.trim(),
       deceased_birthdate: deceasedBirthDate.value,
@@ -871,7 +951,8 @@ const resetForm = () => {
   deceasedAge.value = 0
   deceasedDeathDate.value = ''
   reasonOfDeath.value = ''
-  location.value = ''
+  burialLocation.value = ''
+  preferredServiceDate.value = getDefaultNightTimeDate()
   submitMessage.value = ''
   submitError.value = ''
 }
@@ -884,7 +965,7 @@ const handleMemberSubmit = async () => {
 
   // Basic validation
   if (!memberFormData.deceased_name.trim() || !memberFormData.deceased_birthdate || 
-      !memberFormData.date_death || !memberFormData.relationship || !memberFormData.location.trim() ||
+      !memberFormData.date_death || !memberFormData.relationship || !memberFormData.burial_location.trim() ||
       !memberFormData.reason_of_death.trim()) {
     submitError.value = 'Please fill in all required fields.'
     ElMessage.error('Please fill in all required fields.')
@@ -899,9 +980,10 @@ const handleMemberSubmit = async () => {
       requester_name: `${userInfo.value.member?.firstname || ''} ${userInfo.value.member?.middle_name || ''} ${userInfo.value.member?.lastname || ''}`.replace(/\s+/g, ' ').trim(),
       requester_email: userInfo.value.account?.email?.trim().toLowerCase() || '',
       relationship: memberFormData.relationship,
-      location: memberFormData.location.trim(),
+      location: memberFormData.burial_location.trim(),
       pastor_name: null,
       service_date: null,
+      preferred_service_time: memberFormData.preferred_service_date ? new Date(memberFormData.preferred_service_date).toISOString() : null,
       status: 'pending',
       deceased_name: memberFormData.deceased_name.trim(),
       deceased_birthdate: memberFormData.deceased_birthdate ? new Date(memberFormData.deceased_birthdate).toISOString().split('T')[0] : '',
@@ -920,8 +1002,10 @@ const handleMemberSubmit = async () => {
       memberFormData.deceased_birthdate = ''
       memberFormData.date_death = ''
       memberFormData.relationship = ''
-      memberFormData.location = ''
+      memberFormData.burial_location = ''
       memberFormData.reason_of_death = ''
+      memberFormData.reason_of_death = ''
+      memberFormData.preferred_service_date = null
     } else {
       submitError.value = result.error || 'An error occurred while submitting the request. Please try again.'
       ElMessage.error(submitError.value)

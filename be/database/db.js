@@ -4,42 +4,35 @@ const mysql = require('mysql2/promise');
  * Database Configuration for Local and Cloud
  *
  * Connection Pool Sizing:
- * - Local Development: Default 10 connections (higher limit for local MySQL)
- * - Cloud Databases: Default 2 connections (to stay well under typical 5 max_user_connections limit)
+ * - Local Development: 10 connections (higher limit for local MySQL)
+ * - Cloud Databases: 5 connections (stays well under typical 5 max_user_connections limit)
+ * - Vercel/Serverless: 2 connections per function (prevents connection leaks)
  * - Can be overridden with DB_CONNECTION_LIMIT environment variable
- *
- * Cloud databases (especially free/shared tiers) often have strict connection limits:
- * - max_connections: Server-wide limit (typically 5-10 for free tiers)
- * - max_user_connections: Per-user limit (typically 5 for free tiers)
- *
- * Using 2 connections ensures we stay well under the limit and account for:
- * - Multiple application instances/processes
- * - Other applications using the same database user
- * - Connection pool overhead
  */
 
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
 const IS_VERCEL = process.env.VERCEL || process.env.VERCEL_ENV;
 
 // Determine connection limit based on environment
-// Cloud databases typically have 5 connection limit (both max_connections and max_user_connections)
-// We use 1 connection to stay well under the limit and account for multiple instances/processes
-// This prevents max_user_connections errors that block audit trail logging
 const getConnectionLimit = () => {
   // Allow explicit override via environment variable
   if (process.env.DB_CONNECTION_LIMIT) {
     return parseInt(process.env.DB_CONNECTION_LIMIT, 10);
   }
 
-  // For Vercel/serverless: use 1 connection per function
+  // For Vercel/serverless: use 2 connections per function
   if (IS_VERCEL) {
-    return 1;
+    return 2;
   }
 
-  // Default: 1 connection for both production and development
-  // This ensures we never hit max_user_connections limits and audit trails work properly
-  return 1;
+  // Production: use 5 connections for better concurrency
+  if (IS_PRODUCTION) {
+    return 5;
+  }
+
+  // Development: use 10 connections for better performance
+  return 10;
 };
 
 const dbConfig = {
@@ -59,8 +52,6 @@ const dbConfig = {
 
   // Connection timeout settings (important for cloud databases)
   connectTimeout: 10000, // 10 seconds
-  // acquireTimeout: 10000, // 10 seconds to acquire connection from pool
-  // timeout: 60000, // 60 seconds query timeout
 
   // Enable keep-alive for cloud databases (prevents connection drops)
   enableKeepAlive: true,
@@ -140,7 +131,6 @@ const recreatePool = async (newConnectionLimit = null) => {
       console.log('Old pool closed successfully');
     } catch (err) {
       console.error('Error closing old pool:', err);
-      // Continue anyway - force close
     }
   }
 

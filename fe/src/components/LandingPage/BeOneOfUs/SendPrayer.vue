@@ -112,12 +112,6 @@
                   required
                   class="mb-4"
                 ></v-textarea>
-                <v-checkbox
-                  v-model="formData.anonymous"
-                  label="Submit anonymously"
-                  hide-details
-                  class="mb-4"
-                ></v-checkbox>
                 <v-btn
                   type="submit"
                   color="teal"
@@ -194,8 +188,7 @@ const formData = ref({
   name: '',
   email: '',
   phone: '',
-  request: '',
-  anonymous: false
+  request: ''
 })
 
 // Initialize form with user info if available
@@ -231,16 +224,14 @@ const handleSubmit = async () => {
     return
   }
 
-  // For non-anonymous requests, validate name and email
-  if (!formData.value.anonymous) {
-    if (!formData.value.name || formData.value.name.trim() === '') {
-      showSuccessDialog('Validation Error', 'Please enter your name', true)
-      return
-    }
-    if (!formData.value.email || formData.value.email.trim() === '') {
-      showSuccessDialog('Validation Error', 'Please enter your email', true)
-      return
-    }
+  // Validate required fields
+  if (!formData.value.name || formData.value.name.trim() === '') {
+    showSuccessDialog('Validation Error', 'Please enter your name', true)
+    return
+  }
+  if (!formData.value.email || formData.value.email.trim() === '') {
+    showSuccessDialog('Validation Error', 'Please enter your email', true)
+    return
   }
 
   submitting.value = true
@@ -250,8 +241,7 @@ const handleSubmit = async () => {
     const payload = {
       form_type: 'prayer_request',
       form_data: {
-        request: formData.value.request.trim(),
-        anonymous: formData.value.anonymous
+        request: formData.value.request.trim()
       },
       status: 'pending'
     }
@@ -261,50 +251,38 @@ const handleSubmit = async () => {
       payload.submitted_by = userId
     }
 
-    // Add name, email, phone if not anonymous or if user is not authenticated
-    // Always include email for notification purposes, even for anonymous requests
-    if (!formData.value.anonymous || !userId) {
-      payload.name = formData.value.name.trim()
-      payload.email = formData.value.email.trim()
-      if (formData.value.phone) {
-        payload.phone = formData.value.phone.trim()
-      }
-    } else if (formData.value.anonymous && userId) {
-      // For anonymous requests from authenticated users, still include email for notifications
-      payload.email = formData.value.email.trim()
+    // Add name, email, phone
+    payload.name = formData.value.name.trim()
+    payload.email = formData.value.email.trim()
+    if (formData.value.phone) {
+      payload.phone = formData.value.phone.trim()
     }
 
     const result = await formsStore.createForm(payload)
     showSuccessDialog('Success!', result?.message || 'Prayer request submitted successfully! We will pray for you.', false)
 
-    // Reset form (but keep user info if not anonymous)
-    if (formData.value.anonymous) {
+    // Reset form but keep user info
     formData.value = {
       name: '',
       email: '',
       phone: '',
-      request: '',
-      anonymous: false
+      request: ''
     }
-      // Re-initialize with user info if available
-      if (userInfo.value?.member) {
-        const nameParts = []
-        if (userInfo.value.member.firstname) {
-          nameParts.push(userInfo.value.member.firstname)
-        }
-        if (userInfo.value.member.middle_name) {
-          nameParts.push(userInfo.value.member.middle_name)
-        }
-        if (userInfo.value.member.lastname) {
-          nameParts.push(userInfo.value.member.lastname)
-        }
-        formData.value.name = nameParts.join(' ').trim()
-        formData.value.email = userInfo.value.account?.email || userInfo.value.member.email || ''
-        formData.value.phone = userInfo.value.member.phone_number || userInfo.value.member.contactNo || ''
+    // Re-initialize with user info if available
+    if (userInfo.value?.member) {
+      const nameParts = []
+      if (userInfo.value.member.firstname) {
+        nameParts.push(userInfo.value.member.firstname)
       }
-  } else {
-    // Keep name, email, phone but clear request
-    formData.value.request = ''
+      if (userInfo.value.member.middle_name) {
+        nameParts.push(userInfo.value.member.middle_name)
+      }
+      if (userInfo.value.member.lastname) {
+        nameParts.push(userInfo.value.member.lastname)
+      }
+      formData.value.name = nameParts.join(' ').trim()
+      formData.value.email = userInfo.value.account?.email || userInfo.value.member.email || ''
+      formData.value.phone = userInfo.value.member.phone_number || userInfo.value.member.contactNo || ''
     }
   } catch (error) {
     // Error message is already shown by the store/axios interceptor

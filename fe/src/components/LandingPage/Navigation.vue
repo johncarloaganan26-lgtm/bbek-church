@@ -115,14 +115,6 @@
                   <el-icon><Clock /></el-icon>
                   <span>View Transactions</span>
                 </el-dropdown-item>
-                <el-dropdown-item @click="navigateTo('/events/my-events')" class="menu-item">
-                  <el-icon><Calendar /></el-icon>
-                  <span>Joined Events</span>
-                </el-dropdown-item>
-                <el-dropdown-item @click="navigateTo('/ministries/my-ministry')" class="menu-item">
-                  <el-icon><Guide /></el-icon>
-                  <span>Joined Ministries</span>
-                </el-dropdown-item>
                 <el-dropdown-item @click="navigateTo('/schedule-change')" class="menu-item">
                   <el-icon><Calendar /></el-icon>
                   <span>Request Schedule Change</span>
@@ -237,14 +229,6 @@
               <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/landpage/transactions' })">
                 <el-icon><Clock /></el-icon>
                 <span>View Transactions</span>
-              </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/events/my-events' })">
-                <el-icon><Calendar /></el-icon>
-                <span>Joined Events</span>
-              </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/ministries/my-ministry' })">
-                <el-icon><Guide /></el-icon>
-                <span>Joined Ministries</span>
               </div>
               <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/schedule-change' })">
                 <el-icon><Calendar /></el-icon>
