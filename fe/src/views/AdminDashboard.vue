@@ -107,6 +107,13 @@
             <v-list-item v-bind="props" title="SERVICES"></v-list-item>
           </template>
            <v-list-item
+            prepend-icon="mdi-account-plus"
+            title="Discipleship Requests"
+            :to="{ name: 'DiscipleshipAdmin' }"
+            :active="$route.name === 'DiscipleshipAdmin'"
+            @click="closeDrawerOnMobile"
+          ></v-list-item>
+           <v-list-item
             prepend-icon="mdi-water"
             title="Water Baptism"
             :to="{ name: 'WaterBaptism' }"

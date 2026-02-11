@@ -19,6 +19,7 @@ import WaterBaptismAdmin from '../components/Admin/ServicesRecords/WaterBaptism.
 import ChildDedicationAdmin from '../components/Admin/ServicesRecords/ChildDedication.vue'
 import BurialServiceAdmin from '../components/Admin/ServicesRecords/BurialService.vue'
 import MarriageRecordAdmin from '../components/Admin/ServicesRecords/MarriageRecord.vue'
+import DiscipleshipAdmin from '../components/Admin/ServicesRecords/Discipleship.vue'
 // Communication
 import Messages from '../components/Admin/CommunicationRecords/Messages.vue'
 // Maintenance Pages
@@ -135,7 +136,7 @@ const routes = [
       },
     ]
   },
- 
+
   {
     path: '/live',
     name: 'Live',
@@ -189,6 +190,11 @@ const routes = [
     component: SendPrayer
   },
   {
+    path: '/beoneofus/discipleship',
+    name: 'Discipleship',
+    component: () => import('../components/LandingPage/BeOneOfUs/Discipleship.vue')
+  },
+  {
     path: '/about',
     component: About,
     children: [
@@ -232,6 +238,11 @@ const routes = [
         path: 'water-baptism',
         name: 'WaterBaptismService',
         component: WaterBaptism
+      },
+      {
+        path: 'water-baptism/registration',
+        name: 'WaterBaptismRegistration',
+        component: () => import('../components/LandingPage/Services/WaterBaptismRegistration.vue')
       },
       {
         path: 'burial-service',
@@ -314,6 +325,11 @@ const routes = [
         path: 'water-baptism',
         name: 'WaterBaptism',
         component: WaterBaptismAdmin
+      },
+      {
+        path: 'discipleship-requests',
+        name: 'DiscipleshipAdmin',
+        component: DiscipleshipAdmin
       },
       {
         path: 'child-dedication-admin',
@@ -435,10 +451,10 @@ router.beforeEach((to, from, next) => {
       console.error('Error parsing userInfo:', error)
     }
   }
-  
+
   // Check if userInfo or accessToken is null
   const isAuthenticated = userInfo || accessToken
-  
+
   // Define public routes that don't require authentication
   const publicRoutes = [
     'LandingPage',
@@ -471,14 +487,15 @@ router.beforeEach((to, from, next) => {
     'PasswordManagement',
     'PasswordManagementFromEmail',
     'CertificatePreview',
+    'Discipleship',
   ]
-  
+
   // Check if the route is public
   const isPublicRoute = publicRoutes.includes(to.name)
-  
+
   // Check if trying to access admin routes
   const isAdminRoute = to.path.startsWith('/admin')
-  
+
   // If trying to access admin routes
   if (isAdminRoute) {
     // Check if user is authenticated
@@ -487,18 +504,18 @@ router.beforeEach((to, from, next) => {
       next({ name: 'LandingPage' })
       return
     }
-    
+
     // Check if user has admin or staff position
     const userPosition = userInfo?.account?.position
     const hasAdminAccess = userPosition === 'admin' || userPosition === 'staff'
-    
+
     if (!hasAdminAccess) {
       // Redirect to LandingPage if user doesn't have admin/staff access
       next({ name: 'LandingPage' })
       return
     }
   }
-  
+
   // If trying to access a protected route without authentication
   if (!isAuthenticated && !isPublicRoute) {
     // Redirect to LandingPage

@@ -1,36 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from '@/api/axios'
 
-// Helper function to convert base64 to Blob
-function base64ToBlob(base64String, contentType = 'image/jpeg') {
-  // Handle null/undefined input
-  if (!base64String || typeof base64String !== 'string') {
-    return null
-  }
-
-  // Remove data URL prefix if present
-  let base64 = base64String
-  if (base64String.includes && base64String.includes(',')) {
-    const parts = base64String.split(',')
-    base64 = parts[1]
-    // Try to extract content type from data URL
-    const mimeMatch = parts[0].match(/data:([^;]+)/)
-    if (mimeMatch) {
-      contentType = mimeMatch[1]
-    }
-  }
-
-  // Convert base64 to binary
-  const byteCharacters = atob(base64)
-  const byteNumbers = new Array(byteCharacters.length)
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
-  }
-  const byteArray = new Uint8Array(byteNumbers)
-
-  return new Blob([byteArray], { type: contentType })
-}
-
 export const useMinistriesStore = defineStore('ministries', {
   state: () => ({
     ministries: [],
@@ -213,14 +183,15 @@ export const useMinistriesStore = defineStore('ministries', {
 
         // Add image as base64 if provided (Vercel compatible - no multipart)
         if (ministryData.imageFile) {
-          // Convert File to base64
+          // Convert File to base64 and strip data URL prefix if present
           console.log('Converting image file to base64 for Vercel upload:', ministryData.imageFile.name)
           const reader = new FileReader()
-          const base64 = await new Promise((resolve, reject) => {
+          const dataUrl = await new Promise((resolve, reject) => {
             reader.onload = () => resolve(reader.result)
             reader.onerror = reject
             reader.readAsDataURL(ministryData.imageFile)
           })
+          const base64 = (typeof dataUrl === 'string' && dataUrl.includes(',')) ? dataUrl.split(',')[1] : dataUrl
           payload.image = base64
         } else if (ministryData.image && typeof ministryData.image === 'string') {
           // Already base64
@@ -275,19 +246,23 @@ export const useMinistriesStore = defineStore('ministries', {
         if (ministryData.link !== undefined) payload.link = ministryData.link || ''
         if (ministryData.tags !== undefined) payload.tags = ministryData.tags || ''
 
-        // Add image as base64 if provided (Vercel compatible - no multipart)
+        // Add image as base64 if provided - ensure no data URL prefix
         if (ministryData.imageFile) {
-          // Convert File to base64
+          // Convert File to base64 and strip data URL prefix if present
           console.log('Converting image file to base64 for Vercel update:', ministryData.imageFile.name)
           const reader = new FileReader()
-          const base64 = await new Promise((resolve, reject) => {
+          const dataUrl = await new Promise((resolve, reject) => {
             reader.onload = () => resolve(reader.result)
             reader.onerror = reject
             reader.readAsDataURL(ministryData.imageFile)
           })
-          payload.image = base64
+          // Always strip data URL prefix for backend compatibility
+          payload.image = (typeof dataUrl === 'string' && dataUrl.includes(',')) ? dataUrl.split(',')[1] : dataUrl
+        } else if (ministryData.image !== undefined && typeof ministryData.image === 'string' && ministryData.image.startsWith('data:')) {
+          // Strip data URL prefix from existing base64
+          payload.image = ministryData.image.includes(',') ? ministryData.image.split(',')[1] : ministryData.image.replace('data:image/jpeg;base64,', '').replace('data:image/png;base64,', '').replace('data:image/gif;base64,', '').replace('data:image/webp;base64,', '')
         } else if (ministryData.image !== undefined && typeof ministryData.image === 'string') {
-          // Already base64
+          // Raw base64 string
           payload.image = ministryData.image
         } else {
           console.log('No image provided for update - keeping existing image')

@@ -28,8 +28,8 @@
               <div class="text-caption grey--text mb-1">Total Baptisms</div>
               <div class="text-h5 font-weight-bold">{{ totalBaptisms }}</div>
             </div>
-            <v-avatar size="56" color="blue lighten-5" class="d-flex align-center justify-center">
-              <span style="color: white !important;" class="mdi mdi-water icon-custom" aria-hidden="true"></span>
+            <v-avatar size="56" color="blue-lighten-4" class="d-flex align-center justify-center">
+              <v-icon color="blue-darken-2" size="large">mdi-water</v-icon>
             </v-avatar>
           </div>
         </v-card>
@@ -41,8 +41,8 @@
               <div class="text-caption grey--text mb-1">This Year</div>
               <div class="text-h5 font-weight-bold">{{ thisYear }}</div>
             </div>
-            <v-avatar size="56" color="blue lighten-5" class="d-flex align-center justify-center">
-              <span style="color: white !important;" class="mdi mdi-water icon-custom" aria-hidden="true"></span>
+            <v-avatar size="56" color="blue-lighten-4" class="d-flex align-center justify-center">
+              <v-icon color="blue-darken-2" size="large">mdi-calendar-check</v-icon>
             </v-avatar>
           </div>
         </v-card>
@@ -54,8 +54,8 @@
               <div class="text-caption grey--text mb-1">Certificates Issued</div>
               <div class="text-h5 font-weight-bold">{{ certificatesIssued }}</div>
             </div>
-            <v-avatar size="56" color="green lighten-5" class="d-flex align-center justify-center">
-              <span style="color: white !important;" class="mdi mdi-file-document icon-custom" aria-hidden="true"></span>
+            <v-avatar size="56" color="green-lighten-4" class="d-flex align-center justify-center">
+              <v-icon color="green-darken-2" size="large">mdi-file-document-check</v-icon>
             </v-avatar>
           </div>
         </v-card>
@@ -526,12 +526,40 @@ const clearSelection = () => {
 }
 
 const bulkCompleteBaptisms = async () => {
-  // Count only approved baptisms in the selection
-  const approvedCount = selectedBaptisms.value.filter(b => b.status === 'approved').length;
+  // Filter for approved baptisms first
+  const approvedBaptisms = selectedBaptisms.value.filter(b => b.status === 'approved');
+  
+  if (approvedBaptisms.length === 0) {
+    ElMessage.warning('No approved baptisms selected.');
+    return;
+  }
+
+  // Check dates: cannot complete future baptisms
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const validBaptisms = approvedBaptisms.filter(b => {
+    if (!b.baptism_date) return false;
+    const baptismDate = new Date(b.baptism_date);
+    baptismDate.setHours(0, 0, 0, 0);
+    return baptismDate <= today;
+  });
+
+  const skippedCount = approvedBaptisms.length - validBaptisms.length;
+
+  if (validBaptisms.length === 0) {
+    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date.');
+    return;
+  }
   
   try {
+    let confirmMessage = `Are you sure you want to mark ${validBaptisms.length} approved water baptism record(s) as completed?`;
+    if (skippedCount > 0) {
+      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
+    }
+
     await ElMessageBox.confirm(
-      `Are you sure you want to mark ${approvedCount} approved water baptism record(s) as completed?`,
+      confirmMessage,
       'Confirm Bulk Complete',
       {
         confirmButtonText: 'Yes, Mark as Completed',
@@ -540,10 +568,8 @@ const bulkCompleteBaptisms = async () => {
       }
     )
 
-    // Extract baptism IDs for only approved baptisms
-    const baptismIds = selectedBaptisms.value
-      .filter(b => b.status === 'approved')
-      .map(b => b.baptism_id)
+    // Extract baptism IDs for valid baptisms
+    const baptismIds = validBaptisms.map(b => b.baptism_id)
 
     // Use the bulk complete endpoint
     const result = await waterBaptismStore.bulkCompleteWaterBaptisms(baptismIds)
@@ -702,7 +728,8 @@ const formatDateTime = (dateString) => {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: true
   })
 }
 
@@ -732,7 +759,15 @@ const formatBaptismDateTime = (dateString, timeString, status) => {
 
   // If explicit time string exists, use it
   if (timeString) {
-    return `${datePart} at ${timeString}`
+    const [hours, minutes] = timeString.split(':');
+    const time = new Date();
+    time.setHours(parseInt(hours), parseInt(minutes));
+    const formattedTime = time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${datePart} at ${formattedTime}`
   }
 
   // Check if date has a time component (not midnight)

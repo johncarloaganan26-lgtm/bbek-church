@@ -169,7 +169,7 @@ const homeData = ref({
   // Button 2 (Be One Of Us)
   button2Text: 'Be One Of Us',
   button2HoverColor: '#0d9488',
-  button2Link: '/services/water-baptism',
+  button2Link: '/beoneofus/discipleship',
   button2Variant: 'filled', // 'filled' or 'outlined'
   homeBackgroundImage: null
 })

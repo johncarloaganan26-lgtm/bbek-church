@@ -1,0 +1,488 @@
+<template>
+  <div class="discipleship-records pa-6">
+    <div class="d-flex justify-space-between align-center mb-6">
+      <h1 class="text-h4 font-weight-bold">Discipleship Requests</h1>
+      <v-btn
+        color="success"
+        prepend-icon="mdi-plus"
+        size="small"
+        @click="openAddDialog"
+      >
+        New Request
+      </v-btn>
+    </div>
+
+    <!-- Filters -->
+    <v-card class="mb-4" elevation="2">
+      <v-card-text>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="search"
+              prepend-inner-icon="mdi-magnify"
+              label="Search Name/Email"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="handleSearch"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-select
+              v-model="statusFilter"
+              :items="['All', 'Pending', 'Scheduled', 'Completed', 'Promoted', 'Cancelled']"
+              label="Filter Status"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="handleFilter"
+            ></v-select>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
+
+    <!-- Table -->
+    <v-card elevation="2">
+      <v-table>
+        <thead>
+          <tr>
+            <th class="text-left font-weight-bold">Name</th>
+            <th class="text-left font-weight-bold">Email</th>
+            <th class="text-left font-weight-bold">Request Type</th>
+            <th class="text-left font-weight-bold">Status</th>
+            <th class="text-left font-weight-bold">Schedule</th>
+            <th class="text-left font-weight-bold">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading">
+             <td colspan="6" class="text-center pa-4">Loading...</td>
+          </tr>
+          <tr v-else-if="requests.length === 0">
+             <td colspan="6" class="text-center pa-4">No requests found.</td>
+          </tr>
+          <tr v-for="item in requests" :key="item.request_id">
+            <td>{{ item.firstname }} {{ item.lastname }}</td>
+            <td>{{ item.email }}</td>
+            <td>
+              <v-chip size="small" :color="getRequestTypeColor(item.request_type)" class="text-white">
+                {{ item.request_type }}
+              </v-chip>
+            </td>
+            <td>
+              <v-chip size="small" :color="getStatusColor(item.status)" class="text-white">
+                {{ item.status }}
+              </v-chip>
+            </td>
+            <td>{{ formatDateTime(item.scheduled_date) }}</td>
+            <td>
+              <div class="d-flex gap-2 align-center">
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  color="primary"
+                  @click="openScheduleDialog(item)"
+                  v-if="item.status !== 'Promoted'"
+                >
+                  <v-icon>mdi-calendar-clock</v-icon>
+                  <v-tooltip activator="parent" location="top">Update Status / Schedule</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  color="success"
+                  @click="promoteRequest(item)"
+                  v-if="item.status === 'Completed'"
+                >
+                  <v-icon>mdi-water</v-icon>
+                  <v-tooltip activator="parent" location="top">Promote to Water Baptism</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  color="error"
+                  @click="deleteItem(item)"
+                >
+                  <v-icon>mdi-delete</v-icon>
+                  <v-tooltip activator="parent" location="top">Delete Request</v-tooltip>
+                </v-btn>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+      
+      <!-- Pagination -->
+      <div class="d-flex justify-end pa-4">
+        <v-pagination
+          v-model="currentPage"
+          :length="totalPages"
+          :total-visible="5"
+          density="compact"
+          @update:model-value="handlePageChange"
+        ></v-pagination>
+      </div>
+    </v-card>
+
+    <!-- Update Dialog -->
+    <v-dialog v-model="dialogVisible" max-width="500px">
+      <v-card>
+        <v-card-title class="bg-primary text-white">
+           Update Request
+        </v-card-title>
+        <v-card-text class="mt-4">
+          <div v-if="!isEditing">
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="selectedRequest.firstname" label="First Name" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="selectedRequest.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+            </v-row>
+            <v-text-field v-model="selectedRequest.email" label="Email Address" variant="outlined" density="compact"></v-text-field>
+            <v-text-field v-model="selectedRequest.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="selectedRequest.birthdate" label="Birthday" type="date" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="selectedRequest.age" label="Age" type="number" variant="outlined" density="compact" readonly></v-text-field>
+              </v-col>
+            </v-row>
+          </div>
+
+          <v-row>
+            <v-col cols="12" md="6">
+              <v-select
+                v-model="selectedRequest.pastor_id"
+                :items="pastors"
+                item-title="name"
+                item-value="name"
+                label="Assigned Pastor"
+                variant="outlined"
+                density="compact"
+                clearable
+              ></v-select>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field v-model="selectedRequest.location" label="Location" variant="outlined" density="compact"></v-text-field>
+            </v-col>
+          </v-row>
+
+          <v-select
+            v-model="selectedRequest.status"
+            :items="['Pending', 'Scheduled', 'Completed', 'Cancelled']"
+            label="Status"
+            variant="outlined"
+            density="compact"
+          ></v-select>
+
+          <label class="text-caption grey--text mb-1 d-block">Schedule Date & Time</label>
+          <el-date-picker
+            v-model="selectedRequest.scheduled_date"
+            type="datetime"
+            placeholder="Select Sunday date and time"
+            style="width: 100%"
+            :disabled-date="disabledDate"
+            format="YYYY-MM-DD hh:mm A"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :default-time="new Date(0, 0, 0, 9, 0, 0)"
+            popper-class="discipleship-date-picker"
+          />
+          <div class="text-caption grey--text mt-1">Schedules are strictly limited to Sundays</div>
+
+          <v-textarea
+            v-model="selectedRequest.notes"
+            label="Notes / Remarks"
+            variant="outlined"
+            rows="3"
+            class="mt-3"
+          ></v-textarea>
+
+          <div v-if="formattedSchedulePreview" class="mt-4 pa-3 bg-teal-lighten-5 rounded border-teal">
+            <div class="text-caption text-teal-darken-3 font-weight-bold">VALIDATED SCHEDULE (SUNDAY)</div>
+            <div class="text-h6 text-teal-darken-4">{{ formattedSchedulePreview }}</div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey-darken-1" variant="text" @click="dialogVisible = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="saveUpdate" :loading="store.loading">Save Changes</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Promotion Choice Dialog -->
+    <v-dialog v-model="promotionDialogVisible" max-width="450px">
+      <v-card class="rounded-xl overflow-hidden">
+        <v-card-title class="bg-teal text-white text-center py-4">
+          <v-icon large class="mr-2">mdi-water-check</v-icon>
+          Water Baptism Promotion
+        </v-card-title>
+        <v-card-text class="pa-6">
+          <p class="text-body-1 mb-6 text-center">
+            How would you like to proceed with <b>{{ promotingItem?.firstname }} {{ promotingItem?.lastname }}</b>?
+          </p>
+          
+          <v-btn
+            block
+            color="teal-darken-1"
+            size="large"
+            variant="tonal"
+            class="mb-4 py-6"
+            @click="handlePromotionAction(true)"
+            :loading="loadingPromotion"
+          >
+            <div class="d-flex flex-column align-start" style="width: 100%">
+              <div class="font-weight-bold">Candidate Decided</div>
+              <div class="text-caption">Promote directly to Water Baptism module</div>
+            </div>
+          </v-btn>
+
+          <v-btn
+            block
+            color="grey-darken-2"
+            size="large"
+            variant="tonal"
+            class="py-6"
+            @click="handlePromotionAction(false)"
+            :loading="loadingPromotion"
+          >
+            <div class="d-flex flex-column align-start" style="width: 100%">
+              <div class="font-weight-bold">Requester Undecided</div>
+              <div class="text-caption">Send invitation link for consideration</div>
+            </div>
+          </v-btn>
+        </v-card-text>
+        <v-card-actions class="pa-4 bg-grey-lighten-4">
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="promotionDialogVisible = false">Cancel</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAdminDiscipleshipStore } from '@/stores/admin/discipleshipStore';
+import { storeToRefs } from 'pinia';
+import { ElMessage, ElMessageBox } from 'element-plus';
+
+const store = useAdminDiscipleshipStore();
+const router = useRouter();
+const { requests, loading, totalCount, currentPage, pageSize, pastors } = storeToRefs(store);
+
+onMounted(() => {
+    store.fetchRequests();
+    store.fetchPastors();
+});
+
+const search = ref('');
+const statusFilter = ref('All'); // Changed from 'All Statuses' to 'All' to match existing code
+const sortBy = ref('Date Created (Newest)'); // Added
+const page = ref(1); // Added
+// pageSize is already destructured from storeToRefs, so no need to declare here.
+const dialogVisible = ref(false);
+const promotionDialogVisible = ref(false);
+const promotingItem = ref(null);
+const loadingPromotion = ref(false);
+const selectedRequest = ref({});
+const isEditing = ref(false);
+
+// Auto-calculate age from birthdate in Admin dialog
+watch(() => selectedRequest.value?.birthdate, (newDate) => {
+  if (newDate) {
+    const today = new Date();
+    const birthDate = new Date(newDate);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    selectedRequest.value.age = age;
+  }
+}, { deep: true });
+
+const formattedSchedulePreview = computed(() => {
+  if (!selectedRequest.value.scheduled_date) return '';
+  const d = new Date(selectedRequest.value.scheduled_date);
+  if (isNaN(d.getTime())) return '';
+  
+  return d.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+});
+
+const headers = [
+  { title: 'Name', key: 'fullname', align: 'start' },
+  { title: 'Email', key: 'email' },
+  { title: 'Pastor', key: 'pastor_id' },
+  { title: 'Status', key: 'status' },
+  { title: 'Actions', key: 'actions', sortable: false }
+];
+
+const totalPages = computed(() => {
+    return Math.ceil((totalCount.value || 0) / pageSize.value) || 1;
+});
+
+const fetchData = () => {
+    store.fetchRequests();
+};
+
+onMounted(() => {
+  fetchData();
+});
+
+const handleSearch = (val) => {
+    if (window.searchTimeout) clearTimeout(window.searchTimeout);
+    window.searchTimeout = setTimeout(() => {
+        store.setFilters({ search: val });
+    }, 500);
+};
+
+const handleFilter = (val) => {
+    store.setFilters({ status: val });
+};
+
+const handlePageChange = (page) => {
+  store.setPage(page);
+};
+
+const getRequestTypeColor = (type) => {
+  if (type === 'Salvation') return 'orange';
+  if (type === 'Bible Study') return 'blue';
+  return 'purple'; // Both
+};
+
+const getStatusColor = (status) => {
+  switch(status) {
+      case 'Pending': return 'warning';
+      case 'Scheduled': return 'info';
+      case 'Completed': return 'success';
+      case 'Promoted': return 'teal';
+      case 'Cancelled': return 'grey';
+      default: return 'grey';
+  }
+};
+
+const formatDateTime = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+const openAddDialog = () => {
+  isEditing.value = false;
+  selectedRequest.value = {
+    firstname: '',
+    lastname: '',
+    email: '',
+    phone_number: '',
+    request_type: 'Both',
+    status: 'Pending',
+    scheduled_date: '',
+    notes: ''
+  };
+  dialogVisible.value = true;
+};
+
+const openScheduleDialog = (item) => {
+  isEditing.value = true;
+  selectedRequest.value = { ...item };
+  
+  // Ensure notes is a string and not [object Object]
+  if (typeof selectedRequest.value.notes === 'object' && selectedRequest.value.notes !== null) {
+    selectedRequest.value.notes = JSON.stringify(selectedRequest.value.notes);
+  } else if (selectedRequest.value.notes === null || selectedRequest.value.notes === undefined) {
+    selectedRequest.value.notes = '';
+  }
+  
+  dialogVisible.value = true;
+};
+
+const saveUpdate = async () => {
+  if (!isEditing.value) {
+    if (!selectedRequest.value.firstname || !selectedRequest.value.lastname || !selectedRequest.value.email) {
+      ElMessage.warning('Please fill in required fields (Name and Email)');
+      return;
+    }
+    const success = await store.createRequest(selectedRequest.value); 
+    if (success) {
+        dialogVisible.value = false;
+    }
+  } else {
+    const success = await store.updateRequest(selectedRequest.value.request_id, {
+      status: selectedRequest.value.status,
+      scheduled_date: selectedRequest.value.scheduled_date,
+      notes: selectedRequest.value.notes,
+      pastor_id: selectedRequest.value.pastor_id,
+      location: selectedRequest.value.location
+    });
+    
+    if (success) {
+        dialogVisible.value = false;
+    }
+  }
+};
+
+const promoteRequest = (item) => {
+  promotingItem.value = item;
+  promotionDialogVisible.value = true;
+};
+
+const handlePromotionAction = async (isDecided) => {
+  if (!promotingItem.value) return;
+  
+  loadingPromotion.value = true;
+  try {
+    const success = await store.inviteToBaptism(promotingItem.value.request_id, isDecided);
+    if (success) {
+      promotionDialogVisible.value = false;
+    }
+  } finally {
+    loadingPromotion.value = false;
+  }
+};
+
+const deleteItem = async (item) => {
+  if (confirm(`Are you sure you want to delete the request from ${item.firstname} ${item.lastname}? This action cannot be undone.`)) {
+    await store.deleteRequest(item.request_id);
+  }
+};
+
+const disabledDate = (time) => {
+  // 0 is Sunday
+  return time.getDay() !== 0;
+};
+</script>
+
+<style scoped>
+.discipleship-records {
+  height: 100%;
+}
+</style>
+
+<style>
+/* Global style to fix z-index for element-plus date picker popper in vuetify dialog */
+.discipleship-date-picker {
+  z-index: 3000 !important;
+}
+</style>

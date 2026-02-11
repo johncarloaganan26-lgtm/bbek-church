@@ -88,34 +88,59 @@
                 </v-card-text>
               </v-card>
 
-              <!-- Join Button -->
+              <!-- Add to Calendar Button -->
               <v-card
                 class="mb-4 event-card event-card-3"
                 variant="flat"
                 color="teal-lighten-5"
               >
                 <v-card-text>
+                  <v-menu v-if="eventStatus !== 'completed' && userInfo?.member?.member_id" location="bottom">
+                    <template v-slot:activator="{ props }">
+                      <v-btn
+                        v-bind="props"
+                        size="large"
+                        block
+                        class="calendar-btn"
+                        prepend-icon="mdi-calendar-plus"
+                        color="primary"
+                        append-icon="mdi-chevron-down"
+                      >
+                        Add to Calendar
+                      </v-btn>
+                    </template>
+                    <v-list>
+                      <v-list-item :href="googleCalendarLink" target="_blank" prepend-icon="mdi-google">
+                        <v-list-item-title>Google Calendar</v-list-item-title>
+                      </v-list-item>
+                      <v-list-item :href="outlookCalendarLink" target="_blank" prepend-icon="mdi-microsoft-outlook">
+                        <v-list-item-title>Outlook Calendar</v-list-item-title>
+                      </v-list-item>
+                      <v-list-item @click="downloadICal" prepend-icon="mdi-apple">
+                        <v-list-item-title>Download iCal (.ics)</v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
                   <v-btn
-                    v-if="userInfo?.member?.member_id"
-                    :loading="loading"
-                    :class="getButtonClass"
-                    :style="{ '--btn-bg': getButtonColor, '--btn-color': 'white', '--btn-border': getButtonColor }"
-                    :disabled="getButtonDisabled"
-                    @click="handleJoinEvent"
+                    v-else-if="eventStatus !== 'completed' && !userInfo?.member?.member_id"
                     size="large"
                     block
+                    class="calendar-btn"
+                    prepend-icon="mdi-login"
+                    color="secondary"
+                    @click="showLoginDialog = true"
                   >
-                    {{ getButtonText }}
+                    Login to Add to Calendar
                   </v-btn>
                   <v-btn
                     v-else
                     size="large"
                     block
-                    :style="{ '--btn-bg': learnMoreEventsData.buttonColor || '#14b8a6', '--btn-color': 'white', '--btn-border': learnMoreEventsData.buttonColor || '#14b8a6' }"
-                    class="join-btn"
-                    @click="handleJoinAsGuest"
+                    disabled
+                    class="disabled-btn"
+                    color="grey"
                   >
-                    {{ learnMoreEventsData.joinButtonText || 'Join Us' }}
+                    Event Completed
                   </v-btn>
                 </v-card-text>
               </v-card>
@@ -135,14 +160,7 @@
         </v-row>
       </v-container>
     </section>
-
-    <AcceptJesusChristDialog 
-      :modelValue="showJoinEvent" 
-      :type="'event'" 
-      :requestId="eventModel?.event_id || eventModel?.id"
-      @update:modelValue="showJoinEvent = $event"
-      @approval-created="handleApprovalCreated"
-    />
+    <LoginDialog v-model="showLoginDialog" @login-success="handleLoginSuccess" />
   </div>
 </template>
 
@@ -151,17 +169,16 @@ import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import axios from '@/api/axios'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import AcceptJesusChristDialog from '../Dialog/AcceptJesusChristDialog.vue'
+import { ElMessage } from 'element-plus'
 import { useCms } from '@/composables/useCms'
+import LoginDialog from '@/components/Dialogs/LoginDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const eventModel = ref({})
 const loading = ref(true)
-const showJoinEvent = ref(false)
-const approvalStatus = ref(null)
+const showLoginDialog = ref(false)
 
 const fetchEventData = async () => {
   try {
@@ -185,11 +202,26 @@ const fetchEventData = async () => {
   }
 }
 
+const handleLoginSuccess = () => {
+  userInfo.value = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  showLoginDialog.value = false
+}
+
+const learnMoreEventsData = reactive({
+  backgroundColor: '#ffffff',
+  buttonColor: '#14b8a6',
+  aboutTitle: 'About This Event',
+  noDescriptionText: 'No description available',
+  detailsTitle: 'Event Details',
+  pendingText: 'Pending',
+  approvedText: 'You Already Joined'
+})
+
+// Load CMS data
+const { loading: cmsLoading, loadPageData } = useCms('learnmoreevents')
+
 onMounted(async () => {
   await fetchEventData()
-  
-  // Check if user already joined this event (always check fresh from server)
-  await checkIfAlreadyJoined()
   
   // Load CMS data
   const cmsData = await loadPageData()
@@ -245,144 +277,67 @@ const eventStatusText = computed(() => {
   return getStatusText(eventStatus.value)
 })
 
-const handleJoinEvent = async () => {
-  // Check if event is completed
-  if (eventStatus.value === 'completed') {
-    ElMessage.warning('This event has already been completed and is no longer accepting new registrations.')
-    return
-  }
-
-  if (approvalStatus.value !== null) {
-    ElMessage.warning('You have already submitted a request for this event.')
-    return
-  }
+const googleCalendarLink = computed(() => {
+  if (!eventModel.value?.start_date) return '#'
   
-  try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to join "${eventModel.value?.eventName || 'this event'}"? Your request will be reviewed by an admin.`,
-      'Confirm Join Request',
-      {
-        confirmButtonText: 'Join',
-        cancelButtonText: 'Cancel',
-        type: 'info',
-      }
-    )
-  } catch (error) {
-    return
-  }
+  const event = eventModel.value
+  const start = dayjs(event.start_date).format('YYYYMMDDTHHmmss')
+  const end = event.end_date ? dayjs(event.end_date).format('YYYYMMDDTHHmmss') : dayjs(event.start_date).add(1, 'hour').format('YYYYMMDDTHHmmss')
   
-  try {
-    loading.value = true
-    const approvalData = {
-      email: userInfo.value.account.email,
-      type: 'event',
-      request_id: eventModel.value?.event_id || eventModel.value?.id,
-      status: 'pending'
-    }
-    const response = await axios.post('/church-records/approvals/createApproval', approvalData)
-    if (response.data.success) {
-      ElMessage.success('Your request to join has been submitted. An admin will review and approve your request.')
-      approvalStatus.value = 'pending'
-    } else {
-      ElMessage.error(response.data.message || 'Failed to submit join request')
-    }
-  } catch (error) {
-    console.error('Error creating approval:', error)
-    ElMessage.error('An error occurred while submitting your request. Please try again.')
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleJoinAsGuest = () => {
-  showJoinEvent.value = true
-}
-
-const handleApprovalCreated = () => {
-  approvalStatus.value = 'pending'
-  checkIfAlreadyJoined()
-}
-
-const checkIfAlreadyJoined = async () => {
-  const eventId = eventModel.value?.event_id || eventModel.value?.id
-  if (!userInfo.value?.account?.email || !eventId) {
-    return
-  }
-
-  // Always check fresh from server (remove cache)
-  const timestamp = new Date().getTime()
+  const title = encodeURIComponent(event.eventName || 'Church Event')
+  const details = encodeURIComponent(event.description || '')
+  const location = encodeURIComponent(event.location || '')
   
-  try {
-    const response = await axios.get(`/church-records/approvals/checkMemberApprovalStatus?t=${timestamp}`, {
-      params: {
-        email: userInfo.value.account.email,
-        type: 'event',
-        request_id: eventId
-      }
-    })
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}&sf=true&output=xml`
+})
 
-    if (response.data.success && response.data.data?.status) {
-      approvalStatus.value = response.data.data.status
-    } else {
-      approvalStatus.value = null
-    }
-  } catch (error) {
-    console.error('Error checking approval status:', error)
-    approvalStatus.value = null
-  }
+const outlookCalendarLink = computed(() => {
+  if (!eventModel.value?.start_date) return '#'
+  
+  const event = eventModel.value
+  const start = dayjs(event.start_date).format('YYYY-MM-DDTHH:mm:ss')
+  const end = event.end_date ? dayjs(event.end_date).format('YYYY-MM-DDTHH:mm:ss') : dayjs(event.start_date).add(1, 'hour').format('YYYY-MM-DDTHH:mm:ss')
+  
+  const title = encodeURIComponent(event.eventName || 'Church Event')
+  const details = encodeURIComponent(event.description || '')
+  const location = encodeURIComponent(event.location || '')
+  
+  return `https://outlook.office.com/calendar/0/deeplink/compose?subject=${title}&body=${details}&location=${location}&startdt=${start}&enddt=${end}`
+})
+
+const downloadICal = () => {
+  if (!eventModel.value?.start_date) return
+
+  const event = eventModel.value
+  const start = dayjs(event.start_date).format('YYYYMMDDTHHmmss')
+  const end = event.end_date ? dayjs(event.end_date).format('YYYYMMDDTHHmmss') : dayjs(event.start_date).add(1, 'hour').format('YYYYMMDDTHHmmss')
+  const now = dayjs().format('YYYYMMDDTHHmmss') + 'Z'
+
+  const content = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'prodid:-//My Church//Events//EN',
+    'BEGIN:VEVENT',
+    `UID:${event.event_id || 'event'}-${now}`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `SUMMARY:${event.eventName || 'Church Event'}`,
+    `DESCRIPTION:${event.description || ''}`,
+    `LOCATION:${event.location || ''}`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n')
+
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${event.eventName || 'event'}.ics`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
-const learnMoreEventsData = reactive({
-  backgroundColor: '#ffffff',
-  buttonColor: '#14b8a6',
-  aboutTitle: 'About This Event',
-  noDescriptionText: 'No description available',
-  detailsTitle: 'Event Details',
-  joinButtonText: 'Join Us',
-  pendingText: 'Pending',
-  approvedText: 'You Already Joined'
-})
-
-// Load CMS data
-const { loading: cmsLoading, loadPageData } = useCms('learnmoreevents')
-
-// Computed properties for button states
-const getButtonText = computed(() => {
-  if (eventStatus.value === 'completed') {
-    return 'Event Completed'
-  } else if (approvalStatus.value === 'pending') {
-    return learnMoreEventsData.pendingText || 'Pending Request'
-  } else if (approvalStatus.value === 'approved') {
-    return learnMoreEventsData.approvedText || 'You Already Joined'
-  } else if (approvalStatus.value === 'rejected') {
-    return 'Request Rejected'
-  }
-  return learnMoreEventsData.joinButtonText || 'Join Us'
-})
-
-const getButtonClass = computed(() => {
-  if (approvalStatus.value === null) {
-    return 'join-btn'
-  }
-  return 'disabled-btn'
-})
-
-const getButtonColor = computed(() => {
-  if (eventStatus.value === 'completed') {
-    return '#6b7280' // Gray color for completed events
-  } else if (approvalStatus.value === 'pending') {
-    return '#f59e0b'
-  } else if (approvalStatus.value === 'approved') {
-    return '#10b981'
-  } else if (approvalStatus.value === 'rejected') {
-    return '#ef4444'
-  }
-  return learnMoreEventsData.buttonColor || '#14b8a6'
-})
-
-const getButtonDisabled = computed(() => {
-  return approvalStatus.value !== null || eventStatus.value === 'completed'
-})
 </script>
 
 <style scoped>
@@ -434,25 +389,19 @@ const getButtonDisabled = computed(() => {
   transform: scale(1.05);
 }
 
-.join-btn {
+.calendar-btn {
   transition: all 0.3s ease;
-  background-color: var(--btn-bg) !important;
-  color: var(--btn-color) !important;
-  border: 1px solid var(--btn-border) !important;
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-.join-btn:hover {
+.calendar-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
 .disabled-btn {
-  background-color: var(--btn-bg) !important;
-  color: var(--btn-color) !important;
-  border: 1px solid var(--btn-border) !important;
   cursor: not-allowed !important;
   font-weight: bold;
   text-transform: uppercase;

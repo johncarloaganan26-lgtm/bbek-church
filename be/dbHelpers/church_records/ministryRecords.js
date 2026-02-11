@@ -22,88 +22,77 @@ const { archiveBeforeDelete, bulkArchiveBeforeDelete } = require('../archiveHelp
 
 /**
  * Helper function to convert image to blob
- * Supports: base64 string, Buffer, file path
- * @param {String|Buffer|Object} imageInput - Image as base64 string, Buffer, or file path
- * @returns {Buffer|null} - Image as Buffer (blob) or null
+ * Handles base64 strings, data URLs, Buffers, and file paths
  */
 function convertImageToBlob(imageInput) {
   try {
-    // If null or undefined, return null
     if (!imageInput) {
+      console.log('convertImageToBlob: No image input provided');
       return null;
     }
 
     // If already a Buffer, return it
     if (Buffer.isBuffer(imageInput)) {
+      console.log('convertImageToBlob: Input is already a Buffer, length:', imageInput.length);
       return imageInput;
     }
 
     // If it's a file object from multer (has buffer property)
     if (imageInput.buffer && Buffer.isBuffer(imageInput.buffer)) {
+      console.log('convertImageToBlob: Input is multer file object, buffer length:', imageInput.buffer.length);
       return imageInput.buffer;
     }
 
-    // If it's a base64 DATA URL (starts with 'data:') - check this BEFORE file path check
-    if (typeof imageInput === 'string' && imageInput.startsWith('data:')) {
-      // Extract the base64 part from data URL
-      const hasPrefix = imageInput.includes(',');
-      const base64Data = hasPrefix
-        ? imageInput.split(',')[1]
-        : imageInput;
-
-      console.log('convertImageToBlob - data URL - base64Data length:', base64Data.length);
-      console.log('convertImageToBlob - data URL - first 50 chars:', base64Data.substring(0, 50));
-
-      // Check if base64Data is valid
-      const isValidBase64 = /^[A-Za-z0-9+/=]+$/.test(base64Data.trim());
-      console.log('convertImageToBlob - isValidBase64:', isValidBase64);
-
-      try {
-        // Convert base64 to Buffer
-        const buffer = Buffer.from(base64Data, 'base64');
-        console.log('convertImageToBlob - buffer length:', buffer.length);
-        return buffer;
-      } catch (error) {
-        console.error('convertImageToBlob - error:', error.message);
-        throw new Error('Failed to convert base64 to buffer: ' + error.message);
-      }
-    }
-
-    // If it's a file path (string starting with / or containing path separators)
-    if (typeof imageInput === 'string' && (imageInput.startsWith('/') || imageInput.includes('\\') || imageInput.includes('/'))) {
-      // Check if file exists
-      if (fs.existsSync(imageInput)) {
-        return fs.readFileSync(imageInput);
-      }
-      return null;
-    }
-
-    // If it's a plain base64 string (no data URL prefix, no path separators)
+    // Handle string inputs
     if (typeof imageInput === 'string') {
-      // Remove any data URL prefix if present
-      const hasPrefix = imageInput.includes(',');
-      const base64Data = hasPrefix
-        ? imageInput.split(',')[1]
-        : imageInput;
+      console.log('convertImageToBlob: Input is string, length:', imageInput.length);
 
-      console.log('convertImageToBlob - plain base64 - length:', base64Data.length);
-      console.log('convertImageToBlob - first 50 chars:', base64Data.substring(0, 50));
+      // Check if it's a data URL (starts with 'data:')
+      if (imageInput.startsWith('data:')) {
+        console.log('convertImageToBlob: Detected data URL');
+        // Extract base64 data from data URL
+        const base64Data = imageInput.includes(',') ? imageInput.split(',')[1] : imageInput;
+        console.log('convertImageToBlob: Extracted base64 data length:', base64Data.length);
 
-      // Check if base64Data is valid
-      const isValidBase64 = /^[A-Za-z0-9+/=]+$/.test(base64Data.trim());
-      console.log('convertImageToBlob - isValidBase64:', isValidBase64);
+        // Validate base64 format
+        if (!/^[A-Za-z0-9+/=]+$/.test(base64Data.trim())) {
+          throw new Error('Invalid base64 data in data URL');
+        }
 
-      try {
-        // Convert base64 to Buffer
         const buffer = Buffer.from(base64Data, 'base64');
-        console.log('convertImageToBlob - buffer length:', buffer.length);
+        console.log('convertImageToBlob: Converted to buffer, length:', buffer.length);
         return buffer;
-      } catch (error) {
-        console.error('convertImageToBlob - error:', error.message);
-        throw new Error('Failed to convert base64 to buffer: ' + error.message);
       }
+
+      // Check if it's a file path (contains path separators and no spaces)
+      // Only treat as a file path if the path actually exists on disk;
+      // otherwise fall through and treat the string as base64.
+      if ((imageInput.includes('/') || imageInput.includes('\\')) && !imageInput.includes(' ')) {
+        console.log('convertImageToBlob: Detected potential file path:', imageInput);
+        if (fs.existsSync(imageInput)) {
+          const fileBuffer = fs.readFileSync(imageInput);
+          console.log('convertImageToBlob: Read file, buffer length:', fileBuffer.length);
+          return fileBuffer;
+        } else {
+          console.log('convertImageToBlob: Path does not exist, will treat input as base64');
+          // do not throw here; continue to base64 handling below
+        }
+      }
+
+      // Treat as raw base64 string (no data URL prefix, no path separators)
+      console.log('convertImageToBlob: Treating as raw base64 string');
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/=]+$/.test(imageInput.trim())) {
+        throw new Error('Invalid base64 string format');
+      }
+
+      const buffer = Buffer.from(imageInput, 'base64');
+      console.log('convertImageToBlob: Converted raw base64 to buffer, length:', buffer.length);
+      return buffer;
     }
 
+    console.log('convertImageToBlob: Unsupported input type:', typeof imageInput);
     return null;
   } catch (error) {
     console.error('Error converting image to blob:', error);
@@ -365,6 +354,7 @@ async function getAllMinistries(options = {}) {
       mem.firstname as leader_firstname,
       mem.lastname as leader_lastname,
       mem.middle_name as leader_middle_name,
+      mem.email as leader_email,
       CONCAT(
         mem.firstname,
         IF(mem.middle_name IS NOT NULL AND mem.middle_name != '', CONCAT(' ', mem.middle_name), ''),
@@ -622,6 +612,7 @@ async function getMinistryById(ministryId) {
       mem.firstname as leader_firstname,
       mem.lastname as leader_lastname,
       mem.middle_name as leader_middle_name,
+      mem.email as leader_email,
       CONCAT(
         mem.firstname,
         IF(mem.middle_name IS NOT NULL AND mem.middle_name != '', CONCAT(' ', mem.middle_name), ''),

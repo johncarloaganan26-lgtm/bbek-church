@@ -117,12 +117,12 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
     // Analyze which fields match
     rows.forEach(member => {
       const matches = [];
-      
+
       if (email && member.email && member.email.toLowerCase().trim() === email.toLowerCase().trim()) {
         matches.push('email');
         duplicateFields.push('email');
       }
-      
+
       // Normalize phone numbers for comparison (using new normalization function)
       if (phone_number && member.phone_number) {
         const normalizedInput = normalizePhoneNumber(phone_number);
@@ -132,16 +132,16 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
           duplicateFields.push('phone_number');
         }
       }
-      
+
       // Check name and birthdate combination (case-insensitive)
       if (firstname && lastname && birthdate) {
         const memberBirthdate = moment(member.birthdate).format('YYYY-MM-DD');
         const inputBirthdate = moment(birthdate).format('YYYY-MM-DD');
-        
-        if (member.firstname && member.lastname && 
-            member.firstname.trim().toLowerCase() === firstname.trim().toLowerCase() && 
-            member.lastname.trim().toLowerCase() === lastname.trim().toLowerCase() && 
-            memberBirthdate === inputBirthdate) {
+
+        if (member.firstname && member.lastname &&
+          member.firstname.trim().toLowerCase() === firstname.trim().toLowerCase() &&
+          member.lastname.trim().toLowerCase() === lastname.trim().toLowerCase() &&
+          memberBirthdate === inputBirthdate) {
           matches.push('name and birthdate');
           duplicateFields.push('name_birthdate');
         }
@@ -206,8 +206,22 @@ async function createMember(memberData) {
     const finalFirstname = firstname || 'Unknown';
     const finalLastname = lastname || 'Unknown';
     const finalAge = age || '0';
-    const finalGender = gender || 'M';
-    const finalAddress = String(address || 'Not Provided').substring(0, 44);
+
+    // Normalize gender to a single character (M/F) to avoid 'ER_DATA_TOO_LONG' errors
+    // Since tbl_members schema might use VARCHAR(1), we ensure only 'M' or 'F' is sent
+    let finalGender = 'M';
+    if (gender) {
+      const g = gender.toString().toLowerCase();
+      if (g === 'male' || g === 'm' || g === 'man') {
+        finalGender = 'M';
+      } else if (g === 'female' || g === 'f' || g === 'woman') {
+        finalGender = 'F';
+      } else {
+        // Fallback to first character if it's something else
+        finalGender = g.charAt(0).toUpperCase();
+      }
+    }
+    const finalAddress = String(address || 'Not Provided');
     const finalEmail = email || 'unknown@example.com';
     const finalPhone = phone_number || '+639000000000';
 
@@ -236,7 +250,7 @@ async function createMember(memberData) {
     });
     if (duplicateCheck.isDuplicate) {
       const duplicateMessages = [];
-      
+
       if (duplicateCheck.duplicateFields.includes('email')) {
         duplicateMessages.push('Email address already exists');
       }
@@ -292,7 +306,7 @@ async function createMember(memberData) {
     ];
 
     const [result] = await query(sql, params);
-    
+
     return {
       success: true,
       message: 'Member created successfully',
@@ -493,7 +507,7 @@ async function updateMember(memberId, memberData) {
     const duplicateCheck = await checkDuplicateMember(memberData, memberId);
     if (duplicateCheck.isDuplicate) {
       const duplicateMessages = [];
-      
+
       if (duplicateCheck.duplicateFields.includes('email')) {
         duplicateMessages.push('Email address already exists');
       }
@@ -695,245 +709,245 @@ async function deleteMember(memberId, archivedBy = null) {
  * @returns {Promise<Object>} Object with paginated member records and metadata
  */
 async function getAllMembers(options = {}) {
-    try {
-      // Extract and normalize parameters from options
-      // Handle both query params (strings) and body payload (may be strings or numbers)
-      const search = options.search || options.q || null;
-      const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
-      const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
-      const page = options.page !== undefined ? parseInt(options.page) : undefined;
-      const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
-      const ageRange = options.ageRange || null;
-      const joinMonth = options.joinMonth || null;
-      const gender = options.gender || null;
-      const sortBy = options.sortBy || null;
-      let startDate = null;
-      let endDate = null;
-      if (options.dateRange) {
-        try {
-          const [start, end] = typeof options.dateRange === 'string' ? JSON.parse(options.dateRange) : options.dateRange;
-          startDate = start;
-          endDate = end;
-        } catch (error) {
-          console.warn('Invalid date range format:', options.dateRange);
-        }
+  try {
+    // Extract and normalize parameters from options
+    // Handle both query params (strings) and body payload (may be strings or numbers)
+    const search = options.search || options.q || null;
+    const limit = options.limit !== undefined ? parseInt(options.limit) : undefined;
+    const offset = options.offset !== undefined ? parseInt(options.offset) : undefined;
+    const page = options.page !== undefined ? parseInt(options.page) : undefined;
+    const pageSize = options.pageSize !== undefined ? parseInt(options.pageSize) : undefined;
+    const ageRange = options.ageRange || null;
+    const joinMonth = options.joinMonth || null;
+    const gender = options.gender || null;
+    const sortBy = options.sortBy || null;
+    let startDate = null;
+    let endDate = null;
+    if (options.dateRange) {
+      try {
+        const [start, end] = typeof options.dateRange === 'string' ? JSON.parse(options.dateRange) : options.dateRange;
+        startDate = start;
+        endDate = end;
+      } catch (error) {
+        console.warn('Invalid date range format:', options.dateRange);
       }
-      
-      // Build base query for counting total records
-      let countSql = 'SELECT COUNT(*) as total FROM tbl_members';
-      let countParams = [];
-      
-      // Build query for fetching records
-      let sql = 'SELECT * FROM tbl_members';
-      const params = [];
-  
-      // Build WHERE conditions array
-      const whereConditions = [];
-      let hasWhere = false;
-  
-      // Add search functionality
-      // Handle both 'search' and 'q' parameter names, and filter out empty strings
-      const searchValue = search && search.trim() !== '' ? search.trim() : null;
-      if (searchValue) {
-        const searchCondition = `(firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR phone_number LIKE ?)`;
-        const searchPattern = `%${searchValue}%`;
-        
-        whereConditions.push(searchCondition);
-        countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
-        params.push(searchPattern, searchPattern, searchPattern, searchPattern);
-        hasWhere = true;
-      }
-  
-      // Add age range filter
-      // Handle ageRange parameter (e.g., "0-18", "19-30", "31-50", "51+", "All Ages")
-      if (ageRange && ageRange !== 'All Ages' && ageRange.trim() !== '') {
-        const ageRangeValue = ageRange.trim();
-        if (ageRangeValue === '51+') {
-          // Cast age to number for comparison (age is stored as VARCHAR)
-          whereConditions.push('CAST(age AS UNSIGNED) >= ?');
-          countParams.push(51);
-          params.push(51);
-        } else if (ageRangeValue.includes('-')) {
-          const [min, max] = ageRangeValue.split('-').map(Number);
-          if (!isNaN(min) && !isNaN(max)) {
-            // Cast age to number for comparison (age is stored as VARCHAR)
-            whereConditions.push('CAST(age AS UNSIGNED) >= ? AND CAST(age AS UNSIGNED) <= ?');
-            countParams.push(min, max);
-            params.push(min, max);
-          }
-        }
-        hasWhere = true;
-      }
-  
-      // Add join month filter
-      // Handle joinMonth parameter (e.g., "January", "February", etc., or "All Months", "This Month", "Last Month")
-      if (joinMonth && joinMonth !== 'All Months' && joinMonth.trim() !== '') {
-        const monthName = joinMonth.trim();
-        
-        if (monthName === 'This Month') {
-          whereConditions.push('MONTH(date_created) = MONTH(CURDATE()) AND YEAR(date_created) = YEAR(CURDATE())');
-          hasWhere = true;
-        } else if (monthName === 'Last Month') {
-          whereConditions.push('MONTH(date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
-          hasWhere = true;
-        } else {
-          // Get month number (1-12) from month name
-          const monthMap = {
-            'January': 1, 'February': 2, 'March': 3, 'April': 4,
-            'May': 5, 'June': 6, 'July': 7, 'August': 8,
-            'September': 9, 'October': 10, 'November': 11, 'December': 12
-          };
-          const monthNum = monthMap[monthName];
-          
-          if (monthNum) {
-            whereConditions.push('MONTH(date_created) = ? AND YEAR(date_created) = YEAR(CURDATE())');
-            countParams.push(monthNum);
-            params.push(monthNum);
-            hasWhere = true;
-          }
-        }
-      }
-  
-      // Add gender filter
-      // Handle gender parameter (e.g., "Male", "Female")
-      if (gender && gender !== 'All Genders' && gender.trim() !== '') {
-        const genderValue = gender.trim();
-        // Map display name to database value
-        const genderMap = {
-          'Male': 'M',
-          'Female': 'F'
-        };
-        const dbGender = genderMap[genderValue] || genderValue;
-        
-        whereConditions.push('gender = ?');
-        countParams.push(dbGender);
-        params.push(dbGender);
-        hasWhere = true;
-      }
-
-      // Add date range filter
-      if (startDate && endDate) {
-        whereConditions.push('DATE(date_created) BETWEEN ? AND ?');
-        countParams.push(startDate, endDate);
-        params.push(startDate, endDate);
-        hasWhere = true;
-      }
-
-      // Apply WHERE clause if any conditions exist
-      if (hasWhere) {
-        const whereClause = ' WHERE ' + whereConditions.join(' AND ');
-        countSql += whereClause;
-        sql += whereClause;
-      }
-  
-      // Add sorting
-      // Handle sortBy parameter (e.g., "Name (A-Z)", "Name (Z-A)", "Join Date (Newest)", etc.)
-      let orderByClause = ' ORDER BY ';
-      const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
-      switch (sortByValue) {
-        case 'Name (A-Z)':
-          orderByClause += 'firstname ASC, lastname ASC';
-          break;
-        case 'Name (Z-A)':
-          orderByClause += 'firstname DESC, lastname DESC';
-          break;
-        case 'Join Date (Newest)':
-          orderByClause += 'date_created DESC';
-          break;
-        case 'Join Date (Oldest)':
-          orderByClause += 'date_created ASC';
-          break;
-        case 'Age (Low to High)':
-          // Cast age to number for proper numeric sorting (age is stored as VARCHAR)
-          orderByClause += 'CAST(age AS UNSIGNED) ASC';
-          break;
-        case 'Age (High to Low)':
-          // Cast age to number for proper numeric sorting (age is stored as VARCHAR)
-          orderByClause += 'CAST(age AS UNSIGNED) DESC';
-          break;
-        case 'Gender (Male First)':
-          orderByClause += 'gender ASC';
-          break;
-        case 'Gender (Female First)':
-          orderByClause += 'gender DESC';
-          break;
-        default:
-          orderByClause += 'date_created DESC'; // Default sorting
-      }
-      sql += orderByClause;
-  
-      // Determine pagination values
-      // Priority: use page/pageSize if provided, otherwise use limit/offset
-      let finalLimit, finalOffset;
-      
-      if (page !== undefined && pageSize !== undefined) {
-        // Use page-based pagination
-        const pageNum = parseInt(page) || 1;
-        const size = parseInt(pageSize) || 10;
-        finalLimit = size;
-        finalOffset = (pageNum - 1) * size;
-      } else if (limit !== undefined) {
-        // Use limit/offset pagination
-        finalLimit = parseInt(limit) || 10;
-        finalOffset = offset !== undefined ? parseInt(offset) : 0;
-      } else {
-        // No pagination - return all records
-        finalLimit = null;
-        finalOffset = null;
-      }
-  
-      // Get total count (before pagination)
-      const [countResult] = await query(countSql, countParams);
-      const totalCount = countResult[0]?.total || 0;
-  
-      // Add pagination to main query
-      // Note: MySQL doesn't support parameterized LIMIT/OFFSET, so we interpolate directly
-      // This is safe because finalLimit and finalOffset are already parsed and validated as integers
-      if (finalLimit !== null) {
-        const limitValue = Math.max(1, parseInt(finalLimit) || 10); // Ensure at least 1, default to 10
-        const offsetValue = Math.max(0, parseInt(finalOffset) || 0); // Ensure non-negative
-        
-        if (offsetValue > 0) {
-          sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
-        } else {
-          sql += ` LIMIT ${limitValue}`;
-        }
-      }
-  
-      // Execute query to get paginated results
-      const [rows] = await query(sql, params);
-      
-      // Calculate pagination metadata
-      const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
-      const currentPageSize = finalLimit || rows.length;
-      const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
-      
-      return {
-        success: true,
-        message: 'Members retrieved successfully',
-        data: rows,
-        count: rows.length, // Number of records in current page
-        totalCount: totalCount, // Total number of records matching the query
-        pagination: {
-          page: currentPage,
-          pageSize: currentPageSize,
-          totalPages: totalPages,
-          totalCount: totalCount,
-          hasNextPage: currentPage < totalPages,
-          hasPreviousPage: currentPage > 1
-        }
-      };
-    } catch (error) {
-      console.error('Error fetching members:', error);
-      throw error;
     }
+
+    // Build base query for counting total records
+    let countSql = 'SELECT COUNT(*) as total FROM tbl_members';
+    let countParams = [];
+
+    // Build query for fetching records
+    let sql = 'SELECT * FROM tbl_members';
+    const params = [];
+
+    // Build WHERE conditions array
+    const whereConditions = [];
+    let hasWhere = false;
+
+    // Add search functionality
+    // Handle both 'search' and 'q' parameter names, and filter out empty strings
+    const searchValue = search && search.trim() !== '' ? search.trim() : null;
+    if (searchValue) {
+      const searchCondition = `(firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR phone_number LIKE ?)`;
+      const searchPattern = `%${searchValue}%`;
+
+      whereConditions.push(searchCondition);
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      hasWhere = true;
+    }
+
+    // Add age range filter
+    // Handle ageRange parameter (e.g., "0-18", "19-30", "31-50", "51+", "All Ages")
+    if (ageRange && ageRange !== 'All Ages' && ageRange.trim() !== '') {
+      const ageRangeValue = ageRange.trim();
+      if (ageRangeValue === '51+') {
+        // Cast age to number for comparison (age is stored as VARCHAR)
+        whereConditions.push('CAST(age AS UNSIGNED) >= ?');
+        countParams.push(51);
+        params.push(51);
+      } else if (ageRangeValue.includes('-')) {
+        const [min, max] = ageRangeValue.split('-').map(Number);
+        if (!isNaN(min) && !isNaN(max)) {
+          // Cast age to number for comparison (age is stored as VARCHAR)
+          whereConditions.push('CAST(age AS UNSIGNED) >= ? AND CAST(age AS UNSIGNED) <= ?');
+          countParams.push(min, max);
+          params.push(min, max);
+        }
+      }
+      hasWhere = true;
+    }
+
+    // Add join month filter
+    // Handle joinMonth parameter (e.g., "January", "February", etc., or "All Months", "This Month", "Last Month")
+    if (joinMonth && joinMonth !== 'All Months' && joinMonth.trim() !== '') {
+      const monthName = joinMonth.trim();
+
+      if (monthName === 'This Month') {
+        whereConditions.push('MONTH(date_created) = MONTH(CURDATE()) AND YEAR(date_created) = YEAR(CURDATE())');
+        hasWhere = true;
+      } else if (monthName === 'Last Month') {
+        whereConditions.push('MONTH(date_created) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(date_created) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))');
+        hasWhere = true;
+      } else {
+        // Get month number (1-12) from month name
+        const monthMap = {
+          'January': 1, 'February': 2, 'March': 3, 'April': 4,
+          'May': 5, 'June': 6, 'July': 7, 'August': 8,
+          'September': 9, 'October': 10, 'November': 11, 'December': 12
+        };
+        const monthNum = monthMap[monthName];
+
+        if (monthNum) {
+          whereConditions.push('MONTH(date_created) = ? AND YEAR(date_created) = YEAR(CURDATE())');
+          countParams.push(monthNum);
+          params.push(monthNum);
+          hasWhere = true;
+        }
+      }
+    }
+
+    // Add gender filter
+    // Handle gender parameter (e.g., "Male", "Female")
+    if (gender && gender !== 'All Genders' && gender.trim() !== '') {
+      const genderValue = gender.trim();
+      // Map display name to database value
+      const genderMap = {
+        'Male': 'M',
+        'Female': 'F'
+      };
+      const dbGender = genderMap[genderValue] || genderValue;
+
+      whereConditions.push('gender = ?');
+      countParams.push(dbGender);
+      params.push(dbGender);
+      hasWhere = true;
+    }
+
+    // Add date range filter
+    if (startDate && endDate) {
+      whereConditions.push('DATE(date_created) BETWEEN ? AND ?');
+      countParams.push(startDate, endDate);
+      params.push(startDate, endDate);
+      hasWhere = true;
+    }
+
+    // Apply WHERE clause if any conditions exist
+    if (hasWhere) {
+      const whereClause = ' WHERE ' + whereConditions.join(' AND ');
+      countSql += whereClause;
+      sql += whereClause;
+    }
+
+    // Add sorting
+    // Handle sortBy parameter (e.g., "Name (A-Z)", "Name (Z-A)", "Join Date (Newest)", etc.)
+    let orderByClause = ' ORDER BY ';
+    const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
+    switch (sortByValue) {
+      case 'Name (A-Z)':
+        orderByClause += 'firstname ASC, lastname ASC';
+        break;
+      case 'Name (Z-A)':
+        orderByClause += 'firstname DESC, lastname DESC';
+        break;
+      case 'Join Date (Newest)':
+        orderByClause += 'date_created DESC';
+        break;
+      case 'Join Date (Oldest)':
+        orderByClause += 'date_created ASC';
+        break;
+      case 'Age (Low to High)':
+        // Cast age to number for proper numeric sorting (age is stored as VARCHAR)
+        orderByClause += 'CAST(age AS UNSIGNED) ASC';
+        break;
+      case 'Age (High to Low)':
+        // Cast age to number for proper numeric sorting (age is stored as VARCHAR)
+        orderByClause += 'CAST(age AS UNSIGNED) DESC';
+        break;
+      case 'Gender (Male First)':
+        orderByClause += 'gender ASC';
+        break;
+      case 'Gender (Female First)':
+        orderByClause += 'gender DESC';
+        break;
+      default:
+        orderByClause += 'date_created DESC'; // Default sorting
+    }
+    sql += orderByClause;
+
+    // Determine pagination values
+    // Priority: use page/pageSize if provided, otherwise use limit/offset
+    let finalLimit, finalOffset;
+
+    if (page !== undefined && pageSize !== undefined) {
+      // Use page-based pagination
+      const pageNum = parseInt(page) || 1;
+      const size = parseInt(pageSize) || 10;
+      finalLimit = size;
+      finalOffset = (pageNum - 1) * size;
+    } else if (limit !== undefined) {
+      // Use limit/offset pagination
+      finalLimit = parseInt(limit) || 10;
+      finalOffset = offset !== undefined ? parseInt(offset) : 0;
+    } else {
+      // No pagination - return all records
+      finalLimit = null;
+      finalOffset = null;
+    }
+
+    // Get total count (before pagination)
+    const [countResult] = await query(countSql, countParams);
+    const totalCount = countResult[0]?.total || 0;
+
+    // Add pagination to main query
+    // Note: MySQL doesn't support parameterized LIMIT/OFFSET, so we interpolate directly
+    // This is safe because finalLimit and finalOffset are already parsed and validated as integers
+    if (finalLimit !== null) {
+      const limitValue = Math.max(1, parseInt(finalLimit) || 10); // Ensure at least 1, default to 10
+      const offsetValue = Math.max(0, parseInt(finalOffset) || 0); // Ensure non-negative
+
+      if (offsetValue > 0) {
+        sql += ` LIMIT ${limitValue} OFFSET ${offsetValue}`;
+      } else {
+        sql += ` LIMIT ${limitValue}`;
+      }
+    }
+
+    // Execute query to get paginated results
+    const [rows] = await query(sql, params);
+
+    // Calculate pagination metadata
+    const currentPage = page !== undefined ? parseInt(page) : (finalOffset !== null ? Math.floor(finalOffset / finalLimit) + 1 : 1);
+    const currentPageSize = finalLimit || rows.length;
+    const totalPages = finalLimit ? Math.ceil(totalCount / finalLimit) : 1;
+
+    return {
+      success: true,
+      message: 'Members retrieved successfully',
+      data: rows,
+      count: rows.length, // Number of records in current page
+      totalCount: totalCount, // Total number of records matching the query
+      pagination: {
+        page: currentPage,
+        pageSize: currentPageSize,
+        totalPages: totalPages,
+        totalCount: totalCount,
+        hasNextPage: currentPage < totalPages,
+        hasPreviousPage: currentPage > 1
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching members:', error);
+    throw error;
   }
+}
 // Create function to get the next member_id (incremental integer)
 async function getNextMemberId() {
   try {
     const sql = 'SELECT MAX(member_id) AS max_member_id FROM tbl_members';
     const [rows] = await query(sql);
-    
+
     // If no records exist, start with 1, otherwise increment by 1
     const maxId = rows[0]?.max_member_id || 0;
     // it should return a string like 0000000001
@@ -945,33 +959,33 @@ async function getNextMemberId() {
   }
 }
 async function getMemberById(memberId) {
-    try {
-      if (!memberId) {
-        throw new Error('Member ID is required');
-      }
-  
-      const sql = 'SELECT * FROM tbl_members WHERE member_id = ?';
-      const [rows] = await query(sql, [memberId]);
-  
-      if (rows.length === 0) {
-        return {
-          success: false,
-          message: 'Member not found',
-          data: null
-        };
-      }
-  
-      return {
-        success: true,
-        message: 'Member retrieved successfully',
-        data: rows[0]
-      };
-    } catch (error) {
-      console.error('Error fetching member:', error);
-      throw error;
+  try {
+    if (!memberId) {
+      throw new Error('Member ID is required');
     }
+
+    const sql = 'SELECT * FROM tbl_members WHERE member_id = ?';
+    const [rows] = await query(sql, [memberId]);
+
+    if (rows.length === 0) {
+      return {
+        success: false,
+        message: 'Member not found',
+        data: null
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Member retrieved successfully',
+      data: rows[0]
+    };
+  } catch (error) {
+    console.error('Error fetching member:', error);
+    throw error;
   }
-  
+}
+
 /**
  * EXPORT - Export member records to CSV
  * @param {Object} options - Optional query parameters (same as getAllMembers: search, ageRange, joinMonth, sortBy)
@@ -1070,7 +1084,7 @@ async function exportMembersToExcel(options = {}) {
     console.log('Export options:', exportOptions);
 
     const result = await getAllMembers(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No members found to export');
     }
@@ -1141,8 +1155,8 @@ async function exportMembersToExcel(options = {}) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Members');
 
     // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });
@@ -1299,9 +1313,9 @@ async function getSpecificMemberByEmailAndStatus(email) {
     // tbl_members schema does not have a status column; check by email only
     const sql = 'SELECT * FROM tbl_members WHERE email = ?';
     const [rows] = await query(sql, [email]);
-    if(rows.length === 0) {
+    if (rows.length === 0) {
       return null;
-    }else{
+    } else {
       return rows[0];
     }
   }

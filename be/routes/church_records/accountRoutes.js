@@ -145,13 +145,20 @@ router.get('/getAccountById/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await getAccountById(id);
-    if (result && result.data) {
+
+    if (result && result.success && result.data) {
       req.auditDescription = `Viewed details of account for user: ${result.data.email} (${result.data.position})`;
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message || 'Account not found',
+        error: 'Account not found'
+      });
     }
-    res.json({
-      success: true,
-      data: result
-    });
   } catch (error) {
     console.error('Error fetching account:', error);
     res.status(500).json({
@@ -273,56 +280,61 @@ router.put('/updateAccount/:id', async (req, res) => {
     const { id } = req.params;
     const { email, password, position, status, member_id } = req.body;
 
-    // Check if email is provided - if not, we'll get it from the database
-    let emailToUse = email;
-    if (!emailToUse) {
-      // Fetch current account to get email
-      const account = await getAccountById(id);
-      if (account && account.data) {
-        emailToUse = account.data.email;
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: 'Account not found',
-          error: 'Account not found'
-        });
-      }
+    // Check if account exists first
+    const accountResult = await getAccountById(id);
+    if (!accountResult || !accountResult.success || !accountResult.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found',
+        error: 'Account not found'
+      });
     }
+
+    const currentAccount = accountResult.data;
+    const emailToUse = email || currentAccount.email;
 
     const result = await updateAccount(id, {
       email: emailToUse,
       password: password,
-      position,
-      status,
-      member_id
+      position: position || currentAccount.position,
+      status: status || currentAccount.status,
+      member_id: member_id !== undefined ? member_id : currentAccount.member_id
     });
 
-    // Audit log
-    try {
-      await auditTrailRecords.createAuditLog({
-        user_id: req.user?.acc_id || null,
-        user_email: req.user?.email || 'system',
-        user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
-        user_position: req.user?.position || 'system',
-        action_type: 'UPDATE',
-        module: 'Account Management',
-        description: `Updated account for email: ${emailToUse} (ID: ${id})`,
-        entity_type: 'account',
-        entity_id: id,
-        ip_address: req.ip || req.connection?.remoteAddress,
-        user_agent: req.headers['user-agent'] || null,
-        status: 'success',
-        error_message: null
+    if (result.success) {
+      // Audit log
+      try {
+        await auditTrailRecords.createAuditLog({
+          user_id: req.user?.acc_id || null,
+          user_email: req.user?.email || 'system',
+          user_name: (req.user?.member?.firstname && req.user?.member?.lastname) ? `${req.user.member.firstname} ${req.user.member.lastname}` : (req.user?.email || 'System'),
+          user_position: req.user?.position || 'system',
+          action_type: 'UPDATE',
+          module: 'Account Management',
+          description: `Updated account for email: ${emailToUse} (ID: ${id})`,
+          entity_type: 'account',
+          entity_id: id,
+          ip_address: req.ip || req.connection?.remoteAddress,
+          user_agent: req.headers['user-agent'] || null,
+          status: 'success',
+          error_message: null
+        });
+      } catch (auditError) {
+        console.error('Error creating audit log:', auditError);
+      }
+
+      res.json({
+        success: true,
+        data: result.data,
+        message: result.message || 'Account updated successfully'
       });
-    } catch (auditError) {
-      console.error('Error creating audit log:', auditError);
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message || 'Failed to update account',
+        error: result.message
+      });
     }
-
-    res.json({
-      success: true,
-      data: result,
-      message: 'Account updated successfully'
-    });
   } catch (error) {
     console.error('Error updating account:', error);
     res.status(500).json({
@@ -855,9 +867,11 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     // Log system error during login
     try {
+      const email = req.body.email; // Access email from request body
       await auditTrailRecords.createAuditLog({
         user_id: null,
         user_email: email || 'unknown',
+        user_name: 'Unknown User',
         user_name: 'Unknown User',
         user_position: 'unknown',
         action_type: 'LOGIN_ERROR',

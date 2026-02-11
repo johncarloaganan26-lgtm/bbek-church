@@ -6,38 +6,79 @@ const { archiveBeforeDelete } = require('../archiveHelper');
 
 /**
  * Helper function to convert image to blob
+ * Handles base64 strings, data URLs, Buffers, and file paths
  */
 function convertImageToBlob(imageInput) {
   try {
     if (!imageInput) {
+      console.log('convertImageToBlob: No image input provided');
       return null;
     }
+
+    // If already a Buffer, return it
     if (Buffer.isBuffer(imageInput)) {
+      console.log('convertImageToBlob: Input is already a Buffer, length:', imageInput.length);
       return imageInput;
     }
+
+    // If it's a file object from multer (has buffer property)
     if (imageInput.buffer && Buffer.isBuffer(imageInput.buffer)) {
+      console.log('convertImageToBlob: Input is multer file object, buffer length:', imageInput.buffer.length);
       return imageInput.buffer;
     }
+
+    // Handle string inputs
     if (typeof imageInput === 'string') {
-      // Check if it's a data URL (starts with 'data:') or a raw base64 string
+      console.log('convertImageToBlob: Input is string, length:', imageInput.length);
+
+      // Check if it's a data URL (starts with 'data:')
       if (imageInput.startsWith('data:')) {
+        console.log('convertImageToBlob: Detected data URL');
         // Extract base64 data from data URL
         const base64Data = imageInput.includes(',') ? imageInput.split(',')[1] : imageInput;
-        return Buffer.from(base64Data, 'base64');
-      } else if (imageInput.includes(',') && imageInput.split(',')[0].startsWith('data:')) {
-        // Handle case where it might be a partial data URL
-        const base64Data = imageInput.split(',')[1];
-        return Buffer.from(base64Data, 'base64');
-      } else if (!imageInput.includes(' ') && !imageInput.includes('/') && !imageInput.includes('\\')) {
-        // Check if it's a file path (not a base64 string)
-        if (fs.existsSync(imageInput)) {
-          return fs.readFileSync(imageInput);
+        console.log('convertImageToBlob: Extracted base64 data length:', base64Data.length);
+
+        // Validate base64 format
+        if (!/^[A-Za-z0-9+/=]+$/.test(base64Data.trim())) {
+          throw new Error('Invalid base64 data in data URL');
         }
-      } else {
-        // Treat as raw base64 string
-        return Buffer.from(imageInput, 'base64');
+
+        const buffer = Buffer.from(base64Data, 'base64');
+        console.log('convertImageToBlob: Converted to buffer, length:', buffer.length);
+        return buffer;
       }
+
+      // Check if it's a file path: only treat as path if the path actually exists on disk
+      if ((imageInput.includes('/') || imageInput.includes('\\')) && !imageInput.includes(' ')) {
+        try {
+          if (fs.existsSync(imageInput)) {
+            console.log('convertImageToBlob: Detected file path and it exists:', imageInput);
+            const fileBuffer = fs.readFileSync(imageInput);
+            console.log('convertImageToBlob: Read file, buffer length:', fileBuffer.length);
+            return fileBuffer;
+          } else {
+            // Not an existing path - fall through to treat as raw base64 string
+            console.log('convertImageToBlob: Path-like string does not exist on disk, treating as base64');
+          }
+        } catch (fsErr) {
+          console.warn('convertImageToBlob: fs.existsSync error, treating as base64', fsErr && fsErr.message);
+        }
+      }
+
+      // Treat as raw base64 string (no data URL prefix, no path separators)
+      console.log('convertImageToBlob: Treating as raw base64 string');
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/=]+$/.test(imageInput.trim())) {
+        throw new Error('Invalid base64 string format');
+      }
+
+      const buffer = Buffer.from(imageInput, 'base64');
+      console.log('convertImageToBlob: Converted raw base64 to buffer, length:', buffer.length);
+      return buffer;
     }
+
+    console.log('convertImageToBlob: Unsupported input type:', typeof imageInput);
     return null;
   } catch (error) {
     console.error('Error converting image to blob:', error);

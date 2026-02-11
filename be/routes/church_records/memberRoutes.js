@@ -62,7 +62,7 @@ const upload = multer({
 router.post('/createMember', async (req, res) => {
   try {
     const result = await createMember(req.body);
-
+    
     if (result.success) {
       res.status(201).json({
         message: result.message,
@@ -92,7 +92,7 @@ router.post('/import', authenticateToken, async (req, res) => {
   try {
     let fileBuffer;
     let fileExtension;
-
+    
     // Check if file was uploaded via multer (multipart/form-data)
     if (req.file) {
       fileBuffer = req.file.buffer;
@@ -102,7 +102,7 @@ router.post('/import', authenticateToken, async (req, res) => {
       // Base64 file data from JSON body
       console.log('File provided as base64 data');
       const fileData = req.body;
-
+      
       // Extract extension from filename
       fileExtension = (fileData.extension || '').toLowerCase();
       // Ensure extension has a dot prefix
@@ -112,7 +112,7 @@ router.post('/import', authenticateToken, async (req, res) => {
       if (!fileExtension && fileData.filename) {
         fileExtension = path.extname(fileData.filename).toLowerCase();
       }
-
+      
       // Decode base64 to buffer
       if (fileData.data && typeof fileData.data === 'string') {
         // Remove data URL prefix if present
@@ -380,29 +380,29 @@ router.get('/exportExcel', async (req, res) => {
   try {
     // Get parameters from query string
     const options = req.query
-
+    
     console.log('Export request with options:', options)
-
+    
     const excelBuffer = await exportMembersToExcel(options)
-
+    
     if (!excelBuffer || excelBuffer.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Failed to generate Excel file'
       })
     }
-
+    
     // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss')
     const filename = `members_export_${timestamp}.xlsx`
-
+    
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Content-Length', excelBuffer.length)
-
+    
     console.log(`Sending Excel file: ${filename} (${excelBuffer.length} bytes)`)
-
+    
     // Send the Excel file
     res.send(excelBuffer)
   } catch (error) {
@@ -422,29 +422,29 @@ router.post('/exportExcel', async (req, res) => {
   try {
     // Get parameters from request body
     const options = req.body
-
+    
     console.log('Export POST request with options:', options)
-
+    
     const excelBuffer = await exportMembersToExcel(options)
-
+    
     if (!excelBuffer || excelBuffer.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Failed to generate Excel file'
       })
     }
-
+    
     // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss')
     const filename = `members_export_${timestamp}.xlsx`
-
+    
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Content-Length', excelBuffer.length)
-
+    
     console.log(`Sending Excel file: ${filename} (${excelBuffer.length} bytes)`)
-
+    
     // Send the Excel file
     res.send(excelBuffer)
   } catch (error) {
@@ -583,12 +583,8 @@ router.get('/getMemberById/:id', async (req, res) => {
     }
 
     const result = await getMemberById(memberId);
-
+    
     if (result.success) {
-      // Set audit trail override for better description
-      const member = result.data;
-      req.auditDescription = `Viewed details of member: ${member.firstname} ${member.lastname} (ID: ${memberId})`;
-
       res.status(200).json({
         message: result.message,
         data: result.data
@@ -614,7 +610,7 @@ router.get('/getMemberById/:id', async (req, res) => {
 router.get('/getSpecificMemberByEmail/:email', async (req, res) => {
   try {
     const { email } = req.params;
-
+    
     if (!email || email.trim() === '') {
       return res.status(400).json({
         success: false,
@@ -624,7 +620,7 @@ router.get('/getSpecificMemberByEmail/:email', async (req, res) => {
     }
 
     const result = await getSpecificMemberByEmailAndStatus(email);
-
+    
     if (result) {
       res.status(200).json({
         success: true,
@@ -664,12 +660,8 @@ router.put('/updateMember/:id', async (req, res) => {
     }
 
     const result = await updateMember(memberId, req.body);
-
+    
     if (result.success) {
-      // Set audit trail override for better description
-      const member = result.data;
-      req.auditDescription = `Updated member: ${member.firstname} ${member.lastname} (ID: ${memberId})`;
-
       res.status(200).json({
         message: result.message,
         data: result.data
@@ -705,7 +697,7 @@ router.delete('/deleteMember/:id', async (req, res) => {
     }
 
     const result = await deleteMember(memberId, archivedBy);
-
+    
     if (result.success) {
       res.status(200).json({
         success: true,

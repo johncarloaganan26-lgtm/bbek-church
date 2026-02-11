@@ -171,390 +171,67 @@
                 </template>
               </template>
               <template v-else>
-                <h2 class="section-title fade-in" style="animation-delay: 700ms; font-family: 'Georgia', serif; font-style: italic;">
-                  Register for Baptism and Become Part of Our Family
-                </h2>
-                <el-card class="registration-card fade-in-up" style="animation-delay: 800ms;" shadow="hover">
-                  <template #header>
-                    <div class="registration-header">
-                      <h3 class="registration-title" style="font-family: 'Georgia', serif; font-style: italic;">Baptism Registration Form</h3>
-                      <p class="registration-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">
-                        Please fill out this form to register for an upcoming baptism service.
+                <div class="journey-info fade-in-up" style="animation-delay: 700ms;">
+                  <h2 class="section-title" style="font-family: 'Georgia', serif; font-style: italic;">
+                    Your Journey Towards Baptism
+                  </h2>
+                  
+                  <v-card class="journey-card pb-6" variant="elevated">
+                    <v-card-text>
+                      <p class="mb-6" style="font-family: 'Georgia', serif; font-style: italic; font-size: 1.1rem; line-height: 1.6;">
+                        Baptism is more than just a ceremony; it is a public declaration of your new life in Christ. At Bible Baptist Ekklesia of Kawit, we want to walk with you through every step of this spiritual commitment.
                       </p>
-                    </div>
-                  </template>
-                  <el-form
-                    ref="formRef"
-                    :model="formData"
-                    :rules="rules"
-                    label-width="0"
-                    label-position="top"
-                    :hide-required-asterisk="true"
-                    class="registration-form"
-                  >
-                    <div class="form-row">
-                      <el-form-item label="First Name" prop="firstname" class="form-group">
-                        <template #label>
-                          <span>First Name <span class="required-text">Required</span></span>
-                        </template>
-                        <el-input
-                          v-model="formData.firstname"
-                          placeholder="Enter your first name"
-                          size="large"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                      <el-form-item label="Middle Name" prop="middleName" class="form-group">
-                        <template #label>
-                          <span>Middle Name</span>
-                        </template>
-                        <el-input
-                          v-model="formData.middleName"
-                          placeholder="Enter your middle name"
-                          size="large"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                    </div>
 
-                    <div class="form-row">
-                      <el-form-item label="Last Name" prop="lastname" class="form-group">
-                        <template #label>
-                          <span>Last Name <span class="required-text">Required</span></span>
-                        </template>
-                        <el-input
-                          v-model="formData.lastname"
-                          placeholder="Enter your last name"
-                          size="large"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                      <el-form-item label="Birthdate" prop="birthdate" class="form-group">
-                        <template #label>
-                          <span>Birthdate <span class="required-text">Required</span></span>
-                        </template>
-                        <el-date-picker
-                          v-model="formData.birthdate"
-                          type="date"
-                          placeholder="Select birthdate"
-                          size="large"
-                          format="YYYY-MM-DD"
-                          value-format="YYYY-MM-DD"
-                          style="width: 100%"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                    </div>
-
-                    <div class="form-row">
-                      <el-form-item label="Age" prop="age" class="form-group">
-                        <template #label>
-                          <span>Age <span class="required-text">Required (12+ years old)</span></span>
-                        </template>
-                        <el-input
-                          v-model.number="formData.age"
-                          type="number"
-                          placeholder="Enter your age"
-                          size="large"
-                          readonly
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                      <el-form-item label="Sex" prop="gender" class="form-group">
-                        <template #label>
-                          <span>Sex <span class="required-text">Required</span></span>
-                        </template>
-                        <el-select
-                          v-model="formData.gender"
-                          placeholder="Select sex"
-                          size="large"
-                          style="width: 100%"
-                          :disabled="memberRegistrationStore.loading"
-                        >
-                          <el-option label="Male" value="M" />
-                          <el-option label="Female" value="F" />
-                        </el-select>
-                      </el-form-item>
-                    </div>
-
-                    <el-form-item label="Address" prop="address" class="form-group">
-                      <template #label>
-                        <span>Address <span class="required-text">Required</span></span>
-                      </template>
-                      <el-input
-                        v-model="formData.address"
-                        type="textarea"
-                        :rows="3"
-                        placeholder="Enter your address"
-                        size="large"
-                        :disabled="memberRegistrationStore.loading"
-                      />
-                    </el-form-item>
-
-                    <el-form-item label="Email" prop="email" class="form-group">
-                      <template #label>
-                        <span>Email <span class="required-text">Required</span></span>
-                      </template>
-                      <el-input
-                        v-model="formData.email"
-                        type="email"
-                        placeholder="Enter your email"
-                        size="large"
-                        :disabled="memberRegistrationStore.loading"
-                      />
-                    </el-form-item>
-
-                    <el-form-item label="Phone Number" prop="phoneNumber" class="form-group">
-                      <template #label>
-                        <span>Phone Number <span class="required-text">Required</span></span>
-                      </template>
-                      <el-input
-                        v-model="formData.phoneNumber"
-                        type="tel"
-                        placeholder="9XXXXXXXXX"
-                        size="large"
-                        :maxlength="10"
-                        :disabled="memberRegistrationStore.loading"
-                      >
-                        <template #prepend>+63</template>
-                      </el-input>
-                    </el-form-item>
-
-                    <el-form-item label="Civil Status" prop="civilStatus" class="form-group">
-                      <template #label>
-                        <span>Civil Status <span class="required-text">Required</span></span>
-                      </template>
-                      <el-select
-                        v-model="formData.civilStatus"
-                        placeholder="Select civil status"
-                        size="large"
-                        style="width: 100%"
-                        :disabled="memberRegistrationStore.loading"
-                      >
-                        <el-option label="Single" value="single" />
-                        <el-option label="Married" value="married" />
-                        <el-option label="Widowed" value="widowed" />
-                        <el-option label="Divorced" value="divorced" />
-                        <el-option label="Separated" value="separated" />
-                      </el-select>
-                    </el-form-item>
-
-                    <el-form-item label="Profession" prop="profession" class="form-group">
-                      <template #label>
-                        <span>Profession</span>
-                      </template>
-                      <el-input
-                        v-model="formData.profession"
-                        placeholder="Enter your profession"
-                        size="large"
-                        :disabled="memberRegistrationStore.loading"
-                      />
-                    </el-form-item>
-
-
-                    <!-- Spouse and Children fields - shown only if married -->
-                    <template v-if="formData.civilStatus === 'married'">
-                      <el-form-item label="Spouse Name" prop="spouseName" class="form-group">
-                        <template #label>
-                          <span>Spouse Name</span>
-                        </template>
-                        <el-input
-                          v-model="formData.spouseName"
-                          placeholder="Enter spouse's full name"
-                          size="large"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-
-                      <el-form-item label="Marriage Date" prop="marriageDate" class="form-group">
-                        <template #label>
-                          <span>Marriage Date</span>
-                        </template>
-                        <el-date-picker
-                          v-model="formData.marriageDate"
-                          type="date"
-                          placeholder="Select marriage date"
-                          size="large"
-                          format="YYYY-MM-DD"
-                          value-format="YYYY-MM-DD"
-                          style="width: 100%"
-                          :disabled="memberRegistrationStore.loading"
-                        />
-                      </el-form-item>
-                    </template>
-
-                    <!-- Children Section -->
-                    <div class="children-section">
-                      <h4 class="children-title" style="font-family: 'Georgia', serif; font-style: italic;">Children Information</h4>
-                      <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">You can add information about your children at any time (optional)</p>
-
-                      <div v-for="(child, index) in formData.children" :key="index" class="child-item">
-                        <div class="child-header">
-                          <span class="child-number">Child {{ index + 1 }}</span>
-                          <el-button
-                            type="danger"
-                            size="small"
-                            @click="removeChild(index)"
-                            :disabled="memberRegistrationStore.loading"
-                          >
-                            Remove
-                          </el-button>
+                      <div class="roadmap">
+                        <div class="roadmap-item">
+                          <div class="roadmap-icon">1</div>
+                          <div class="roadmap-content">
+                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Discipleship & Salvation</h3>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">The first step is establishing a firm foundation in your salvation and understanding the basics of the Christian faith.</p>
+                          </div>
                         </div>
 
-                        <div class="form-row">
-                          <el-form-item :label="`Child ${index + 1} Name`" :prop="`children.${index}.name`" class="form-group">
-                            <el-input
-                              v-model="child.name"
-                              :placeholder="`Enter child ${index + 1} name`"
-                              size="large"
-                              :disabled="memberRegistrationStore.loading"
-                            />
-                          </el-form-item>
-                          <el-form-item :label="`Child ${index + 1} Age`" :prop="`children.${index}.age`" class="form-group">
-                            <el-input
-                              v-model.number="child.age"
-                              type="number"
-                              :placeholder="`Enter child ${index + 1} age`"
-                              size="large"
-                              :disabled="memberRegistrationStore.loading"
-                            />
-                          </el-form-item>
+                        <div class="roadmap-connector"></div>
+
+                        <div class="roadmap-item">
+                          <div class="roadmap-icon">2</div>
+                          <div class="roadmap-content">
+                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Prerequisite Bible Studies</h3>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">Complete a series of lessons designed to prepare your heart and mind for the significance of water baptism.</p>
+                          </div>
                         </div>
 
-                        <div class="form-row">
-                          <el-form-item :label="`Child ${index + 1} Gender`" :prop="`children.${index}.gender`" class="form-group">
-                            <el-select
-                              v-model="child.gender"
-                              :placeholder="`Select child ${index + 1} gender`"
-                              size="large"
-                              style="width: 100%"
-                              :disabled="memberRegistrationStore.loading"
-                            >
-                              <el-option label="Male" value="M" />
-                              <el-option label="Female" value="F" />
-                            </el-select>
-                          </el-form-item>
-                          <el-form-item :label="`Child ${index + 1} Birthday`" :prop="`children.${index}.birthday`" class="form-group">
-                            <el-date-picker
-                              v-model="child.birthday"
-                              type="date"
-                              :placeholder="`Select child ${index + 1} birthday`"
-                              size="large"
-                              format="YYYY-MM-DD"
-                              value-format="YYYY-MM-DD"
-                              style="width: 100%"
-                              :disabled="memberRegistrationStore.loading"
-                              @change="calculateChildAge(index)"
-                            />
-                          </el-form-item>
+                        <div class="roadmap-connector"></div>
+
+                        <div class="roadmap-item final">
+                          <div class="roadmap-icon bg-teal">
+                            <v-icon color="white">mdi-water</v-icon>
+                          </div>
+                          <div class="roadmap-content">
+                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Water Baptism</h3>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">Once prerequisites are completed, you will be officially scheduled for our next baptism service!</p>
+                          </div>
                         </div>
                       </div>
 
-                      <el-button
-                        type="primary"
-                        size="large"
-                        @click="addChild"
-                        :disabled="memberRegistrationStore.loading"
-                        class="add-child-btn"
-                      >
-                        <v-icon start>add</v-icon>
-                        Add Child
-                      </el-button>
-                    </div>
-
-                    <el-form-item label="Guardian Name" prop="guardianName" class="form-group" v-if="formData.civilStatus === 'single'">
-                      <template #label>
-                        <span>Guardian Name (Optional)</span>
-                      </template>
-                      <el-input
-                        v-model="formData.guardianName"
-                        placeholder="Enter guardian's full name"
-                        size="large"
-                        :disabled="memberRegistrationStore.loading"
-                      />
-                    </el-form-item>
-
-                    <el-form-item label="Guardian Contact" prop="guardianContact" class="form-group" v-if="formData.civilStatus === 'single'">
-                      <template #label>
-                        <span>Guardian Contact (Optional)</span>
-                      </template>
-                      <el-input
-                        v-model="formData.guardianContact"
-                        type="tel"
-                        placeholder="9XXXXXXXXX"
-                        size="large"
-                        :maxlength="10"
-                        :disabled="memberRegistrationStore.loading"
-                      >
-                        <template #prepend>+63</template>
-                      </el-input>
-                    </el-form-item>
-
-                    <el-form-item label="Guardian Relationship" prop="guardianRelationship" class="form-group" v-if="formData.civilStatus === 'single'">
-                      <template #label>
-                        <span>Guardian Relationship (Optional)</span>
-                      </template>
-                      <el-select
-                        v-model="formData.guardianRelationship"
-                        placeholder="Select relationship"
-                        size="large"
-                        style="width: 100%"
-                        :disabled="memberRegistrationStore.loading"
-                      >
-                        <el-option label="Parent" value="parent" />
-                        <el-option label="Grandparent" value="grandparent" />
-                        <el-option label="Sibling" value="sibling" />
-                        <el-option label="Guardian" value="guardian" />
-                        <el-option label="Other" value="other" />
-                      </el-select>
-                    </el-form-item>
-
-                    <el-form-item label="Your Testimony" prop="testimony" class="form-group">
-                      <template #label>
-                        <span>Your Testimony (Optional)</span>
-                      </template>
-                      <el-input
-                        v-model="formData.testimony"
-                        type="textarea"
-                        :rows="4"
-                        placeholder="Share your journey to faith in Christ"
-                        :disabled="memberRegistrationStore.loading"
-                      />
-                    </el-form-item>
-
-                    <el-form-item>
-                      <el-button
-                        type="primary"
-                        size="large"
-                        class="submit-btn"
-                        :loading="memberRegistrationStore.loading"
-                        :disabled="memberRegistrationStore.loading"
-                        @click="handleSubmit"
-                      >
-                        Submit Registration
-                      </el-button>
-                    </el-form-item>
-
-                    <el-alert
-                      v-if="submitMessage"
-                      type="success"
-                      :closable="false"
-                      show-icon
-                      class="mt-4"
-                    >
-                      {{ submitMessage }}
-                    </el-alert>
-                    <el-alert
-                      v-if="submitError"
-                      type="error"
-                      :closable="false"
-                      show-icon
-                      class="mt-4"
-                    >
-                      {{ submitError }}
-                    </el-alert>
-                  </el-form>
-                </el-card>
+                      <div class="cta-section mt-8 text-center">
+                        <p class="mb-4" style="font-family: 'Georgia', serif; font-style: italic; font-weight: bold;">
+                          Ready to take the first step?
+                        </p>
+                        <v-btn
+                          color="teal"
+                          size="x-large"
+                          @click="$router.push('/beoneofus/discipleship')"
+                          class="action-btn"
+                          elevation="4"
+                        >
+                          Sign Up for Discipleship
+                          <v-icon end>mdi-arrow-right</v-icon>
+                        </v-btn>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </div>
               </template>
             </div>
           </div>
@@ -581,110 +258,9 @@ const churchLeadersStore = useChurchLeadersStore()
 const user = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const pastors = ref([])
 const churchLeaders = ref([])
-// Form ref
-const formRef = ref(null)
-
-// Form data
-const formData = reactive({
-  firstname: '',
-  middleName: '',
-  lastname: '',
-  birthdate: null,
-  age: 0,
-  gender: '',
-  address: '',
-  email: '',
-  phoneNumber: '',
-  civilStatus: '',
-  profession: '',
-  spouseName: '',
-  marriageDate: null,
-  children: [],
-  testimony: '',
-  preferredDate: null,
-  guardianName: '',
-  guardianContact: '',
-  guardianRelationship: ''
-})
-
-// Validation rules
-const rules = {
-  firstname: [
-    { required: true, message: 'First name is required', trigger: 'blur' }
-  ],
-  lastname: [
-    { required: true, message: 'Last name is required', trigger: 'blur' }
-  ],
-  birthdate: [
-    { required: true, message: 'Birthdate is required', trigger: 'change' },
-    {
-      validator: (rule, value, callback) => {
-        if (!value) {
-          callback(new Error('Birthdate is required'))
-          return
-        }
-        const birth = new Date(value)
-        const today = new Date()
-        if (birth >= today) {
-          callback(new Error('Birthdate cannot be today or in the future'))
-          return
-        }
-        // Check if too far in the past (more than 100 years)
-        const minDate = new Date()
-        minDate.setFullYear(today.getFullYear() - 100)
-        if (birth < minDate) {
-          callback(new Error('Birthdate is too far in the past'))
-          return
-        }
-        // Check if person is at least 12 years old
-        let calculatedAge = today.getFullYear() - birth.getFullYear()
-        const monthDiff = today.getMonth() - birth.getMonth()
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-          calculatedAge--
-        }
-        if (calculatedAge < 12) {
-          callback(new Error('You must be at least 12 years old to be baptized'))
-          return
-        }
-        callback()
-      },
-      trigger: 'change'
-    }
-  ],
-  age: [
-    { required: true, message: 'Age is required', trigger: 'blur' }
-  ],
-  gender: [
-    { required: true, message: 'Sex is required', trigger: 'change' }
-  ],
-  address: [
-    { required: true, message: 'Address is required', trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: 'Email is required', trigger: 'blur' },
-    { type: 'email', message: 'Please enter a valid email address', trigger: 'blur' }
-  ],
-  phoneNumber: [
-    { required: true, message: 'Phone number is required', trigger: 'blur' },
-    { min: 10, max: 10, message: 'Phone number must be 10 digits', trigger: 'blur' }
-  ],
-  civilStatus: [
-    { required: true, message: 'Civil status is required', trigger: 'change' }
-  ],
-  guardianContact: [
-    {
-      pattern: /^(\d{10})?$/,
-      message: 'Guardian contact must be 10 digits if provided',
-      trigger: 'blur'
-    }
-  ]
-}
-
 const isMember = ref(false)
 const memberBaptismData = ref(null)
 const loadingCertificate = ref(false)
-const submitMessage = ref('')
-const submitError = ref('')
 
 // Water Baptism CMS data
 const waterBaptismData = ref({
@@ -735,65 +311,11 @@ const fetchWaterBaptismData = async () => {
   }
 }
 
-// Watch birthdate to calculate age
-watch(() => formData.birthdate, (newDate) => {
-  if (!newDate) {
-    formData.age = 0
-    return
-  }
-
-  const birth = new Date(newDate)
-  const today = new Date()
-  
-  if (birth >= today) {
-    ElMessage.error('Invalid birthdate. Birthdate cannot be today or in the future.')
-    formData.birthdate = null
-    formData.age = 0
-    return
-  }
-
-  let calculatedAge = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    calculatedAge--
-  }
-
-  // Check if person is at least 12 years old
-  if (calculatedAge < 12) {
-    ElMessage.error('You must be at least 12 years old to be baptized')
-    formData.birthdate = null
-    formData.age = 0
-    return
-  }
-
-  formData.age = calculatedAge
-})
-
-// Normalize phone number input to digits only and cap at 10 digits (Philippines local without country code)
-watch(() => formData.phoneNumber, (val) => {
-  const digits = (val || '').replace(/\D/g, '').slice(0, 10)
-  if (digits !== val) {
-    formData.phoneNumber = digits
-  }
-})
-
-// Format phone number with +63 country code
-const formatPhoneNumber = (raw) => {
-  if (!raw) return ''
-  const digits = raw.replace(/\D/g, '')
-  // If user includes leading 0, drop it for international format
-  const trimmed = digits.startsWith('0') ? digits.slice(1) : digits
-  const withoutPrefix = trimmed.startsWith('63') ? trimmed.slice(2) : trimmed
-  return `+63${withoutPrefix}`
-}
-
 // Check if user is member and fetch data
 onMounted(async () => {
   await fetchWaterBaptismData()
   await churchLeadersStore.fetchLeaders()
   churchLeaders.value = churchLeadersStore.leaders
-  console.log('Church Leaders:', churchLeaders.value)
   await churchLeadersStore.fetchMemberOptions()
   pastors.value = churchLeadersStore.memberOptions
   await fetchMemberBaptismData()
@@ -804,20 +326,16 @@ const fetchMemberBaptismData = async () => {
   try {
     // Check if user has member data
     if (!user.value || !user.value.member || !user.value.member.member_id) {
-      console.log('User is not a member or member_id not found')
       isMember.value = false
       return
     }
     const memberId = user.value.member.member_id
-    console.log('Fetching baptism data for member ID:', memberId)
     
     const baptismData = await waterBaptismStore.fetchBaptismByMemberId(memberId)
-    console.log('Baptism data received:', baptismData)
     
     if (baptismData) {
       isMember.value = true
       memberBaptismData.value = baptismData
-      console.log('Member baptism data set:', memberBaptismData.value)
     } else {
       isMember.value = true // User is a member but no baptism record found
       memberBaptismData.value = null
@@ -886,173 +404,6 @@ const openCertificatePreview = () => {
     })
   } else {
     ElMessage.error('Certificate data not available')
-  }
-}
-
-const handleSubmit = async () => {
-  if (!formRef.value) return
-  
-  submitMessage.value = ''
-  submitError.value = ''
-
-  try {
-    // Validate form
-    await formRef.value.validate()
-    
-    await ElMessageBox.confirm(
-      'Please confirm you want to submit your baptism registration. You will receive an email with account setup details after submission.',
-      'Confirm Submission',
-      {
-        confirmButtonText: 'Confirm',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      }
-    )
-
-    // Prepare payload - use snake_case to match database columns
-    const payload = {
-      firstname: formData.firstname.trim(),
-      middle_name: formData.middleName.trim() || null,
-      lastname: formData.lastname.trim(),
-      birthdate: formData.birthdate,
-      age: formData.age,
-      gender: formData.gender,
-      address: formData.address.trim(),
-      email: formData.email.trim(),
-      phone_number: formatPhoneNumber(formData.phoneNumber),
-      civil_status: formData.civilStatus,
-      profession: formData.profession.trim() || null,
-      spouse_name: formData.spouseName.trim() || null,
-      marriage_date: formData.marriageDate || null,
-      children: formData.children.length > 0 ? JSON.stringify(formData.children) : null,
-      testimony: formData.testimony.trim() || null,
-      preferred_date: formData.preferredDate || null,
-      guardian_name: formData.guardianName.trim() || null,
-      guardian_contact: formData.guardianContact ? formatPhoneNumber(formData.guardianContact) : null,
-      guardian_relationship: formData.guardianRelationship || null
-    }
-    console.log(payload ,'register water baptism')
-    const result = await memberRegistrationStore.registerNonMemberWaterBaptism(payload)
-    
-    if (result.success) {
-      submitMessage.value = 'Registration submitted successfully!'
-      ElMessage.success('Registration submitted successfully!')
-      // Clear form
-      resetForm()
-    } else {
-      // Enhanced error trapping for common issues
-      const errorMsg = result.error || result.message || ''
-      const errors = result.errors || []
-      
-      // Check for duplicate email
-      if (errorMsg.toLowerCase().includes('email') && 
-          (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('duplicate') || 
-           errorMsg.toLowerCase().includes('registered'))) {
-        submitError.value = 'This email address is already registered. Please use a different email or contact support.'
-        ElMessage.error('This email address is already registered')
-      }
-      // Check for duplicate phone
-      else if (errorMsg.toLowerCase().includes('phone') && 
-               (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('duplicate'))) {
-        submitError.value = 'This phone number is already registered. Please use a different number or contact support.'
-        ElMessage.error('This phone number is already registered')
-      }
-      // Check for member already exists
-      else if (errorMsg.toLowerCase().includes('duplicate member') || 
-               errorMsg.toLowerCase().includes('member already')) {
-        submitError.value = 'A member with the same name and birthdate already exists in our system. Please contact the church office for assistance.'
-        ElMessage.error('Member already exists in our system')
-      }
-      // Check for account already exists
-      else if (errorMsg.toLowerCase().includes('account') && 
-               (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('exists'))) {
-        submitError.value = 'An account with this email already exists. Please use a different email or login to your existing account.'
-        ElMessage.error('An account with this email already exists')
-      }
-      // Display all errors from the errors array if available
-      else if (errors.length > 0) {
-        submitError.value = errors.join(', ')
-        ElMessage.error(errors[0])
-      }
-      // Default error message
-      else {
-        submitError.value = result.error || 'An error occurred. Please try again.'
-        ElMessage.error(result.error || 'An error occurred. Please try again.')
-      }
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Validation failed or submission cancelled:', error)
-      if (error !== 'Validation failed') {
-        ElMessage.error('Please fill in all required fields correctly.')
-      }
-    }
-  }
-}
-
-const addChild = () => {
-  formData.children.push({
-    name: '',
-    age: null,
-    gender: '',
-    birthday: null
-  })
-}
-
-const removeChild = (index) => {
-  formData.children.splice(index, 1)
-}
-
-// Calculate child age from birthday
-const calculateChildAge = (index) => {
-  const child = formData.children[index]
-  if (!child || !child.birthday) {
-    child.age = null
-    return
-  }
-
-  const birthDate = new Date(child.birthday)
-  const today = new Date()
-
-  if (birthDate >= today) {
-    child.age = null
-    return
-  }
-
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
-  }
-
-  child.age = age >= 0 ? age : null
-}
-
-const resetForm = () => {
-  formData.firstname = ''
-  formData.middleName = ''
-  formData.lastname = ''
-  formData.birthdate = null
-  formData.age = 0
-  formData.gender = ''
-  formData.address = ''
-  formData.email = ''
-  formData.phoneNumber = ''
-  formData.civilStatus = ''
-  formData.profession = ''
-  formData.spouseName = ''
-  formData.marriageDate = null
-  formData.children = []
-  formData.testimony = ''
-  formData.preferredDate = null
-  formData.guardianName = ''
-  formData.guardianContact = ''
-  formData.guardianRelationship = ''
-
-  // Clear validation
-  if (formRef.value) {
-    formRef.value.clearValidate()
   }
 }
 </script>
@@ -1410,6 +761,75 @@ const resetForm = () => {
 .loading-text {
   color: #4b5563;
   margin-left: 12px;
+}
+
+/* Roadmap Styles */
+.journey-card {
+  border-radius: 12px;
+  border-top: 4px solid #14b8a6;
+}
+
+.roadmap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+}
+
+.roadmap-item {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.roadmap-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f0fdfa;
+  border: 2px solid #14b8a6;
+  color: #0d9488;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.roadmap-icon.bg-teal {
+  background: #14b8a6;
+  border-color: #14b8a6;
+}
+
+.roadmap-connector {
+  width: 2px;
+  height: 30px;
+  background: #ccfbf1;
+  margin-left: 17px;
+}
+
+.roadmap-content h3 {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.roadmap-content p {
+  font-size: 0.95rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.action-btn {
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  transition: transform 0.3s ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-4px);
 }
 
 /* Certificate Card */

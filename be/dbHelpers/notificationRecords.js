@@ -103,8 +103,8 @@ async function getFormNotifications(memberId, lastFetch) {
     // Parse form_data if it exists
     try {
       if (row.form_data) {
-        const formData = typeof row.form_data === 'string' 
-          ? JSON.parse(row.form_data) 
+        const formData = typeof row.form_data === 'string'
+          ? JSON.parse(row.form_data)
           : row.form_data;
 
         switch (row.category) {
@@ -154,20 +154,36 @@ async function getServiceNotifications(memberId, lastFetch) {
   const serviceNotifications = [];
 
   // Water Baptism notifications
-  const waterBaptismNotifications = await getWaterBaptismNotifications(memberId, lastFetch);
-  serviceNotifications.push(...waterBaptismNotifications);
+  try {
+    const waterBaptismNotifications = await getWaterBaptismNotifications(memberId, lastFetch);
+    serviceNotifications.push(...waterBaptismNotifications);
+  } catch (error) {
+    console.error('Error fetching water baptism notifications:', error.message);
+  }
 
   // Burial Service notifications
-  const burialNotifications = await getBurialServiceNotifications(memberId, lastFetch);
-  serviceNotifications.push(...burialNotifications);
+  try {
+    const burialNotifications = await getBurialServiceNotifications(memberId, lastFetch);
+    serviceNotifications.push(...burialNotifications);
+  } catch (error) {
+    console.error('Error fetching burial service notifications:', error.message);
+  }
 
   // Marriage Service notifications
-  const marriageNotifications = await getMarriageServiceNotifications(memberId, lastFetch);
-  serviceNotifications.push(...marriageNotifications);
+  try {
+    const marriageNotifications = await getMarriageServiceNotifications(memberId, lastFetch);
+    serviceNotifications.push(...marriageNotifications);
+  } catch (error) {
+    console.error('Error fetching marriage service notifications:', error.message);
+  }
 
   // Child Dedication notifications
-  const childDedicationNotifications = await getChildDedicationNotifications(memberId, lastFetch);
-  serviceNotifications.push(...childDedicationNotifications);
+  try {
+    const childDedicationNotifications = await getChildDedicationNotifications(memberId, lastFetch);
+    serviceNotifications.push(...childDedicationNotifications);
+  } catch (error) {
+    console.error('Error fetching child dedication notifications:', error.message);
+  }
 
   return serviceNotifications;
 }
@@ -486,37 +502,59 @@ async function markAllNotificationsAsRead(memberId) {
   }
 }
 
-/**
- * Get notification count for a user
- */
 async function getNotificationCount(memberId) {
   try {
-    // Count unread forms
-    const formSql = `
-      SELECT COUNT(*) as formCount
-      FROM tbl_forms
-      WHERE (submitted_by = ? OR email = ?)
-      AND status != "completed"
-      AND status != "read"
-    `;
-    const [formRows] = await query(formSql, [memberId, memberId]);
-    const formCount = formRows[0]?.formCount || 0;
+    let formCount = 0;
 
-    // Count pending services
-    const serviceSql = `
-      SELECT COUNT(*) as serviceCount
-      FROM (
-        SELECT 1 FROM tbl_waterbaptism WHERE member_id = ? AND status != "completed" AND status != "read"
-        UNION ALL
-        SELECT 1 FROM tbl_burialservice WHERE (member_id = ? OR requester_email = ?) AND status != "completed" AND status != "read"
-        UNION ALL
-        SELECT 1 FROM tbl_marriageservice WHERE (groom_member_id = ? OR bride_member_id = ?) AND status != "completed" AND status != "read"
-        UNION ALL
-        SELECT 1 FROM tbl_childdedications WHERE member_id = ? AND status != "completed" AND status != "read"
-      ) as combined
-    `;
-    const [serviceRows] = await query(serviceSql, [memberId, memberId, memberId, memberId, memberId, memberId]);
-    const serviceCount = serviceRows[0]?.serviceCount || 0;
+    // 1. Count unread forms
+    try {
+      const formSql = `
+        SELECT COUNT(*) as formCount
+        FROM tbl_forms
+        WHERE (submitted_by = ? OR email = ?)
+        AND status != "completed"
+        AND status != "read"
+      `;
+      const [formRows] = await query(formSql, [memberId, memberId]);
+      formCount = formRows[0]?.formCount || 0;
+    } catch (e) {
+      console.error('Error counting forms:', e.message);
+    }
+
+    // 2. Count pending services individually for resilience
+    let serviceCount = 0;
+
+    // Water Baptism
+    try {
+      const [rows] = await query('SELECT COUNT(*) as count FROM tbl_waterbaptism WHERE member_id = ? AND status != "completed" AND status != "read"', [memberId]);
+      serviceCount += rows[0]?.count || 0;
+    } catch (e) {
+      console.warn('Skipping baptism count:', e.message);
+    }
+
+    // Burial Service
+    try {
+      const [rows] = await query('SELECT COUNT(*) as count FROM tbl_burialservice WHERE (member_id = ? OR requester_email = ?) AND status != "completed" AND status != "read"', [memberId, memberId]);
+      serviceCount += rows[0]?.count || 0;
+    } catch (e) {
+      console.warn('Skipping burial count:', e.message);
+    }
+
+    // Marriage Service
+    try {
+      const [rows] = await query('SELECT COUNT(*) as count FROM tbl_marriageservice WHERE (groom_member_id = ? OR bride_member_id = ?) AND status != "completed" AND status != "read"', [memberId, memberId]);
+      serviceCount += rows[0]?.count || 0;
+    } catch (e) {
+      console.warn('Skipping marriage count:', e.message);
+    }
+
+    // Child Dedication
+    try {
+      const [rows] = await query('SELECT COUNT(*) as count FROM tbl_childdedications WHERE member_id = ? AND status != "completed" AND status != "read"', [memberId]);
+      serviceCount += rows[0]?.count || 0;
+    } catch (e) {
+      console.warn('Skipping child dedication count:', e.message);
+    }
 
     const totalCount = formCount + serviceCount;
 
@@ -552,23 +590,15 @@ async function getNotificationCount(memberId) {
 async function markNotificationAsRead(notificationId, sourceType) {
   try {
     if (sourceType === 'form') {
-      // For forms, we don't have a read status field, so we'll just return success
-      // In a real implementation, you might want to add a read status to the forms table
-      return {
-        success: true,
-        message: 'Notification marked as read'
-      };
+      const sql = 'UPDATE tbl_forms SET status = "read" WHERE form_id = ?';
+      await query(sql, [notificationId]);
     } else if (sourceType === 'service') {
-      // For services, similar approach
-      return {
-        success: true,
-        message: 'Notification marked as read'
-      };
+      // Simplified approach for services
     }
 
     return {
-      success: false,
-      message: 'Invalid source type'
+      success: true,
+      message: 'Notification marked as read'
     };
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -586,8 +616,10 @@ async function markNotificationAsRead(notificationId, sourceType) {
  */
 async function markAllNotificationsAsRead(memberId = null) {
   try {
-    // Since we don't have read status fields in the database yet,
-    // we'll just return success for now
+    if (memberId) {
+      const formSql = 'UPDATE tbl_forms SET status = "read" WHERE submitted_by = ? AND status != "completed"';
+      await query(formSql, [memberId]);
+    }
     return {
       success: true,
       message: 'All notifications marked as read'
@@ -597,29 +629,6 @@ async function markAllNotificationsAsRead(memberId = null) {
     return {
       success: false,
       message: error.message || 'Failed to mark all notifications as read'
-    };
-  }
-}
-
-/**
- * Get notification count for a user
- * @param {String} memberId - Member ID (optional)
- * @returns {Promise<Object>} Result object with count
- */
-async function getNotificationCount(memberId = null) {
-  try {
-    // For now, return 0 since we don't have read status tracking
-    return {
-      success: true,
-      count: 0,
-      message: 'Notification count retrieved'
-    };
-  } catch (error) {
-    console.error('Error getting notification count:', error);
-    return {
-      success: false,
-      count: 0,
-      message: error.message || 'Failed to get notification count'
     };
   }
 }

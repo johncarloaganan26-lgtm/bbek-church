@@ -69,18 +69,12 @@ const dbConfig = {
   // SSL configuration (many cloud databases require SSL)
   ssl: process.env.DB_SSL === 'true' ? {} : false,
 
-  // Ensure binary data (BLOB) is handled correctly and text fields are converted to strings
-  // This fixes issues where VARCHAR/TEXT/DATETIME fields are returned as Buffer objects
+  // Images are now stored as base64 strings in LONGTEXT columns
+  // This avoids BLOB corruption issues with typeCast
   typeCast: function (field, next) {
-    // Handle BLOB fields (binary data)
-    if (field.type === 'BLOB' || field.type === 'LONGBLOB') {
-      return field.buffer();
-    }
-
-    // For TEXT fields, ensure they are returned as strings, not Buffers
+    // Handle TEXT fields by converting to string
     if (field.type === 'TEXT' || field.type === 'LONGTEXT' ||
-        field.type === 'MEDIUMTEXT' || field.type === 'TINYTEXT') {
-      // TEXT fields should be returned as strings by mysql2, but if they're Buffer, convert
+      field.type === 'MEDIUMTEXT' || field.type === 'TINYTEXT') {
       const value = field.string();
       if (Buffer.isBuffer(value)) {
         return value.toString('utf8');
@@ -99,7 +93,7 @@ const dbConfig = {
 
     // Handle DATETIME and TIMESTAMP fields
     if (field.type === 'DATETIME' || field.type === 'TIMESTAMP' ||
-        field.type === 'DATE' || field.type === 'TIME') {
+      field.type === 'DATE' || field.type === 'TIME') {
       return field.string();
     }
 
@@ -132,13 +126,13 @@ pool.on('connection', async (connection) => {
  */
 const recreatePool = async (newConnectionLimit = null) => {
   console.warn('Recreating database connection pool...');
-  
+
   // If new limit provided, update config
   if (newConnectionLimit !== null && newConnectionLimit > 0) {
     console.log(`Reducing connection pool limit from ${dbConfig.connectionLimit} to ${newConnectionLimit}`);
     dbConfig.connectionLimit = newConnectionLimit;
   }
-  
+
   // Close existing pool gracefully
   if (pool) {
     try {
@@ -149,13 +143,13 @@ const recreatePool = async (newConnectionLimit = null) => {
       // Continue anyway - force close
     }
   }
-  
+
   // Wait a moment for connections to fully close
   await sleep(1000);
-  
+
   // Create new pool with updated configuration
   pool = mysql.createPool(dbConfig);
-  
+
   // Re-attach event listeners
   pool.on('connection', async (connection) => {
     if (!IS_PRODUCTION) {
@@ -169,21 +163,21 @@ const recreatePool = async (newConnectionLimit = null) => {
       console.warn('Failed to set session timezone:', error.message);
     }
   });
-  
+
   pool.on('error', (err) => {
     console.error('Database pool error:', {
       code: err.code || err.errno,
       message: err.message || err.sqlMessage,
       sqlState: err.sqlState
     });
-    
+
     // If it's a max_connection error at pool level, log it prominently
     if (isMaxConnectionError(err)) {
       console.error('⚠️ CRITICAL: Max connection error detected at pool level!');
       console.error('Consider recreating the pool or reducing connection limit.');
     }
   });
-  
+
   console.log(`Database connection pool recreated successfully with limit: ${dbConfig.connectionLimit}`);
 };
 
@@ -210,7 +204,7 @@ pool.on('error', (err) => {
     message: err.message || err.sqlMessage,
     sqlState: err.sqlState
   });
-  
+
   // If it's a max_connection error at pool level, log it prominently
   if (isMaxConnectionError(err)) {
     console.error('⚠️ CRITICAL: Max connection error detected at pool level!');
@@ -227,24 +221,28 @@ pool.on('error', (err) => {
  */
 const isMaxConnectionError = (error) => {
   if (!error) return false;
-  
+
   // Check error code (string or number)
   const errorCode = error.code || error.errno;
   if (errorCode === 'ER_CON_COUNT_ERROR' || errorCode === 1040 || errorCode === '1040' ||
-      errorCode === 'ER_USER_LIMIT_REACHED' || errorCode === 1203 || errorCode === '1203') {
+    errorCode === 'ER_USER_LIMIT_REACHED' || errorCode === 1203 || errorCode === '1203' ||
+    errorCode === 'ECONNRESET' || errorCode === 'PROTOCOL_CONNECTION_LOST' ||
+    errorCode === 'EPIPE' || errorCode === 'ETIMEDOUT') {
     return true;
   }
-  
+
   // Check error message
   const errorMessage = (error.message || error.sqlMessage || '').toLowerCase();
-  if (errorMessage.includes('too many connections') || 
-      errorMessage.includes('max_connections') ||
-      errorMessage.includes('max_user_connections') ||
-      errorMessage.includes('exceeded') && errorMessage.includes('connection') ||
-      errorMessage.includes('connection limit')) {
+  if (errorMessage.includes('too many connections') ||
+    errorMessage.includes('max_connections') ||
+    errorMessage.includes('max_user_connections') ||
+    (errorMessage.includes('exceeded') && errorMessage.includes('connection')) ||
+    errorMessage.includes('connection limit') ||
+    errorMessage.includes('connection lost') ||
+    errorMessage.includes('handshake inactivity timeout')) {
     return true;
   }
-  
+
   // Check sqlState
   if (error.sqlState === '08004' || error.sqlState === 'HY000') {
     // These SQL states can indicate connection issues
@@ -252,7 +250,7 @@ const isMaxConnectionError = (error) => {
       return true;
     }
   }
-  
+
   return false;
 };
 
@@ -261,18 +259,18 @@ const isMaxConnectionError = (error) => {
  */
 const isMaxUserConnectionsError = (error) => {
   if (!error) return false;
-  
+
   const errorCode = error.code || error.errno;
   if (errorCode === 'ER_USER_LIMIT_REACHED' || errorCode === 1203 || errorCode === '1203') {
     return true;
   }
-  
+
   const errorMessage = (error.message || error.sqlMessage || '').toLowerCase();
-  if (errorMessage.includes('max_user_connections') || 
-      (errorMessage.includes('exceeded') && errorMessage.includes('max_user_connections'))) {
+  if (errorMessage.includes('max_user_connections') ||
+    (errorMessage.includes('exceeded') && errorMessage.includes('max_user_connections'))) {
     return true;
   }
-  
+
   return false;
 };
 
@@ -302,16 +300,16 @@ const query = async (sql, params, retryCount = 0) => {
   const MAX_RETRIES = 5;
   const INITIAL_RETRY_DELAY = 1000; // 1 second
   const MAX_RETRY_DELAY = 10000; // 10 seconds
-  
+
   let connection = null;
   try {
     // Get a connection from the pool
     // This can throw max_connection errors
     connection = await pool.getConnection();
-    
+
     // Execute the query using query() for regular queries, execute() for prepared statements
     const result = await connection.query(sql, params || []);
-    
+
     // Return the result
     return result;
   } catch (error) {
@@ -325,26 +323,32 @@ const query = async (sql, params, retryCount = 0) => {
         sql: sql.substring(0, 100) // First 100 chars of SQL for debugging
       });
     }
-    
+
     // Check if this is a max_connection error
     const isMaxConnError = isMaxConnectionError(error);
     const isMaxUserConnError = isMaxUserConnectionsError(error);
-    
+
     if (isMaxConnError && retryCount < MAX_RETRIES) {
       // Calculate exponential backoff delay
       const delay = Math.min(
         INITIAL_RETRY_DELAY * Math.pow(2, retryCount),
         MAX_RETRY_DELAY
       );
-      
-      const errorType = isMaxUserConnError ? 'max_user_connections' : 'max_connections';
-      console.warn(`⚠️ ${errorType} error detected (attempt ${retryCount + 1}/${MAX_RETRIES}). Retrying in ${delay}ms...`, {
+
+      let errorType = 'connection_error';
+      if (isMaxUserConnError) {
+        errorType = 'max_user_connections';
+      } else if (error.code === 'ER_CON_COUNT_ERROR' || error.code === '1040') {
+        errorType = 'max_connections';
+      }
+
+      console.warn(`⚠️ ${errorType} detected (attempt ${retryCount + 1}/${MAX_RETRIES}). Retrying in ${delay}ms...`, {
         errorCode: error.code || error.errno,
         errorMessage: error.message || error.sqlMessage,
         sqlState: error.sqlState,
         errorType
       });
-      
+
       // Release connection if we have one (might not have one if getConnection failed)
       if (connection) {
         try {
@@ -354,10 +358,10 @@ const query = async (sql, params, retryCount = 0) => {
         }
         connection = null;
       }
-      
+
       // Wait before retrying
       await sleep(delay);
-      
+
       // For max_user_connections errors, reduce pool size more aggressively
       if (isMaxUserConnError && retryCount === 0) {
         // Reduce pool size immediately on first retry for user connection limit
@@ -370,21 +374,22 @@ const query = async (sql, params, retryCount = 0) => {
         console.log('Recreating pool before final retry attempt...');
         await recreatePool();
       }
-      
+
       // Retry the query
       return query(sql, params, retryCount + 1);
     }
-    
+
     // For non-max-connection errors or if retries exhausted, re-throw
     // Log final error if max connection error
     if (isMaxConnError && retryCount >= MAX_RETRIES) {
-      console.error('❌ Max connection error: All retry attempts exhausted', {
+      const errorType = isMaxUserConnError ? 'max_user_connections' : 'connection_error';
+      console.error(`❌ ${errorType}: All retry attempts exhausted`, {
         errorCode: error.code || error.errno,
         errorMessage: error.message || error.sqlMessage,
         totalRetries: MAX_RETRIES
       });
     }
-    
+
     throw error;
   } finally {
     // Always release the connection back to the pool

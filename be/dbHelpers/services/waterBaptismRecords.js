@@ -231,6 +231,13 @@ async function createWaterBaptism(baptismData) {
     const new_baptism_id = await getNextBaptismId();
     console.log('New baptism ID:', new_baptism_id);
 
+    // If request_id is present, it's from a discipleship promotion
+    const { request_id } = baptismData;
+    if (request_id) {
+      await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
+      delete baptismData.request_id; // Remove it so it doesn't interfere with mapping
+    }
+
     let {
       baptism_id = new_baptism_id,
       member_id,
@@ -1515,19 +1522,22 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
         const baptismResult = await getWaterBaptismById(baptismId);
 
         if (!baptismResult.success || !baptismResult.data) {
+          console.error(`Skipping ${baptismId}: Record not found`);
           failed++;
           continue;
         }
 
         const baptism = baptismResult.data;
+        const currentStatus = (baptism.status || '').toLowerCase();
 
-        // Strictly target 'approved' records for bulk completion
-        if (baptism.status !== 'approved') {
+        // Allow 'pending' or 'approved' records for bulk completion
+        if (currentStatus !== 'approved' && currentStatus !== 'pending') {
+          console.log(`Skipping ${baptismId}: Status is '${currentStatus}' (Only 'pending' or 'approved' are allowed)`);
           skipped++;
           continue;
         }
 
-        console.log(`=== Processing bulk water baptism completion for ID: ${baptismId} ===`);
+        console.log(`=== Processing bulk completion for ${baptismId} (Status: ${currentStatus}) ===`);
 
         // Mark as completed in DB first if not already
         if (baptism.status !== 'completed') {
@@ -1644,10 +1654,13 @@ async function processBaptismCompletion(baptismId) {
           birthdate: baptism.birthdate ? moment(baptism.birthdate).format('YYYY-MM-DD') : null,
           age: baptism.age || '',
           gender: baptism.gender || '',
-          address: String(baptism.address || '').substring(0, 44),
+          address: baptism.address || '',
           email: baptism.email || '',
           phone_number: baptism.phone_number || '',
           civil_status: baptism.civil_status || null,
+          guardian_name: baptism.guardian_name || null,
+          guardian_contact: baptism.guardian_contact || null,
+          guardian_relationship: baptism.guardian_relationship || null,
           position: 'Member'
         };
 
@@ -1674,7 +1687,17 @@ async function processBaptismCompletion(baptismId) {
       }
     }
 
-    // PART 2: ENSURE ACCOUNT EXISTS
+    // PART 2: ENSURE EMAIL IS PRESENT (If missing from baptism, fetch from member)
+    if (!email) {
+      console.log(`Email missing in baptism ${baptismId}. Fetching from member ${memberId}...`);
+      const memberCheck = await getMemberById(memberId);
+      if (memberCheck.success && memberCheck.data && memberCheck.data.email) {
+        email = memberCheck.data.email;
+        console.log(`Resolved email from member record: ${email}`);
+      }
+    }
+
+    // PART 3: ENSURE ACCOUNT EXISTS
     if (email) {
       console.log(`Ensuring account exists for ${email}...`);
       const tempPassword = Math.random().toString(36).slice(-12);
@@ -1684,68 +1707,92 @@ async function processBaptismCompletion(baptismId) {
       const accountResult = await getAccountByEmail(email);
 
       if (!accountResult.success || !accountResult.data) {
-        console.log('No account found. Creating new account...');
+        console.log(`No account found for ${email}. Creating new account...`);
         const bcrypt = require('bcrypt');
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         isNewAccount = true;
 
-        const [ins] = await query(
-          "INSERT INTO tbl_accounts (email, password, position, status, date_created) VALUES (?, ?, 'Member', 'active', NOW())",
-          [email.toLowerCase(), hashedPassword]
-        );
-        accountId = ins.insertId;
+        try {
+          // Attempt insert with basic columns first for maximum compatibility
+          const [ins] = await query(
+            "INSERT INTO tbl_accounts (email, password, position, status, date_created) VALUES (?, ?, 'Member', 'active', NOW())",
+            [email.toLowerCase(), hashedPassword]
+          );
+          accountId = ins.insertId;
+
+          // Best effort: Try to update acc_name if it exists
+          try {
+            await query("UPDATE tbl_accounts SET acc_name = ? WHERE acc_id = ?", [`${baptism.firstname || ''} ${baptism.lastname || ''}`.trim(), accountId]);
+          } catch (nameErr) {
+            console.warn('Could not set acc_name (column might not exist):', nameErr.message);
+          }
+        } catch (insertErr) {
+          console.error(`Failed to insert new account for ${email}:`, insertErr);
+          throw insertErr;
+        }
+
+        console.log(`New account created for ${email} with ID: ${accountId}`);
       } else {
         accountId = accountResult.data.acc_id;
-        console.log(`Existing account found: ${accountId}`);
+        console.log(`Existing account found for ${email} with ID: ${accountId}`);
       }
 
-      // PART 3: SEND EMAILS
+      // PART 4: SEND EMAILS
       if (accountId) {
-        const baptismData = (await getWaterBaptismById(baptismId)).data;
-        const name = `${baptismData.firstname || ''} ${baptismData.middle_name ? baptismData.middle_name + ' ' : ''}${baptismData.lastname || ''}`.trim();
+        const baptismDataResult = await getWaterBaptismById(baptismId);
+        const b = baptismDataResult.data;
+        const name = `${b.firstname || ''} ${b.middle_name ? b.middle_name + ' ' : ''}${b.lastname || ''}`.trim();
 
-        console.log(`Sending emails to ${email}...`);
+        console.log(`Attempting to send completion emails to ${email}...`);
 
-        // Only send password for new accounts
-        // Using new_account type to enable password setting link
-        await sendAccountDetails({
-          acc_id: accountId,
-          email: email,
-          name: name || 'Valued Member',
-          type: 'new_account',
-          temporaryPassword: isNewAccount ? tempPassword : null
-        });
+        try {
+          // 1. Send Account Details (Welcome / Set Password)
+          // Always send this during completion to ensure they can log in
+          await sendAccountDetails({
+            acc_id: accountId,
+            email: email,
+            name: name || 'Valued Member',
+            type: 'new_account',
+            temporaryPassword: isNewAccount ? tempPassword : null
+          });
+          console.log(`- Account details email sent to ${email}`);
 
-        await sendWaterBaptismDetails({
-          email: email,
-          status: 'completed',
-          recipientName: name || 'Valued Member',
-          memberName: name || 'Valued Member',
-          baptismDate: baptismData.baptism_date || moment().format('YYYY-MM-DD HH:mm'),
-          location: baptismData.location || '',
-          pastorName: baptismData.pastor_name || '',
-          isMember: true,
-          firstname: baptismData.firstname || '',
-          middleName: baptismData.middle_name || '',
-          lastname: baptismData.lastname || '',
-          birthdate: baptismData.birthdate || '',
-          age: baptismData.age || null,
-          gender: baptismData.gender || '',
-          address: baptismData.address || '',
-          phoneNumber: baptismData.phone_number || '',
-          civilStatus: baptismData.civil_status || '',
-          profession: baptismData.profession || ''
-        });
-
-        console.log('✅ Emails sent successfully');
+          // 2. Send Baptism Completion Confirmation
+          await sendWaterBaptismDetails({
+            email: email,
+            status: 'completed',
+            recipientName: name || 'Valued Member',
+            memberName: name || 'Valued Member',
+            baptismDate: b.baptism_date || moment().format('YYYY-MM-DD HH:mm'),
+            location: b.location || '',
+            pastorName: b.pastor_name || '',
+            isMember: true,
+            firstname: b.firstname || '',
+            middleName: b.middle_name || '',
+            lastname: b.lastname || '',
+            birthdate: b.birthdate || '',
+            age: b.age || null,
+            gender: b.gender || '',
+            address: b.address || '',
+            phoneNumber: b.phone_number || '',
+            civilStatus: b.civil_status || '',
+            profession: b.profession || ''
+          });
+          console.log(`- Baptism completion email sent to ${email}`);
+          console.log('✅ All emails sent successfully');
+        } catch (emailErr) {
+          console.error(`❌ Error sending one or more emails for baptism ${baptismId}:`, emailErr);
+        }
+      } else {
+        console.error(`❌ Failed to resolve accountId for ${email}. Emails not sent.`);
       }
     } else {
-      console.warn('No email address found for the record. Skipping account/email processing.');
+      console.warn(`⚠️ No email address found for baptism ${baptismId} or its member ${memberId}. Skipping account/email processing.`);
     }
 
     return { success: true };
   } catch (error) {
-    console.error(`Error in processBaptismCompletion for ${baptismId}:`, error);
+    console.error(`❌ Error in processBaptismCompletion for baptism ${baptismId}:`, error);
     return { success: false, error: error.message };
   }
 }

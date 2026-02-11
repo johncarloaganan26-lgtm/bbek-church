@@ -53,6 +53,7 @@ const approvalRoutes = require('./routes/church_records/approvalRoutes');
 const childDedicationRouter = require('./routes/services/childDedicationRoutes');
 const burialServiceRouter = require('./routes/services/burialServiceRoutes');
 const waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
+const discipleshipRouter = require('./routes/services/discipleshipRoutes');
 const marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
 const transactionRouter = require('./routes/transactionRoutes');
 const memberRegistrationRouter = require('./routes/memberRegistrationRoute');
@@ -265,6 +266,7 @@ app.use('/api/church-records/approvals', approvalRoutes);
 app.use('/api/church-records/child-dedications', childDedicationRouter);
 app.use('/api/church-records/burial-services', burialServiceRouter);
 app.use('/api/services/water-baptisms', waterBaptismRouter);
+app.use('/api/services/discipleship-requests', discipleshipRouter);
 app.use('/api/services/marriage-services', marriageServiceRouter);
 app.use('/api/transactions', transactionRouter);
 

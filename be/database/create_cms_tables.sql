@@ -242,12 +242,12 @@ IF
                                       CURRENT_TIMESTAMP
                                   ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                  -- AdultMen CMS Table
+                                  -- Ministries CMS Table (missing in some deployments)
                                   CREATE TABLE
                                   IF
-                                    NOT EXISTS tbl_cms_adultmen (
+                                    NOT EXISTS tbl_cms_ministries (
                                       id INT AUTO_INCREMENT PRIMARY KEY
-                                      , page_name VARCHAR(50) DEFAULT 'adultmen' UNIQUE
+                                      , page_name VARCHAR(50) DEFAULT 'ministries' UNIQUE
                                       , content_json JSON
                                       , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                       , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -256,12 +256,12 @@ IF
                                         CURRENT_TIMESTAMP
                                     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                    -- AdultLadies CMS Table
+                                    -- AdultMen CMS Table
                                     CREATE TABLE
                                     IF
-                                      NOT EXISTS tbl_cms_adultladies (
+                                      NOT EXISTS tbl_cms_adultmen (
                                         id INT AUTO_INCREMENT PRIMARY KEY
-                                        , page_name VARCHAR(50) DEFAULT 'adultladies' UNIQUE
+                                        , page_name VARCHAR(50) DEFAULT 'adultmen' UNIQUE
                                         , content_json JSON
                                         , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                         , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -270,12 +270,12 @@ IF
                                           CURRENT_TIMESTAMP
                                       ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                      -- LearnMoreMinistry CMS Table
+                                      -- AdultLadies CMS Table
                                       CREATE TABLE
                                       IF
-                                        NOT EXISTS tbl_cms_learnmoreministry (
+                                        NOT EXISTS tbl_cms_adultladies (
                                           id INT AUTO_INCREMENT PRIMARY KEY
-                                          , page_name VARCHAR(50) DEFAULT 'learnmoreministry' UNIQUE
+                                          , page_name VARCHAR(50) DEFAULT 'adultladies' UNIQUE
                                           , content_json JSON
                                           , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                           , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -284,12 +284,12 @@ IF
                                             CURRENT_TIMESTAMP
                                         ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                        -- LearnMoreEvents CMS Table
+                                        -- LearnMoreMinistry CMS Table
                                         CREATE TABLE
                                         IF
-                                          NOT EXISTS tbl_cms_learnmoreevents (
+                                          NOT EXISTS tbl_cms_learnmoreministry (
                                             id INT AUTO_INCREMENT PRIMARY KEY
-                                            , page_name VARCHAR(50) DEFAULT 'learnmoreevents' UNIQUE
+                                            , page_name VARCHAR(50) DEFAULT 'learnmoreministry' UNIQUE
                                             , content_json JSON
                                             , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                             , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -298,12 +298,12 @@ IF
                                               CURRENT_TIMESTAMP
                                           ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                          -- AcceptJesus CMS Table
+                                          -- LearnMoreEvents CMS Table
                                           CREATE TABLE
                                           IF
-                                            NOT EXISTS tbl_cms_acceptjesus (
+                                            NOT EXISTS tbl_cms_learnmoreevents (
                                               id INT AUTO_INCREMENT PRIMARY KEY
-                                              , page_name VARCHAR(50) DEFAULT 'acceptjesus' UNIQUE
+                                              , page_name VARCHAR(50) DEFAULT 'learnmoreevents' UNIQUE
                                               , content_json JSON
                                               , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                               , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -312,12 +312,12 @@ IF
                                                 CURRENT_TIMESTAMP
                                             ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                            -- Belief CMS Table
+                                            -- AcceptJesus CMS Table
                                             CREATE TABLE
                                             IF
-                                              NOT EXISTS tbl_cms_belief (
+                                              NOT EXISTS tbl_cms_acceptjesus (
                                                 id INT AUTO_INCREMENT PRIMARY KEY
-                                                , page_name VARCHAR(50) DEFAULT 'belief' UNIQUE
+                                                , page_name VARCHAR(50) DEFAULT 'acceptjesus' UNIQUE
                                                 , content_json JSON
                                                 , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                                 , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -326,12 +326,12 @@ IF
                                                   CURRENT_TIMESTAMP
                                               ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                              -- ChurchLeader CMS Table
+                                              -- Belief CMS Table
                                               CREATE TABLE
                                               IF
-                                                NOT EXISTS tbl_cms_churchleader (
+                                                NOT EXISTS tbl_cms_belief (
                                                   id INT AUTO_INCREMENT PRIMARY KEY
-                                                  , page_name VARCHAR(50) DEFAULT 'churchleader' UNIQUE
+                                                  , page_name VARCHAR(50) DEFAULT 'belief' UNIQUE
                                                   , content_json JSON
                                                   , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                                   , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -340,12 +340,12 @@ IF
                                                     CURRENT_TIMESTAMP
                                                 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                                -- DepartmentOfficer CMS Table
+                                                -- ChurchLeader CMS Table
                                                 CREATE TABLE
                                                 IF
-                                                  NOT EXISTS tbl_cms_departmentofficer (
+                                                  NOT EXISTS tbl_cms_churchleader (
                                                     id INT AUTO_INCREMENT PRIMARY KEY
-                                                    , page_name VARCHAR(50) DEFAULT 'departmentofficer' UNIQUE
+                                                    , page_name VARCHAR(50) DEFAULT 'churchleader' UNIQUE
                                                     , content_json JSON
                                                     , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                                     , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -354,12 +354,12 @@ IF
                                                       CURRENT_TIMESTAMP
                                                   ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-                                                  -- OurStory CMS Table
+                                                  -- DepartmentOfficer CMS Table
                                                   CREATE TABLE
                                                   IF
-                                                    NOT EXISTS tbl_cms_ourstory (
+                                                    NOT EXISTS tbl_cms_departmentofficer (
                                                       id INT AUTO_INCREMENT PRIMARY KEY
-                                                      , page_name VARCHAR(50) DEFAULT 'ourstory' UNIQUE
+                                                      , page_name VARCHAR(50) DEFAULT 'departmentofficer' UNIQUE
                                                       , content_json JSON
                                                       , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                                                       , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -367,3 +367,17 @@ IF
                                                       UPDATE
                                                         CURRENT_TIMESTAMP
                                                     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+                                                    -- OurStory CMS Table
+                                                    CREATE TABLE
+                                                    IF
+                                                      NOT EXISTS tbl_cms_ourstory (
+                                                        id INT AUTO_INCREMENT PRIMARY KEY
+                                                        , page_name VARCHAR(50) DEFAULT 'ourstory' UNIQUE
+                                                        , content_json JSON
+                                                        , created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                                        , updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                                        ON
+                                                        UPDATE
+                                                          CURRENT_TIMESTAMP
+                                                      ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

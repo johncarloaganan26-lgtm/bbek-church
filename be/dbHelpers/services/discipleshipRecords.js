@@ -1,0 +1,384 @@
+const { query } = require('../../database/db');
+const moment = require('moment-timezone');
+const { createWaterBaptism } = require('./waterBaptismRecords');
+const { sendDiscipleshipDetails, sendWaterBaptismInvitation } = require('../emailHelper');
+
+// Set default timezone to Philippines (Asia/Manila, UTC+8)
+moment.tz.setDefault('Asia/Manila');
+
+/**
+ * Discipleship Requests CRUD Operations
+ * 
+ * tbl_discipleship_requests schema:
+ * - request_id (VARCHAR(50), PK)
+ * - firstname, lastname, middle_name, email, phone_number
+ * - birthdate, age, gender, address, civil_status, profession
+ * - spouse_name, marriage_date, children
+ * - request_type (ENUM: 'Salvation', 'Bible Study', 'Both')
+ * - status (ENUM: 'Pending', 'Scheduled', 'Completed', 'Cancelled', 'Promoted')
+ * - scheduled_date, scheduled_time, notes
+ * - date_created, date_updated
+ */
+
+/**
+ * Get next request_id
+ * @returns {Promise<String>} Next request_id
+ */
+async function getNextRequestId() {
+    try {
+        const sql = 'SELECT MAX(request_id) AS max_id FROM tbl_discipleship_requests';
+        const [rows] = await query(sql);
+        const maxId = rows[0]?.max_id || null;
+
+        if (!maxId) return 'REQ000001';
+
+        // Extract numeric part
+        const numericMatch = maxId.match(/\d+$/);
+        if (numericMatch) {
+            const numericPart = parseInt(numericMatch[0]);
+            return `REQ${String(numericPart + 1).padStart(6, '0')}`;
+        }
+        return 'REQ000001';
+    } catch (error) {
+        console.error('Error generating request ID:', error);
+        throw error;
+    }
+}
+
+/**
+ * Create a new discipleship request
+ * @param {Object} data - Request data
+ */
+async function createDiscipleshipRequest(data) {
+    try {
+        const request_id = await getNextRequestId();
+
+        // Extract fields
+        const {
+            firstname, lastname, middle_name, email, phone_number,
+            birthdate, age, gender, address, civil_status, profession,
+            spouse_name, marriage_date, children,
+            request_type = 'Both',
+            notes,
+            pastor_id = null,
+            location = null
+        } = data;
+
+        // Validation
+        if (!firstname || !lastname || !email) {
+            throw new Error('Missing required fields: firstname, lastname, email');
+        }
+
+        // Age Verification
+        if (age && parseInt(age) < 12) {
+            throw new Error('Only 12 years old and above are allowed to request discipleship.');
+        }
+
+        // Email Duplication Check - Check Discipleship Requests
+        const [existingReq] = await query('SELECT request_id FROM tbl_discipleship_requests WHERE email = ?', [email]);
+        if (existingReq.length > 0) {
+            throw new Error('You have already submitted a request with this email. Please wait for our team to contact you.');
+        }
+
+        // Email Duplication Check - Check Member Records
+        const [existingMember] = await query('SELECT member_id FROM tbl_members WHERE email = ?', [email]);
+        if (existingMember.length > 0) {
+            throw new Error('This email is already registered as an official member. Please log in to your account.');
+        }
+
+        const sql = `
+      INSERT INTO tbl_discipleship_requests (
+        request_id, firstname, lastname, middle_name, email, phone_number,
+        birthdate, age, gender, address, civil_status, profession,
+        spouse_name, marriage_date, children, request_type, notes, pastor_id, location
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+        const formattedBirth = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
+        const formattedMarriage = marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null;
+        const childrenStr = (children && typeof children === 'object') ? JSON.stringify(children) : (children || null);
+        const notesStr = (notes && typeof notes === 'object') ? JSON.stringify(notes) : (notes || null);
+
+        const params = [
+            request_id, firstname, lastname, middle_name || null, email, phone_number || null,
+            formattedBirth, age || null, gender || null, address || null, civil_status || null, profession || null,
+            spouse_name || null, formattedMarriage, childrenStr, request_type, notesStr, pastor_id, location
+        ];
+
+        await query(sql, params);
+
+        // Send Email Notification
+        try {
+            await sendDiscipleshipDetails({
+                email,
+                firstname,
+                status: 'Pending'
+            });
+        } catch (emailError) {
+            console.error('Email notification failed for discipleship request:', emailError);
+        }
+
+        return {
+            success: true,
+            message: 'Discipleship request submitted successfully',
+            data: { request_id, ...data }
+        };
+    } catch (error) {
+        console.error('Error creating discipleship request:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get all requests with filters
+ */
+async function getAllDiscipleshipRequests(options = {}) {
+    try {
+        const { status, search, page = 1, pageSize = 10 } = options;
+        let sql = 'SELECT * FROM tbl_discipleship_requests WHERE 1=1';
+        const params = [];
+
+        if (status && status !== 'All Statuses') {
+            sql += ' AND status = ?';
+            params.push(status);
+        }
+
+        if (search) {
+            sql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
+            const term = `%${search}%`;
+            params.push(term, term, term, term);
+        }
+
+        sql += ' ORDER BY date_created DESC';
+
+        // Pagination
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
+
+        // Count total
+        const countSql = `SELECT COUNT(*) as total FROM (${sql}) as sub`;
+        // We need to reconstruct count query properly or just run it separately?
+        // Using simple replacement for count on WHERE clause is safer
+        let whereClause = sql.substring(sql.indexOf('WHERE'));
+        let orderByIdx = whereClause.lastIndexOf('ORDER BY');
+        if (orderByIdx > -1) whereClause = whereClause.substring(0, orderByIdx);
+
+        const [countResult] = await query(`SELECT COUNT(*) as total FROM tbl_discipleship_requests ${whereClause}`, params);
+        const totalCount = countResult[0]?.total || 0;
+
+        sql += ' LIMIT ? OFFSET ?';
+        params.push(limit, offset);
+
+        const [rows] = await query(sql, params);
+
+        // Convert any Buffers (notes, etc.) to strings
+        const cleanedRows = rows.map(row => {
+            if (row.notes && Buffer.isBuffer(row.notes)) {
+                row.notes = row.notes.toString('utf8');
+            }
+            return row;
+        });
+
+        return {
+            success: true,
+            data: cleanedRows,
+            pagination: {
+                page: parseInt(page),
+                pageSize: limit,
+                totalCount,
+                totalPages: Math.ceil(totalCount / limit)
+            }
+        };
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update request status/schedule
+ */
+async function updateDiscipleshipRequest(request_id, updateData) {
+    try {
+        const { status, scheduled_date, scheduled_time, notes, pastor_id, location } = updateData;
+
+        let sql = 'UPDATE tbl_discipleship_requests SET ';
+        const updates = [];
+        const params = [];
+
+        if (status) { updates.push('status = ?'); params.push(status); }
+        if (scheduled_date !== undefined) {
+            updates.push('scheduled_date = ?');
+            params.push(scheduled_date ? moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss') : null);
+        }
+        if (scheduled_time !== undefined) {
+            updates.push('scheduled_time = ?');
+            params.push(scheduled_time || null);
+        }
+        if (notes !== undefined) {
+            updates.push('notes = ?');
+            const notesStr = (notes && typeof notes === 'object') ? JSON.stringify(notes) : (notes || null);
+            params.push(notesStr);
+        }
+        if (pastor_id !== undefined) { updates.push('pastor_id = ?'); params.push(pastor_id || null); }
+        if (location !== undefined) { updates.push('location = ?'); params.push(location || null); }
+
+        if (updates.length === 0) return { success: true, message: 'No changes' };
+
+        sql += updates.join(', ') + ' WHERE request_id = ?';
+        params.push(request_id);
+
+        await query(sql, params);
+
+        // Send Email Notification on status or schedule update
+        if (status || scheduled_date) {
+            try {
+                // Get updated request details for email
+                const [reqRows] = await query('SELECT firstname, email, status, scheduled_date, pastor_id, location FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+                if (reqRows.length > 0) {
+                    await sendDiscipleshipDetails(reqRows[0]);
+                }
+            } catch (emailError) {
+                console.error('Email update failed for discipleship request:', emailError);
+            }
+        }
+
+        return { success: true, message: 'Request updated successfully' };
+    } catch (error) {
+        console.error('Error updating request:', error);
+        throw error;
+    }
+}
+
+/**
+ * Promote to Baptism
+ * Copies data to tbl_waterbaptism and updates status to Promoted
+ */
+async function promoteToBaptism(request_id, isDecided = false) {
+    try {
+        // 1. Get request data
+        const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+        if (rows.length === 0) throw new Error('Request not found');
+
+        const req = rows[0];
+
+        // 2. Prepare baptism data
+        // Map fields from request to baptism schema
+        const baptismData = {
+            firstname: req.firstname,
+            lastname: req.lastname,
+            middle_name: req.middle_name,
+            email: req.email,
+            phone_number: req.phone_number,
+            birthdate: req.birthdate,
+            age: req.age,
+            gender: req.gender,
+            address: req.address,
+            civil_status: req.civil_status,
+            profession: req.profession,
+            spouse_name: req.spouse_name,
+            marriage_date: req.marriage_date,
+            children: req.children,
+            is_member: false, // They are visitors initially
+            member_id: null,
+            status: isDecided ? 'approved' : 'pending',
+            desire_ministry: null,
+            pastor_name: req.pastor_id || null, // Use the pastor from Phase 1
+            location: req.location || null,    // Use the location from Phase 1
+            baptism_date: isDecided ? moment().format('YYYY-MM-DD') : null, // Set date to now if decided
+            baptism_time: isDecided ? moment().format('HH:mm:ss') : null    // Set time to now if decided
+        };
+
+        // 3. Create Water Baptism record
+        const result = await createWaterBaptism(baptismData);
+
+        if (result.success) {
+            // 4. Update request status to Promoted
+            await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
+
+            // Send Email Notification - Removed as per user request (no more send email for decided ones)
+            /*
+            try {
+                await sendDiscipleshipDetails({
+                    email: req.email,
+                    firstname: req.firstname,
+                    status: 'Promoted'
+                });
+            } catch (emailError) {
+                console.error('Email promotion notification failed:', emailError);
+            }
+            */
+
+            return {
+                success: true,
+                message: 'Promoted to Baptism successfully',
+                data: result.data
+            };
+        } else {
+            throw new Error('Failed to create baptism record');
+        }
+    } catch (error) {
+        console.error('Error promoting to baptism:', error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a request
+ */
+/**
+ * Send Water Baptism Invitation
+ */
+async function inviteToBaptism(request_id, isDecided = false) {
+    try {
+        const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+        if (rows.length === 0) throw new Error('Request not found');
+
+        const req = rows[0];
+
+        // If candidate is decided, promote directly without sending invitation email
+        if (isDecided) {
+            console.log(`Candidate ${request_id} is decided. Promoting directly to Water Baptism...`);
+            return await promoteToBaptism(request_id, true);
+        }
+
+        // If undecided, send the invitation email
+        console.log(`Candidate ${request_id} is undecided. Sending Water Baptism invitation email...`);
+        const result = await sendWaterBaptismInvitation({
+            request_id: req.request_id,
+            email: req.email,
+            firstname: req.firstname,
+            isDecided: isDecided
+        });
+
+        if (result.success) {
+            return {
+                success: true,
+                message: 'Baptism invitation sent successfully'
+            };
+        } else {
+            throw new Error('Failed to send invitation');
+        }
+    } catch (error) {
+        console.error('Error inviting to baptism:', error);
+        throw error;
+    }
+}
+async function deleteDiscipleshipRequest(request_id) {
+    try {
+        await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+        return { success: true, message: 'Request deleted successfully' };
+    } catch (error) {
+        console.error('Error deleting request:', error);
+        throw error;
+    }
+}
+
+module.exports = {
+    createDiscipleshipRequest,
+    getAllDiscipleshipRequests,
+    updateDiscipleshipRequest,
+    promoteToBaptism,
+    inviteToBaptism,
+    deleteDiscipleshipRequest
+};

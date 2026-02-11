@@ -1,31 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from '@/api/axios'
 
-// Helper function to convert base64 to Blob
-function base64ToBlob(base64String, contentType = 'image/jpeg') {
-  // Remove data URL prefix if present
-  let base64 = base64String
-  if (base64String.includes(',')) {
-    const parts = base64String.split(',')
-    base64 = parts[1]
-    // Try to extract content type from data URL
-    const mimeMatch = parts[0].match(/data:([^;]+)/)
-    if (mimeMatch) {
-      contentType = mimeMatch[1]
-    }
-  }
-  
-  // Convert base64 to binary
-  const byteCharacters = atob(base64)
-  const byteNumbers = new Array(byteCharacters.length)
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
-  }
-  const byteArray = new Uint8Array(byteNumbers)
-  
-  return new Blob([byteArray], { type: contentType })
-}
-
 export const useEventsRecordsStore = defineStore('eventsRecords', {
   state: () => ({
     events: [],
@@ -163,34 +138,37 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
           type: eventData.type || '',
           status: eventData.status || 'pending'
         }
-        
-        // Add image as base64 if provided
+
+        // Add image as base64 if provided - ensure no data URL prefix
         if (eventData.imageFile) {
-          // Convert File to base64
+          // Convert File to base64 and strip data URL prefix if present
           const reader = new FileReader()
-          eventPayload.image = await new Promise((resolve) => {
+          const dataUrl = await new Promise((resolve) => {
             reader.onload = () => resolve(reader.result)
             reader.readAsDataURL(eventData.imageFile)
           })
+          // Always strip data URL prefix for backend compatibility
+          eventPayload.image = (typeof dataUrl === 'string' && dataUrl.includes(',')) ? dataUrl.split(',')[1] : dataUrl
         } else if (eventData.image && typeof eventData.image === 'string' && eventData.image.startsWith('data:')) {
-          // Already base64
-          eventPayload.image = eventData.image
+          // Strip data URL prefix from existing base64
+          eventPayload.image = eventData.image.includes(',') ? eventData.image.split(',')[1] : eventData.image.replace('data:image/jpeg;base64,', '').replace('data:image/png;base64,', '').replace('data:image/gif;base64,', '').replace('data:image/webp;base64,', '')
         } else if (eventData.image) {
+          // Raw base64 string
           eventPayload.image = eventData.image
         }
-        
+
         // Add joined_members if provided
         if (eventData.joined_members !== undefined) {
           eventPayload.joined_members = JSON.stringify(eventData.joined_members)
         }
-        
+
         const response = await axios.post('/church-records/events/createEvent', eventPayload, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data.success) {
           await this.fetchEvents({
             page: this.currentPage,
@@ -230,12 +208,13 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
         
         // Add image as base64 if provided (new file or existing base64)
         if (eventData.imageFile) {
-          // Convert File to base64
+          // Convert File to base64 and strip data URL prefix if present
           const reader = new FileReader()
-          eventPayload.image = await new Promise((resolve) => {
+          const dataUrl = await new Promise((resolve) => {
             reader.onload = () => resolve(reader.result)
             reader.readAsDataURL(eventData.imageFile)
           })
+          eventPayload.image = (typeof dataUrl === 'string' && dataUrl.includes(',')) ? dataUrl.split(',')[1] : dataUrl
         } else if (eventData.image && typeof eventData.image === 'string' && eventData.image.startsWith('data:')) {
           // Already base64
           eventPayload.image = eventData.image

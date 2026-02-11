@@ -8,7 +8,8 @@ const {
   updateChurchLeader,
   deleteChurchLeader,
   bulkDeleteChurchLeaders,
-  exportChurchLeadersToExcel
+  exportChurchLeadersToExcel,
+  getAllChurchLeadersForSelect
 } = require('../../dbHelpers/church_records/churchLeaderRecords');
 
 const { getAllPastorsForSelect } = require('../../dbHelpers/church_records/memberRecords');
@@ -23,7 +24,7 @@ const router = express.Router();
 router.post('/createChurchLeader', async (req, res) => {
   try {
     const result = await createChurchLeader(req.body);
-    
+
     if (result.success) {
       res.status(201).json({
         success: true,
@@ -130,7 +131,7 @@ router.get('/getChurchLeaderById/:id', async (req, res) => {
     }
 
     const result = await getChurchLeaderById(leaderId);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -169,7 +170,7 @@ router.get('/getChurchLeaderByMemberId/:memberId', async (req, res) => {
     }
 
     const result = await getChurchLeaderByMemberId(memberId);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -210,7 +211,7 @@ router.put('/updateChurchLeader/:id', async (req, res) => {
     }
 
     const result = await updateChurchLeader(leaderId, req.body);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -252,7 +253,7 @@ router.delete('/deleteChurchLeader/:id', async (req, res) => {
 
     const archivedBy = req.user?.acc_id || null;
     const result = await deleteChurchLeader(leaderId, archivedBy);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -341,16 +342,16 @@ router.get('/exportExcel', async (req, res) => {
     // Get parameters from query string
     const options = req.query;
     const excelBuffer = await exportChurchLeadersToExcel(options);
-    
+
     // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
     const filename = `church_leaders_export_${timestamp}.xlsx`;
-    
+
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', excelBuffer.length);
-    
+
     // Send the Excel file
     res.send(excelBuffer);
   } catch (error) {
@@ -367,16 +368,16 @@ router.post('/exportExcel', async (req, res) => {
     // Get parameters from request body (payload)
     const options = req.body;
     const excelBuffer = await exportChurchLeadersToExcel(options);
-    
+
     // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
     const filename = `church_leaders_export_${timestamp}.xlsx`;
-    
+
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', excelBuffer.length);
-    
+
     // Send the Excel file
     res.send(excelBuffer);
   } catch (error) {
@@ -395,12 +396,12 @@ router.post('/exportExcel', async (req, res) => {
  */
 router.get('/getAllChurchLeadersForSelect', async (req, res) => {
   try {
-    const result = await getAllPastorsForSelect();
-    
+    const result = await getAllChurchLeadersForSelect();
+
     if (result.success) {
       res.status(200).json({
         success: true,
-        message: 'Pastors retrieved successfully for leader selection',
+        message: 'Church leaders retrieved successfully for leader selection',
         data: result.data
       });
     } else {
@@ -411,10 +412,10 @@ router.get('/getAllChurchLeadersForSelect', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Error fetching pastors for leader selection:', error);
+    console.error('Error fetching church leaders for leader selection:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch pastors for leader selection'
+      error: error.message || 'Failed to fetch church leaders for leader selection'
     });
   }
 });

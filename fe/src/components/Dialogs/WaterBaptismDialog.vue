@@ -187,81 +187,6 @@
         />
       </el-form-item>
 
-      <!-- Children Section -->
-      <el-divider>Children Information</el-divider>
-      <div class="children-section">
-        <p class="children-subtitle" style="font-family: 'Georgia', serif; font-style: italic;">You can add information about your children at any time (optional)</p>
-          <div v-for="(child, index) in formData.children" :key="index" class="child-item">
-            <div class="child-header">
-              <span class="child-number">Child {{ index + 1 }}</span>
-              <el-button
-                type="danger"
-                size="small"
-                @click="removeChild(index)"
-                :disabled="loading"
-              >
-                Remove
-              </el-button>
-            </div>
-
-            <el-form-item :label="`Name`" class="child-form-item">
-              <el-input
-                v-model="child.name"
-                :placeholder="`Enter child ${index + 1} name`"
-                size="large"
-                :disabled="loading"
-              />
-            </el-form-item>
-
-            <div class="child-row">
-              <el-form-item label="Age" class="child-form-item">
-                <el-input
-                  v-model.number="child.age"
-                  type="number"
-                  placeholder="Age"
-                  size="large"
-                  :disabled="loading"
-                />
-              </el-form-item>
-
-              <el-form-item label="Gender" class="child-form-item">
-                <el-select
-                  v-model="child.gender"
-                  placeholder="Gender"
-                  size="large"
-                  :disabled="loading"
-                >
-                  <el-option label="Male" value="M" />
-                  <el-option label="Female" value="F" />
-                </el-select>
-              </el-form-item>
-            </div>
-
-            <el-form-item label="Birthday" class="child-form-item">
-              <el-date-picker
-                v-model="child.birthday"
-                type="date"
-                placeholder="Select birthday"
-                size="large"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                :disabled="loading"
-                @change="calculateChildAge(index)"
-              />
-            </el-form-item>
-          </div>
-
-          <el-button
-            type="primary"
-            size="large"
-            @click="addChild"
-            :disabled="loading"
-            class="add-child-btn"
-          >
-            <v-icon>add</v-icon>
-            Add Child
-          </el-button>
-        </div>
 
       <!-- Address -->
       <el-form-item label="Address" prop="address">
@@ -313,7 +238,11 @@
             value-format="YYYY-MM-DD"
             style="width: 100%"
             :disabled="loading"
-            :disabled-date="(date) => isEditMode ? false : date < new Date().setHours(0,0,0,0)"
+            :disabled-date="(date) => {
+              const isPast = date < new Date().setHours(0,0,0,0);
+              const isNotSunday = date.getDay() !== 0;
+              return isEditMode ? isNotSunday : (isPast || isNotSunday);
+            }"
             @change="onDateTimeChange"
           />
         </el-form-item>
@@ -323,7 +252,7 @@
             v-model="formData.baptism_time"
             placeholder="Select baptism time"
             size="large"
-            format="HH:mm"
+            format="hh:mm A"
             value-format="HH:mm"
             style="width: 100%"
             :disabled="loading"
@@ -899,7 +828,6 @@ const clearMemberData = () => {
   formData.profession = ''
   formData.spouse_name = ''
   formData.marriage_date = null
-  formData.children = []
   formData.desire_ministry = ''
   formData.address = ''
   formData.email = ''
@@ -927,46 +855,6 @@ const calculateAge = () => {
   formData.age = age >= 0 ? age : ''
 }
 
-// Add child
-const addChild = () => {
-  formData.children.push({
-    name: '',
-    age: null,
-    gender: '',
-    birthday: null
-  })
-}
-
-// Remove child
-const removeChild = (index) => {
-  formData.children.splice(index, 1)
-}
-
-// Calculate child age from birthday
-const calculateChildAge = (index) => {
-  const child = formData.children[index]
-  if (!child || !child.birthday) {
-    child.age = null
-    return
-  }
-
-  const birthDate = new Date(child.birthday)
-  const today = new Date()
-
-  if (birthDate >= today) {
-    child.age = null
-    return
-  }
-
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
-  }
-
-  child.age = age >= 0 ? age : null
-}
 
 // Watch for birthdate changes to auto-calculate age
 watch(() => formData.birthdate, () => {
@@ -1025,7 +913,6 @@ watch(() => props.baptismData, async (newData) => {
     formData.profession = newData.profession || ''
     formData.spouse_name = newData.spouse_name || ''
     formData.marriage_date = newData.marriage_date || null
-    formData.children = newData.children ? (typeof newData.children === 'string' ? JSON.parse(newData.children) : newData.children) : []
     formData.desire_ministry = newData.desire_ministry || ''
     formData.address = newData.address || ''
     formData.email = newData.email || ''
@@ -1077,7 +964,6 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.profession = data.profession || ''
       formData.spouse_name = data.spouse_name || ''
       formData.marriage_date = data.marriage_date || null
-      formData.children = data.children ? (typeof data.children === 'string' ? JSON.parse(data.children) : data.children) : []
       formData.desire_ministry = data.desire_ministry || ''
       formData.address = data.address || ''
       formData.email = data.email || ''
@@ -1114,7 +1000,6 @@ const resetForm = () => {
   formData.profession = ''
   formData.spouse_name = ''
   formData.marriage_date = null
-  formData.children = []
   formData.desire_ministry = ''
   formData.address = ''
   formData.email = ''
@@ -1190,7 +1075,6 @@ const handleSubmit = async () => {
       profession: formData.profession?.trim() || null,
       spouse_name: formData.spouse_name?.trim() || null,
       marriage_date: formData.marriage_date || null,
-      children: formData.children.length > 0 ? JSON.stringify(formData.children) : null,
       desire_ministry: formData.desire_ministry?.trim() || null,
       address: formData.address?.trim() || null,
       email: formData.email?.trim() || null,
@@ -1376,53 +1260,6 @@ defineExpose({
   border-color: #0d9488;
 }
 
-/* Children Section Styles */
-.children-section {
-  margin-top: 16px;
-}
-
-.child-item {
-  background: #f8fafc;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 12px;
-}
-
-.child-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.child-number {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.child-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.child-form-item {
-  margin-bottom: 12px;
-}
-
-.add-child-btn {
-  width: 100%;
-  margin-top: 12px;
-  background-color: #14b8a6;
-  border-color: #14b8a6;
-}
-
-.add-child-btn:hover {
-  background-color: #0d9488;
-  border-color: #0d9488;
-}
 
 /* Baptism DateTime Row Styles */
 .baptism-datetime-row {

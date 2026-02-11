@@ -113,28 +113,46 @@
                   color="teal-lighten-5"
                 >
                   <v-card-text>
-                    <v-btn
-                      v-if="userInfo?.member?.member_id"
-                      :loading="loading"
-                      size="large"
-                      :class="getButtonClass"
-                      :style="{ '--btn-bg': getButtonColor, '--btn-color': 'white', '--btn-border': getButtonColor }"
-                      :disabled="getButtonDisabled"
-                      @click="handleJoinMinistry"
-                      block
-                    >
-                      {{ getButtonText }}
-                    </v-btn>
-                    <v-btn
-                      v-else
-                      size="large"
-                      class="join-btn"
-                      :style="{ '--btn-bg': learnMoreMinistryData.buttonColor || '#16a34a', '--btn-color': 'white', '--btn-border': learnMoreMinistryData.buttonColor || '#16a34a' }"
-                      @click="handleJoinAsGuest"
-                      block
-                    >
-                      Become a Member
-                    </v-btn>
+                    <div class="d-flex flex-column gap-3">
+                      <v-menu v-if="model?.schedule && userInfo?.member?.member_id" location="bottom">
+                        <template v-slot:activator="{ props }">
+                          <v-btn
+                            v-bind="props"
+                            size="large"
+                            block
+                            class="calendar-btn"
+                            prepend-icon="mdi-calendar-plus"
+                            color="teal-darken-1"
+                            append-icon="mdi-chevron-down"
+                          >
+                            Add to Calendar
+                          </v-btn>
+                        </template>
+                        <v-list>
+                          <v-list-item :href="googleCalendarLink" target="_blank" prepend-icon="mdi-google">
+                            <v-list-item-title>Google Calendar</v-list-item-title>
+                          </v-list-item>
+                          <v-list-item :href="outlookCalendarLink" target="_blank" prepend-icon="mdi-microsoft-outlook">
+                            <v-list-item-title>Outlook Calendar</v-list-item-title>
+                          </v-list-item>
+                          <v-list-item @click="downloadICal" prepend-icon="mdi-apple">
+                            <v-list-item-title>Download iCal (.ics)</v-list-item-title>
+                          </v-list-item>
+                        </v-list>
+                      </v-menu>
+                      
+                      <v-btn
+                        v-else-if="model?.schedule && !userInfo?.member?.member_id"
+                        size="large"
+                        block
+                        class="calendar-btn"
+                        prepend-icon="mdi-login"
+                        color="secondary"
+                        @click="showLoginDialog = true"
+                      >
+                        Login to Add to Calendar
+                      </v-btn>
+                    </div>
                   </v-card-text>
                 </v-card>
               </div>
@@ -154,36 +172,97 @@
         </v-container>
       </section>
     </div>
-    
-    <AcceptJesusChristDialog 
-      :modelValue="showJoinEvent" 
-      :type="'ministry'" 
-      :requestId="model?.ministry_id || model?.id"
-      @update:modelValue="showJoinEvent = $event"
-      @approval-created="handleApprovalCreated"
-    />
+    <LoginGuest v-model="showLoginDialog" @login-success="handleLoginSuccess" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, reactive } from 'vue'
+import { ref, onMounted, watch, reactive, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/api/axios'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import AcceptJesusChristDialog from '../Dialog/AcceptJesusChristDialog.vue'
 import dayjs from 'dayjs'
 import { useCms } from '@/composables/useCms'
+import LoginDialog from '@/components/Dialogs/LoginDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
+const showLoginDialog = ref(false)
+
+const contactEmailLink = computed(() => {
+  const ministryName = model.value?.ministry_name || model.value?.ministryName || 'Ministry'
+  const subject = encodeURIComponent(`Inquiry about ${ministryName}`)
+  const body = encodeURIComponent(`Hi, I would like to know more about the ${ministryName}.`)
+  // Use leader's email if available, otherwise fallback to general church email
+  const email = model.value?.leader_email || 'church@example.com' 
+  return `mailto:${email}?subject=${subject}&body=${body}`
+})
+
+const googleCalendarLink = computed(() => {
+  if (!model.value?.schedule) return '#'
+  
+  const scheduleDate = dayjs(model.value.schedule)
+  // Format: YYYYMMDDTHHmmss
+  const start = scheduleDate.format('YYYYMMDDTHHmmss')
+  const end = scheduleDate.add(1, 'hour').format('YYYYMMDDTHHmmss')
+  
+  const title = encodeURIComponent(model.value.ministry_name || 'Ministry Meeting')
+  const details = encodeURIComponent(model.value.description || '')
+  const location = encodeURIComponent('Church')
+  
+  return `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}&sf=true&output=xml`
+})
+
+const outlookCalendarLink = computed(() => {
+  if (!model.value?.schedule) return '#'
+  
+  const scheduleDate = dayjs(model.value.schedule)
+  const start = scheduleDate.format('YYYY-MM-DDTHH:mm:ss')
+  const end = scheduleDate.add(1, 'hour').format('YYYY-MM-DDTHH:mm:ss')
+  
+  const title = encodeURIComponent(model.value.ministry_name || 'Ministry Meeting')
+  const details = encodeURIComponent(model.value.description || '')
+  const location = encodeURIComponent('Church')
+  
+  return `https://outlook.office.com/calendar/0/deeplink/compose?subject=${title}&body=${details}&location=${location}&startdt=${start}&enddt=${end}`
+})
+
+const downloadICal = () => {
+  if (!model.value?.schedule) return
+
+  const scheduleDate = dayjs(model.value.schedule)
+  const start = scheduleDate.format('YYYYMMDDTHHmmss')
+  const end = scheduleDate.add(1, 'hour').format('YYYYMMDDTHHmmss')
+  const now = dayjs().format('YYYYMMDDTHHmmss') + 'Z'
+
+  const content = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'prodid:-//My Church//Ministries//EN',
+    'BEGIN:VEVENT',
+    `UID:${model.value.ministry_id || 'ministry'}-${now}`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `SUMMARY:${model.value.ministry_name || 'Ministry Meeting'}`,
+    `DESCRIPTION:${model.value.description || ''}`,
+    `LOCATION:Church`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n')
+
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${model.value.ministry_name || 'ministry'}.ics`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const isMemberLandPage = ref(false)
-const showJoinEvent = ref(false)
 const model = ref(null)
 const loading = ref(false)
-const approvalStatus = ref(null)
-const checkingStatus = ref(false)
 
 // In Vue Router, state is accessed via query params
 const ministryModelFromState = ref(
@@ -233,7 +312,8 @@ const fetchMinistryData = async () => {
             imageUrl: ministryData.imageUrl,
             image: ministryData.image,
             department_name: ministryData.department_name,
-            leader_fullname: ministryData.leader_fullname
+            leader_fullname: ministryData.leader_fullname,
+            leader_email: ministryData.leader_email || ministryData.email || ministryData.leader_email_address || ministryData.email_address
           }
         } else {
           console.warn('⚠️ Unexpected response format:', response.data)
@@ -256,96 +336,9 @@ const fetchMinistryData = async () => {
   }
 }
 
-const handleJoinMinistry = async () => {
-  // Don't allow joining if already has approval (pending, approved, or rejected)
-  if (approvalStatus.value !== null) {
-    ElMessage.warning('You have already submitted a request for this ministry.')
-    return
-  }
-  
-  // Show confirmation dialog before submitting
-  try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to join "${model.value?.ministryName || model?.ministry_name || 'this ministry'}"? Your request will be reviewed by an admin.`,
-      'Confirm Join Request',
-      {
-        confirmButtonText: 'Join',
-        cancelButtonText: 'Cancel',
-        type: 'info',
-      }
-    )
-  } catch (error) {
-    return
-  }
-  
-  // create approval
-  try {
-    loading.value = true
-    const approvalData = {
-      email: userInfo.value.account.email,
-      type: 'ministry',
-      request_id: model.value?.ministry_id || model.value?.id,
-      status: 'pending'
-    }
-    const response = await axios.post('/church-records/approvals/createApproval', approvalData)
-    if (response.data.success) {
-      ElMessage.success('Your request to join has been submitted. An admin will review and approve your request.')
-      approvalStatus.value = 'pending'
-    } else {
-      ElMessage.error(response.data.message || 'Failed to submit join request')
-    }
-  } catch (error) {
-    console.error('Error creating approval:', error)
-    ElMessage.error('An error occurred while submitting your request. Please try again.')
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleJoinAsGuest = () => {
-  // Navigate to Accept Jesus Christ page for non-logged in users
-  showJoinEvent.value = true
-}
-
-const handleApprovalCreated = () => {
-  // When approval is created in dialog, update the status
-  approvalStatus.value = 'pending'
-  // Re-check to get the latest approval info
-  checkIfAlreadyJoined()
-}
-
-const checkIfAlreadyJoined = async () => {
-  const ministryId = model.value?.ministry_id || model.value?.id
-  if (!userInfo.value?.account?.email || !ministryId) {
-    return
-  }
-
-  // Don't check if already have a status
-  if (approvalStatus.value !== null) {
-    return
-  }
-
-  checkingStatus.value = true
-  try {
-    const response = await axios.get('/church-records/approvals/checkMemberApprovalStatus', {
-      params: {
-        email: userInfo.value.account.email,
-        type: 'ministry',
-        request_id: ministryId
-      }
-    })
-
-    if (response.data.success && response.data.data?.status) {
-      approvalStatus.value = response.data.data.status
-    } else {
-      approvalStatus.value = null
-    }
-  } catch (error) {
-    console.error('Error checking approval status:', error)
-    approvalStatus.value = null
-  } finally {
-    checkingStatus.value = false
-  }
+const handleLoginSuccess = () => {
+  userInfo.value = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  showLoginDialog.value = false
 }
 
 watch(() => route.query.ministryId || route.params.id, () => {
@@ -355,66 +348,18 @@ watch(() => route.query.ministryId || route.params.id, () => {
   }
 })
 
-watch(() => model.value, (newModel) => {
-  // When model is loaded, check if member has already joined
-  if (newModel && userInfo.value?.member?.member_id) {
-    checkIfAlreadyJoined()
-  }
-})
-
 const learnMoreMinistryData = reactive({
   backgroundColor: '#ffffff',
-  buttonColor: '#16a34a',
   aboutTitle: 'About This Ministry',
   defaultDescription: "This ministry is designed to help believers grow in faith, connect with community, and discover God's purpose for their lives.",
   detailsTitle: 'Ministry Details',
-  joinButtonText: 'Join Us',
-  pendingText: 'Pending Request',
-  approvedText: 'You Already Join',
-  rejectedText: 'Request Rejected',
-  heroImage: null,
   heroSubtitle: 'Discover more about this ministry and join us in serving God.',
   joinCommunityTitle: 'Join Our Community',
-  joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.',
-  joinButtonColor: '#14b8a6'
+  joinCommunityText: 'We invite you to be a part of our church family. Come worship with us and experience the love of Christ.'
 })
 
 // Load CMS data
 const { loading: cmsLoading, loadPageData } = useCms('learnmoreministry')
-
-// Computed properties for button states
-const getButtonText = computed(() => {
-  if (approvalStatus.value === 'pending') {
-    return learnMoreMinistryData.pendingText || 'Pending Request'
-  } else if (approvalStatus.value === 'approved') {
-    return learnMoreMinistryData.approvedText || 'You Already Join'
-  } else if (approvalStatus.value === 'rejected') {
-    return learnMoreMinistryData.rejectedText || 'Request Rejected'
-  }
-  return learnMoreMinistryData.joinButtonText || 'Join Us'
-})
-
-const getButtonClass = computed(() => {
-  if (approvalStatus.value === null) {
-    return 'join-btn'
-  }
-  return 'disabled-btn'
-})
-
-const getButtonColor = computed(() => {
-  if (approvalStatus.value === 'pending') {
-    return '#f59e0b'
-  } else if (approvalStatus.value === 'approved') {
-    return '#10b981'
-  } else if (approvalStatus.value === 'rejected') {
-    return '#ef4444'
-  }
-  return learnMoreMinistryData.buttonColor || '#16a34a'
-})
-
-const getButtonDisabled = computed(() => {
-  return approvalStatus.value !== null
-})
 
 onMounted(async () => {
   const isMember = sessionStorage.getItem('isMember') === 'true'
@@ -426,11 +371,6 @@ onMounted(async () => {
   } else {
     loading.value = false
     model.value = null
-  }
-
-  // Check if member has already joined after model is loaded
-  if (model.value && userInfo.value?.member?.member_id) {
-    checkIfAlreadyJoined()
   }
   
   // Load CMS data
@@ -499,31 +439,6 @@ onMounted(async () => {
 
 .ministry-image:hover {
   transform: scale(1.05);
-}
-
-.join-btn {
-  transition: all 0.3s ease;
-  background-color: var(--btn-bg) !important;
-  color: var(--btn-color) !important;
-  border: 1px solid var(--btn-border) !important;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.join-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.disabled-btn {
-  background-color: var(--btn-bg) !important;
-  color: var(--btn-color) !important;
-  border: 1px solid var(--btn-border) !important;
-  cursor: not-allowed !important;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 @keyframes fadeInUp {

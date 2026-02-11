@@ -2076,6 +2076,169 @@ const sendDonorStatusUpdateEmail = async (donationData, action, reason = null) =
   }
 };
 
+/**
+ * Send discipleship service details email
+ * @param {Object} details - Discipleship details object
+ */
+const sendDiscipleshipDetails = async (details) => {
+  try {
+    if (!details || !details.email || !details.status) {
+      return { success: false, message: 'Email and status are required' };
+    }
+
+    const transporter = createTransporter();
+    const status = details.status.toLowerCase();
+    const statusColors = {
+      pending: '#f39c12',
+      scheduled: '#3498db',
+      completed: '#27ae60',
+      promoted: '#14b8a6',
+      cancelled: '#95a5a6',
+    };
+    const statusMessages = {
+      pending: 'Your discipleship request has been received and is currently pending review.',
+      scheduled: 'Your discipleship session has been scheduled!',
+      completed: 'Your discipleship phase has been marked as completed.',
+      promoted: 'Congratulations! You have been promoted to Water Baptism candidate.',
+      cancelled: 'Your discipleship request has been cancelled.',
+    };
+
+    const recipientName = details.recipientName || details.firstname || 'Valued Member';
+    const scheduleDate = details.scheduled_date ? moment(details.scheduled_date).tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A') : 'To be determined';
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: details.email,
+      subject: `Discipleship Request Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Discipleship Update</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+            <h2 style="color: #2c3e50; margin-top: 0;">Discipleship Update</h2>
+            <p>Dear ${recipientName},</p>
+            <p>${statusMessages[status] || 'Your discipleship request status has been updated.'}</p>
+            
+            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
+              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
+                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
+                  ${status}
+                </span>
+              </p>
+              <p style="margin: 0 0 5px 0;"><strong>Schedule:</strong> ${scheduleDate}</p>
+              ${details.pastor_id ? `<p style="margin: 0 0 5px 0;"><strong>Pastor:</strong> ${details.pastor_id}</p>` : ''}
+              ${details.location ? `<p style="margin: 0;"><strong>Location:</strong> ${details.location}</p>` : ''}
+            </div>
+
+            ${status === 'scheduled' ? `
+            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+              <p style="margin: 0;"><strong>Preparation:</strong></p>
+              <p style="margin: 10px 0 0 0;">Please be prepared for your session. Our team will meet you at the church on the scheduled date. If you have any questions, please contact us.</p>
+            </div>
+            ` : ''}
+
+            <p>If you have any questions, please contact the church administration.</p>
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
+              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
+              Please do not reply to this email.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, message: 'Email sent successfully', messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending discipleship email:', error);
+    return { success: false, message: 'Failed to send email', error: error.message };
+  }
+};
+
+/**
+ * Send Water Baptism Invitation/Registration Email
+ */
+const sendWaterBaptismInvitation = async (details) => {
+  try {
+    const transporter = createTransporter();
+    const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
+    // Link to the registration page for the candidate to fill up details
+    const registrationUrl = `${frontendUrl}/services/water-baptism/registration?reqId=${details.request_id}`;
+
+    const recipientName = details.firstname || 'Valued Member';
+    const isDecided = details.isDecided || false;
+
+    const subject = isDecided
+      ? 'Next Step: Water Baptism Registration - Bible Baptist Ekklesia of Kawit'
+      : 'Invitation to Water Baptism - Bible Baptist Ekklesia of Kawit';
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: details.email,
+      subject: subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            .container { font-family: 'Georgia', serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
+            .header { background-color: #0d9488; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { padding: 30px; background-color: #fdfdfd; }
+            .button { display: inline-block; padding: 12px 30px; background-color: #0d9488; color: white !important; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+            .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Water Baptism Registration</h1>
+            </div>
+            <div class="content">
+              <p>Dear ${recipientName},</p>
+              
+              ${isDecided
+          ? `<p>We are excited to hear that you have decided to take the next step in your faith journey through Water Baptism! This is a wonderful public declaration of your commitment to follow Jesus Christ.</p>`
+          : `<p>As you complete your discipleship journey, we would like to invite you to consider taking the next step: <strong>Water Baptism</strong>. This is a significant milestone in your spiritual walk, symbolizing your identification with Christ's death, burial, and resurrection.</p>`}
+              
+              <p>To proceed with your registration, please click the button below to fill out the necessary information (including personal details and guardian information if applicable).</p>
+              
+              <div style="text-align: center;">
+                <a href="${registrationUrl}" class="button">Complete Registration Form</a>
+              </div>
+              
+              <p style="margin-top: 30px;">If the button doesn't work, you can copy and paste this link into your browser:</p>
+              <p style="font-size: 13px; color: #0d9488;">${registrationUrl}</p>
+              
+              <p>We look forward to witnessing this special moment in your life!</p>
+              
+              <p>Grace and peace,<br>Bible Baptist Ekklesia of Kawit</p>
+            </div>
+            <div class="footer">
+              <p>&copy; 2026 Bible Baptist Ekklesia of Kawit. All rights reserved.</p>
+              <p>This is an automated message. Please do not reply.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending water baptism invitation:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendAccountDetails,
   sendMarriageDetails,
@@ -2090,6 +2253,8 @@ module.exports = {
   sendDonationNotification,
   sendDonorAcknowledgementEmail,
   sendDonorStatusUpdateEmail,
+  sendDiscipleshipDetails,
+  sendWaterBaptismInvitation,
   generateResetToken,
 };
 
