@@ -46,7 +46,7 @@ const path = require('path');
 console.log('🚀 Starting API server initialization...');
 let authenticateToken, memberRouter, accountRouter, departmentOfficerRouter, departmentRouter;
 let tithesRouter, ministryRouter, eventRouter, churchLeaderRouter, approvalRoutes;
-let childDedicationRouter, burialServiceRouter, waterBaptismRouter, marriageServiceRouter;
+let childDedicationRouter, burialServiceRouter, waterBaptismRouter, discipleshipRouter, marriageServiceRouter;
 let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRouter;
 let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
 let notificationRouter;
@@ -67,6 +67,7 @@ try {
   childDedicationRouter = require('../routes/services/childDedicationRoutes');
   burialServiceRouter = require('../routes/services/burialServiceRoutes');
   waterBaptismRouter = require('../routes/services/waterBaptismRoutes');
+  discipleshipRouter = require('../routes/services/discipleshipRoutes');
   marriageServiceRouter = require('../routes/services/marriageServiceRoutes');
   transactionRouter = require('../routes/transactionRoutes');
   memberRegistrationRouter = require('../routes/memberRegistrationRoute');
@@ -332,6 +333,7 @@ if (approvalRoutes) app.use('/api/church-records/approvals', approvalRoutes);
 if (childDedicationRouter) app.use('/api/church-records/child-dedications', childDedicationRouter);
 if (burialServiceRouter) app.use('/api/church-records/burial-services', burialServiceRouter);
 if (waterBaptismRouter) app.use('/api/services/water-baptisms', waterBaptismRouter);
+if (discipleshipRouter) app.use('/api/services/discipleship-requests', discipleshipRouter);
 if (marriageServiceRouter) app.use('/api/services/marriage-services', marriageServiceRouter);
 if (transactionRouter) app.use('/api/transactions', transactionRouter);
 
