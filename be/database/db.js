@@ -10,7 +10,7 @@ const mysql = require('mysql2/promise');
  * - Can be overridden with DB_CONNECTION_LIMIT environment variable
  */
 
-const NODE_ENV = process.env.NODE.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
 const IS_VERCEL = process.env.VERCEL || process.env.VERCEL_ENV;
 
