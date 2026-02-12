@@ -144,7 +144,7 @@
               rounded
               class="text-white join-community-btn"
               :style="{ backgroundColor: eventsData.joinButtonColor || '#14b8a6', borderColor: eventsData.joinButtonColor || '#14b8a6', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
-              @click="$router.push('/beoneofus/accept-jesus')"
+              @click="$router.push('/join')"
             >
               {{ eventsData.joinButtonText || 'Become a Member' }}
             </v-btn>

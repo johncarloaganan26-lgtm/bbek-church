@@ -330,6 +330,7 @@ e<template>
             size="large"
             style="width: 100%"
             :disabled="loading"
+            @change="handleStatusChange"
           >
             <el-option
               v-for="opt in statusOptions"
@@ -338,6 +339,18 @@ e<template>
               :value="opt.value"
             />
           </el-select>
+        </el-form-item>
+
+        <!-- Rejection Reason (shown when disapproved or cancelled) -->
+        <el-form-item v-if="formData.status === 'disapproved' || formData.status === 'cancelled'" label="Rejection Reason" prop="rejection_reason" :rules="[{ required: true, message: 'Please provide a reason for rejection', trigger: 'blur' }]">
+          <el-input
+            v-model="formData.rejection_reason"
+            type="textarea"
+            placeholder="Please provide a reason for rejection/cancellation"
+            size="large"
+            :rows="3"
+            :disabled="loading"
+          />
         </el-form-item>
       </div>
     </el-form>
@@ -584,7 +597,8 @@ const formData = reactive({
   pastor_name: '',
   service_date: null,
   preferred_service_date: defaultNightTime, // Default to 6:00 PM for night services
-  status: 'pending'
+  status: 'pending',
+  rejection_reason: ''
 })
 
 // Status options
@@ -704,6 +718,13 @@ const handleMemberChange = async (memberId) => {
   }
 }
 
+// Handle status change - clear reason when status changes from rejected/cancelled
+const handleStatusChange = () => {
+  if (formData.status !== 'disapproved' && formData.status !== 'cancelled') {
+    formData.rejection_reason = ''
+  }
+}
+
 // Reset form
 const resetForm = () => {
   formData.member_id = null
@@ -719,7 +740,8 @@ const resetForm = () => {
   formData.service_date = null
   formData.preferred_service_date = getDefaultNightTime() // Default to tomorrow 6:00 PM
   formData.status = 'pending'
-  
+  formData.rejection_reason = ''
+
   // Clear validation
   if (formRef.value) {
     formRef.value.resetFields()
@@ -747,6 +769,7 @@ watch(() => props.burialServiceData, (newData) => {
       formData.preferred_service_date = getDefaultNightTime()
     }
     formData.status = newData.status || 'pending'
+    formData.rejection_reason = newData.rejection_reason || ''
   } else {
     // Reset form when dialog is opened for new request
     resetForm()
@@ -799,7 +822,12 @@ const handleSubmit = async () => {
       pastor_name: formData.pastor_name,
       service_date: formData.service_date ? new Date(formData.service_date).toISOString() : null,
       preferred_service_time: formData.preferred_service_date ? new Date(formData.preferred_service_date).toISOString() : null,
-      status: formData.status
+      status: formData.status,
+      rejection_reason: formData.rejection_reason || null,
+      rejected_by: (() => {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        return userInfo?.account?.acc_id || userInfo?.acc_id || null
+      })()
     }
     
     let response

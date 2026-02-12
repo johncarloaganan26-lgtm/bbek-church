@@ -755,7 +755,9 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       deceased_name,
       deceased_birthdate,
       date_death,
-      reason_of_death
+      reason_of_death,
+      rejection_reason,
+      rejected_by
     } = burialData;
 
     // Check current status and block updates if pending (except for admins or status changes)
@@ -893,6 +895,20 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       params.push(status);
     }
 
+    // Handle rejection reason when status is disapproved or cancelled
+    if (status === 'disapproved' || status === 'cancelled') {
+      if (rejection_reason !== undefined) {
+        fields.push('rejection_reason = ?');
+        params.push(rejection_reason ? rejection_reason.trim() : null);
+      }
+      if (rejected_by !== undefined) {
+        fields.push('rejected_by = ?');
+        params.push(rejected_by);
+      }
+      fields.push('rejected_at = ?');
+      params.push(moment().format('YYYY-MM-DD HH:mm:ss'));
+    }
+
     if (date_created !== undefined && date_created !== null && date_created !== '') {
       const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
       fields.push('date_created = ?');
@@ -976,6 +992,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
           await sendBurialDetails({
             email: member.email,
             status: updatedBurialService.data.status,
+            rejectionReason: updatedBurialService.data.rejection_reason || '',
             deceasedName: updatedBurialService.data.deceased_name,
             familyContact: recipientName || member.phone_number || 'N/A',
             burialDate: updatedBurialService.data.service_date
@@ -992,6 +1009,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
         await sendBurialDetails({
           email: updatedBurialService.data.requester_email,
           status: updatedBurialService.data.status,
+          rejectionReason: updatedBurialService.data.rejection_reason || '',
           deceasedName: updatedBurialService.data.deceased_name,
           familyContact: updatedBurialService.data.requester_name || 'N/A',
           burialDate: updatedBurialService.data.service_date
@@ -1454,7 +1472,8 @@ async function bulkCompleteBurialServices(burialIds) {
     return {
       success: true,
       message,
-      data: { completed, failed, skipped }
+      data: { completed, failed, skipped, skippedMessages },
+      skippedMessages
     };
   } catch (error) {
     console.error('Error in bulk complete burial services:', error);

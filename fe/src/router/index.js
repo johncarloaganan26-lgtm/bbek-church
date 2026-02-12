@@ -168,6 +168,11 @@ const routes = [
     component: MessagesPage
   },
   {
+    path: '/join',
+    name: 'Join',
+    component: AcceptJesusChrist
+  },
+  {
     path: '/beoneofus/accept-jesus',
     name: 'AcceptJesusChrist',
     component: AcceptJesusChrist
@@ -455,6 +460,7 @@ router.beforeEach((to, from, next) => {
     'MinistryByDepartment',
     'LearnMoreMinistry',
     'MessagesPage',
+    'Join',
     'AcceptJesusChrist',
     'SendPrayer',
     'AboutGrid',

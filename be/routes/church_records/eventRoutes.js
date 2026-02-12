@@ -11,7 +11,9 @@ const {
   exportEventsToExcel,
   getEventsByMemberId,
   getSermonEvents,
-  getCompletedSermonEvents
+  getCompletedSermonEvents,
+  joinEvent,
+  checkMemberJoinedEvent
 } = require('../../dbHelpers/church_records/eventRecords');
 
 const router = express.Router();
@@ -524,6 +526,99 @@ router.get('/getCompletedSermonEvents', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch completed sermon events'
+    });
+  }
+});
+
+/**
+ * CHECK IF MEMBER HAS JOINED EVENT - Check if a member has already joined an event
+ * GET /api/church-records/events/checkJoined/:eventId/:memberId
+ */
+router.get('/checkJoined/:eventId/:memberId', async (req, res) => {
+  try {
+    const { eventId, memberId } = req.params;
+    
+    if (!eventId || isNaN(parseInt(eventId))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid event ID'
+      });
+    }
+    
+    if (!memberId || isNaN(parseInt(memberId))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid member ID'
+      });
+    }
+
+    const result = await checkMemberJoinedEvent(parseInt(eventId), parseInt(memberId));
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        hasJoined: result.hasJoined,
+        event: result.event
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error checking if member joined event:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to check event membership'
+    });
+  }
+});
+
+/**
+ * JOIN EVENT - Add a member to an event's joined_members list
+ * POST /api/church-records/events/joinEvent
+ * Body: { eventId, memberId }
+ * Prevents joining if event is completed or past
+ */
+router.post('/joinEvent', async (req, res) => {
+  try {
+    const { eventId, memberId } = req.body;
+
+    if (!eventId || isNaN(parseInt(eventId))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid event ID'
+      });
+    }
+
+    if (!memberId || isNaN(parseInt(memberId))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid member ID'
+      });
+    }
+
+    const result = await joinEvent(parseInt(eventId), parseInt(memberId));
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Error joining event:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to join event'
     });
   }
 });

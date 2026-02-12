@@ -299,6 +299,7 @@
           size="large"
           style="width: 100%"
           :disabled="loading"
+          @change="handleStatusChange"
         >
           <el-option
             v-for="option in statusOptions"
@@ -307,6 +308,18 @@
             :value="option.value"
           />
         </el-select>
+      </el-form-item>
+
+      <!-- Rejection Reason (shown when disapproved or cancelled) -->
+      <el-form-item v-if="formData.status === 'disapproved' || formData.status === 'cancelled'" label="Rejection Reason" prop="rejection_reason" :rules="[{ required: true, message: 'Please provide a reason for rejection', trigger: 'blur' }]">
+        <el-input
+          v-model="formData.rejection_reason"
+          type="textarea"
+          placeholder="Please provide a reason for rejection/cancellation"
+          size="large"
+          :rows="3"
+          :disabled="loading"
+        />
       </el-form-item>
 
       <!-- Guardian Name (shown only if single) -->
@@ -546,6 +559,7 @@ const formData = reactive({
   location: '',
   pastor_name: '',
   status: 'pending', // Default status
+  rejection_reason: '',
   // Personal info (for both member and non-member)
   firstname: '',
   middle_name: '',
@@ -731,6 +745,13 @@ const updateStatusFromBaptismDate = () => {
   }
 }
 
+// Handle status change - clear reason when status changes from rejected/cancelled
+const handleStatusChange = () => {
+  if (formData.status !== 'disapproved' && formData.status !== 'cancelled') {
+    formData.rejection_reason = ''
+  }
+}
+
 // Handle date/time change - show immediate toast notification for conflicts and update status
 const onDateTimeChange = async (value) => {
   // First update status based on date change
@@ -898,6 +919,7 @@ watch(() => props.baptismData, async (newData) => {
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
     formData.status = newData.status || 'pending'
+    formData.rejection_reason = newData.rejection_reason || ''
     formData.guardian_name = newData.guardian_name || ''
     formData.guardian_contact = newData.guardian_contact || ''
     formData.guardian_relationship = newData.guardian_relationship || ''
@@ -989,6 +1011,7 @@ const resetForm = () => {
   formData.location = ''
   formData.pastor_name = ''
   formData.status = 'pending' // Reset to default
+  formData.rejection_reason = ''
   // Personal info
   formData.firstname = ''
   formData.middle_name = ''
@@ -1064,6 +1087,12 @@ const handleSubmit = async () => {
       guardian_name: formData.guardian_name?.trim() || null,
       guardian_contact: formData.guardian_contact?.trim() || null,
       guardian_relationship: formData.guardian_relationship || null,
+      // Rejection reason fields
+      rejection_reason: formData.rejection_reason?.trim() || null,
+      rejected_by: (() => {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        return userInfo?.account?.acc_id || userInfo?.acc_id || null
+      })(),
       // Personal info fields
       firstname: formData.firstname?.trim() || null,
       middle_name: formData.middle_name?.trim() || null,

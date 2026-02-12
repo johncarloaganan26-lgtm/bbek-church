@@ -933,7 +933,9 @@ async function updateWaterBaptism(baptismId, baptismData) {
       date_created,
       guardian_name,
       guardian_contact,
-      guardian_relationship
+      guardian_relationship,
+      rejection_reason,
+      rejected_by
     } = baptismData;
 
     // Check for time slot conflicts before updating
@@ -1099,6 +1101,20 @@ async function updateWaterBaptism(baptismId, baptismData) {
       params.push(status);
     }
 
+    // Handle rejection reason when status is disapproved or cancelled
+    if (status === 'disapproved' || status === 'cancelled') {
+      if (rejection_reason !== undefined) {
+        fields.push('rejection_reason = ?');
+        params.push(rejection_reason ? rejection_reason.trim() : null);
+      }
+      if (rejected_by !== undefined) {
+        fields.push('rejected_by = ?');
+        params.push(rejected_by);
+      }
+      fields.push('rejected_at = ?');
+      params.push(moment().format('YYYY-MM-DD HH:mm:ss'));
+    }
+
     if (date_created !== undefined) {
       // date_created is VARCHAR(45), so format as string
       const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
@@ -1205,6 +1221,7 @@ async function updateWaterBaptism(baptismId, baptismData) {
             status: updatedBaptism.status,
             recipientName: recipientNameFinal,
             memberName: recipientNameFinal,
+            rejectionReason: updatedBaptism.rejection_reason || '',
             // Registration Information
             firstname: updatedBaptism.firstname || '',
             middleName: updatedBaptism.middle_name || '',

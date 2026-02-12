@@ -538,11 +538,39 @@ const clearSelection = () => {
 
 const bulkCompleteDedications = async () => {
   // Count only approved dedications in the selection
-  const approvedCount = selectedDedications.value.filter(d => d.status === 'approved').length;
+  const approvedDedications = selectedDedications.value.filter(d => d.status === 'approved');
+  
+  if (approvedDedications.length === 0) {
+    ElMessage.warning('No approved dedications selected.');
+    return;
+  }
+
+  // Check dates: cannot complete future dedications
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const validDedications = approvedDedications.filter(d => {
+    if (!d.preferred_dedication_date) return false;
+    const dedicationDate = new Date(d.preferred_dedication_date);
+    dedicationDate.setHours(0, 0, 0, 0);
+    return dedicationDate <= today;
+  });
+
+  const skippedCount = approvedDedications.length - validDedications.length;
+
+  if (validDedications.length === 0) {
+    ElMessage.warning('Cannot mark future dedications as completed. Please wait until the scheduled date.');
+    return;
+  }
   
   try {
+    let confirmMessage = `Are you sure you want to mark ${validDedications.length} approved child dedication(s) as completed?`;
+    if (skippedCount > 0) {
+      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
+    }
+
     await ElMessageBox.confirm(
-      `Are you sure you want to mark ${approvedCount} approved child dedication(s) as completed?`,
+      confirmMessage,
       'Confirm Bulk Complete',
       {
         confirmButtonText: 'Yes, Mark as Completed',
@@ -551,10 +579,8 @@ const bulkCompleteDedications = async () => {
       }
     )
 
-    // Extract child IDs for only approved dedications
-    const childIds = selectedDedications.value
-      .filter(d => d.status === 'approved')
-      .map(d => d.child_id)
+    // Extract child IDs for only approved dedications with past dates
+    const childIds = validDedications.map(d => d.child_id)
 
     // Use the bulk complete endpoint
     const result = await childDedicationStore.bulkCompleteChildDedications(childIds)

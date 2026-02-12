@@ -49,11 +49,11 @@
         </el-select>
       </el-form-item>
 
-      <!-- Department Lead -->
-      <el-form-item label="Department Lead" prop="member_id">
+      <!-- Department President -->
+      <el-form-item label="Department President" prop="member_id">
         <el-select
           v-model="formData.member_id"
-          placeholder="Select department lead (optional)"
+          placeholder="Select department president (optional)"
           size="large"
           style="width: 100%"
           clearable
@@ -68,11 +68,11 @@
         </el-select>
       </el-form-item>
 
-      <!-- Joined Members -->
-      <el-form-item label="Joined Members" prop="joined_members">
+      <!-- Department Officers -->
+      <el-form-item label="Department Officers" prop="joined_members">
         <el-select
           v-model="formData.joined_members"
-          placeholder="Select members (optional)"
+          placeholder="Select department officers (optional)"
           size="large"
           style="width: 100%"
           multiple
@@ -87,7 +87,7 @@
           />
         </el-select>
         <div class="text-caption mt-1 text-grey">
-          Select multiple members who have joined this department
+          Select multiple officers who have joined this department
         </div>
       </el-form-item>
     </el-form>
@@ -122,12 +122,12 @@ const props = defineProps({
     type: Object,
     default: null
   },
-  // Members for department lead select: [{ id, name, position }] - only President position
+  // Members for department president select: [{ id, name, position }] - only President position
   departmentLeadOptions: {
     type: Array,
     default: () => []
   },
-  // Members for joined members select: [{ id, name, position }] - only VP, Secretary, etc.
+  // Members for department officers select: [{ id, name, position }] - only Vice President, Secretary, etc.
   joinedMemberOptions: {
     type: Array,
     default: () => []

@@ -195,8 +195,8 @@
             </th>
             <!-- <th class="text-left font-weight-bold">Department ID</th> -->
             <th class="text-left font-weight-bold">Department Name</th>
-            <th class="text-left font-weight-bold">Department Lead</th>
-            <th class="text-left font-weight-bold">Joined Members</th>
+            <th class="text-left font-weight-bold">Department President</th>
+            <th class="text-left font-weight-bold">Department Officers</th>
             <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Date Created</th>
             <th class="text-left font-weight-bold">Actions</th>
@@ -232,6 +232,19 @@
             </td>
             <td>{{ department.date_created ? new Date(department.date_created).toLocaleDateString() : '-' }}</td>
             <td>
+              <v-tooltip text="View Department" location="top">
+                <template v-slot:activator="{ props }">
+              <v-btn
+                icon="mdi-eye"
+                variant="text"
+                size="small"
+                class="mr-2"
+                    v-bind="props"
+                @click="handleViewDepartment(department)"
+                :disabled="loading"
+              ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip text="Edit Department" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn
@@ -303,6 +316,13 @@
       @update:model-value="departmentDialog = $event"
       @submit="handleSubmit"
     />
+
+    <!-- View Department Dialog -->
+    <ViewDepartmentDialog
+      v-model="viewDepartmentDialog"
+      :department-data="viewDepartmentData"
+      @update:model-value="viewDepartmentDialog = $event"
+    />
   </div>
 </template>
 
@@ -311,6 +331,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDepartmentsStore } from '@/stores/ChurchRecords/departmentsStore'
 import DepartmentDialog from '@/components/Dialogs/DepartmentDialog.vue'
+import ViewDepartmentDialog from '@/components/Dialogs/ViewDepartmentDialog.vue'
 
 // Pinia Store
 const departmentsStore = useDepartmentsStore()
@@ -320,29 +341,40 @@ const memberOptions = computed(() => departmentsStore.memberOptions)
 
 // Position constants for filtering
 const PRESIDENT_POSITION = 'President'
-const JOINED_MEMBER_POSITIONS = ['VP', 'Secretary', 'Assistant Secretary', 'Treasurer', 'Auditor', 'Coordinator', 'PIO', 'Social Media Coordinator']
+const JOINED_MEMBER_POSITIONS = ['Vice President', 'Secretary', 'Assistant Secretary', 'Treasurer', 'Auditor', 'Coordinator', 'PIO', 'Social Media Coordinator']
 
-// Filtered options for Department Lead (only President position)
+// Filtered options for Department Lead (only President position, exclude unavailable)
 const departmentLeadOptions = computed(() => {
   return memberOptions.value.filter(member => {
     const position = member.position?.toLowerCase() || ''
-    return position.toLowerCase() === PRESIDENT_POSITION.toLowerCase()
+    const isPresidentPosition = position.toLowerCase() === PRESIDENT_POSITION.toLowerCase()
+    const isUnavailable = unavailableMembers.value.presidentIds.includes(member.id)
+    return isPresidentPosition && !isUnavailable
   })
 })
 
-// Filtered options for Joined Members (VP, Secretary, Assistant Secretary, Treasurer, Auditor, Coordinator, PIO, Social Media Coordinator)
+// Filtered options for Joined Members (VP, Secretary, etc., exclude unavailable)
 const joinedMemberOptions = computed(() => {
   return memberOptions.value.filter(member => {
     const position = member.position?.toLowerCase() || ''
-    return JOINED_MEMBER_POSITIONS.some(pos => position.includes(pos.toLowerCase()))
+    const isOfficerPosition = JOINED_MEMBER_POSITIONS.some(pos => position.includes(pos.toLowerCase()))
+    const isUnavailable = unavailableMembers.value.officerIds.includes(member.id)
+    return isOfficerPosition && !isUnavailable
   })
 })
 
 // Component state
 const departmentDialog = ref(false)
 const departmentData = ref(null)
+const viewDepartmentDialog = ref(false)
+const viewDepartmentData = ref(null)
 const localDateRange = ref([])
 const selectedDepartments = ref([])
+const unavailableMembers = ref({
+  presidentIds: [],
+  officerIds: [],
+  allAssignedIds: []
+})
 
 // Computed properties from store
 const departments = computed(() => departmentsStore.paginatedDepartments)
@@ -438,8 +470,14 @@ watch(() => departments, () => {
 }, { deep: true })
 
 
-// Handle dialog
-const handleDepartmentDialog = (data = null) => {
+// Handle dialog - fetch unavailable members first
+const handleDepartmentDialog = async (data = null) => {
+  // Get excludeDepartmentId for edit mode
+  const excludeDepartmentId = data?.department_id || null
+  
+  // Fetch unavailable members to filter dropdowns
+  unavailableMembers.value = await departmentsStore.fetchUnavailableMembers(excludeDepartmentId)
+  
   if (data) {
     departmentData.value = {
       department_id: data.department_id,
@@ -452,6 +490,16 @@ const handleDepartmentDialog = (data = null) => {
     departmentData.value = null
   }
   departmentDialog.value = true
+}
+
+// Handle view department
+const handleViewDepartment = async (data) => {
+  // Ensure member options are loaded for resolving names
+  if (departmentsStore.memberOptions.length === 0) {
+    await departmentsStore.fetchMemberOptions()
+  }
+  viewDepartmentData.value = data
+  viewDepartmentDialog.value = true
 }
 
 // Handle submit from dialog
@@ -475,7 +523,20 @@ const handleSubmit = async (submitData) => {
       departmentDialog.value = false
       departmentData.value = null
     } else {
-      ElMessage.error(result.error || 'Failed to save department')
+      // Handle validation errors
+      if (result.validationErrors && result.validationErrors.length > 0) {
+        // Show all validation errors in a single message
+        const errorMessage = result.validationErrors.join('\n')
+        ElMessage({
+          message: errorMessage,
+          type: 'error',
+          duration: 5000,
+          showClose: true,
+          grouping: true
+        })
+      } else {
+        ElMessage.error(result.error || 'Failed to save department')
+      }
     }
   } catch (error) {
     console.error('Error saving department:', error)

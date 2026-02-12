@@ -15,6 +15,243 @@ const { archiveBeforeDelete } = require('../archiveHelper');
  */
 
 /**
+ * VALIDATION - Check if a member is already assigned as President in another department
+ * @param {String} memberId - Member ID to check
+ * @param {Number} excludeDepartmentId - Optional department_id to exclude (for updates)
+ * @returns {Promise<Object>} Object with isAssigned flag and department info
+ */
+async function checkMemberAsPresidentInOtherDepartment(memberId, excludeDepartmentId = null) {
+  try {
+    if (!memberId) {
+      return { isAssigned: false, department: null };
+    }
+
+    let sql = 'SELECT department_id, department_name, member_id FROM tbl_departments WHERE member_id = ?';
+    const params = [memberId.trim()];
+
+    if (excludeDepartmentId) {
+      sql += ' AND department_id != ?';
+      params.push(excludeDepartmentId);
+    }
+
+    sql += ' LIMIT 1';
+    const [rows] = await query(sql, params);
+
+    if (rows.length > 0) {
+      return {
+        isAssigned: true,
+        department: {
+          department_id: rows[0].department_id,
+          department_name: rows[0].department_name
+        }
+      };
+    }
+
+    return { isAssigned: false, department: null };
+  } catch (error) {
+    console.error('Error checking member president assignment:', error);
+    throw error;
+  }
+}
+
+/**
+ * VALIDATION - Check if a member is already an officer in another department
+ * @param {String} memberId - Member ID to check
+ * @param {Number} excludeDepartmentId - Optional department_id to exclude (for updates)
+ * @returns {Promise<Object>} Object with isAssigned flag and department info
+ */
+async function checkMemberAsOfficerInOtherDepartment(memberId, excludeDepartmentId = null) {
+  try {
+    if (!memberId) {
+      return { isAssigned: false, department: null };
+    }
+
+    let sql = 'SELECT department_id, department_name, joined_members FROM tbl_departments WHERE joined_members IS NOT NULL AND joined_members != ?';
+    const params = [''];
+
+    if (excludeDepartmentId) {
+      sql += ' AND department_id != ?';
+      params.push(excludeDepartmentId);
+    }
+
+    const [rows] = await query(sql, params);
+
+    for (const row of rows) {
+      try {
+        const officers = JSON.parse(row.joined_members);
+        if (Array.isArray(officers) && officers.includes(memberId.trim())) {
+          return {
+            isAssigned: true,
+            department: {
+              department_id: row.department_id,
+              department_name: row.department_name
+            }
+          };
+        }
+      } catch (e) {
+        // Skip invalid JSON
+        continue;
+      }
+    }
+
+    return { isAssigned: false, department: null };
+  } catch (error) {
+    console.error('Error checking member officer assignment:', error);
+    throw error;
+  }
+}
+
+/**
+ * VALIDATION - Check for duplicate officers within the same department
+ * @param {Array} officerIds - Array of member IDs
+ * @returns {Object} Object with hasDuplicates flag
+ */
+function checkForDuplicateOfficers(officerIds) {
+  if (!officerIds || !Array.isArray(officerIds)) {
+    return { hasDuplicates: false, duplicates: [] };
+  }
+
+  const seen = new Map();
+  const duplicates = [];
+
+  for (const id of officerIds) {
+    if (seen.has(id)) {
+      duplicates.push(id);
+    } else {
+      seen.set(id, true);
+    }
+  }
+
+  return {
+    hasDuplicates: duplicates.length > 0,
+    duplicates
+  };
+}
+
+/**
+ * VALIDATION - Comprehensive validation for department assignment
+ * @param {Object} assignmentData - Assignment data
+ * @returns {Promise<Object>} Object with isValid flag and error messages
+ */
+async function validateDepartmentAssignment(assignmentData) {
+  const errors = [];
+  const {
+    presidentId,
+    officerIds = [],
+    excludeDepartmentId = null
+  } = assignmentData;
+
+  // Check if president is already assigned to another department
+  if (presidentId) {
+    const presidentCheck = await checkMemberAsPresidentInOtherDepartment(presidentId, excludeDepartmentId);
+    if (presidentCheck.isAssigned) {
+      errors.push(`This member is already the President of "${presidentCheck.department.department_name}"`);
+    }
+  }
+
+  // Check if any officer is already an officer in another department
+  if (officerIds && officerIds.length > 0) {
+    for (const officerId of officerIds) {
+      const officerCheck = await checkMemberAsOfficerInOtherDepartment(officerId, excludeDepartmentId);
+      if (officerCheck.isAssigned) {
+        // Get member name for better error message
+        const memberName = await getMemberName(officerId);
+        errors.push(`${memberName} is already an officer of "${officerCheck.department.department_name}"`);
+      }
+    }
+  }
+
+  // Check if president is also in the officers list
+  if (presidentId && officerIds && officerIds.includes(presidentId)) {
+    errors.push('The President cannot also be listed as an officer');
+  }
+
+  // Check for duplicate officers within the same department
+  const duplicateCheck = checkForDuplicateOfficers(officerIds);
+  if (duplicateCheck.hasDuplicates) {
+    errors.push('Duplicate officers selected');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * HELPER - Get member full name by ID
+ * @param {String} memberId - Member ID
+ * @returns {Promise<String>} Member full name
+ */
+async function getMemberName(memberId) {
+  try {
+    const sql = 'SELECT firstname, middle_name, lastname FROM tbl_members WHERE member_id = ?';
+    const [rows] = await query(sql, [memberId.trim()]);
+
+    if (rows.length > 0) {
+      const m = rows[0];
+      return `${m.firstname}${m.middle_name ? ' ' + m.middle_name : ''} ${m.lastname}`;
+    }
+    return 'Unknown member';
+  } catch (error) {
+    console.error('Error getting member name:', error);
+    return 'Unknown member';
+  }
+}
+
+/**
+ * VALIDATION - Get all unavailable members for department assignment filtering
+ * Returns members who are already assigned as President or Officer elsewhere
+ * @param {Number} excludeDepartmentId - Department ID to exclude (for edit mode)
+ * @returns {Promise<Object>} Object with presidentIds and officerIds arrays for filtering dropdowns
+ */
+async function getUnavailableMembers(excludeDepartmentId = null) {
+  try {
+    // Get members who are Presidents elsewhere
+    let presidentSql = 'SELECT member_id FROM tbl_departments WHERE member_id IS NOT NULL';
+    const presidentParams = [];
+    if (excludeDepartmentId) {
+      presidentSql += ' AND department_id != ?';
+      presidentParams.push(excludeDepartmentId);
+    }
+    const [presidentRows] = await query(presidentSql, presidentParams);
+    const presidentIds = presidentRows
+      .filter(row => row.member_id)
+      .map(row => row.member_id.trim());
+
+    // Get members who are Officers elsewhere
+    let officerSql = 'SELECT department_id, joined_members FROM tbl_departments WHERE joined_members IS NOT NULL AND joined_members != ?';
+    const officerParams = [''];
+    if (excludeDepartmentId) {
+      officerSql += ' AND department_id != ?';
+      officerParams.push(excludeDepartmentId);
+    }
+    const [officerRows] = await query(officerSql, officerParams);
+    
+    const allOfficerIds = new Set();
+    for (const row of officerRows) {
+      try {
+        const officers = JSON.parse(row.joined_members);
+        if (Array.isArray(officers)) {
+          officers.forEach(id => allOfficerIds.add(id.trim()));
+        }
+      } catch (e) {
+        // Skip invalid JSON
+      }
+    }
+
+    return {
+      presidentIds,       // Members who are Presidents elsewhere (cannot be selected as President)
+      officerIds: Array.from(allOfficerIds),  // Members who are Officers elsewhere (cannot be selected as Officer)
+      allAssignedIds: [...new Set([...presidentIds, ...allOfficerIds])]  // All assigned members
+    };
+  } catch (error) {
+    console.error('Error getting unavailable members:', error);
+    return { presidentIds: [], officerIds: [], allAssignedIds: [] };
+  }
+}
+
+/**
  * Check if a department with the same name already exists
  * @param {String} departmentName - Department name to check
  * @param {Number} excludeDepartmentId - Optional department_id to exclude from check (for updates)
@@ -69,6 +306,22 @@ async function createDepartment(departmentData) {
         success: false,
         message: 'A department with this name already exists',
         error: 'Duplicate department name'
+      };
+    }
+
+    // Validate president and officer assignments
+    const validationResult = await validateDepartmentAssignment({
+      presidentId: member_id,
+      officerIds: joined_members,
+      excludeDepartmentId: null
+    });
+
+    if (!validationResult.isValid) {
+      return {
+        success: false,
+        message: validationResult.errors[0],
+        error: 'Assignment validation failed',
+        validationErrors: validationResult.errors
       };
     }
 
@@ -564,6 +817,28 @@ async function updateDepartment(departmentId, departmentData) {
       params.push(joinedMembersJson);
     }
 
+    // Add assignment validation if president or officers are being updated
+    if (member_id !== undefined || joined_members !== undefined) {
+      // Get current values if not provided
+      const currentPresident = member_id !== undefined ? member_id : departmentCheck.data.member_id;
+      const currentOfficers = joined_members !== undefined ? joined_members : departmentCheck.data.joined_members;
+
+      const validationResult = await validateDepartmentAssignment({
+        presidentId: currentPresident,
+        officerIds: currentOfficers,
+        excludeDepartmentId: departmentId
+      });
+
+      if (!validationResult.isValid) {
+        return {
+          success: false,
+          message: validationResult.errors[0],
+          error: 'Assignment validation failed',
+          validationErrors: validationResult.errors
+        };
+      }
+    }
+
     if (fields.length === 0) {
       return {
         success: false,
@@ -827,6 +1102,12 @@ module.exports = {
   bulkDeleteDepartments,
   checkDuplicateDepartment,
   exportDepartmentsToExcel,
-  getAllDepartmentsForSelect
+  getAllDepartmentsForSelect,
+  // Validation functions exported for use in other modules
+  checkMemberAsPresidentInOtherDepartment,
+  checkMemberAsOfficerInOtherDepartment,
+  checkForDuplicateOfficers,
+  validateDepartmentAssignment,
+  getMemberName,
+  getUnavailableMembers
 };
-

@@ -567,6 +567,7 @@
           size="large"
           style="width: 100%"
           :disabled="loading"
+          @change="handleStatusChange"
         >
           <el-option
             v-for="opt in statusOptions"
@@ -575,6 +576,18 @@
             :value="opt.value"
           />
         </el-select>
+      </el-form-item>
+
+      <!-- Rejection Reason (shown when disapproved or cancelled) -->
+      <el-form-item v-if="!isMemberUser && (formData.status === 'disapproved' || formData.status === 'cancelled')" label="Rejection Reason" prop="rejection_reason" :rules="[{ required: true, message: 'Please provide a reason for rejection', trigger: 'blur' }]">
+        <el-input
+          v-model="formData.rejection_reason"
+          type="textarea"
+          placeholder="Please provide a reason for rejection/cancellation"
+          size="large"
+          :rows="3"
+          :disabled="loading"
+        />
       </el-form-item>
     </el-form>
 
@@ -821,6 +834,13 @@ const onPastorChange = (pastorName) => {
   console.log('Pastor selected:', pastorName)
 }
 
+// Handle status change - clear reason when status changes from rejected/cancelled
+const handleStatusChange = () => {
+  if (formData.status !== 'disapproved' && formData.status !== 'cancelled') {
+    formData.rejection_reason = ''
+  }
+}
+
 // Handle date change - NO error trapping for dates (multiple services allowed on same date)
 const onDateChange = async (date) => {
   // Only validate for admin/staff users and if time is already selected
@@ -987,7 +1007,8 @@ const formData = reactive({
   sponsors: [],
   pastor: '',
   location: '',
-  status: 'pending'
+  status: 'pending',
+  rejection_reason: ''
 })
 
 // Status options
@@ -1343,6 +1364,7 @@ watch(() => props.dedicationData, (newData) => {
     formData.pastor = newData.pastor || ''
     formData.location = newData.location || ''
     formData.status = newData.status || 'pending'
+    formData.rejection_reason = newData.rejection_reason || ''
   }
 }, { immediate: true })
 
@@ -1411,6 +1433,7 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.pastor = data.pastor || ''
       formData.location = data.location || ''
       formData.status = data.status || 'pending'
+      formData.rejection_reason = data.rejection_reason || ''
 
       // For edit mode, if admin/staff user, fetch the selected member's data
       if (!isMemberUser.value && data.requested_by) {
@@ -1494,6 +1517,7 @@ const resetForm = () => {
   formData.pastor = ''
   formData.location = ''
   formData.status = 'pending'
+  formData.rejection_reason = ''
   
   // Clear selected member data
   selectedMemberData.value = null
@@ -1662,7 +1686,12 @@ const handleSubmit = async () => {
             address: s.address ? s.address.trim() : ''
           })).filter(s => s.firstname && s.lastname && s.phone_number && s.address) // Only include complete sponsors
         : [],
-      status: formData.status
+      status: formData.status,
+      rejection_reason: formData.rejection_reason || null,
+      rejected_by: (() => {
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        return userInfo?.account?.acc_id || userInfo?.acc_id || null
+      })()
     }
 
     // Only include pastor and location for admin/staff users

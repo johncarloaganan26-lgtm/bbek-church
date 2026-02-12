@@ -88,14 +88,14 @@
                 </v-card-text>
               </v-card>
 
-              <!-- Add to Calendar Button -->
+              <!-- Add to Calendar / Join Event Button -->
               <v-card
                 class="mb-4 event-card event-card-3"
                 variant="flat"
                 color="teal-lighten-5"
               >
                 <v-card-text>
-                  <v-menu v-if="eventStatus !== 'completed' && userInfo?.member?.member_id" location="bottom">
+                  <v-menu v-if="canJoinEvent && userInfo?.member?.member_id" location="bottom">
                     <template v-slot:activator="{ props }">
                       <v-btn
                         v-bind="props"
@@ -105,8 +105,9 @@
                         prepend-icon="mdi-calendar-plus"
                         color="primary"
                         append-icon="mdi-chevron-down"
+                        :loading="isJoining"
                       >
-                        Add to Calendar
+                        Join Event
                       </v-btn>
                     </template>
                     <v-list>
@@ -121,8 +122,10 @@
                       </v-list-item>
                     </v-list>
                   </v-menu>
+                  
+                  <!-- Show Join button directly (no calendar options) -->
                   <v-btn
-                    v-else-if="eventStatus !== 'completed' && !userInfo?.member?.member_id"
+                    v-else-if="canJoinEvent && !userInfo?.member?.member_id"
                     size="large"
                     block
                     class="calendar-btn"
@@ -130,8 +133,47 @@
                     color="secondary"
                     @click="showLoginDialog = true"
                   >
-                    Login to Add to Calendar
+                    Login to Join Event
                   </v-btn>
+                  
+                  <!-- Already joined -->
+                  <v-btn
+                    v-else-if="hasJoined"
+                    size="large"
+                    block
+                    disabled
+                    class="disabled-btn"
+                    color="success"
+                    prepend-icon="mdi-check"
+                  >
+                    Already Joined
+                  </v-btn>
+                  
+                  <!-- Event completed -->
+                  <v-btn
+                    v-else-if="eventStatus === 'completed'"
+                    size="large"
+                    block
+                    disabled
+                    class="disabled-btn"
+                    color="grey"
+                  >
+                    Event Completed
+                  </v-btn>
+                  
+                  <!-- Event is past -->
+                  <v-btn
+                    v-else-if="isEventPast"
+                    size="large"
+                    block
+                    disabled
+                    class="disabled-btn"
+                    color="grey"
+                  >
+                    Event Ended
+                  </v-btn>
+                  
+                  <!-- Fallback for other states -->
                   <v-btn
                     v-else
                     size="large"
@@ -140,7 +182,7 @@
                     class="disabled-btn"
                     color="grey"
                   >
-                    Event Completed
+                    Not Available
                   </v-btn>
                 </v-card-text>
               </v-card>
@@ -172,27 +214,56 @@ import axios from '@/api/axios'
 import { ElMessage } from 'element-plus'
 import { useCms } from '@/composables/useCms'
 import LoginDialog from '@/components/Dialogs/LoginDialog.vue'
+import { useEventsRecordsStore } from '@/stores/ChurchRecords/eventsRecordsStore'
 
 const route = useRoute()
 const router = useRouter()
+const eventsStore = useEventsRecordsStore()
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const eventModel = ref({})
 const loading = ref(true)
 const showLoginDialog = ref(false)
+const hasJoined = ref(false)
+const isJoining = ref(false)
 
 const fetchEventData = async () => {
   try {
+    // Support both eventId (new) and eventModel (old/backwards compatibility)
     const eventId = route.query?.eventId
-    if (!eventId) {
+    const eventModelParam = route.query?.eventModel
+    
+    if (eventId) {
+      // New method: fetch event by ID from API
+      const response = await axios.get(`/church-records/events/getEventById/${eventId}`)
+      if (response.data.success && response.data.data) {
+        eventModel.value = response.data.data
+        
+        // Check if user has already joined this event
+        if (userInfo.value?.member?.member_id) {
+          const checkResult = await eventsStore.checkMemberJoinedEvent(
+            parseInt(eventId),
+            userInfo.value.member.member_id
+          )
+          if (checkResult.success) {
+            hasJoined.value = checkResult.hasJoined
+          }
+        }
+      } else {
+        ElMessage.error(response.data.message || 'Failed to fetch event details')
+      }
+    } else if (eventModelParam) {
+      // Old method: event data passed as query parameter
+      try {
+        const decoded = decodeURIComponent(eventModelParam)
+        const eventData = JSON.parse(decoded)
+        eventModel.value = eventData
+      } catch (e) {
+        console.error('Error parsing event data:', e)
+        ElMessage.error('Invalid event data')
+      }
+    } else {
       ElMessage.error('Event ID is required')
       return
-    }
-    
-    const response = await axios.get(`/church-records/events/getEventById/${eventId}`)
-    if (response.data.success && response.data.data) {
-      eventModel.value = response.data.data
-    } else {
-      ElMessage.error(response.data.message || 'Failed to fetch event details')
     }
   } catch (error) {
     console.error('Error fetching event:', error)
@@ -336,6 +407,63 @@ const downloadICal = () => {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+}
+
+// Check if event is past (end_date < now)
+const isEventPast = computed(() => {
+  if (!eventModel.value?.end_date) return false
+  const now = new Date()
+  const endDate = new Date(eventModel.value.end_date)
+  return endDate < now
+})
+
+// Check if event is completed or past
+const canJoinEvent = computed(() => {
+  // Can't join if already joined
+  if (hasJoined.value) return false
+  // Can't join if completed
+  if (eventStatus.value === 'completed') return false
+  // Can't join if past
+  if (isEventPast.value) return false
+  return true
+})
+
+// Join event handler
+const joinEvent = async () => {
+  const eventId = route.query?.eventId
+  const memberId = userInfo.value?.member?.member_id
+  
+  if (!eventId || !memberId) {
+    ElMessage.error('Unable to join event')
+    return
+  }
+  
+  if (!canJoinEvent.value) {
+    if (isEventPast.value) {
+      ElMessage.warning('Cannot join past events')
+    } else if (eventStatus.value === 'completed') {
+      ElMessage.warning('Cannot join completed events')
+    } else {
+      ElMessage.warning('You have already joined this event')
+    }
+    return
+  }
+  
+  isJoining.value = true
+  try {
+    const result = await eventsStore.joinEvent(parseInt(eventId), memberId)
+    if (result.success) {
+      ElMessage.success('Successfully joined the event!')
+      hasJoined.value = true
+    } else {
+      ElMessage.error(result.error || 'Failed to join event')
+    }
+  } catch (error) {
+    console.error('Error joining event:', error)
+    ElMessage.error('An error occurred while joining the event')
+  } finally {
+    isJoining.value = false
+  }
 }
 
 </script>

@@ -151,7 +151,7 @@
               rounded
               class="text-white join-community-btn"
               :style="{ backgroundColor: ministriesData.joinButtonColor || '#14b8a6', borderColor: ministriesData.joinButtonColor || '#14b8a6', fontFamily: 'Georgia, serif', fontStyle: 'italic' }"
-              @click="$router.push('/beoneofus/accept-jesus')"
+              @click="$router.push('/join')"
             >
               {{ ministriesData.joinButtonText || 'Become a Member' }}
             </v-btn>

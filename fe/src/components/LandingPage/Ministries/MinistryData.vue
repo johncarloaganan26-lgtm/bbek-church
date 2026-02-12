@@ -119,7 +119,7 @@
               rounded
               class="text-white"
               style="font-family: 'Georgia', serif; font-style: italic;"
-              @click="$router.push('/beoneofus/accept-jesus')"
+              @click="$router.push('/join')"
             >
               Become a Member
             </v-btn>

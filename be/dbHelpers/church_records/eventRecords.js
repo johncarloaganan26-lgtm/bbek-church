@@ -1184,6 +1184,134 @@ async function getCompletedSermonEvents() {
   }
 }
 
+/**
+ * Check if a member has already joined an event
+ * @param {number} eventId - Event ID
+ * @param {number} memberId - Member ID
+ * @returns {Object} Result with success status and whether member has joined
+ */
+async function checkMemberJoinedEvent(eventId, memberId) {
+  try {
+    if (!eventId) {
+      throw new Error('Event ID is required');
+    }
+    if (!memberId) {
+      throw new Error('Member ID is required');
+    }
+
+    const eventResult = await getEventById(eventId);
+    if (!eventResult.success || !eventResult.data) {
+      return {
+        success: false,
+        hasJoined: false,
+        message: 'Event not found'
+      };
+    }
+
+    const event = eventResult.data;
+    const joinedMembers = event.joined_members || [];
+    const hasJoined = joinedMembers.some(id => parseInt(id) === parseInt(memberId));
+
+    return {
+      success: true,
+      hasJoined: hasJoined,
+      event: event
+    };
+  } catch (error) {
+    console.error('Error checking if member joined event:', error);
+    throw error;
+  }
+}
+
+/**
+ * Add a member to an event's joined_members list
+ * Prevents joining if event is completed or past
+ * @param {number} eventId - Event ID
+ * @param {number} memberId - Member ID
+ * @returns {Object} Result with success status and updated event data
+ */
+async function joinEvent(eventId, memberId) {
+  try {
+    if (!eventId) {
+      throw new Error('Event ID is required');
+    }
+    if (!memberId) {
+      throw new Error('Member ID is required');
+    }
+
+    // First, get the current event data
+    const eventResult = await getEventById(eventId);
+    if (!eventResult.success || !eventResult.data) {
+      return {
+        success: false,
+        message: 'Event not found',
+        error: 'Event not found'
+      };
+    }
+
+    const event = eventResult.data;
+
+    // Check if event is completed or past (end_date < NOW())
+    const now = new Date();
+    const endDate = new Date(event.end_date);
+    
+    if (event.status === 'completed') {
+      return {
+        success: false,
+        message: 'Cannot join a completed event',
+        error: 'This event has already been completed'
+      };
+    }
+
+    if (endDate < now) {
+      return {
+        success: false,
+        message: 'Cannot join a past event',
+        error: 'This event has already ended'
+      };
+    }
+
+    // Get current joined_members array
+    let joinedMembers = event.joined_members || [];
+    
+    // Check if member already joined
+    const memberIdNum = parseInt(memberId);
+    const alreadyJoined = joinedMembers.some(id => parseInt(id) === memberIdNum);
+    if (alreadyJoined) {
+      return {
+        success: false,
+        message: 'Member already joined this event',
+        error: 'You have already joined this event'
+      };
+    }
+
+    // Add member to joined_members
+    joinedMembers.push(memberIdNum);
+
+    // Update the event with the new joined_members
+    const updateResult = await updateEvent(eventId, {
+      joined_members: joinedMembers
+    });
+
+    if (updateResult.success) {
+      return {
+        success: true,
+        message: 'Successfully joined the event',
+        data: updateResult.data
+      };
+    } else {
+      return {
+        success: false,
+        message: updateResult.message,
+        error: updateResult.message
+      };
+    }
+  } catch (error) {
+    console.error('Error joining event:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createEvent,
   getAllEvents,
@@ -1195,5 +1323,7 @@ module.exports = {
   getEventsByMemberId,
   getSermonEvents,
   getCompletedSermonEvents,
-  autoUpdateEventStatuses
+  autoUpdateEventStatuses,
+  joinEvent,
+  checkMemberJoinedEvent
 };

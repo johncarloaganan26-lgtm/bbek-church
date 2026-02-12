@@ -371,10 +371,10 @@ const stopAutoScroll = () => {
 };
 
 const goToLearnMore = (event) => {
-  // Use the same navigation pattern as AllEvents.vue
+  // Use eventId for shorter URL and to fetch event data from API
   router.push({
     name: "LearnMoreEvent",
-    query: { eventModel: encodeURIComponent(JSON.stringify(event)) },
+    query: { eventId: event.id || event.event_id },
   });
 };
 

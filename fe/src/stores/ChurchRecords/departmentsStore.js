@@ -185,13 +185,21 @@ export const useDepartmentsStore = defineStore('departments', {
         } else {
           const errorMsg = response.data?.message || 'Failed to create department'
           this.error = errorMsg
-          return { success: false, error: errorMsg }
+          return { 
+            success: false, 
+            error: errorMsg,
+            validationErrors: response.data?.validationErrors || []
+          }
         }
       } catch (error) {
         console.error('Error creating department:', error)
         const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create department'
         this.error = errorMsg
-        return { success: false, error: errorMsg }
+        return { 
+          success: false, 
+          error: errorMsg,
+          validationErrors: error.response?.data?.validationErrors || []
+        }
       } finally {
         this.loading = false
       }
@@ -216,13 +224,21 @@ export const useDepartmentsStore = defineStore('departments', {
         } else {
           const errorMsg = response.data?.message || 'Failed to update department'
           this.error = errorMsg
-          return { success: false, error: errorMsg }
+          return { 
+            success: false, 
+            error: errorMsg,
+            validationErrors: response.data?.validationErrors || []
+          }
         }
       } catch (error) {
         console.error('Error updating department:', error)
         const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update department'
         this.error = errorMsg
-        return { success: false, error: errorMsg }
+        return { 
+          success: false, 
+          error: errorMsg,
+          validationErrors: error.response?.data?.validationErrors || []
+        }
       } finally {
         this.loading = false
       }
@@ -405,6 +421,24 @@ export const useDepartmentsStore = defineStore('departments', {
       } catch (error) {
         console.error('Error fetching member options:', error)
         this.error = error.response?.data?.error || error.message || 'Failed to fetch member options'
+      }
+    },
+
+    async fetchUnavailableMembers(excludeDepartmentId = null) {
+      try {
+        const params = new URLSearchParams()
+        if (excludeDepartmentId) {
+          params.append('excludeDepartmentId', excludeDepartmentId.toString())
+        }
+        
+        const response = await axios.get(`/church-records/departments/getUnavailableMembers?${params}`)
+        if (response.data.success && response.data.data) {
+          return response.data.data
+        }
+        return { presidentIds: [], officerIds: [], allAssignedIds: [] }
+      } catch (error) {
+        console.error('Error fetching unavailable members:', error)
+        return { presidentIds: [], officerIds: [], allAssignedIds: [] }
       }
     }
   }

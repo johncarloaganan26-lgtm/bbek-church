@@ -656,6 +656,70 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
       } finally {
         this.loading = false
       }
+    },
+
+    /**
+     * Check if a member has joined an event
+     * @param {number} eventId - Event ID
+     * @param {number} memberId - Member ID
+     * @returns {Promise<Object>} { success, hasJoined, event }
+     */
+    async checkMemberJoinedEvent(eventId, memberId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await axios.get(`/church-records/events/checkJoined/${eventId}/${memberId}`)
+        if (response.data.success) {
+          return {
+            success: true,
+            hasJoined: response.data.hasJoined,
+            event: response.data.event
+          }
+        } else {
+          this.error = response.data.error || 'Failed to check event membership'
+          return { success: false, hasJoined: false, error: this.error }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to check event membership'
+        console.error('Error checking if member joined event:', error)
+        return { success: false, hasJoined: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * Join an event (add member to joined_members)
+     * Prevents joining if event is completed or past
+     * @param {number} eventId - Event ID
+     * @param {number} memberId - Member ID
+     * @returns {Promise<Object>} { success, message, error }
+     */
+    async joinEvent(eventId, memberId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await axios.post('/church-records/events/joinEvent', {
+          eventId,
+          memberId
+        })
+        if (response.data.success) {
+          return {
+            success: true,
+            message: response.data.message,
+            data: response.data.data
+          }
+        } else {
+          this.error = response.data.error || response.data.message || 'Failed to join event'
+          return { success: false, message: response.data.message, error: this.error }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to join event'
+        console.error('Error joining event:', error)
+        return { success: false, message: error.response?.data?.message, error: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

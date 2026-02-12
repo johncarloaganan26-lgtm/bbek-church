@@ -9,7 +9,8 @@ const {
   deleteDepartment,
   bulkDeleteDepartments,
   exportDepartmentsToExcel,
-  getAllDepartmentsForSelect
+  getAllDepartmentsForSelect,
+  getUnavailableMembers
 } = require('../../dbHelpers/church_records/departmentRecords');
 
 const router = express.Router();
@@ -408,6 +409,33 @@ router.get('/getAllDepartmentsForSelect', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch departments for select'
+    });
+  }
+});
+
+/**
+ * GET UNAVAILABLE MEMBERS - Get members who are already assigned as President or Officer elsewhere
+ * Used for filtering dropdown options in department dialog
+ * GET /api/church-records/departments/getUnavailableMembers?excludeDepartmentId=1
+ */
+router.get('/getUnavailableMembers', async (req, res) => {
+  try {
+    const excludeDepartmentId = req.query.excludeDepartmentId 
+      ? parseInt(req.query.excludeDepartmentId) 
+      : null;
+
+    const result = await getUnavailableMembers(excludeDepartmentId);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Unavailable members retrieved successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error fetching unavailable members:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch unavailable members'
     });
   }
 });

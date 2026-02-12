@@ -533,12 +533,39 @@ const clearSelection = () => {
 
 const bulkCompleteServices = async () => {
   // Count only approved services in the selection
-  const approvedCount = selectedServices.value.filter(s => s.status === 'approved').length;
-  const nonApprovedCount = selectedServices.value.length - approvedCount;
+  const approvedServices = selectedServices.value.filter(s => s.status === 'approved');
+  
+  if (approvedServices.length === 0) {
+    ElMessage.warning('No approved services selected.');
+    return;
+  }
+
+  // Check dates: cannot complete future services
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const validServices = approvedServices.filter(s => {
+    if (!s.service_date) return false;
+    const serviceDate = new Date(s.service_date);
+    serviceDate.setHours(0, 0, 0, 0);
+    return serviceDate <= today;
+  });
+
+  const skippedCount = approvedServices.length - validServices.length;
+
+  if (validServices.length === 0) {
+    ElMessage.warning('Cannot mark future services as completed. Please wait until the scheduled date.');
+    return;
+  }
   
   try {
+    let confirmMessage = `Are you sure you want to mark ${validServices.length} approved burial service(s) as completed?`;
+    if (skippedCount > 0) {
+      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
+    }
+
     await ElMessageBox.confirm(
-      `Are you sure you want to mark ${approvedCount} approved burial service(s) as completed?`,
+      confirmMessage,
       'Confirm Bulk Complete',
       {
         confirmButtonText: 'Yes, Mark as Completed',
@@ -547,10 +574,8 @@ const bulkCompleteServices = async () => {
       }
     )
 
-    // Extract burial IDs for only approved services
-    const burialIds = selectedServices.value
-      .filter(s => s.status === 'approved')
-      .map(s => s.burial_id)
+    // Extract burial IDs for only approved services with past dates
+    const burialIds = validServices.map(s => s.burial_id)
 
     // Use the bulk complete endpoint
     const result = await burialServiceStore.bulkCompleteBurialServices(burialIds)

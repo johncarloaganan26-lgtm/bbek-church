@@ -462,6 +462,13 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
             </div>
             ` : ''}
 
+            ${(status === 'disapproved' || status === 'cancelled') ? `
+            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+              <p style="margin: 0;"><strong>Reason:</strong></p>
+              <p style="margin: 10px 0 0 0;">${baptismDetails.rejectionReason || 'No reason provided.'}</p>
+            </div>
+            ` : ''}
+
             ${status === 'completed' ? `
             <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
               <p style="margin: 0;"><strong>Welcome to the Family!</strong></p>
@@ -712,6 +719,13 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
             <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
               <p style="margin: 0;"><strong>Preparation:</strong></p>
               <p style="margin: 10px 0 0 0;">Schedule confirmed! Please coordinate with the church office to finalize the names of godparents for the certificate and invite your loved ones to join this special occasion.</p>
+            </div>
+            ` : ''}
+
+            ${(status === 'disapproved' || status === 'cancelled') ? `
+            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+              <p style="margin: 0;"><strong>Reason:</strong></p>
+              <p style="margin: 10px 0 0 0;">${dedicationDetails.rejectionReason || 'No reason provided.'}</p>
             </div>
             ` : ''}
 
@@ -988,6 +1002,13 @@ const sendBurialDetails = async (burialDetails) => {
                 <li>Coordinate any special service requirements (music, tributes) with the assigned pastor</li>
                 <li>Finalize venue arrangements and inform the family accordingly</li>
               </ul>
+            </div>
+            ` : ''}
+
+            ${(status === 'disapproved' || status === 'cancelled') ? `
+            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+              <p style="margin: 0;"><strong>Reason:</strong></p>
+              <p style="margin: 10px 0 0 0;">${burialDetails.rejectionReason || 'No reason provided.'}</p>
             </div>
             ` : ''}
 

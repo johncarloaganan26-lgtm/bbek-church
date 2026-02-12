@@ -1162,7 +1162,9 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
       pastor,
       location,
       status,
-      date_created
+      date_created,
+      rejection_reason,
+      rejected_by
     } = dedicationData;
 
     // Check current status and block updates if pending (except for admins or status changes)
@@ -1484,6 +1486,20 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
       params.push(status);
     }
 
+    // Handle rejection reason when status is disapproved or cancelled
+    if (status === 'disapproved' || status === 'cancelled') {
+      if (rejection_reason !== undefined) {
+        fields.push('rejection_reason = ?');
+        params.push(rejection_reason ? rejection_reason.trim() : null);
+      }
+      if (rejected_by !== undefined) {
+        fields.push('rejected_by = ?');
+        params.push(rejected_by);
+      }
+      fields.push('rejected_at = ?');
+      params.push(moment().format('YYYY-MM-DD HH:mm:ss'));
+    }
+
     if (date_created !== undefined) {
       // Format preferred dedication time to HH:mm:ss
       let formattedPreferredTime = preferred_dedication_time;
@@ -1646,6 +1662,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
         await sendChildDedicationDetails({
           email: member.email,
           status: dedicationStatus,
+          rejectionReason: updatedDedication.data?.rejection_reason || '',
           recipientName: recipientName,
           memberName: memberName,
           childName: childName,
@@ -1674,6 +1691,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
           await sendChildDedicationDetails({
             email: contactEmail.trim(),
             status: dedicationStatus,
+            rejectionReason: updatedDedication.data?.rejection_reason || '',
             recipientName: 'Valued Member',
             memberName: memberName,
             childName: childName,
@@ -1705,6 +1723,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
           await sendChildDedicationDetails({
             email: fatherEmail.trim(),
             status: dedicationStatus,
+            rejectionReason: updatedDedication.data?.rejection_reason || '',
             recipientName: fatherName,
             memberName: memberName,
             childName: childName,
@@ -1736,6 +1755,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
           await sendChildDedicationDetails({
             email: motherEmail.trim(),
             status: dedicationStatus,
+            rejectionReason: updatedDedication.data?.rejection_reason || '',
             recipientName: motherName,
             memberName: memberName,
             childName: childName,
@@ -2057,6 +2077,7 @@ async function bulkCompleteChildDedications(childIds) {
     let completed = 0;
     let failed = 0;
     let skipped = 0;
+    let skippedMessages = [];
 
     for (const childId of childIds) {
       try {
@@ -2073,12 +2094,14 @@ async function bulkCompleteChildDedications(childIds) {
         // Skip if already completed
         if (dedication.status === 'completed') {
           skipped++;
+          skippedMessages.push(`Child dedication for ${dedication.child_fullname || dedication.child_id} was skipped because it is already completed.`);
           continue;
         }
 
         // Skip if not approved (only approved services can be marked as completed)
         if (dedication.status !== 'approved') {
           skipped++;
+          skippedMessages.push(`Child dedication for ${dedication.child_fullname || dedication.child_id} was skipped because it is not approved (current status: ${dedication.status}).`);
           continue;
         }
 
@@ -2157,7 +2180,8 @@ async function bulkCompleteChildDedications(childIds) {
     return {
       success: true,
       message,
-      data: { completed, failed, skipped }
+      data: { completed, failed, skipped, skippedMessages },
+      skippedMessages
     };
   } catch (error) {
     console.error('Error in bulk complete child dedications:', error);
