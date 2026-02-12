@@ -191,6 +191,27 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
+    // Public water baptism registration (no auth required)
+    async createPublicBaptism(baptismData) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await axios.post('/public/water-baptism/register', baptismData)
+        if (response.data.success) {
+          return { success: true, data: response.data.data }
+        } else {
+          this.error = response.data.message || 'Failed to register for water baptism'
+          return { success: false, error: response.data.message }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.error || error.message || 'Failed to register for water baptism'
+        console.error('Error in public water baptism registration:', error)
+        return { success: false, error: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updateBaptism(id, baptismData) {
       this.loading = true
       this.error = null

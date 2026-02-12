@@ -19,8 +19,9 @@
                     v-model="formData.firstname"
                     label="First Name"
                     variant="outlined"
-                    readonly
                     density="comfortable"
+                    required
+                    :rules="[v => !!v || 'First name is required']"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -37,8 +38,9 @@
                     v-model="formData.lastname"
                     label="Last Name"
                     variant="outlined"
-                    readonly
                     density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Last name is required']"
                   ></v-text-field>
                 </v-col>
               </v-row>
@@ -109,8 +111,9 @@
                     v-model="formData.email"
                     label="Email Address"
                     variant="outlined"
-                    readonly
                     density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Email is required', v => /.+@.+\..+/.test(v) || 'Email must be valid']"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -224,32 +227,28 @@ watch(() => formData.birthdate, (newDate) => {
 });
 
 onMounted(async () => {
-  if (!requestId.value) {
-    ElMessage.error('Invalid registration link');
-    router.push('/');
-    return;
-  }
-
-  const data = await discipleshipStore.fetchRegistrationData(requestId.value);
-  if (data) {
-    formData.firstname = data.firstname;
-    formData.lastname = data.lastname;
-    formData.email = data.email || '';
-    formData.phone_number = data.phone_number || '';
-    formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
-    formData.age = data.age || null;
-    formData.gender = data.gender || '';
-    
-    // Safety check for Buffer/Object address
-    if (data.address && typeof data.address === 'object') {
-      formData.address = data.address.data ? String.fromCharCode(...data.address.data) : JSON.stringify(data.address);
-    } else {
-      formData.address = data.address || '';
+  // If reqId is provided (from discipleship invitation), fetch the data
+  if (requestId.value) {
+    const data = await discipleshipStore.fetchRegistrationData(requestId.value);
+    if (data) {
+      formData.firstname = data.firstname;
+      formData.lastname = data.lastname;
+      formData.email = data.email || '';
+      formData.phone_number = data.phone_number || '';
+      formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
+      formData.age = data.age || null;
+      formData.gender = data.gender || '';
+      
+      // Safety check for Buffer/Object address
+      if (data.address && typeof data.address === 'object') {
+        formData.address = data.address.data ? String.fromCharCode(...data.address.data) : JSON.stringify(data.address);
+      } else {
+        formData.address = data.address || '';
+      }
     }
-  } else {
-    ElMessage.error('Could not find your discipleship record');
-    router.push('/');
+    // If no data found with reqId, continue with empty form (user can still register)
   }
+  // If no reqId, the form is empty and ready for public registration
 });
 
 const handleSubmit = async () => {
@@ -258,12 +257,18 @@ const handleSubmit = async () => {
 
   submitting.value = true;
   try {
-    // We create a new Water Baptism record directly as "pending"
-    // and mark the discipleship request as "promoted"
-    const result = await waterBaptismStore.createBaptism({
-      ...formData,
-      request_id: requestId.value // For backend to know which discipleship request to update
-    });
+    let result;
+    
+    if (requestId.value) {
+      // User came from discipleship invitation - use authenticated endpoint
+      result = await waterBaptismStore.createBaptism({
+        ...formData,
+        request_id: requestId.value
+      });
+    } else {
+      // Public user (no reqId) - use public registration endpoint
+      result = await waterBaptismStore.createPublicBaptism(formData);
+    }
 
     if (result.success) {
       await ElMessageBox.alert(
@@ -272,6 +277,8 @@ const handleSubmit = async () => {
         { type: 'success' }
       );
       router.push('/');
+    } else {
+      ElMessage.error(result.error || 'Failed to submit registration. Please try again.');
     }
   } catch (error) {
     console.error('Registration error:', error);

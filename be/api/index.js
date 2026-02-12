@@ -305,6 +305,107 @@ if (authRouter) {
   app.use('/api/auth', authRouter);
 }
 
+// PUBLIC WATER BAPTISM REGISTRATION ROUTE (no auth required)
+// This allows anyone to register for water baptism without logging in
+app.post('/api/public/water-baptism/register', async (req, res) => {
+  try {
+    const { createWaterBaptism } = require('../dbHelpers/services/waterBaptismRecords');
+    const { sendWaterBaptismDetails } = require('../dbHelpers/emailHelper');
+    const { checkDuplicateAccount, getSpecificMemberByEmailAndStatus } = require('../dbHelpers/church_records/accountRecords');
+
+    const { firstname, lastname, email, middle_name, phone_number, birthdate, age, gender, address, civil_status, guardian_name, guardian_contact, guardian_relationship } = req.body;
+
+    // Validate required fields
+    if (!firstname || !lastname || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'First name, last name, and email are required'
+      });
+    }
+
+    // Check if email already exists
+    const duplicateAccount = await checkDuplicateAccount(email);
+    if (duplicateAccount.isDuplicate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered',
+        error: 'An account with this email already exists. Please use a different email.'
+      });
+    }
+
+    const existingMember = await getSpecificMemberByEmailAndStatus(email?.trim().toLowerCase());
+    if (existingMember) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered as member',
+        error: 'A member with this email already exists. Please use a different email.'
+      });
+    }
+
+    // Create water baptism record
+    const baptismData = {
+      firstname,
+      lastname,
+      middle_name: middle_name || '',
+      email,
+      phone_number: phone_number || '',
+      birthdate: birthdate || '',
+      age: age || null,
+      gender: gender || '',
+      address: address || '',
+      civil_status: civil_status || '',
+      guardian_name: guardian_name || '',
+      guardian_contact: guardian_contact || '',
+      guardian_relationship: guardian_relationship || '',
+      is_member: false,
+      member_id: null,
+      status: 'pending'
+    };
+
+    const result = await createWaterBaptism(baptismData);
+
+    if (result.success) {
+      // Send confirmation email
+      const recipientName = `${firstname} ${lastname}`;
+      await sendWaterBaptismDetails({
+        email: email,
+        status: 'pending',
+        recipientName: recipientName,
+        firstname: firstname,
+        lastname: lastname,
+        middleName: middle_name || '',
+        birthdate: birthdate || '',
+        age: age || null,
+        gender: gender || '',
+        address: address || '',
+        phoneNumber: phone_number || '',
+        civilStatus: civil_status || '',
+        guardianName: guardian_name || '',
+        guardianContact: guardian_contact || '',
+        guardianRelationship: guardian_relationship || ''
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Water baptism registration submitted successfully! Check your email for confirmation.',
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        error: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error in public water baptism registration:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to register for water baptism'
+    });
+  }
+});
+
 // Apply JWT authentication middleware to all routes
 // Public routes are handled within the middleware itself
 if (authenticateToken) {
