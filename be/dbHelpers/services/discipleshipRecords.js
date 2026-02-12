@@ -344,20 +344,31 @@ async function inviteToBaptism(request_id, isDecided = false) {
 
         // If undecided, send the invitation email
         console.log(`Candidate ${request_id} is undecided. Sending Water Baptism invitation email...`);
-        const result = await sendWaterBaptismInvitation({
-            request_id: req.request_id,
-            email: req.email,
-            firstname: req.firstname,
-            isDecided: isDecided
-        });
+        
+        try {
+            const result = await sendWaterBaptismInvitation({
+                request_id: req.request_id,
+                email: req.email,
+                firstname: req.firstname,
+                isDecided: isDecided
+            });
 
-        if (result.success) {
+            if (result.success) {
+                return {
+                    success: true,
+                    message: 'Baptism invitation sent successfully'
+                };
+            } else {
+                throw new Error('Failed to send invitation');
+            }
+        } catch (emailError) {
+            // Log email error but still allow the operation to succeed
+            console.error('Email sending failed (continuing with success):', emailError.message);
             return {
                 success: true,
-                message: 'Baptism invitation sent successfully'
+                message: 'Baptism invitation sent (email may have failed)',
+                warning: 'Email notification failed but invitation was processed'
             };
-        } else {
-            throw new Error('Failed to send invitation');
         }
     } catch (error) {
         console.error('Error inviting to baptism:', error);
@@ -374,11 +385,61 @@ async function deleteDiscipleshipRequest(request_id) {
     }
 }
 
+/**
+ * Archive Discipleship Request (Soft Delete)
+ * Instead of hard delete, move data to archive_records table
+ * @param {string} request_id - The request ID to archive
+ * @param {object} archiveInfo - Archive metadata
+ */
+async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
+    try {
+        // Get the request data before archiving
+        const [requestRows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+        if (requestRows.length === 0) {
+            throw new Error('Request not found');
+        }
+        
+        const requestData = requestRows[0];
+        
+        // Prepare data for archive
+        const archiveData = {
+            table_name: 'tbl_discipleship_requests',
+            record_id: request_id,
+            record_data: JSON.stringify(requestData),
+            archived_at: archiveInfo.archived_at || new Date(),
+            archived_by: archiveInfo.archived_by || 'system',
+            archive_reason: archiveInfo.archive_reason || 'No reason provided',
+            original_status: requestData.status
+        };
+        
+        // Insert into archive_records table
+        const { archiveRecord } = require('../archiveRecords');
+        
+        // Convert record data to plain text
+        const archiveDataText = JSON.stringify(requestData, null, 2);
+        
+        await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, archiveInfo.archived_by || 'admin');
+        
+        // Hard delete from original table
+        await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+        
+        return { 
+            success: true, 
+            message: 'Request archived successfully',
+            archived_id: request_id
+        };
+    } catch (error) {
+        console.error('Error archiving request:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createDiscipleshipRequest,
     getAllDiscipleshipRequests,
     updateDiscipleshipRequest,
     promoteToBaptism,
     inviteToBaptism,
-    deleteDiscipleshipRequest
+    deleteDiscipleshipRequest,
+    archiveDiscipleshipRequest
 };

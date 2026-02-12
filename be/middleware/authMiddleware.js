@@ -142,6 +142,8 @@ const publicRoutes = [
   // Discipleship routes (public for form submission)
   '/api/services/discipleship-requests/submit',
   '/api/services/discipleship-requests/registration-data',
+  // Water baptism public registration (no auth required)
+  '/api/public/water-baptism/register',
   // Give page recommendation/routes (public)
   '/api/cms/give/recommendations',
   '/api/cms/give/recommendations/create',
@@ -242,7 +244,39 @@ const authenticateToken = (req, res, next) => {
  * (Optional) Role middleware was removed because roles are not required now.
  * Keep this placeholder for future use if role checks are needed.
  */
+
+/**
+ * Admin Role Check Middleware
+ * Ensures only users with admin role can access certain routes
+ * Requires authenticateToken to be used before this
+ */
+const checkAdminRole = (req, res, next) => {
+  // Check if user is authenticated and has admin role
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required. Please login first.'
+    });
+  }
+  
+  // Check if user has admin position
+  const userPosition = (req.user.position || '').toLowerCase();
+  const adminRoles = ['admin', 'administrator', 'super admin', 'superadmin'];
+  
+  if (!adminRoles.includes(userPosition)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin role required for this action.',
+      errorCode: 'ADMIN_REQUIRED'
+    });
+  }
+  
+  // User is admin - continue
+  next();
+};
+
 module.exports = {
   authenticateToken,
-  isPublicRoute
+  isPublicRoute,
+  checkAdminRole
 };

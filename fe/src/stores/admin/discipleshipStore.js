@@ -119,20 +119,24 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         fetchRequests();
     };
 
-    const deleteRequest = async (id) => {
+    const deleteRequest = async (id, reason = '') => {
         loading.value = true;
         try {
-            const response = await axios.delete(`/services/discipleship-requests/${id}`);
+            const response = await axios.delete(`/services/discipleship-requests/${id}`, {
+                data: { reason }
+            });
             if (response.data.success) {
-                ElMessage.success('Request deleted successfully');
+                ElMessage.success('Request archived successfully');
                 await fetchRequests();
-                return true;
+                return response.data;
             }
-            return false;
+            ElMessage.error(response.data.message || 'Failed to archive request');
+            return response.data;
         } catch (error) {
-            console.error('Error deleting request:', error);
-            ElMessage.error('Failed to delete request');
-            return false;
+            console.error('Error archiving request:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to archive request';
+            ElMessage.error(errorMessage);
+            return { success: false, message: errorMessage };
         } finally {
             loading.value = false;
         }
@@ -171,6 +175,38 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         }
     };
 
+    const bulkArchiveRequests = async (requestIds, reason) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/discipleship-requests/bulk-archive', {
+                requestIds,
+                reason
+            });
+            
+            if (response.data.success) {
+                const { archived, failed } = response.data.data;
+                ElMessage.success(`Successfully archived ${archived.length} requests`);
+                
+                if (failed.length > 0) {
+                    ElMessage.warning(`${failed.length} requests failed to archive`);
+                }
+                
+                await fetchRequests();
+                return response.data;
+            }
+            
+            ElMessage.error(response.data.message || 'Failed to archive requests');
+            return response.data;
+        } catch (error) {
+            console.error('Error bulk archiving requests:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to archive requests';
+            ElMessage.error(errorMessage);
+            return { success: false, message: errorMessage };
+        } finally {
+            loading.value = false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -186,6 +222,7 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         inviteToBaptism,
         fetchRegistrationData,
         deleteRequest,
+        bulkArchiveRequests,
         createRequest,
         setPage,
         setFilters

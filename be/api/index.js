@@ -312,8 +312,25 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
     const { createWaterBaptism } = require('../dbHelpers/services/waterBaptismRecords');
     const { sendWaterBaptismDetails } = require('../dbHelpers/emailHelper');
     const { checkDuplicateAccount, getSpecificMemberByEmailAndStatus } = require('../dbHelpers/church_records/accountRecords');
+    const { query } = require('../database/db');
 
-    const { firstname, lastname, email, middle_name, phone_number, birthdate, age, gender, address, civil_status, guardian_name, guardian_contact, guardian_relationship } = req.body;
+    // Extract all fields including optional request_id
+    const { 
+      firstname, 
+      lastname, 
+      email, 
+      middle_name, 
+      phone_number, 
+      birthdate, 
+      age, 
+      gender, 
+      address, 
+      civil_status, 
+      guardian_name, 
+      guardian_contact, 
+      guardian_relationship,
+      request_id  // Optional: from discipleship invitation
+    } = req.body;
 
     // Validate required fields
     if (!firstname || !lastname || !email) {
@@ -359,12 +376,18 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
       guardian_relationship: guardian_relationship || '',
       is_member: false,
       member_id: null,
-      status: 'pending'
+      status: 'pending',
+      ...(request_id && { request_id })
     };
 
     const result = await createWaterBaptism(baptismData);
 
     if (result.success) {
+      // If request_id is provided (from discipleship invitation), update the discipleship request
+      if (request_id) {
+        await query('UPDATE tbl_discipleship_requests SET water_baptism_registered = 1 WHERE request_id = ?', [request_id]);
+      }
+
       // Send confirmation email
       const recipientName = `${firstname} ${lastname}`;
       await sendWaterBaptismDetails({

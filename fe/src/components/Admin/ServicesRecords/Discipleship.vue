@@ -44,9 +44,25 @@
 
     <!-- Table -->
     <v-card elevation="2">
+      <div v-if="selectedRequests.length > 0" class="bg-error-lighten-5 pa-2 d-flex align-center">
+        <v-chip color="error" size="small" class="mr-2">{{ selectedRequests.length }} selected</v-chip>
+        <v-btn size="small" color="error" variant="outlined" @click="bulkArchive">
+          <v-icon left>mdi-archive</v-icon>
+          Archive Selected
+        </v-btn>
+        <v-btn size="small" variant="text" class="ml-2" @click="clearSelection">Clear</v-btn>
+      </div>
       <v-table>
         <thead>
           <tr>
+            <th class="text-center" style="width: 50px;">
+              <v-checkbox
+                v-model="selectAll"
+                density="compact"
+                hide-details
+                @update:model-value="toggleSelectAll"
+              ></v-checkbox>
+            </th>
             <th class="text-left font-weight-bold">Name</th>
             <th class="text-left font-weight-bold">Email</th>
             <th class="text-left font-weight-bold">Request Type</th>
@@ -57,12 +73,20 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-             <td colspan="6" class="text-center pa-4">Loading...</td>
+             <td colspan="7" class="text-center pa-4">Loading...</td>
           </tr>
           <tr v-else-if="requests.length === 0">
-             <td colspan="6" class="text-center pa-4">No requests found.</td>
+             <td colspan="7" class="text-center pa-4">No requests found.</td>
           </tr>
           <tr v-for="item in requests" :key="item.request_id">
+            <td class="text-center">
+              <v-checkbox
+                v-model="selectedRequests"
+                :value="item.request_id"
+                density="compact"
+                hide-details
+              ></v-checkbox>
+            </td>
             <td>{{ item.firstname }} {{ item.lastname }}</td>
             <td>{{ item.email }}</td>
             <td>
@@ -106,8 +130,8 @@
                   color="error"
                   @click="deleteItem(item)"
                 >
-                  <v-icon>mdi-delete</v-icon>
-                  <v-tooltip activator="parent" location="top">Delete Request</v-tooltip>
+                  <v-icon>mdi-archive</v-icon>
+                  <v-tooltip activator="parent" location="top">Archive Request</v-tooltip>
                 </v-btn>
               </div>
             </td>
@@ -294,6 +318,61 @@ const promotingItem = ref(null);
 const loadingPromotion = ref(false);
 const selectedRequest = ref({});
 const isEditing = ref(false);
+const deleteReason = ref('');
+const showDeleteReasonDialog = ref(false);
+const itemToDelete = ref(null);
+const selectedRequests = ref([]);
+const selectAll = ref(false);
+
+const toggleSelectAll = (value) => {
+  if (value) {
+    selectedRequests.value = requests.value.map(r => r.request_id);
+  } else {
+    selectedRequests.value = [];
+  }
+};
+
+const clearSelection = () => {
+  selectedRequests.value = [];
+  selectAll.value = false;
+};
+
+const bulkArchive = async () => {
+  if (selectedRequests.value.length === 0) {
+    ElMessage.warning('No requests selected');
+    return;
+  }
+  
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      `Enter the reason for archiving ${selectedRequests.value.length} selected requests:`,
+      'Bulk Archive Requests',
+      {
+        confirmButtonText: 'Archive',
+        cancelButtonText: 'Cancel',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entries, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
+      }
+    );
+    
+    const result = await store.bulkArchiveRequests(selectedRequests.value, reason);
+    if (result.success) {
+      clearSelection();
+    }
+  } catch {
+    // User cancelled
+  }
+};
+
+// Watch for selection changes
+watch(selectedRequests, (newVal) => {
+  selectAll.value = newVal.length === requests.value.length && requests.value.length > 0;
+}, { deep: true });
 
 // Auto-calculate age from birthdate in Admin dialog
 watch(() => selectedRequest.value?.birthdate, (newDate) => {
@@ -463,8 +542,32 @@ const handlePromotionAction = async (isDecided) => {
 };
 
 const deleteItem = async (item) => {
-  if (confirm(`Are you sure you want to delete the request from ${item.firstname} ${item.lastname}? This action cannot be undone.`)) {
-    await store.deleteRequest(item.request_id);
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      `Enter the reason for archiving the request from ${item.firstname} ${item.lastname}:`,
+      'Archive Request',
+      {
+        confirmButtonText: 'Archive',
+        cancelButtonText: 'Cancel',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
+      }
+    );
+    
+    // Proceed with deletion and reason
+    const result = await store.deleteRequest(item.request_id, reason);
+    if (result.success) {
+      ElMessage.success('Request archived successfully');
+    } else {
+      ElMessage.error(result.message || 'Failed to archive request');
+    }
+  } catch {
+    // User cancelled
   }
 };
 

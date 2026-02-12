@@ -76,57 +76,54 @@ instance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // Handle 401 Unauthorized - token expired or invalid
+    // Check if this is a public endpoint
+    const isLoginRequest = originalRequest.url?.includes('/accounts/login')
+    const isCmsEndpoint = originalRequest.url?.includes('/cms/')
+    const isPublicEndpoint = originalRequest.url?.includes('/public/') ||
+                             originalRequest.url?.includes('/church-records/') || 
+                             originalRequest.url?.includes('/services/') ||
+                             originalRequest.url?.includes('/events/') ||
+                             originalRequest.url?.includes('/ministries/')
+    
+    // Check if current path is a public route (services pages, etc.)
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+    const isPublicPath = currentPath.startsWith('/services/') || 
+                        currentPath.startsWith('/events/') ||
+                        currentPath.startsWith('/ministries/') ||
+                        currentPath.startsWith('/about/') ||
+                        currentPath === '/' ||
+                        currentPath === '/live' ||
+                        currentPath === '/give' ||
+                        currentPath === '/new' ||
+                        currentPath === '/plan-your-visit' ||
+                        currentPath === '/messages' ||
+                        currentPath === '/schedule-change' ||
+                        currentPath.startsWith('/beoneofus/')
+    
+    // Don't show error messages or redirect for public endpoints
+    if (isPublicEndpoint || isCmsEndpoint || isPublicPath) {
+      // For public endpoints, just log and return (no error message)
+      console.log('Public endpoint error (ignored):', error.message)
+      return Promise.reject(error)
+    }
+
+    // Handle 401 Unauthorized - token expired or invalid (only for non-public endpoints)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-
-      // Only redirect if it's NOT a login request (login failures should be handled by the component)
-      const isLoginRequest = originalRequest.url?.includes('/accounts/login')
       
-      // Don't redirect for CMS endpoints or public endpoints that might return 401 for unauthenticated users
-      // These endpoints are public and 401 is expected for unauthenticated users
-      const isCmsEndpoint = originalRequest.url?.includes('/cms/')
-      const isPublicEndpoint = originalRequest.url?.includes('/church-records/') || 
-                               originalRequest.url?.includes('/services/') ||
-                               originalRequest.url?.includes('/events/') ||
-                               originalRequest.url?.includes('/ministries/')
-      
-      // Check if current path is a public route (services pages, etc.)
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
-      const isPublicPath = currentPath.startsWith('/services/') || 
-                          currentPath.startsWith('/events/') ||
-                          currentPath.startsWith('/ministries/') ||
-                          currentPath.startsWith('/about/') ||
-                          currentPath === '/' ||
-                          currentPath === '/live' ||
-                          currentPath === '/give' ||
-                          currentPath === '/new' ||
-                          currentPath === '/plan-your-visit' ||
-                          currentPath === '/messages' ||
-                          currentPath === '/schedule-change' ||
-                          currentPath.startsWith('/beoneofus/')
-      
-      // Only clear tokens and show error if NOT on a public path
-      if (!isPublicPath && !isPublicEndpoint) {
+      // Only redirect if it's NOT a login request
+      if (!isLoginRequest && typeof window !== 'undefined') {
         // Clear invalid tokens
         localStorage.removeItem('accessToken')
         localStorage.removeItem('auth_token')
         localStorage.removeItem('token')
         localStorage.removeItem('userInfo')
         
-        // Show error message if available, but only for non-public routes
+        // Show error message
         const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Unauthorized. Please login again.'
         ElMessage.error(errorMessage)
-      }
-      
-      // Only redirect if:
-      // 1. Not a login request
-      // 2. Not a CMS endpoint (these can return 401 for unauthenticated users)
-      // 3. Not a public endpoint
-      // 4. Not already on a public path
-      // 5. Not already on landing page
-      if (!isLoginRequest && !isCmsEndpoint && !isPublicEndpoint && !isPublicPath && typeof window !== 'undefined') {
-        // Only redirect if not already on landing page to avoid infinite loops
+        
+        // Only redirect if not already on landing page
         if (window.location.pathname !== '/') {
           window.location.href = '/'
         }
@@ -134,8 +131,8 @@ instance.interceptors.response.use(
 
       return Promise.reject(error)
     }
-
-    // Handle other errors
+    
+    // Handle other errors for non-public endpoints
     if (error.response) {
       // Server responded with error status
       console.error('API Error:', error.response.status, error.response.data)

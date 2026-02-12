@@ -234,8 +234,12 @@ async function createWaterBaptism(baptismData) {
     // If request_id is present, it's from a discipleship promotion
     const { request_id } = baptismData;
     if (request_id) {
-      await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
+      console.log('Updating discipleship request status to Promoted for:', request_id);
+      const [updateResult] = await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
+      console.log('Discipleship status update result:', updateResult);
       delete baptismData.request_id; // Remove it so it doesn't interfere with mapping
+    } else {
+      console.log('No request_id found in baptism data - not updating discipleship status');
     }
 
     let {

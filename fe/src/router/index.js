@@ -464,6 +464,7 @@ router.beforeEach((to, from, next) => {
     'DepartmentOfficersAbout',
     'Services',
     'WaterBaptismService',
+    'WaterBaptismRegistration',
     'BurialServicePage',
     'MarriageService',
     'ChildDedication',

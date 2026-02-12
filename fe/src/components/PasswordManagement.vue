@@ -33,6 +33,31 @@
                 Enter your new password below.
               </p>
 
+              <!-- Password Requirements -->
+              <v-card variant="tonal" color="info" class="mb-4 pa-3">
+                <p class="text-subtitle-2 font-weight-bold mb-2">
+                  <v-icon icon="mdi-information" size="small" class="mr-1"></v-icon>
+                  Password Requirements:
+                </p>
+                <ul class="text-body-2 pl-4">
+                  <li :class="{ 'text-success': passwordRequirements.minLength, 'text-grey': !passwordRequirements.minLength }">
+                    At least 8 characters
+                  </li>
+                  <li :class="{ 'text-success': passwordRequirements.hasUpper, 'text-grey': !passwordRequirements.hasUpper }">
+                    At least 1 uppercase letter (A-Z)
+                  </li>
+                  <li :class="{ 'text-success': passwordRequirements.hasLower, 'text-grey': !passwordRequirements.hasLower }">
+                    At least 1 lowercase letter (a-z)
+                  </li>
+                  <li :class="{ 'text-success': passwordRequirements.hasNumber, 'text-grey': !passwordRequirements.hasNumber }">
+                    At least 1 number (0-9)
+                  </li>
+                  <li :class="{ 'text-success': passwordRequirements.hasSpecial, 'text-grey': !passwordRequirements.hasSpecial }">
+                    At least 1 special character (!@#$%^&*)
+                  </li>
+                </ul>
+              </v-card>
+
               <v-text-field
                 v-model="password"
                 label="New Password"
@@ -40,8 +65,9 @@
                 prepend-inner-icon="mdi-lock"
                 :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
                 @click:append-inner="showPassword = !showPassword"
+                @input="checkPasswordRequirements"
                 variant="outlined"
-                class="mb-4"
+                class="mb-2"
                 required
               ></v-text-field>
 
@@ -84,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/api/axios'
 
@@ -100,6 +126,35 @@ const showConfirmPassword = ref(false)
 const accId = ref('')
 const email = ref('')
 const success = ref('')
+
+// Password requirements state
+const passwordRequirements = ref({
+  minLength: false,
+  hasUpper: false,
+  hasLower: false,
+  hasNumber: false,
+  hasSpecial: false
+})
+
+// Check password requirements
+const checkPasswordRequirements = () => {
+  passwordRequirements.value = {
+    minLength: password.value.length >= 8,
+    hasUpper: /[A-Z]/.test(password.value),
+    hasLower: /[a-z]/.test(password.value),
+    hasNumber: /[0-9]/.test(password.value),
+    hasSpecial: /[!@#$%^&*]/.test(password.value)
+  }
+}
+
+// Computed property to check if all requirements are met
+const allRequirementsMet = () => {
+  return passwordRequirements.value.minLength &&
+         passwordRequirements.value.hasUpper &&
+         passwordRequirements.value.hasLower &&
+         passwordRequirements.value.hasNumber &&
+         passwordRequirements.value.hasSpecial
+}
 
 // Snackbar state
 const snackbar = ref({
@@ -151,8 +206,9 @@ async function handleSubmit() {
     return
   }
 
-  if (password.value.length < 8) {
-    showToast('Password must be at least 8 characters')
+  // Check all password requirements
+  if (!allRequirementsMet()) {
+    showToast('Please meet all password requirements')
     return
   }
 

@@ -266,6 +266,80 @@ app.use('/api/church-records/approvals', approvalRoutes);
 app.use('/api/church-records/child-dedications', childDedicationRouter);
 app.use('/api/church-records/burial-services', burialServiceRouter);
 app.use('/api/services/water-baptisms', waterBaptismRouter);
+
+// PUBLIC WATER BAPTISM REGISTRATION ROUTE (no auth required)
+app.post('/api/public/water-baptism/register', async (req, res) => {
+  try {
+    const { createWaterBaptism } = require('./dbHelpers/services/waterBaptismRecords');
+    const { sendWaterBaptismDetails } = require('./dbHelpers/emailHelper');
+    const { checkDuplicateAccount } = require('./dbHelpers/church_records/accountRecords');
+    const { getSpecificMemberByEmailAndStatus } = require('./dbHelpers/church_records/memberRecords');
+    const { query } = require('./database/db');
+
+    const { 
+      firstname, 
+      lastname, 
+      email, 
+      middle_name, 
+      phone_number, 
+      birthdate, 
+      age, 
+      gender, 
+      address, 
+      civil_status, 
+      guardian_name, 
+      guardian_contact, 
+      guardian_relationship,
+      request_id
+    } = req.body;
+
+    if (!firstname || !lastname || !email) {
+      return res.status(400).json({ success: false, message: 'First name, last name, and email are required' });
+    }
+
+    const duplicateAccount = await checkDuplicateAccount(email);
+    if (duplicateAccount.isDuplicate) {
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    const existingMember = await getSpecificMemberByEmailAndStatus(email?.trim().toLowerCase());
+    if (existingMember) {
+      return res.status(400).json({ success: false, message: 'Email already registered as member' });
+    }
+
+    const baptismData = {
+      firstname, lastname, middle_name: middle_name || '', email,
+      phone_number: phone_number || '', birthdate: birthdate || '',
+      age: age || null, gender: gender || '', address: address || '',
+      civil_status: civil_status || '', guardian_name: guardian_name || '',
+      guardian_contact: guardian_contact || '', guardian_relationship: guardian_relationship || '',
+      is_member: false, member_id: null, status: 'pending',
+      ...(request_id && { request_id })
+    };
+
+    const result = await createWaterBaptism(baptismData);
+
+    if (result.success) {
+      const recipientName = `${firstname} ${lastname}`;
+      await sendWaterBaptismDetails({
+        email, status: 'pending', recipientName,
+        firstname, lastname, middleName: middle_name || '', birthdate: birthdate || '',
+        age: age || null, gender: gender || '', address: address || '',
+        phoneNumber: phone_number || '', civilStatus: civil_status || '',
+        guardianName: guardian_name || '', guardianContact: guardian_contact || '',
+        guardianRelationship: guardian_relationship || ''
+      });
+
+      res.status(201).json({ success: true, message: 'Water baptism registration submitted successfully!', data: result.data });
+    } else {
+      res.status(400).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    console.error('Error in public water baptism registration:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to register for water baptism' });
+  }
+});
+
 app.use('/api/services/discipleship-requests', discipleshipRouter);
 app.use('/api/services/marriage-services', marriageServiceRouter);
 app.use('/api/transactions', transactionRouter);

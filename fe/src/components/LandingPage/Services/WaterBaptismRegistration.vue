@@ -10,7 +10,13 @@
               <p class="text-subtitle-1 grey--text">Please complete your details to proceed with your baptism</p>
             </div>
 
-            <v-form ref="formRef" v-model="formValid" @submit.prevent="handleSubmit">
+            <!-- Loading overlay when fetching registration data from discipleship -->
+            <div v-if="loadingRegistrationData" class="text-center mb-4">
+              <v-progress-circular indeterminate color="teal" size="24"></v-progress-circular>
+              <p class="text-subtitle-2 grey--text mt-2">Loading your information from discipleship form...</p>
+            </div>
+
+            <v-form v-if="!loadingRegistrationData" ref="formRef" v-model="formValid" @submit.prevent="handleSubmit">
               <!-- Personal Information -->
               <h3 class="text-h6 mb-4 teal--text">Personal Information</h3>
               <v-row>
@@ -178,14 +184,14 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAdminDiscipleshipStore } from '@/stores/admin/discipleshipStore';
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import publicAxios from '@/api/publicAxios';
 
 const route = useRoute();
 const router = useRouter();
-const discipleshipStore = useAdminDiscipleshipStore();
 const waterBaptismStore = useWaterBaptismStore();
+const loadingRegistrationData = ref(false);
 
 const formRef = ref(null);
 const formValid = ref(false);
@@ -229,24 +235,26 @@ watch(() => formData.birthdate, (newDate) => {
 onMounted(async () => {
   // If reqId is provided (from discipleship invitation), fetch the data
   if (requestId.value) {
-    const data = await discipleshipStore.fetchRegistrationData(requestId.value);
-    if (data) {
-      formData.firstname = data.firstname;
-      formData.lastname = data.lastname;
-      formData.email = data.email || '';
-      formData.phone_number = data.phone_number || '';
-      formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
-      formData.age = data.age || null;
-      formData.gender = data.gender || '';
-      
-      // Safety check for Buffer/Object address
-      if (data.address && typeof data.address === 'object') {
-        formData.address = data.address.data ? String.fromCharCode(...data.address.data) : JSON.stringify(data.address);
-      } else {
+    loadingRegistrationData.value = true;
+    try {
+      const response = await publicAxios.get(`/services/discipleship-requests/registration-data/${requestId.value}`);
+      const data = response.data.success ? response.data.data : null;
+      if (data) {
+        formData.firstname = data.firstname || '';
+        formData.lastname = data.lastname || '';
+        formData.email = data.email || '';
+        formData.phone_number = data.phone_number || '';
+        formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
+        formData.age = data.age || null;
+        formData.gender = data.gender || '';
         formData.address = data.address || '';
       }
+    } catch (error) {
+      console.error('Error fetching registration data:', error);
+      // Don't show error to user - form will be empty and they can fill it in
+    } finally {
+      loadingRegistrationData.value = false;
     }
-    // If no data found with reqId, continue with empty form (user can still register)
   }
   // If no reqId, the form is empty and ready for public registration
 });
@@ -257,18 +265,15 @@ const handleSubmit = async () => {
 
   submitting.value = true;
   try {
-    let result;
+    // Include requestId if coming from discipleship invitation
+    const submissionData = {
+      ...formData,
+      ...(requestId.value && { request_id: requestId.value })
+    };
     
-    if (requestId.value) {
-      // User came from discipleship invitation - use authenticated endpoint
-      result = await waterBaptismStore.createBaptism({
-        ...formData,
-        request_id: requestId.value
-      });
-    } else {
-      // Public user (no reqId) - use public registration endpoint
-      result = await waterBaptismStore.createPublicBaptism(formData);
-    }
+    console.log('Submitting water baptism registration with request_id:', requestId.value);
+    const result = await waterBaptismStore.createPublicBaptism(submissionData);
+    console.log('Water baptism registration result:', result);
 
     if (result.success) {
       await ElMessageBox.alert(
