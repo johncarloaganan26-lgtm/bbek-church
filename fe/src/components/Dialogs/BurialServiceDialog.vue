@@ -270,8 +270,8 @@ e<template>
           </el-select>
         </el-form-item>
 
-        <!-- Service Date & Time (Admin/Staff Only - Required) -->
-        <el-form-item label="Service Date & Time" prop="service_date" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
+        <!-- Service Date & Time (Required) -->
+        <el-form-item label="Service Date & Time" prop="service_date">
           <template #label>
             <span>Service Date & Time</span>
           </template>
@@ -284,70 +284,17 @@ e<template>
             value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
             :disabled="loading"
-            :disabled-date="(date) => date < new Date()"
-            :disabled-hours="disabledHours"
-            :default-value="defaultNightTime"
-            @change="onServiceDateChange"
-          />
-          <div class="form-hint">
-            <el-icon><InfoFilled /></el-icon>
-            <span>Burial services are typically conducted in the evening (6:00 PM - 10:00 PM).</span>
-          </div>
-        </el-form-item>
-
-        <!-- Preferred Service Date & Time (For Members/Non-Members) -->
-        <el-form-item label="Preferred Service Date & Time" prop="preferred_service_date" v-if="userInfo?.account?.position !== 'admin' && userInfo?.account?.position !== 'staff'">
-          <template #label>
-            <span>Preferred Service Date & Time</span>
-          </template>
-          <el-date-picker
-            v-model="formData.preferred_service_date"
-            type="datetime"
-            placeholder="Select date and time"
-            size="large"
-            format="MM/DD/YYYY hh:mm A"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-            :disabled="loading"
             :disabled-date="disabledFutureDate"
             :disabled-hours="disabledHours"
             :default-value="defaultNightTime"
           />
-          <div class="form-hint">
+          <div class="form-hint" v-if="userInfo?.account?.position !== 'admin' && userInfo?.account?.position !== 'staff'">
             <el-icon><InfoFilled /></el-icon>
             <span>Burial services are typically conducted in the evening. Default time is 6:00 PM.</span>
           </div>
-        </el-form-item>
-
-        <!-- Preferred Service Date & Time (Admin View Only) -->
-        <el-form-item label="Preferred Service Date & Time" v-if="userInfo?.account?.position === 'admin' || userInfo?.account?.position === 'staff'">
-          <template #label>
-            <span>Preferred Service Date & Time</span>
-          </template>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <el-date-picker
-              v-model="formData.preferred_service_date"
-              type="datetime"
-              placeholder="No preference set"
-              size="large"
-              format="MM/DD/YYYY hh:mm A"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              style="width: 100%"
-              :disabled="true"
-            />
-            <el-button
-              type="primary"
-              size="large"
-              :disabled="!formData.preferred_service_date"
-              @click="copyPreferredToServiceDate"
-              :icon="'CopyDocument'"
-            >
-              Copy
-            </el-button>
-          </div>
-          <div class="form-hint">
+          <div class="form-hint" v-else>
             <el-icon><InfoFilled /></el-icon>
-            <span>Click "Copy" to set this as the actual Service Date & Time</span>
+            <span>Burial services are typically conducted in the evening (6:00 PM - 10:00 PM).</span>
           </div>
         </el-form-item>
 

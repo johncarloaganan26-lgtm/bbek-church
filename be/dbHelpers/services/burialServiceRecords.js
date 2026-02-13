@@ -181,6 +181,10 @@ async function createBurialService(burialData) {
     } = burialData;
 
     let finalServiceDate = service_date;
+    // Auto-set service date from preferred_service_time if service_date is not provided
+    if (!finalServiceDate && preferred_service_time) {
+      finalServiceDate = preferred_service_time;
+    }
     // Auto-set service date if created as 'completed'
     if (status === 'completed' && !finalServiceDate) {
       finalServiceDate = moment().format('YYYY-MM-DD HH:mm:ss');
