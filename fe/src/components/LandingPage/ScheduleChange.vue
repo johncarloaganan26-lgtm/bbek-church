@@ -147,8 +147,10 @@
                         variant="outlined"
                         required
                         :rules="[v => !!v || 'Requested date is required']"
-                        @update:model-value="updateRequestedDateTime"
+                        @update:model-value="validateDateTime"
                         prepend-inner-icon="mdi-calendar"
+                        :min="minDate"
+                        :error-messages="dateError"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -159,8 +161,9 @@
                         variant="outlined"
                         required
                         :rules="[v => !!v || 'Requested time is required']"
-                        @update:model-value="updateRequestedDateTime"
+                        @update:model-value="validateDateTime"
                         prepend-inner-icon="mdi-clock-outline"
+                        :error-messages="timeError"
                       ></v-text-field>
                     </v-col>
                   </v-row>
@@ -283,6 +286,57 @@ const formData = reactive({
 // Separate date and time parts for datetime picker
 const requestedDatePart = ref('')
 const requestedTimePart = ref('')
+const dateError = ref('')
+const timeError = ref('')
+
+// Minimum date (today) to prevent selecting past dates
+const minDate = computed(() => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+})
+
+// Validate date and time based on service type
+const validateDateTime = () => {
+  dateError.value = ''
+  timeError.value = ''
+  
+  if (!requestedDatePart.value || !requestedTimePart.value) {
+    return false
+  }
+  
+  const selectedDate = new Date(requestedDatePart.value)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  // Check if date is in the past
+  if (selectedDate < today) {
+    dateError.value = 'Cannot select past dates'
+    return false
+  }
+  
+  // Child Dedication: Only allow Sundays
+  if (formData.serviceType === 'child-dedication') {
+    if (selectedDate.getDay() !== 0) {
+      dateError.value = 'Child dedication can only be scheduled on Sundays'
+      return false
+    }
+  }
+  
+  // Burial: Only allow night hours (6 PM - 10 PM)
+  if (formData.serviceType === 'burial') {
+    const hour = parseInt(requestedTimePart.value.split(':')[0], 10)
+    if (hour < 18 || hour >= 22) {
+      timeError.value = 'Burial services must be between 6:00 PM and 10:00 PM'
+      return false
+    }
+  }
+  
+  updateRequestedDateTime()
+  return true
+}
 
 // Update the combined datetime value when date or time changes
 const updateRequestedDateTime = () => {
@@ -504,6 +558,11 @@ const handleSubmit = async () => {
   // Validate that both date and time are provided
   if (!requestedDatePart.value || !requestedTimePart.value) {
     ElMessage.warning('Please provide both date and time for the requested schedule')
+    return
+  }
+
+  // Validate date and time based on service type
+  if (!validateDateTime()) {
     return
   }
 

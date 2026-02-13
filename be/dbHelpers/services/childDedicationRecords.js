@@ -1797,9 +1797,10 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
  * DELETE - Delete a child dedication record (archives it first)
  * @param {String} childId - Child ID
  * @param {String} archivedBy - User ID who is deleting/archiving the record (optional)
+ * @param {String} reason - Reason for deletion (optional)
  * @returns {Promise<Object>} Result object
  */
-async function deleteChildDedication(childId, archivedBy = null) {
+async function deleteChildDedication(childId, archivedBy = null, reason = null) {
   try {
     if (!childId) {
       throw new Error('Child ID is required');
@@ -1820,7 +1821,8 @@ async function deleteChildDedication(childId, archivedBy = null) {
       'tbl_childdedications',
       String(childId),
       dedicationCheck.data,
-      archivedBy
+      archivedBy,
+      reason
     );
 
     // Delete from original table
@@ -1850,9 +1852,10 @@ async function deleteChildDedication(childId, archivedBy = null) {
  * Bulk delete child dedications with archiving
  * @param {Array<string>} childIds - Array of child IDs to delete
  * @param {number|null} archivedBy - User ID who performed the deletion
+ * @param {String} reason - Reason for deletion (optional)
  * @returns {Object} Result object with success status and details
  */
-async function bulkDeleteChildDedications(childIds, archivedBy = null) {
+async function bulkDeleteChildDedications(childIds, archivedBy = null, reason = null) {
   try {
     if (!Array.isArray(childIds) || childIds.length === 0) {
       throw new Error('Child IDs array is required and cannot be empty');
@@ -1873,7 +1876,7 @@ async function bulkDeleteChildDedications(childIds, archivedBy = null) {
         const dedication = await getChildDedicationById(childId);
         if (dedication.success && dedication.data) {
           dedicationsToDelete.push(dedication.data);
-          await archiveBeforeDelete('tbl_childdedications', String(childId), dedication.data, archivedBy);
+          await archiveBeforeDelete('tbl_childdedications', String(childId), dedication.data, archivedBy, reason);
         }
       } catch (error) {
         console.warn(`Failed to archive child dedication ${childId}:`, error.message);

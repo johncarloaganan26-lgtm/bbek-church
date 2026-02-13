@@ -137,9 +137,10 @@ function convertToPlainTextObject(obj) {
  * @param {String} originalId - ID of the record in the original table
  * @param {Object} recordData - Complete data of the record to archive
  * @param {String} archivedBy - User ID who is archiving the record
+ * @param {String} reason - Reason for archiving
  * @returns {Promise<Object>} Result object
  */
-async function archiveRecord(originalTable, originalId, recordData, archivedBy = null) {
+async function archiveRecord(originalTable, originalId, recordData, archivedBy = null, reason = null) {
   try {
     if (!originalTable) {
       throw new Error('Original table name is required');
@@ -164,8 +165,8 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
 
     const sql = `
       INSERT INTO tbl_archives 
-        (original_table, original_id, archived_data, archived_by, archived_at)
-      VALUES (?, ?, ?, ?, ?)
+        (original_table, original_id, archived_data, archived_by, archived_at, reason)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
     const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
@@ -175,7 +176,8 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
       toPlainText(originalId),
       archivedDataText,
       toPlainText(archivedBy),
-      formattedDate
+      formattedDate,
+      reason
     ];
 
     const [result] = await query(sql, params);
@@ -286,6 +288,7 @@ async function getAllArchives(options = {}) {
         a.restored_at,
         a.restored_by,
         a.restore_notes,
+        a.reason,
         CONCAT(
           COALESCE(m.firstname, ''),
           IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
@@ -822,9 +825,10 @@ async function getArchivesByDateRange(dateFrom, dateTo, options = {}) {
 /**
  * DELETE - Permanently delete an archive record
  * @param {Number} archiveId - Archive ID
+ * @param {String} reason - Reason for deletion (for audit purposes)
  * @returns {Promise<Object>} Result object
  */
-async function deleteArchivePermanently(archiveId) {
+async function deleteArchivePermanently(archiveId, reason = null) {
   try {
     if (!archiveId) {
       throw new Error('Archive ID is required');
@@ -842,6 +846,11 @@ async function deleteArchivePermanently(archiveId) {
 
     const archive = archiveResult.data;
 
+    // Log deletion reason for audit
+    console.log(`Permanently deleting archive ${archiveId} from ${archive.original_table}`, {
+      reason: reason || 'No reason provided'
+    });
+
     // Delete the archive record permanently
     const deleteSql = 'DELETE FROM tbl_archives WHERE archive_id = ?';
     const [deleteResult] = await query(deleteSql, [archiveId]);
@@ -853,7 +862,8 @@ async function deleteArchivePermanently(archiveId) {
         archive_id: archiveId,
         original_table: archive.original_table,
         original_id: archive.original_id,
-        deleted_at: moment().format('YYYY-MM-DD HH:mm:ss')
+        deleted_at: moment().format('YYYY-MM-DD HH:mm:ss'),
+        reason: reason
       }
     };
   } catch (error) {
@@ -865,9 +875,10 @@ async function deleteArchivePermanently(archiveId) {
 /**
  * BULK DELETE - Permanently delete multiple archive records
  * @param {Array<Number>} archiveIds - Array of Archive IDs to delete
+ * @param {String} reason - Reason for deletion (for audit purposes)
  * @returns {Promise<Object>} Result object with success/failure counts
  */
-async function bulkDeleteArchivesPermanently(archiveIds) {
+async function bulkDeleteArchivesPermanently(archiveIds, reason = null) {
   try {
     if (!Array.isArray(archiveIds) || archiveIds.length === 0) {
       throw new Error('Archive IDs array is required and cannot be empty');

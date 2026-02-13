@@ -269,11 +269,18 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
-    async deleteBaptism(id) {
+    async deleteBaptism(id, reason) {
       this.loading = true
       this.error = null
       try {
-        const response = await axios.delete(`/services/water-baptisms/deleteWaterBaptism/${id}`)
+        const accessToken = localStorage.getItem('accessToken')
+        const response = await axios.delete(`/services/water-baptisms/deleteWaterBaptism/${id}`, {
+          data: { reason },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
         if (response.data.success) {
           await this.fetchBaptisms({
             page: this.currentPage,
@@ -416,13 +423,13 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
-    async bulkDeleteWaterBaptisms(baptismIds) {
+    async bulkDeleteWaterBaptisms(baptismIds, reason) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
         const response = await axios.delete('/services/water-baptisms/bulkDeleteWaterBaptisms', {
-          data: { baptismIds },
+          data: { baptismIds, reason },
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'

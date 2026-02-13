@@ -451,10 +451,12 @@ router.put('/updateBurialService/:id', async (req, res) => {
 /**
  * DELETE - Delete a burial service record
  * DELETE /api/church-records/burial-services/deleteBurialService/:id
+ * Body: { reason?: string }
  */
 router.delete('/deleteBurialService/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const reason = req.body?.reason || null;
 
     if (!id) {
       return res.status(400).json({
@@ -464,7 +466,7 @@ router.delete('/deleteBurialService/:id', async (req, res) => {
     }
 
     const archivedBy = req.user?.acc_id || null;
-    const result = await deleteBurialService(id, archivedBy);
+    const result = await deleteBurialService(id, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({
@@ -491,11 +493,12 @@ router.delete('/deleteBurialService/:id', async (req, res) => {
 /**
  * BULK DELETE - Delete multiple burial service records
  * DELETE /api/church-records/burial-services/bulkDeleteBurialServices
- * Body: { burialIds: ["id1", "id2", "id3"] }
+ * Body: { burialIds: ["id1", "id2", "id3"], reason?: string }
  */
 router.delete('/bulkDeleteBurialServices', async (req, res) => {
   try {
-    const { burialIds } = req.body;
+    const burialIds = req.body?.burialIds || [];
+    const reason = req.body?.reason || null;
     const archivedBy = req.user?.acc_id || null;
 
     if (!Array.isArray(burialIds) || burialIds.length === 0) {
@@ -508,7 +511,7 @@ router.delete('/bulkDeleteBurialServices', async (req, res) => {
     // Skip audit trail for bulk operations to improve performance
     req.skipAuditTrail = true;
 
-    const result = await bulkDeleteBurialServices(burialIds, archivedBy);
+    const result = await bulkDeleteBurialServices(burialIds, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({

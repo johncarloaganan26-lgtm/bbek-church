@@ -197,11 +197,16 @@ export const useBurialServiceStore = defineStore('burialService', {
       }
     },
 
-    async deleteService(id) {
+    async deleteService(id, reason) {
       this.loading = true
       this.error = null
       try {
-        const response = await axios.delete(`/church-records/burial-services/deleteBurialService/${id}`)
+        const response = await axios.delete(`/church-records/burial-services/deleteBurialService/${id}`, {
+          data: { reason },
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
         if (response.data.success) {
           await this.fetchServices({
             page: this.currentPage,
@@ -311,13 +316,13 @@ export const useBurialServiceStore = defineStore('burialService', {
       }
     },
 
-    async bulkDeleteBurialServices(burialIds) {
+    async bulkDeleteBurialServices(burialIds, reason) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
         const response = await axios.delete('/church-records/burial-services/bulkDeleteBurialServices', {
-          data: { burialIds },
+          data: { burialIds, reason },
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'

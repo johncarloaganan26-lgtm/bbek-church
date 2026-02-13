@@ -269,6 +269,18 @@
               <div v-else>System</div>
             </template>
           </el-table-column>
+          <el-table-column prop="reason" label="Reason" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.reason">{{ row.reason }}</span>
+              <span v-else class="text-grey">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="restore_notes" label="Restore Notes" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.restore_notes">{{ row.restore_notes }}</span>
+              <span v-else class="text-grey">-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="restored" label="Status" min-width="120" width="140">
             <template #default="{ row }">
               <el-tag :type="row.restored ? 'success' : 'warning'" size="small">
@@ -366,6 +378,9 @@
               User ID: {{ selectedArchive.archived_by }}
             </span>
             <span v-else>System</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="Reason" :span="2" v-if="selectedArchive.reason">
+            {{ selectedArchive.reason }}
           </el-descriptions-item>
           <el-descriptions-item label="Status">
             <el-tag :type="selectedArchive.restored ? 'success' : 'warning'" size="small">
@@ -637,21 +652,27 @@ const clearSelection = () => {
 
 const bulkDeleteArchives = async () => {
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to permanently delete ${selectedArchives.value.length} selected archive${selectedArchives.value.length > 1 ? 's' : ''}? This action cannot be undone.`,
+    const { value: reason } = await ElMessageBox.prompt(
+      `Enter the reason for permanently deleting ${selectedArchives.value.length} archive${selectedArchives.value.length > 1 ? 's' : ''}:`,
       'Confirm Bulk Delete',
       {
         confirmButtonText: 'Delete Permanently',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'Enter reason for deletion...',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
     // Extract archive IDs
     const archiveIds = selectedArchives.value.map(archive => archive.archive_id)
 
-    // Use the new bulk delete endpoint
-    const result = await archiveStore.bulkDeleteArchivesPermanently(archiveIds)
+    // Use the bulk delete endpoint with reason
+    const result = await archiveStore.bulkDeleteArchivesPermanently(archiveIds, reason)
 
     if (result.success) {
       const { deleted, failed } = result.data
@@ -685,21 +706,27 @@ const bulkRestoreSelected = async () => {
   }
 
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to restore ${archivesToRestore.length} selected archive${archivesToRestore.length > 1 ? 's' : ''} back to their original tables?`,
-      'Confirm Bulk Restore',
+    const { value: restoreNotes } = await ElMessageBox.prompt(
+      `Enter restore notes for ${archivesToRestore.length} archive${archivesToRestore.length > 1 ? 's' : ''}:`,
+      'Bulk Restore',
       {
         confirmButtonText: 'Restore',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'Enter restore notes...',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Restore notes are required';
+          }
+        },
       }
-    )
+    );
 
     // Extract archive IDs
     const archiveIds = archivesToRestore.map(archive => archive.archive_id)
 
-    // Use the bulk restore endpoint
-    const result = await archiveStore.bulkRestoreArchives(archiveIds)
+    // Use the bulk restore endpoint with notes
+    const result = await archiveStore.bulkRestoreArchives(archiveIds, restoreNotes)
 
     if (result.success) {
       const { restored, failed, skipped } = result.data
@@ -787,7 +814,23 @@ const confirmDelete = async () => {
 
   deleting.value = true
   try {
-    await archiveStore.deleteArchivePermanently(deleteTarget.value.archive_id)
+    const { value: reason } = await ElMessageBox.prompt(
+      'Enter the reason for permanently deleting this archive:',
+      'Confirm Delete',
+      {
+        confirmButtonText: 'Delete Permanently',
+        cancelButtonText: 'Cancel',
+        inputType: 'textarea',
+        inputPlaceholder: 'Enter reason for deletion...',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
+      }
+    );
+
+    await archiveStore.deleteArchivePermanently(deleteTarget.value.archive_id, reason)
     ElMessage.success('Archive permanently deleted')
     deleteDialog.value = false
     deleteTarget.value = null

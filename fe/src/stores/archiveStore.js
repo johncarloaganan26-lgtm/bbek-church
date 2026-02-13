@@ -154,15 +154,17 @@ export const useArchiveStore = defineStore('archive', {
       }
     },
 
-    async deleteArchivePermanently(id) {
+    async deleteArchivePermanently(id, reason = null) {
       this.loading = true
       this.error = null
 
       try {
         const accessToken = localStorage.getItem('accessToken')
         const response = await axios.delete(`/archives/deleteArchive/${id}`, {
+          data: { reason },
           headers: {
-            Authorization: `Bearer ${accessToken}`
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
           }
         })
 
@@ -301,7 +303,7 @@ export const useArchiveStore = defineStore('archive', {
       }
     },
 
-    async bulkDeleteArchivesPermanently(archiveIds) {
+    async bulkDeleteArchivesPermanently(archiveIds, reason = null) {
       this.loading = true
       this.error = null
 
@@ -309,10 +311,12 @@ export const useArchiveStore = defineStore('archive', {
         const accessToken = localStorage.getItem('accessToken')
         const response = await axios.delete('/archives/bulkDeleteArchives', {
           data: {
-            archive_ids: archiveIds
+            archive_ids: archiveIds,
+            reason
           },
           headers: {
-            Authorization: `Bearer ${accessToken}`
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
           }
         })
 

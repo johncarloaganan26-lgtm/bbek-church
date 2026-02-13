@@ -374,10 +374,12 @@ router.put('/updateChildDedication/:id', async (req, res) => {
 /**
  * DELETE - Delete a child dedication record
  * DELETE /api/church-records/child-dedications/deleteChildDedication/:id
+ * Body: { reason?: string }
  */
 router.delete('/deleteChildDedication/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const reason = req.body?.reason || null;
 
     if (!id) {
       return res.status(400).json({
@@ -387,7 +389,7 @@ router.delete('/deleteChildDedication/:id', async (req, res) => {
     }
 
     const archivedBy = req.user?.acc_id || null;
-    const result = await deleteChildDedication(id, archivedBy);
+    const result = await deleteChildDedication(id, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({
@@ -414,11 +416,12 @@ router.delete('/deleteChildDedication/:id', async (req, res) => {
 /**
  * BULK DELETE - Delete multiple child dedication records
  * DELETE /api/church-records/child-dedications/bulkDeleteChildDedications
- * Body: { childIds: ["id1", "id2", "id3"] }
+ * Body: { childIds: ["id1", "id2", "id3"], reason?: string }
  */
 router.delete('/bulkDeleteChildDedications', async (req, res) => {
   try {
-    const { childIds } = req.body;
+    const childIds = req.body?.childIds || [];
+    const reason = req.body?.reason || null;
     const archivedBy = req.user?.acc_id || null;
 
     if (!Array.isArray(childIds) || childIds.length === 0) {
@@ -431,7 +434,7 @@ router.delete('/bulkDeleteChildDedications', async (req, res) => {
     // Skip audit trail for bulk operations to improve performance
     req.skipAuditTrail = true;
 
-    const result = await bulkDeleteChildDedications(childIds, archivedBy);
+    const result = await bulkDeleteChildDedications(childIds, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({

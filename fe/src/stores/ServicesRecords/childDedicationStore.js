@@ -151,11 +151,18 @@ export const useChildDedicationStore = defineStore('childDedication', {
       }
     },
 
-    async deleteDedication(id) {
+    async deleteDedication(id, reason) {
       this.loading = true
       this.error = null
       try {
-        const response = await axios.delete(`/church-records/child-dedications/deleteChildDedication/${id}`)
+        const accessToken = localStorage.getItem('accessToken')
+        const response = await axios.delete(`/church-records/child-dedications/deleteChildDedication/${id}`, {
+          data: { reason },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
         if (response.data.success) {
           await this.fetchDedications({
             page: this.currentPage,
@@ -265,13 +272,13 @@ export const useChildDedicationStore = defineStore('childDedication', {
       }
     },
 
-    async bulkDeleteChildDedications(childIds) {
+    async bulkDeleteChildDedications(childIds, reason) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
         const response = await axios.delete('/church-records/child-dedications/bulkDeleteChildDedications', {
-          data: { childIds },
+          data: { childIds, reason },
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'

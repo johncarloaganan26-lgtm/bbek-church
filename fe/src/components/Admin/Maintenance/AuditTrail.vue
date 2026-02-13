@@ -239,53 +239,158 @@
     <!-- Log Details Dialog -->
     <el-dialog
       v-model="detailsDialogVisible"
-      title="Log Details"
+      :title="`Log Details - ${selectedLog?.action_type || ''}`"
       width="800px"
       :before-close="handleDialogClose"
+      class="log-details-dialog"
     >
+      <template #header>
+        <div class="dialog-header">
+          <div class="log-summary">
+            <el-tag :type="getActionTagType(selectedLog?.action_type)" size="large">
+              {{ selectedLog?.action_type }}
+            </el-tag>
+            <span class="module-name">{{ selectedLog?.module }}</span>
+          </div>
+        </div>
+      </template>
+      
       <div v-if="selectedLog" class="log-details">
-        <el-descriptions :column="1" border>
+        <!-- Quick Info Row -->
+        <el-row :gutter="20" class="quick-info mb-4">
+          <el-col :span="8">
+            <div class="info-card">
+              <el-icon class="info-icon"><User /></el-icon>
+              <div class="info-content">
+                <div class="info-label">User</div>
+                <div class="info-value">{{ selectedLog.user_name }}</div>
+              </div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="info-card">
+              <el-icon class="info-icon"><Clock /></el-icon>
+              <div class="info-content">
+                <div class="info-label">Date & Time</div>
+                <div class="info-value">{{ formatDateTime(selectedLog.date_created) }}</div>
+              </div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="info-card">
+              <el-icon class="info-icon"><Location /></el-icon>
+              <div class="info-content">
+                <div class="info-label">IP Address</div>
+                <div class="info-value">{{ selectedLog.ip_address }}</div>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+
+        <!-- Detailed Information -->
+        <el-descriptions :column="2" border>
           <el-descriptions-item label="User ID">
             {{ selectedLog.user_id }}
           </el-descriptions-item>
-          <el-descriptions-item label="User Name">
-            {{ selectedLog.user_name }}
+          <el-descriptions-item label="User Position">
+            <el-tag :type="getRoleTagType(selectedLog.user_position)" size="small">
+              {{ selectedLog.user_position }}
+            </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="User Email">
+          <el-descriptions-item label="User Email" :span="2">
             {{ selectedLog.user_email }}
           </el-descriptions-item>
-          <el-descriptions-item label="User Position">
-            {{ selectedLog.user_position }}
+          <el-descriptions-item label="Entity Type">
+            {{ selectedLog.entity_type || 'N/A' }}
           </el-descriptions-item>
-          <el-descriptions-item label="Action Type">
-            {{ selectedLog.action_type }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Module">
-            {{ selectedLog.module }}
-          </el-descriptions-item>
-          <el-descriptions-item label="Description" class="description-item">
-            <div class="description-content">
-              <pre v-if="isJsonDescription(selectedLog.description)" class="json-description">{{ formatJsonDescription(selectedLog.description) }}</pre>
-              <span v-else>{{ selectedLog.description }}</span>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="Date Created">
-            <div>
-              <div class="font-weight-medium">{{ formatDateTime(selectedLog.date_created) }}</div>
-              <div class="text-caption text-medium-emphasis">Raw: {{ selectedLog.date_created }}</div>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="IP Address">
-            {{ selectedLog.ip_address }}
+          <el-descriptions-item label="Entity ID">
+            {{ selectedLog.entity_id || 'N/A' }}
           </el-descriptions-item>
           <el-descriptions-item label="Status">
-            {{ selectedLog.status }}
+            <el-tag :type="selectedLog.status === 'success' ? 'success' : 'danger'">
+              {{ selectedLog.status }}
+            </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item v-if="selectedLog.error_message" label="Error Message">
-            {{ selectedLog.error_message }}
+          <el-descriptions-item label="Log ID">
+            {{ selectedLog.log_id }}
+          </el-descriptions-item>
+          <el-descriptions-item label="Description" :span="2">
+            <div class="description-wrapper">
+              <div class="description-toolbar">
+                <el-button-group>
+                  <el-button 
+                    :type="showRawDescription ? 'default' : 'primary'" 
+                    size="small"
+                    @click="showRawDescription = false"
+                  >
+                    <el-icon><Document /></el-icon> Formatted
+                  </el-button>
+                  <el-button 
+                    :type="showRawDescription ? 'primary' : 'default'" 
+                    size="small"
+                    @click="showRawDescription = true"
+                  >
+                    <el-icon><DocumentCopy /></el-icon> Raw
+                  </el-button>
+                </el-button-group>
+                <el-button 
+                  type="primary" 
+                  size="small"
+                  @click="copyDescription"
+                  :icon="CopyDocument"
+                >
+                  Copy
+                </el-button>
+              </div>
+              <div class="description-content">
+                <pre v-if="showRawDescription" class="raw-description">{{ selectedLog.description }}</pre>
+                <div v-else class="formatted-description">
+                  <pre v-if="isJsonDescription(selectedLog.description)" class="json-description">{{ formatJsonDescription(selectedLog.description) }}</pre>
+                  <span v-else class="plain-description">{{ selectedLog.description }}</span>
+                </div>
+              </div>
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="selectedLog.error_message" label="Error Message" :span="2">
+            <div class="error-message">
+              <el-alert
+                :title="selectedLog.error_message"
+                type="error"
+                :closable="false"
+                show-icon
+              />
+            </div>
           </el-descriptions-item>
         </el-descriptions>
+
+        <!-- Raw Database Value -->
+        <div class="raw-data-section mt-4">
+          <el-collapse>
+            <el-collapse-item title="Raw Database Values" name="raw">
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="date_created">
+                  <code>{{ selectedLog.date_created }}</code>
+                </el-descriptions-item>
+                <el-descriptions-item label="user_id">
+                  <code>{{ selectedLog.user_id }}</code>
+                </el-descriptions-item>
+                <el-descriptions-item label="entity_id">
+                  <code>{{ selectedLog.entity_id }}</code>
+                </el-descriptions-item>
+              </el-descriptions>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
       </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="handleDialogClose" icon="Close">Close</el-button>
+          <el-button type="primary" @click="copyAllDetails" icon="CopyDocument">
+            Copy All Details
+          </el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -293,7 +398,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Refresh, Download, View, Printer, Close } from '@element-plus/icons-vue'
+import { Filter, Refresh, Download, View, Printer, Close, CopyDocument, User, Clock, Location, Document } from '@element-plus/icons-vue'
 import { useAuditTrailStore } from '@/stores/auditTrailStore'
 
 // Store
@@ -305,6 +410,7 @@ const logs = ref([])
 const uniqueUsers = ref([])
 const selectedLog = ref(null)
 const detailsDialogVisible = ref(false)
+const showRawDescription = ref(false)
 
 // Filters
 const filters = ref({
@@ -553,6 +659,57 @@ const showLogDetails = (log) => {
 const handleDialogClose = () => {
   detailsDialogVisible.value = false
   selectedLog.value = null
+  showRawDescription.value = false
+}
+
+const copyDescription = async () => {
+  if (!selectedLog.value?.description) return
+  
+  try {
+    await navigator.clipboard.writeText(selectedLog.value.description)
+    ElMessage.success('Description copied to clipboard')
+  } catch (error) {
+    ElMessage.error('Failed to copy description')
+  }
+}
+
+const copyAllDetails = async () => {
+  if (!selectedLog.value) return
+  
+  const details = `
+Audit Trail Log Details
+=======================
+Log ID: ${selectedLog.value.log_id}
+Date: ${formatDateTime(selectedLog.value.date_created)}
+Raw Date: ${selectedLog.value.date_created}
+
+User Information:
+- User ID: ${selectedLog.value.user_id}
+- User Name: ${selectedLog.value.user_name}
+- User Email: ${selectedLog.value.user_email}
+- User Position: ${selectedLog.value.user_position}
+
+Action Details:
+- Action Type: ${selectedLog.value.action_type}
+- Module: ${selectedLog.value.module}
+- Entity Type: ${selectedLog.value.entity_type || 'N/A'}
+- Entity ID: ${selectedLog.value.entity_id || 'N/A'}
+- Status: ${selectedLog.value.status}
+- IP Address: ${selectedLog.value.ip_address}
+
+Description:
+${selectedLog.value.description}
+
+${selectedLog.value.error_message ? `Error Message:
+${selectedLog.value.error_message}` : ''}
+  `.trim()
+  
+  try {
+    await navigator.clipboard.writeText(details)
+    ElMessage.success('All details copied to clipboard')
+  } catch (error) {
+    ElMessage.error('Failed to copy details')
+  }
 }
 
 const formatDateTime = (dateString) => {
@@ -676,6 +833,132 @@ watch(filters.value, () => {
 .log-details {
   max-height: 70vh;
   overflow-y: auto;
+}
+
+.log-details-dialog {
+  border-radius: 12px;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.log-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.module-name {
+  font-size: 16px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.quick-info {
+  margin-bottom: 20px;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.info-icon {
+  font-size: 24px;
+  color: #409eff;
+  margin-right: 12px;
+}
+
+.info-content {
+  flex: 1;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  word-break: break-all;
+}
+
+.description-wrapper {
+  width: 100%;
+}
+
+.description-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.description-content {
+  width: 100%;
+  max-width: 100%;
+}
+
+.raw-description {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.formatted-description {
+  width: 100%;
+}
+
+.plain-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+}
+
+.error-message {
+  width: 100%;
+}
+
+.raw-data-section {
+  margin-top: 16px;
+}
+
+.raw-data-section code {
+  background-color: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.description-item :deep(.el-descriptions__content) {
+  max-width: none;
 }
 
 .description-item :deep(.el-descriptions__content) {

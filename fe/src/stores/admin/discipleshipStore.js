@@ -208,6 +208,38 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         }
     };
 
+    const bulkCompleteRequests = async (requestIds) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/discipleship-requests/bulk-complete', {
+                requestIds
+            });
+            
+            if (response.data.success) {
+                const { completed, failed } = response.data.data;
+                ElMessage.success(`Successfully completed ${completed.length} requests`);
+                
+                if (failed.length > 0) {
+                    const errorReasons = failed.map(f => f.reason).join(', ');
+                    ElMessage.warning(`${failed.length} requests failed to complete: ${errorReasons}`);
+                }
+                
+                await fetchRequests();
+                return response.data;
+            }
+            
+            ElMessage.error(response.data.message || 'Failed to complete requests');
+            return response.data;
+        } catch (error) {
+            console.error('Error bulk completing requests:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to complete requests';
+            ElMessage.error(errorMessage);
+            return { success: false, message: errorMessage };
+        } finally {
+            loading.value = false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -224,6 +256,7 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         fetchRegistrationData,
         deleteRequest,
         bulkArchiveRequests,
+        bulkCompleteRequests,
         createRequest,
         setPage,
         setFilters

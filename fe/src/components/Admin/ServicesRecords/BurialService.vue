@@ -482,17 +482,23 @@ const editService = async (service) => {
 
 const deleteService = async (id) => {
   try {
-    await ElMessageBox.confirm(
-      'Are you sure you want to delete this burial service?',
+    const { value: reason } = await ElMessageBox.prompt(
+      'Enter the reason for deleting this burial service:',
       'Confirm Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
-    const result = await burialServiceStore.deleteService(id)
+    const result = await burialServiceStore.deleteService(id, reason)
     if (result.success) {
       ElMessage.success('Burial service deleted successfully')
     } else {
@@ -608,21 +614,27 @@ const bulkCompleteServices = async () => {
 
 const bulkDeleteServices = async () => {
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedServices.value.length} selected burial service${selectedServices.value.length > 1 ? 's' : ''}?`,
+    const { value: reason } = await ElMessageBox.prompt(
+      'Enter the reason for deleting these burial services:',
       'Confirm Bulk Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entries, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
     // Extract burial IDs
     const burialIds = selectedServices.value.map(service => service.burial_id)
 
-    // Use the new bulk delete endpoint
-    const result = await burialServiceStore.bulkDeleteBurialServices(burialIds)
+    // Use the new bulk delete endpoint with reason
+    const result = await burialServiceStore.bulkDeleteBurialServices(burialIds, reason)
 
     if (result.success) {
       const { deleted, failed } = result.data

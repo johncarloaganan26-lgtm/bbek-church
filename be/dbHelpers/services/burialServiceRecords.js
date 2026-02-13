@@ -1040,7 +1040,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
   }
 }
 
-async function deleteBurialService(burialId, archivedBy = null) {
+async function deleteBurialService(burialId, archivedBy = null, reason = null) {
   try {
     if (!burialId) {
       throw new Error('Burial ID is required');
@@ -1059,7 +1059,8 @@ async function deleteBurialService(burialId, archivedBy = null) {
       'tbl_burialservice',
       String(burialId),
       burialCheck.data,
-      archivedBy
+      archivedBy,
+      reason
     );
 
     const sql = 'DELETE FROM tbl_burialservice WHERE burial_id = ?';
@@ -1088,9 +1089,10 @@ async function deleteBurialService(burialId, archivedBy = null) {
  * Bulk delete burial services with archiving
  * @param {Array<string>} burialIds - Array of burial IDs to delete
  * @param {number|null} archivedBy - User ID who performed the deletion
+ * @param {String} reason - Reason for deletion (optional)
  * @returns {Object} Result object with success status and details
  */
-async function bulkDeleteBurialServices(burialIds, archivedBy = null) {
+async function bulkDeleteBurialServices(burialIds, archivedBy = null, reason = null) {
   try {
     if (!Array.isArray(burialIds) || burialIds.length === 0) {
       throw new Error('Burial IDs array is required and cannot be empty');
@@ -1111,7 +1113,7 @@ async function bulkDeleteBurialServices(burialIds, archivedBy = null) {
         const burialService = await getBurialServiceById(burialId);
         if (burialService.success && burialService.data) {
           burialServicesToDelete.push(burialService.data);
-          await archiveBeforeDelete('tbl_burialservice', String(burialId), burialService.data, archivedBy);
+          await archiveBeforeDelete('tbl_burialservice', String(burialId), burialService.data, archivedBy, reason);
         }
       } catch (error) {
         console.warn(`Failed to archive burial service ${burialId}:`, error.message);

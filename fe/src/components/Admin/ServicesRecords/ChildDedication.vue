@@ -486,26 +486,32 @@ const editDedication = (dedication) => {
 
 const deleteDedication = async (id) => {
   try {
-    await ElMessageBox.confirm(
-      'Are you sure you want to delete this child dedication?',
+    const { value: reason } = await ElMessageBox.prompt(
+      'Enter the reason for deleting this child dedication:',
       'Confirm Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
-    const result = await childDedicationStore.deleteDedication(id)
+    const result = await childDedicationStore.deleteDedication(id, reason);
     if (result.success) {
-      ElMessage.success('Child dedication deleted successfully')
+      ElMessage.success('Child dedication deleted successfully');
     } else {
-      ElMessage.error(result.error || 'Failed to delete child dedication')
+      ElMessage.error(result.error || 'Failed to delete child dedication');
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting child dedication:', error)
-      ElMessage.error('Failed to delete child dedication')
+      console.error('Error deleting child dedication:', error);
+      ElMessage.error('Failed to delete child dedication');
     }
   }
 }
@@ -612,21 +618,27 @@ const bulkCompleteDedications = async () => {
 
 const bulkDeleteDedications = async () => {
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedDedications.value.length} selected child dedication${selectedDedications.value.length > 1 ? 's' : ''}?`,
+    const { value: reason } = await ElMessageBox.prompt(
+      `Enter the reason for deleting ${selectedDedications.value.length} selected child dedication${selectedDedications.value.length > 1 ? 's' : ''}:`,
       'Confirm Bulk Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entries, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
     // Extract child IDs
     const childIds = selectedDedications.value.map(dedication => dedication.child_id)
 
-    // Use the new bulk delete endpoint
-    const result = await childDedicationStore.bulkDeleteChildDedications(childIds)
+    // Use the new bulk delete endpoint with reason
+    const result = await childDedicationStore.bulkDeleteChildDedications(childIds, reason)
 
     if (result.success) {
       const { deleted, failed } = result.data

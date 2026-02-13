@@ -457,10 +457,12 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
 /**
  * DELETE - Delete a water baptism record
  * DELETE /api/services/water-baptisms/deleteWaterBaptism/:id
+ * Body: { reason: "Reason for deletion" }
  */
 router.delete('/deleteWaterBaptism/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -469,8 +471,16 @@ router.delete('/deleteWaterBaptism/:id', async (req, res) => {
       });
     }
 
+    // Reason is now required for delete operations
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for deletion is required'
+      });
+    }
+
     const archivedBy = req.user?.acc_id || null;
-    const result = await deleteWaterBaptism(id, archivedBy);
+    const result = await deleteWaterBaptism(id, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({
@@ -497,11 +507,11 @@ router.delete('/deleteWaterBaptism/:id', async (req, res) => {
 /**
  * BULK DELETE - Delete multiple water baptism records
  * DELETE /api/services/water-baptisms/bulkDeleteWaterBaptisms
- * Body: { baptismIds: ["id1", "id2", "id3"] }
+ * Body: { baptismIds: ["id1", "id2", "id3"], reason: "Reason for deletion" }
  */
 router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
   try {
-    const { baptismIds } = req.body;
+    const { baptismIds, reason } = req.body;
     const archivedBy = req.user?.acc_id || null;
 
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
@@ -511,10 +521,17 @@ router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
       });
     }
 
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason for deletion is required'
+      });
+    }
+
     // Skip audit trail for bulk operations to improve performance
     req.skipAuditTrail = true;
 
-    const result = await bulkDeleteWaterBaptisms(baptismIds, archivedBy);
+    const result = await bulkDeleteWaterBaptisms(baptismIds, archivedBy, reason);
 
     if (result.success) {
       res.status(200).json({

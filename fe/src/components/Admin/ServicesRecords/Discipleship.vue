@@ -44,13 +44,23 @@
 
     <!-- Table -->
     <v-card elevation="2">
-      <div v-if="selectedRequests.length > 0" class="bg-error-lighten-5 pa-2 d-flex align-center">
-        <v-chip color="error" size="small" class="mr-2">{{ selectedRequests.length }} selected</v-chip>
-        <v-btn size="small" color="error" variant="outlined" @click="bulkArchive">
+      <!-- Selection Actions Bar -->
+      <div v-if="selectedRequests.length > 0" class="bg-success-lighten-5 pa-2 d-flex align-center">
+        <v-chip color="success" size="small" class="mr-2">{{ selectedRequests.length }} selected</v-chip>
+        <v-btn size="small" color="success" variant="outlined" @click="bulkComplete" :loading="loading">
+          <v-icon left>mdi-check-all</v-icon>
+          Mark as Completed
+        </v-btn>
+        <v-btn size="small" color="error" variant="outlined" class="ml-2" @click="bulkArchive">
           <v-icon left>mdi-archive</v-icon>
           Archive Selected
         </v-btn>
         <v-btn size="small" variant="text" class="ml-2" @click="clearSelection">Clear</v-btn>
+        <v-spacer></v-spacer>
+        <span class="text-caption text-grey-darken-1 mr-4" v-if="hasNonScheduled">
+          <v-icon size="small" color="warning">mdi-alert</v-icon>
+          Only "Scheduled" records can be completed
+        </span>
       </div>
       <v-table>
         <thead>
@@ -335,6 +345,53 @@ const toggleSelectAll = (value) => {
 const clearSelection = () => {
   selectedRequests.value = [];
   selectAll.value = false;
+};
+
+// Check if selected requests contain non-Scheduled records
+const hasNonScheduled = computed(() => {
+  if (selectedRequests.value.length === 0) return false;
+  return requests.value
+    .filter(r => selectedRequests.value.includes(r.request_id))
+    .some(r => r.status !== 'Scheduled');
+});
+
+// Bulk complete selected requests (only Scheduled status can be completed)
+const bulkComplete = async () => {
+  if (selectedRequests.value.length === 0) {
+    ElMessage.warning('No requests selected');
+    return;
+  }
+  
+  // Check if any selected record is not in Scheduled status
+  const nonScheduledRecords = requests.value
+    .filter(r => selectedRequests.value.includes(r.request_id) && r.status !== 'Scheduled');
+  
+  if (nonScheduledRecords.length > 0) {
+    ElMessage.error(`Cannot complete ${nonScheduledRecords.length} record(s) that are not in "Scheduled" status. Only "Scheduled" records can be marked as completed.`);
+    return;
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to mark ${selectedRequests.value.length} selected request(s) as completed?`,
+      'Bulk Complete Requests',
+      {
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    );
+    
+    const result = await store.bulkCompleteRequests(selectedRequests.value);
+    if (result.success) {
+      ElMessage.success(`Successfully marked ${selectedRequests.value.length} request(s) as completed`);
+      clearSelection();
+    } else if (result.error) {
+      ElMessage.error(result.error);
+    }
+  } catch {
+    // User cancelled
+  }
 };
 
 const bulkArchive = async () => {

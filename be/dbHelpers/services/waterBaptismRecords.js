@@ -1277,12 +1277,17 @@ async function updateWaterBaptism(baptismId, baptismData) {
  * DELETE - Delete a water baptism record (archives it first)
  * @param {String} baptismId - Baptism ID
  * @param {String} archivedBy - User ID who is deleting/archiving the record (optional)
+ * @param {String} reason - Reason for deletion (required)
  * @returns {Promise<Object>} Result object
  */
-async function deleteWaterBaptism(baptismId, archivedBy = null) {
+async function deleteWaterBaptism(baptismId, archivedBy = null, reason = null) {
   try {
     if (!baptismId) {
       throw new Error('Baptism ID is required');
+    }
+
+    if (!reason || reason.trim() === '') {
+      throw new Error('Reason for deletion is required');
     }
 
     // Check if baptism exists
@@ -1300,7 +1305,8 @@ async function deleteWaterBaptism(baptismId, archivedBy = null) {
       'tbl_waterbaptism',
       String(baptismId),
       baptismCheck.data,
-      archivedBy
+      archivedBy,
+      reason
     );
 
     // Delete from original table
@@ -1330,9 +1336,10 @@ async function deleteWaterBaptism(baptismId, archivedBy = null) {
  * Bulk delete water baptisms with archiving
  * @param {Array<string>} baptismIds - Array of baptism IDs to delete
  * @param {number|null} archivedBy - User ID who performed the deletion
+ * @param {String} reason - Reason for deletion
  * @returns {Object} Result object with success status and details
  */
-async function bulkDeleteWaterBaptisms(baptismIds, archivedBy = null) {
+async function bulkDeleteWaterBaptisms(baptismIds, archivedBy = null, reason = null) {
   try {
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
       throw new Error('Baptism IDs array is required and cannot be empty');
@@ -1353,7 +1360,7 @@ async function bulkDeleteWaterBaptisms(baptismIds, archivedBy = null) {
         const baptism = await getWaterBaptismById(baptismId);
         if (baptism.success && baptism.data) {
           baptismsToDelete.push(baptism.data);
-          await archiveBeforeDelete('tbl_waterbaptism', String(baptismId), baptism.data, archivedBy);
+          await archiveBeforeDelete('tbl_waterbaptism', String(baptismId), baptism.data, archivedBy, reason);
         }
       } catch (error) {
         console.warn(`Failed to archive water baptism ${baptismId}:`, error.message);

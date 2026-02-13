@@ -207,7 +207,23 @@ const auditTrailMiddleware = async (req, res, next) => {
                 }
               }
 
-              enhancedDescription = `Deleted archived ${tableName} record: ${JSON.stringify(cleanArchivedData)}`;
+              // Include reason if provided
+              const reasonText = archive.reason ? ` Reason: ${archive.reason}` : '';
+              
+              // Create user-friendly description with key info
+              let userFriendlyInfo = '';
+              if (cleanArchivedData.firstname || cleanArchivedData.lastname) {
+                const name = `${cleanArchivedData.firstname || ''} ${cleanArchivedData.middle_name || ''} ${cleanArchivedData.lastname || ''}`.replace(/\s+/g, ' ').trim();
+                if (name) userFriendlyInfo = ` - ${name}`;
+              } else if (cleanArchivedData.name) {
+                userFriendlyInfo = ` - ${cleanArchivedData.name}`;
+              } else if (cleanArchivedData.member_id) {
+                userFriendlyInfo = ` (Member ID: ${cleanArchivedData.member_id})`;
+              } else if (cleanArchivedData.original_id) {
+                userFriendlyInfo = ` (ID: ${cleanArchivedData.original_id})`;
+              }
+              
+              enhancedDescription = `Deleted archived ${tableName} record${userFriendlyInfo}${reasonText}`;
             } else {
               // Fallback: try to query the database (though archive might be deleted)
               try {
@@ -601,6 +617,8 @@ const auditTrailMiddleware = async (req, res, next) => {
           if (data.name) restoreDetails.push(`"${data.name}"`);
           else if (entityId) restoreDetails.push(`ID: ${entityId}`);
           if (module && module !== 'Unknown Module') restoreDetails.push(`to ${module}`);
+          // Include restore notes if provided
+          if (data.restore_notes) restoreDetails.push(`Note: ${data.restore_notes}`);
 
           return `Restored ${entityName}${restoreDetails.length ? ` (${restoreDetails.join(', ')})` : ''}`;
 

@@ -475,26 +475,32 @@ const editBaptism = (baptism) => {
 
 const deleteBaptism = async (id) => {
   try {
-    await ElMessageBox.confirm(
-      'Are you sure you want to delete this water baptism record?',
+    const { value: reason } = await ElMessageBox.prompt(
+      'Enter the reason for deleting this water baptism record:',
       'Confirm Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
-    const result = await waterBaptismStore.deleteBaptism(id)
+    const result = await waterBaptismStore.deleteBaptism(id, reason);
     if (result.success) {
-      ElMessage.success('Water baptism record deleted successfully')
+      ElMessage.success('Water baptism record deleted successfully');
     } else {
-      ElMessage.error(result.error || 'Failed to delete water baptism record')
+      ElMessage.error(result.error || 'Failed to delete water baptism record');
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting water baptism:', error)
-      ElMessage.error('Failed to delete water baptism record')
+      console.error('Error deleting water baptism:', error);
+      ElMessage.error('Failed to delete water baptism record');
     }
   }
 }
@@ -601,21 +607,27 @@ const bulkCompleteBaptisms = async () => {
 
 const bulkDeleteBaptisms = async () => {
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedBaptisms.value.length} selected water baptism record${selectedBaptisms.value.length > 1 ? 's' : ''}?`,
+    const { value: reason } = await ElMessageBox.prompt(
+      `Enter the reason for deleting ${selectedBaptisms.value.length} selected water baptism record${selectedBaptisms.value.length > 1 ? 's' : ''}:`,
       'Confirm Bulk Delete',
       {
         confirmButtonText: 'Delete',
         cancelButtonText: 'Cancel',
-        type: 'warning',
+        inputType: 'textarea',
+        inputPlaceholder: 'e.g., Duplicate entries, Wrong data, etc.',
+        inputValidator: (value) => {
+          if (!value || value.trim() === '') {
+            return 'Reason is required';
+          }
+        },
       }
-    )
+    );
 
     // Extract baptism IDs
     const baptismIds = selectedBaptisms.value.map(baptism => baptism.baptism_id)
 
-    // Use the new bulk delete endpoint
-    const result = await waterBaptismStore.bulkDeleteWaterBaptisms(baptismIds)
+    // Use the new bulk delete endpoint with reason
+    const result = await waterBaptismStore.bulkDeleteWaterBaptisms(baptismIds, reason)
 
     if (result.success) {
       const { deleted, failed } = result.data

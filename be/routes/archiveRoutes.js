@@ -161,7 +161,8 @@ router.post('/bulkRestoreArchives', requireAdmin, async (req, res) => {
     // Add bulk operation info to request for audit trail
     req.bulk_restore_data = {
       archive_ids: archiveIds,
-      count: archiveIds.length
+      count: archiveIds.length,
+      restore_notes: reason
     };
 
     const result = await bulkRestoreArchives(archiveIds, userId, restore_notes);
@@ -225,6 +226,7 @@ router.get('/getArchiveSummary', requireAdmin, async (req, res) => {
 router.delete('/deleteArchive/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const reason = req.body?.reason || null;
 
     // Get archive details first for audit trail
     const { getArchiveById } = require('../dbHelpers/archiveRecords');
@@ -235,7 +237,8 @@ router.delete('/deleteArchive/:id', requireAdmin, async (req, res) => {
       req.archive_data = {
         original_table: archiveResult.data.original_table,
         original_id: archiveResult.data.original_id,
-        archived_data: archiveResult.data.archived_data
+        archived_data: archiveResult.data.archived_data,
+        reason: reason
       };
     }
 
@@ -248,7 +251,7 @@ router.delete('/deleteArchive/:id', requireAdmin, async (req, res) => {
       });
     }
 
-    const result = await deleteArchivePermanently(parseInt(id));
+    const result = await deleteArchivePermanently(parseInt(id), reason);
 
     if (result.success) {
       res.status(200).json({
@@ -281,9 +284,10 @@ router.delete('/bulkDeleteArchives', requireAdmin, async (req, res) => {
   // Skip audit trail middleware for bulk operations to improve performance
   req.skipAuditTrail = true;
   try {
-    const { archive_ids } = req.body;
+    const archiveIdsParam = req.body?.archive_ids || [];
+    const reason = req.body?.reason || null;
 
-    if (!archive_ids || !Array.isArray(archive_ids) || archive_ids.length === 0) {
+    if (!Array.isArray(archiveIdsParam) || archiveIdsParam.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Archive IDs array is required and cannot be empty',
@@ -292,7 +296,7 @@ router.delete('/bulkDeleteArchives', requireAdmin, async (req, res) => {
     }
 
     // Convert string IDs to numbers and validate
-    const archiveIds = archive_ids.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
+    const archiveIds = archiveIdsParam.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0);
 
     if (archiveIds.length === 0) {
       return res.status(400).json({
@@ -305,10 +309,11 @@ router.delete('/bulkDeleteArchives', requireAdmin, async (req, res) => {
     // Add archive details to request for audit trail middleware
     req.bulk_delete_data = {
       archive_ids: archiveIds,
-      count: archiveIds.length
+      count: archiveIds.length,
+      reason: reason
     };
 
-    const result = await bulkDeleteArchivesPermanently(archiveIds);
+    const result = await bulkDeleteArchivesPermanently(archiveIds, reason);
 
     if (result.success) {
       res.status(200).json({
@@ -375,7 +380,8 @@ router.post('/restoreAllArchives', requireAdmin, async (req, res) => {
     req.bulk_restore_data = {
       archive_ids: allArchiveIds,
       count: allArchiveIds.length,
-      restore_all: true
+      restore_all: true,
+      restore_notes: restore_notes
     };
 
     // Use bulk restore to process all archives

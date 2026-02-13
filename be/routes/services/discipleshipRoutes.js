@@ -825,4 +825,91 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
     }
 });
 
+// ADMIN: Bulk Mark Requests as Completed
+// Only "Scheduled" status can be marked as completed
+router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const { requestIds } = req.body;
+        
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No requests selected',
+                errorCode: 'NO_SELECTION'
+            });
+        }
+        
+        const completedIds = [];
+        const failedIds = [];
+        
+        for (const request_id of requestIds) {
+            try {
+                // Get request data
+                const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+                
+                if (rows.length === 0) {
+                    failedIds.push({ request_id, error: 'Not found', reason: 'Record does not exist' });
+                    continue;
+                }
+                
+                const requestData = rows[0];
+                
+                // Only allow completing "Scheduled" status
+                if (requestData.status !== 'Scheduled') {
+                    failedIds.push({ 
+                        request_id, 
+                        error: `Invalid status: ${requestData.status}`, 
+                        reason: 'Only "Scheduled" records can be marked as completed' 
+                    });
+                    continue;
+                }
+                
+                // Update status to Completed
+                await query(
+                    'UPDATE tbl_discipleship_requests SET status = ?, completed_at = NOW() WHERE request_id = ?', 
+                    ['Completed', request_id]
+                );
+                
+                completedIds.push(request_id);
+            } catch (err) {
+                console.error(`Error completing ${request_id}:`, err);
+                failedIds.push({ request_id, error: err.message, reason: 'Database error' });
+            }
+        }
+        
+        // Log bulk completion
+        if (completedIds.length > 0) {
+            await auditTrailRecords.createAuditLog({
+                action_type: 'DISCIPLESHIP_BULK_COMPLETED',
+                module: 'Discipleship',
+                description: JSON.stringify({
+                    completed_count: completedIds.length,
+                    failed_count: failedIds.length,
+                    request_ids: completedIds
+                }),
+                user_id: req.user?.acc_id || null,
+                user_email: req.user?.email || null,
+                user_name: req.user?.firstname || null,
+                user_position: req.user?.position || null
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: `Successfully completed ${completedIds.length} requests`,
+            data: {
+                completed: completedIds,
+                failed: failedIds
+            }
+        });
+    } catch (error) {
+        console.error('Bulk complete error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message,
+            errorCode: 'BULK_COMPLETE_ERROR'
+        });
+    }
+});
+
 module.exports = router;

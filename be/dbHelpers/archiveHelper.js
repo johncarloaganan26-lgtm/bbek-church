@@ -8,9 +8,10 @@ const { archiveRecord } = require('./archiveRecords');
  * @param {String} recordId - ID of the record to archive
  * @param {Object} recordData - Complete data of the record
  * @param {String} archivedBy - User ID who is archiving (optional)
+ * @param {String} reason - Reason for archiving (optional)
  * @returns {Promise<Object>} Archive result
  */
-async function archiveBeforeDelete(tableName, recordId, recordData, archivedBy = null) {
+async function archiveBeforeDelete(tableName, recordId, recordData, archivedBy = null, reason = null) {
   try {
     if (!tableName || !recordId || !recordData) {
       console.warn('Archive helper: Missing required parameters', {
@@ -26,14 +27,16 @@ async function archiveBeforeDelete(tableName, recordId, recordData, archivedBy =
       tableName,
       recordId,
       dataKeys: Object.keys(recordData || {}),
-      archivedBy: archivedBy || 'system'
+      archivedBy: archivedBy || 'system',
+      reason: reason || 'No reason provided'
     });
 
     const result = await archiveRecord(
       tableName,
       String(recordId),
       recordData,
-      archivedBy
+      archivedBy,
+      reason
     );
 
     if (result.success) {
