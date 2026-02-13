@@ -63,7 +63,8 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
             return false;
         } catch (error) {
             console.error('Error updating request:', error);
-            ElMessage.error('Failed to update request');
+            const errorMessage = error.response?.data?.message || error.response?.data?.errorCode || 'Failed to update request';
+            ElMessage.error(errorMessage);
             return false;
         } finally {
             loading.value = false;
