@@ -287,6 +287,7 @@ e<template>
             :disabled-date="disabledFutureDate"
             :disabled-hours="disabledHours"
             :default-value="defaultNightTime"
+            @change="onServiceDateChange"
           />
           <div class="form-hint" v-if="userInfo?.account?.position !== 'admin' && userInfo?.account?.position !== 'staff'">
             <el-icon><InfoFilled /></el-icon>
