@@ -27,8 +27,8 @@ const VALID_STATUS_TRANSITIONS = {
     'Cancelled': [] // Terminal state - no transitions allowed
 };
 
-// Church closed days (example - can be extended with database)
-const CHURCH_CLOSED_DAYS = ['Sunday', 'Saturday']; // Weekend closure
+// Church open days (discipleship only on Sundays)
+const ALLOWED_SCHEDULE_DAY = 'Sunday';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -82,12 +82,12 @@ function validateScheduledDate(scheduledDate) {
         };
     }
     
-    // Check if date is a church closed day
+    // Check if date is a Sunday (only allowed day for discipleship)
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-    if (CHURCH_CLOSED_DAYS.includes(dayOfWeek)) {
+    if (dayOfWeek !== ALLOWED_SCHEDULE_DAY) {
         return {
             valid: false,
-            message: `Cannot schedule on ${dayOfWeek}. Church is closed on weekends.`
+            message: `Discipleship sessions can only be scheduled on ${ALLOWED_SCHEDULE_DAY}. Please select a Sunday date.`
         };
     }
     
