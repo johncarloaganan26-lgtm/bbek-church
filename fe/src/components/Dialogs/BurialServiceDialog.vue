@@ -740,7 +740,7 @@ watch(() => props.burialServiceData, (newData) => {
     formData.relationship = newData.relationship || ''
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
-    formData.service_date = newData.service_date ? new Date(newData.service_date) : null
+    formData.service_date = newData.service_date ? new Date(newData.service_date) : (newData.preferred_service_time ? new Date(newData.preferred_service_time) : null)
     // Convert preferred_service_time to datetime if available
     if (newData.preferred_service_time) {
       formData.preferred_service_date = new Date(newData.preferred_service_time) || getDefaultNightTime()
