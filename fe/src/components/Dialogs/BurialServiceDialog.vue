@@ -576,7 +576,7 @@ const formData = reactive({
   location: '',
   pastor_name: '',
   service_date: null,
-  preferred_service_date: defaultNightTime, // Default to 6:00 PM for night services
+  preferred_service_date: null,
   status: 'pending',
   rejection_reason: ''
 })
@@ -718,7 +718,7 @@ const resetForm = () => {
   formData.location = ''
   formData.pastor_name = ''
   formData.service_date = null
-  formData.preferred_service_date = getDefaultNightTime() // Default to tomorrow 6:00 PM
+  formData.preferred_service_date = null
   formData.status = 'pending'
   formData.rejection_reason = ''
 
@@ -744,10 +744,10 @@ watch(() => props.burialServiceData, (newData) => {
     formData.relationship = newData.relationship || ''
     formData.location = newData.location || ''
     formData.pastor_name = newData.pastor_name || ''
-    formData.service_date = newData.service_date ? new Date(newData.service_date) : (newData.preferred_service_time ? new Date(newData.preferred_service_time) : null)
+    formData.service_date = newData.service_date || newData.preferred_service_time || null
     // Convert preferred_service_time to datetime if available
     if (newData.preferred_service_time) {
-      formData.preferred_service_date = new Date(newData.preferred_service_time) || getDefaultNightTime()
+      formData.preferred_service_date = newData.preferred_service_time
     } else {
       formData.preferred_service_date = getDefaultNightTime()
     }
@@ -805,6 +805,20 @@ const handleSubmit = async () => {
     
     loading.value = true
     
+    // Helper function to convert date to ISO string
+    const toISODate = (value) => {
+      if (!value) return null
+      if (value instanceof Date) {
+        return !isNaN(value) ? value.toISOString() : null
+      }
+      // If it's already a string, check if it's in valid format
+      if (typeof value === 'string') {
+        const date = new Date(value)
+        return !isNaN(date) ? date.toISOString() : null
+      }
+      return null
+    }
+    
     // Prepare data
     const data = {
       member_id: formData.member_id,
@@ -817,8 +831,8 @@ const handleSubmit = async () => {
       relationship: formData.relationship,
       location: formData.location,
       pastor_name: formData.pastor_name,
-      service_date: formData.service_date ? new Date(formData.service_date).toISOString() : null,
-      preferred_service_time: formData.preferred_service_date ? new Date(formData.preferred_service_date).toISOString() : null,
+      service_date: toISODate(formData.service_date),
+      preferred_service_time: toISODate(formData.preferred_service_date),
       status: formData.status,
       rejection_reason: formData.rejection_reason || null,
       rejected_by: (() => {
