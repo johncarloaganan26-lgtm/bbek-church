@@ -730,7 +730,10 @@ const resetForm = () => {
 
 // Watch for burial service data changes (edit mode)
 watch(() => props.burialServiceData, (newData) => {
+  console.log('burialServiceData received:', newData)
   if (newData) {
+    console.log('service_date:', newData.service_date)
+    console.log('preferred_service_time:', newData.preferred_service_time)
     formData.member_id = newData.member_id || null
     formData.requester_name = newData.requester_name || ''
     formData.requester_email = newData.requester_email || ''
