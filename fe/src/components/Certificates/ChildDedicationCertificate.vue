@@ -57,9 +57,9 @@
               <div class="sec-text">S.E.C. REGISTERED</div>
             </div>
             <div class="church-info">
-              <h1 class="church-name">BIBLE BAPTIST EKKLESIA</h1>
-              <h2 class="church-subtitle">OF KAWIT</h2>
-              <p class="church-address">485 Acacia St. Villa Ramirez, Tabon 1, Kawit Cavite</p>
+              <h1 class="church-name">{{ cmsChurchName || 'BIBLE BAPTIST EKKLESIA' }}</h1>
+              <h2 class="church-subtitle">{{ cmsChurchSubname || 'OF KAWIT' }}</h2>
+              <p class="church-address">{{ cmsChurchAddress || '485 Acacia St. Villa Ramirez, Tabon 1, Kawit Cavite' }}</p>
             </div>
           </div>
 
@@ -284,6 +284,9 @@ const props = defineProps({
 })
 
 const churchLogo = ref(props.churchLogo)
+const cmsChurchName = ref('')
+const cmsChurchSubname = ref('')
+const cmsChurchAddress = ref('')
 
 // Get effective logo (use public logo if CMS logo not available)
 const effectiveLogo = computed(() => {
@@ -392,9 +395,22 @@ const fetchHeaderData = async () => {
   try {
     const response = await axios.get('/cms/header/full')
     if (response.data.success && response.data.data) {
-      const { images } = response.data.data
+      const { content, images } = response.data.data
+      
+      // Get logo
       if (images?.logo) {
         churchLogo.value = images.logo
+      }
+      
+      // Get church name from content
+      if (content?.churchName) {
+        cmsChurchName.value = content.churchName
+      }
+      if (content?.churchSubname) {
+        cmsChurchSubname.value = content.churchSubname
+      }
+      if (content?.churchAddress) {
+        cmsChurchAddress.value = content.churchAddress
       }
     }
   } catch (error) {
