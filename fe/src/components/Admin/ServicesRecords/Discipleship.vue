@@ -509,6 +509,9 @@ const saveUpdate = async () => {
     }
   } else {
     const success = await store.updateRequest(selectedRequest.value.request_id, {
+      firstname: selectedRequest.value.firstname,
+      lastname: selectedRequest.value.lastname,
+      email: selectedRequest.value.email,
       status: selectedRequest.value.status,
       scheduled_date: selectedRequest.value.scheduled_date,
       notes: selectedRequest.value.notes,

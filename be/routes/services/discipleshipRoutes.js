@@ -12,6 +12,7 @@ const { authenticateToken, checkAdminRole } = require('../../middleware/authMidd
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const archiveRecord = require('../../dbHelpers/archiveRecords').archiveRecord;
 const { query } = require('../../database/db');
+const emailHelper = require('../../dbHelpers/emailHelper');
 
 // =============================================================================
 // ERROR TRAPPING CONSTANTS
@@ -19,8 +20,8 @@ const { query } = require('../../database/db');
 
 // Valid status transitions: Current Status → [Allowed Next Statuses]
 const VALID_STATUS_TRANSITIONS = {
-    'Pending': ['In Progress', 'Completed', 'Cancelled'],
-    'In Progress': ['Completed', 'Cancelled'],
+    'Pending': ['Scheduled', 'Completed', 'Cancelled'],
+    'Scheduled': ['Completed', 'Cancelled'],
     'Completed': ['Promoted'], // Can only be promoted, not cancelled
     'Promoted': [], // Terminal state - no transitions allowed
     'Cancelled': [] // Terminal state - no transitions allowed
@@ -204,7 +205,7 @@ async function checkDuplicates(email, excludeRequestId = null) {
         const status = rows[0].status;
         const requestId = rows[0].request_id;
         
-        if (['Pending', 'In Progress'].includes(status)) {
+        if (['Pending', 'Scheduled'].includes(status)) {
             return {
                 valid: false,
                 message: `A discipleship request with this email already exists (${requestId}) with status "${status}". Please check the existing request instead of creating a duplicate.`
@@ -223,6 +224,68 @@ async function checkDuplicates(email, excludeRequestId = null) {
     }
     
     return { valid: true };
+}
+
+// =============================================================================
+// EMAIL HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Send status notification email
+ * @param {object} data - Email data
+ */
+async function sendStatusNotificationEmail({ email, firstname, lastname, status, scheduled_date, pastor_name, location }) {
+    const subject = `Discipleship Request Update - ${status}`;
+    let message = '';
+    
+    switch (status) {
+        case 'Scheduled':
+            message = `
+                <h2>Hello ${firstname} ${lastname},</h2>
+                <p>Good news! Your discipleship session has been scheduled.</p>
+                <p><strong>Details:</strong></p>
+                <ul>
+                    <li><strong>Date:</strong> ${new Date(scheduled_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</li>
+                    <li><strong>Pastor:</strong> ${pastor_name}</li>
+                    <li><strong>Location:</strong> ${location}</li>
+                </ul>
+                <p>Please arrive 15 minutes before your scheduled time.</p>
+                <p>God bless you!</p>
+            `;
+            break;
+            
+        case 'Completed':
+            message = `
+                <h2>Congratulations ${firstname} ${lastname}!</h2>
+                <p>You have successfully completed your discipleship session.</p>
+                <p>We encourage you to continue your spiritual journey by joining our water baptism program.</p>
+                <p>May God bless you abundantly!</p>
+            `;
+            break;
+            
+        case 'Cancelled':
+            message = `
+                <h2>Hello ${firstname} ${lastname},</h2>
+                <p>We regret to inform you that your discipleship session has been cancelled.</p>
+                <p>If you would like to reschedule, please submit a new request or contact our church office.</p>
+                <p>God bless you!</p>
+            `;
+            break;
+            
+        default:
+            message = `
+                <h2>Hello ${firstname} ${lastname},</h2>
+                <p>Your discipleship request status has been updated to: <strong>${status}</strong></p>
+                <p>Thank you for your patience!</p>
+            `;
+    }
+    
+    try {
+        await emailHelper.sendEmail(email, subject, message);
+        console.log(`Status notification email sent to ${email} for status: ${status}`);
+    } catch (emailError) {
+        console.error('Failed to send status notification email:', emailError);
+    }
 }
 
 // =============================================================================
@@ -402,6 +465,27 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 user_name: req.user?.firstname || null,
                 user_position: req.user?.position || null
             });
+            
+            // Send email notification for status change
+            if (email) {
+                let pastor_name = '';
+                if (pastor_id) {
+                    const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                    if (pastorRows.length > 0) {
+                        pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                    }
+                }
+                
+                await sendStatusNotificationEmail({
+                    email,
+                    firstname,
+                    lastname,
+                    status,
+                    scheduled_date,
+                    pastor_name,
+                    location
+                });
+            }
         }
         
         // Log scheduling
@@ -421,6 +505,27 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 user_name: req.user?.firstname || null,
                 user_position: req.user?.position || null
             });
+            
+            // Send email notification for scheduling if status is Scheduled
+            if (email && status === 'Scheduled') {
+                let pastor_name = '';
+                if (pastor_id) {
+                    const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                    if (pastorRows.length > 0) {
+                        pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                    }
+                }
+                
+                await sendStatusNotificationEmail({
+                    email,
+                    firstname,
+                    lastname,
+                    status: 'Scheduled',
+                    scheduled_date,
+                    pastor_name,
+                    location
+                });
+            }
         }
         
         res.json(result);
