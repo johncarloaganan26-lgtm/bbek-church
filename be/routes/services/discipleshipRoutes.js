@@ -469,10 +469,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
             // Send email notification for status change
             if (email) {
                 let pastor_name = '';
-                if (pastor_id) {
-                    const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
-                    if (pastorRows.length > 0) {
-                        pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                if (pastor_id && typeof pastor_id === 'number') {
+                    try {
+                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                        if (pastorRows.length > 0) {
+                            pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                        }
+                    } catch (e) {
+                        console.error('Error fetching pastor:', e);
                     }
                 }
                 
@@ -509,10 +513,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
             // Send email notification for scheduling if status is Scheduled
             if (email && status === 'Scheduled') {
                 let pastor_name = '';
-                if (pastor_id) {
-                    const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
-                    if (pastorRows.length > 0) {
-                        pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                if (pastor_id && typeof pastor_id === 'number') {
+                    try {
+                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                        if (pastorRows.length > 0) {
+                            pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                        }
+                    } catch (e) {
+                        console.error('Error fetching pastor:', e);
                     }
                 }
                 

@@ -185,7 +185,7 @@
                 v-model="selectedRequest.pastor_id"
                 :items="pastors"
                 item-title="name"
-                item-value="name"
+                item-value="acc_id"
                 label="Assigned Pastor"
                 variant="outlined"
                 density="compact"
