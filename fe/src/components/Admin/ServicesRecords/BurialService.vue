@@ -467,6 +467,7 @@ const editService = async (service) => {
         location: fullService.location,
         pastor_name: fullService.pastor_name,
         service_date: fullService.service_date,
+        preferred_service_time: fullService.preferred_service_time,
         status: fullService.status
       }
       burialServiceDialog.value = true

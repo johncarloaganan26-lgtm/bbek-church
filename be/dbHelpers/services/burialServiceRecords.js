@@ -438,7 +438,7 @@ async function getAllBurialServices(options = {}) {
     let countSql = 'SELECT COUNT(*) as total FROM tbl_burialservice bs INNER JOIN tbl_members m ON bs.member_id = m.member_id';
     let countParams = [];
 
-    let sql = `SELECT bs.burial_id, bs.member_id, bs.requester_name, bs.requester_email, bs.relationship, bs.location, bs.pastor_name, bs.service_date, bs.status, bs.date_created, bs.deceased_name, bs.deceased_birthdate, bs.date_death, m.firstname, m.lastname, m.middle_name, m.email as member_email, CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname FROM tbl_burialservice bs LEFT JOIN tbl_members m ON bs.member_id = m.member_id`;
+    let sql = `SELECT bs.burial_id, bs.member_id, bs.requester_name, bs.requester_email, bs.relationship, bs.location, bs.pastor_name, bs.service_date, bs.preferred_service_time, bs.status, bs.date_created, bs.deceased_name, bs.deceased_birthdate, bs.date_death, m.firstname, m.lastname, m.middle_name, m.email as member_email, CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname FROM tbl_burialservice bs LEFT JOIN tbl_members m ON bs.member_id = m.member_id`;
     const params = [];
 
     const whereConditions = [];
