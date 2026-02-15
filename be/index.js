@@ -81,15 +81,7 @@ const IS_DEVELOPMENT = NODE_ENV === 'development';
 //   - FRONTEND_URL (single URL): "https://app.com"
 //   - Default (development): localhost ports
 const getAllowedOrigins = () => {
-  // Check for FRONTEND_URL (single URL) - cloud production
-  if (process.env.FRONTEND_URL1 || process.env.FRONTEND_URL2) {
-    const origins = [];
-    if (process.env.FRONTEND_URL1) origins.push(process.env.FRONTEND_URL1.trim());
-    if (process.env.FRONTEND_URL2) origins.push(process.env.FRONTEND_URL2.trim());
-    return origins;
-  }
-
-  // Default: localhost for development OR add production domain
+  // Default: localhost for development AND production domain
   const defaultOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
