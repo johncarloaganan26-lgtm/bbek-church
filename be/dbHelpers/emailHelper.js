@@ -885,7 +885,7 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       message: 'Burial service request notification email sent successfully',

@@ -15,6 +15,7 @@
     <router-view />
     <Footer v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <SocialMediaIcons v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
+    <MembershipJourneyBanner v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <!-- Announcement Display for all users -->
     <AnnouncementDisplayDialog
       v-for="announcement in activeAnnouncements"
@@ -35,6 +36,7 @@ import { checkAccessTokenValidity } from '@/utils/tokenValidation'
 import Navigation from './components/LandingPage/Navigation.vue'
 import Footer from './components/LandingPage/Footer.vue'
 import SocialMediaIcons from './components/LandingPage/SocialMediaIcons.vue'
+import MembershipJourneyBanner from './components/LandingPage/MembershipJourneyBanner.vue'
 
 const announcementStore = useAnnouncementStore()
 const activeAnnouncements = ref([])
