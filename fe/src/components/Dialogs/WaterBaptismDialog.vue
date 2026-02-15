@@ -306,6 +306,7 @@
             :key="option.value"
             :label="option.name"
             :value="option.value"
+            :disabled="option.value === 'completed' && isFutureDate"
           />
         </el-select>
       </el-form-item>
@@ -549,6 +550,15 @@ const statusOptions = [
   { name: 'Completed', value: 'completed' },
   { name: 'Cancelled', value: 'cancelled' }
 ]
+
+const isFutureDate = computed(() => {
+  if (!formData.baptism_date) return true
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const scheduledDate = new Date(formData.baptism_date)
+  scheduledDate.setHours(0, 0, 0, 0)
+  return scheduledDate > today
+})
 
 // Form data
 const formData = reactive({

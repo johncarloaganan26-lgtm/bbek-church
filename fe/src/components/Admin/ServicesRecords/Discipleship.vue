@@ -209,7 +209,7 @@
 
           <v-select
             v-model="selectedRequest.status"
-            :items="['Pending', 'Scheduled', 'Completed', 'Cancelled']"
+            :items="statusItems"
             label="Status"
             variant="outlined"
             density="compact"
@@ -341,6 +341,25 @@ const toggleSelectAll = (value) => {
     selectedRequests.value = [];
   }
 };
+
+const statusItems = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let isFutureOrMissing = true;
+  if (selectedRequest.value.scheduled_date) {
+    const scheduledDate = new Date(selectedRequest.value.scheduled_date);
+    scheduledDate.setHours(0, 0, 0, 0);
+    isFutureOrMissing = scheduledDate > today;
+  }
+  
+  return [
+    { title: 'Pending', value: 'Pending' },
+    { title: 'Scheduled', value: 'Scheduled' },
+    { title: 'Completed', value: 'Completed', props: { disabled: isFutureOrMissing } },
+    { title: 'Cancelled', value: 'Cancelled' }
+  ];
+});
 
 const clearSelection = () => {
   selectedRequests.value = [];

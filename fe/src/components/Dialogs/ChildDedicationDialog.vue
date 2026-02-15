@@ -574,6 +574,7 @@
             :key="opt.value"
             :label="opt.label"
             :value="opt.value"
+            :disabled="opt.value === 'completed' && isFutureDate"
           />
         </el-select>
       </el-form-item>
@@ -1019,6 +1020,15 @@ const statusOptions = [
   { label: 'Completed', value: 'completed' },
   { label: 'Cancelled', value: 'cancelled' }
 ]
+
+const isFutureDate = computed(() => {
+  if (!formData.preferred_dedication_date) return true
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const scheduledDate = new Date(formData.preferred_dedication_date)
+  scheduledDate.setHours(0, 0, 0, 0)
+  return scheduledDate > today
+})
 
 // Validation rules
 const rules = {

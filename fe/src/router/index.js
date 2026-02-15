@@ -41,12 +41,8 @@ import SendPrayer from '../components/LandingPage/BeOneOfUs/SendPrayer.vue'
 import About from '../components/LandingPage/About/About.vue'
 import AboutGrid from '../components/LandingPage/About/AboutGrid.vue'
 import AboutUs from '../components/LandingPage/About/AboutUs.vue'
-import Vision from '../components/LandingPage/About/Vision.vue'
-import Mission from '../components/LandingPage/About/Mission.vue'
 import Beliefs from '../components/LandingPage/About/Beliefs.vue'
 import Leadership from '../components/LandingPage/About/Leadership.vue'
-import LeadersAndOfficers from '../components/LandingPage/About/LeadersAndOfficers.vue'
-import Officers from '../components/LandingPage/About/Officers.vue'
 import DepartmentOfficersAbout from '../components/LandingPage/About/DepartmentOfficers.vue'
 // Events Pages
 import Event from '../components/LandingPage/Events/Event.vue'
@@ -451,7 +447,6 @@ router.beforeEach((to, from, next) => {
     'Give',
     'AllEvents',
     'AllEventsRoute',
-    'AllEventsOfUser',
     'LearnMoreEvent',
     'Live',
     'Ministry',

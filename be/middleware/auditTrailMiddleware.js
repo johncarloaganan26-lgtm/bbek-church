@@ -94,7 +94,7 @@ const auditTrailMiddleware = async (req, res, next) => {
   // For DELETE and UPDATE operations, try to capture the record data before it's modified/deleted
   // Only capture data in development mode to avoid performance overhead in production
   const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-  
+
   if (!IS_PRODUCTION && (req.method === 'DELETE' || req.method === 'PUT')) {
     // Extract ID from URL path for routes like /api/church-records/members/deleteMember/123 or /updateMember/123
     const path = req.path || '';
@@ -160,7 +160,7 @@ const auditTrailMiddleware = async (req, res, next) => {
   let logged = false;
 
   // Function to log the action
-  const logAction = async (actionData) => {
+  const logAction = async (actionData, responseData = null) => {
     if (logged) return; // Prevent duplicate logging
     logged = true;
 
@@ -209,7 +209,7 @@ const auditTrailMiddleware = async (req, res, next) => {
 
               // Include reason if provided
               const reasonText = archive.reason ? ` Reason: ${archive.reason}` : '';
-              
+
               // Create user-friendly description with key info
               let userFriendlyInfo = '';
               if (cleanArchivedData.firstname || cleanArchivedData.lastname) {
@@ -222,7 +222,7 @@ const auditTrailMiddleware = async (req, res, next) => {
               } else if (cleanArchivedData.original_id) {
                 userFriendlyInfo = ` (ID: ${cleanArchivedData.original_id})`;
               }
-              
+
               enhancedDescription = `Deleted archived ${tableName} record${userFriendlyInfo}${reasonText}`;
             } else {
               // Fallback: try to query the database (though archive might be deleted)
@@ -311,6 +311,28 @@ const auditTrailMiddleware = async (req, res, next) => {
       }
 
 
+      const isFailed = res.statusCode >= 400;
+      let finalDescription = req.auditDescription || enhancedDescription;
+
+      // Prepend failure status to description if it failed
+      if (isFailed) {
+        finalDescription = `FAILED ATTEMPT: ${finalDescription}`;
+      }
+
+      // Extract error message from response data if it's a failure
+      let errorMessage = null;
+      if (isFailed) {
+        if (responseData && typeof responseData === 'object') {
+          errorMessage = responseData.message || responseData.error || responseData.details || `HTTP ${res.statusCode}`;
+          // If message is an object or array, stringify it
+          if (typeof errorMessage === 'object') {
+            errorMessage = JSON.stringify(errorMessage);
+          }
+        } else {
+          errorMessage = `HTTP ${res.statusCode}`;
+        }
+      }
+
       // Use explicit overrides if provided in the request object
       const logData = {
         user_id: userInfo.account?.acc_id || userInfo.acc_id,
@@ -319,13 +341,13 @@ const auditTrailMiddleware = async (req, res, next) => {
         user_position: userInfo.account?.position || userInfo.position || 'member',
         action_type: req.auditAction || actionData.action_type,
         module: req.auditModule || actionData.module,
-        description: truncateDescription(req.auditDescription || enhancedDescription),
+        description: truncateDescription(finalDescription),
         entity_type: req.auditEntityType || actionData.entity_type,
         entity_id: req.auditEntityId || actionData.entity_id,
         ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown',
         user_agent: null, // Hidden for privacy
-        status: res.statusCode >= 400 ? 'failed' : 'success',
-        error_message: res.statusCode >= 400 ? `HTTP ${res.statusCode}` : null,
+        status: isFailed ? 'failed' : 'success',
+        error_message: errorMessage,
         date_created: phTimestamp
       };
 
@@ -430,21 +452,21 @@ const auditTrailMiddleware = async (req, res, next) => {
           // Try to get meaningful name from request body
           const createName = data.name || data.title || data.firstname || data.email ||
             (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-            (entityId ? `#${entityId}` : '');
+            (entityId ? `ID ${entityId}` : '');
 
           // Add more context based on module
           let createContext = '';
           if (module === 'Members') {
-            createContext = data.email ? ` (Email: ${data.email})` : '';
+            createContext = data.email ? ` with email ${data.email}` : '';
           } else if (module === 'Events') {
-            createContext = data.event_date ? ` (Date: ${data.event_date})` : '';
+            createContext = data.event_date ? ` scheduled for ${data.event_date}` : '';
           } else if (module === 'Water Baptism') {
-            createContext = data.baptism_date ? ` (Date: ${data.baptism_date})` : '';
+            createContext = data.baptism_date ? ` set for ${data.baptism_date}` : '';
           }
 
-          let createDescription = `Created new ${entityName}${createName ? `: ${createName}` : ''}${createContext}`;
+          let createDescription = `Added a new ${entityName}${createName ? `: ${createName}` : ''}${createContext}.`;
 
-          // Add complete record data like DELETE does, but only for modules with create forms
+          // Add complete record data at the end for technical reference
           const modulesWithCreateForms = [
             'Members', 'Accounts', 'Events', 'Ministries', 'Departments',
             'Department Officers', 'Church Leaders', 'Tithes & Offerings',
@@ -453,7 +475,6 @@ const auditTrailMiddleware = async (req, res, next) => {
           ];
 
           if (modulesWithCreateForms.includes(module) && Object.keys(data).length > 0) {
-            // Format the complete data as JSON, excluding null/undefined values
             const cleanData = {};
             for (const [key, value] of Object.entries(data)) {
               if (value !== null && value !== undefined && value !== '') {
@@ -468,7 +489,7 @@ const auditTrailMiddleware = async (req, res, next) => {
             }
 
             if (Object.keys(cleanData).length > 0) {
-              createDescription += ` - Complete Data: ${truncateDescription(JSON.stringify(cleanData))}`;
+              createDescription += ` - Record Data: ${JSON.stringify(cleanData)}`;
             }
           }
 
@@ -478,98 +499,52 @@ const auditTrailMiddleware = async (req, res, next) => {
           // Try to get meaningful name from request body or use ID
           let updateName = '';
           if (module === 'Ministries') {
-            updateName = data.ministry_name || (entityId ? `#${entityId}` : '');
+            updateName = data.ministry_name || (entityId ? `ID ${entityId}` : '');
           } else if (module === 'Events') {
-            updateName = data.title || (entityId ? `#${entityId}` : '');
+            updateName = data.title || (entityId ? `ID ${entityId}` : '');
           } else {
             updateName = data.name || data.title || data.firstname || data.email ||
               (data.firstname && data.lastname ? `${data.firstname} ${data.lastname}` : null) ||
-              (entityId ? `#${entityId}` : '');
+              (entityId ? `ID ${entityId}` : '');
           }
 
-          // Add more context based on module
-          let updateContext = '';
-          if (module === 'Members') {
-            updateContext = data.email ? ` (Email: ${data.email})` : '';
-          } else if (module === 'Events') {
-            updateContext = data.start_date ? ` (Date: ${data.start_date})` : '';
-          } else if (module === 'Ministries') {
-            updateContext = data.schedule ? ` (Schedule: ${data.schedule})` : '';
-          }
+          let updateDescription = `Modified ${entityName}${updateName ? `: ${updateName}` : ''}.`;
 
-          let updateDescription = `Updated ${entityName}${updateName ? `: ${updateName}` : (entityId ? ` #${entityId}` : '')}${updateContext}`;
+          // Add summarized changes
+          const oldData = req.record_before_update;
+          const newData = data;
 
-          // Add before/after data for modules with edit forms
-          const modulesWithEditForms = [
-            'Members', 'Accounts', 'Events', 'Ministries', 'Departments',
-            'Department Officers', 'Church Leaders', 'Tithes & Offerings',
-            'Water Baptism', 'Burial Service', 'Child Dedication', 'Marriage Service',
-            'Approvals', 'Forms', 'Content Management'
-          ];
+          if (oldData && Object.keys(newData).length > 0) {
+            const changes = [];
+            for (const [key, newVal] of Object.entries(newData)) {
+              const oldVal = oldData[key];
+              // Skip if same or if it's a sensitive/system field
+              if (JSON.stringify(oldVal) === JSON.stringify(newVal) ||
+                ['updated_at', 'created_at', 'password', 'token'].includes(key)) continue;
 
-          if (modulesWithEditForms.includes(module)) {
-            // Get old data if available
-            const oldData = req.record_before_update;
-            const newData = data;
+              const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              changes.push(`${label} was changed from "${oldVal || 'None'}" to "${newVal || 'None'}"`);
+            }
 
-            if (oldData && Object.keys(newData).length > 0) {
-              // Format old data
-              const cleanOldData = {};
-              for (const [key, value] of Object.entries(oldData)) {
-                if (value !== null && value !== undefined && value !== '') {
-                  if (Buffer.isBuffer(value)) {
-                    cleanOldData[key] = value.toString('utf8');
-                  } else if (typeof value === 'object') {
-                    cleanOldData[key] = JSON.stringify(value);
-                  } else {
-                    cleanOldData[key] = value;
-                  }
-                }
-              }
-
-              // Format new data
-              const cleanNewData = {};
-              for (const [key, value] of Object.entries(newData)) {
-                if (value !== null && value !== undefined && value !== '') {
-                  if (Buffer.isBuffer(value)) {
-                    cleanNewData[key] = value.toString('utf8');
-                  } else if (typeof value === 'object') {
-                    cleanNewData[key] = JSON.stringify(value);
-                  } else {
-                    cleanNewData[key] = value;
-                  }
-                }
-              }
-
-              if (Object.keys(cleanOldData).length > 0 || Object.keys(cleanNewData).length > 0) {
-                updateDescription += ` - Before: ${JSON.stringify(cleanOldData)} | After: ${JSON.stringify(cleanNewData)}`;
-              }
-            } else if (Object.keys(newData).length > 0) {
-              // Fallback: just show new data if old data not available
-              const cleanData = {};
-              for (const [key, value] of Object.entries(newData)) {
-                if (value !== null && value !== undefined && value !== '') {
-                  if (Buffer.isBuffer(value)) {
-                    cleanData[key] = value.toString('utf8');
-                  } else if (typeof value === 'object') {
-                    cleanData[key] = JSON.stringify(value);
-                  } else {
-                    cleanData[key] = value;
-                  }
-                }
-              }
-
-              if (Object.keys(cleanData).length > 0) {
-                updateDescription += ` - Updated Data: ${JSON.stringify(cleanData)}`;
+            if (changes.length > 0) {
+              if (changes.length <= 3) {
+                updateDescription = `Updated ${entityName}${updateName ? `: ${updateName}` : ''}. Changes: ${changes.join('; ')}.`;
+              } else {
+                updateDescription = `Updated ${entityName}${updateName ? `: ${updateName}` : ''}. Total of ${changes.length} fields were modified.`;
               }
             }
+
+            // Always keep the full JSON at the end for the structured view
+            updateDescription += ` - Before: ${JSON.stringify(oldData)} | After: ${JSON.stringify(newData)}`;
+          } else if (Object.keys(newData).length > 0) {
+            updateDescription += ` - Updated Data: ${JSON.stringify(newData)}`;
           }
 
           return updateDescription;
 
         case 'DELETE':
           // For delete, show complete record data like archives do
-          let deleteDescription = `Deleted ${entityName}`;
+          let deleteDescription = `Permanently removed ${entityName}`;
 
           // Add identifying information
           const identifiers = [];
@@ -578,20 +553,18 @@ const auditTrailMiddleware = async (req, res, next) => {
           else if (data.firstname && data.lastname) identifiers.push(`${data.firstname} ${data.lastname}`);
           else if (data.firstname) identifiers.push(data.firstname);
           else if (data.email) identifiers.push(data.email);
-          else if (entityId) identifiers.push(`ID: ${entityId}`);
+          else if (entityId) identifiers.push(`ID ${entityId}`);
 
           if (identifiers.length > 0) {
-            deleteDescription += ` (${identifiers[0]})`;
+            deleteDescription += `: ${identifiers[0]}`;
           }
 
-          // Add module context
           if (module && module !== 'Unknown Module') {
-            deleteDescription += ` from ${module}`;
+            deleteDescription += ` from ${module}.`;
           }
 
-          // Add complete record data if available (like archives)
+          // Keep JSON at the end
           if (Object.keys(data).length > 0) {
-            // Format the complete data as JSON, excluding null/undefined values
             const cleanData = {};
             for (const [key, value] of Object.entries(data)) {
               if (value !== null && value !== undefined && value !== '') {
@@ -606,7 +579,7 @@ const auditTrailMiddleware = async (req, res, next) => {
             }
 
             if (Object.keys(cleanData).length > 0) {
-              deleteDescription += ` - Complete Data: ${truncateDescription(JSON.stringify(cleanData))}`;
+              deleteDescription += ` - Removed Data: ${JSON.stringify(cleanData)}`;
             }
           }
 
@@ -653,33 +626,36 @@ const auditTrailMiddleware = async (req, res, next) => {
           // More detailed view descriptions
           let viewDetails = [];
           if (entityId) {
-            viewDetails.push(`specific ${entityName} (ID: ${entityId})`);
+            viewDetails.push(`a specific ${entityName} (ID ${entityId})`);
           } else if (query.search) {
-            viewDetails.push(`search results for "${query.search}"`);
+            viewDetails.push(`the search results for "${query.search}"`);
           } else if (query.page && query.pageSize) {
-            viewDetails.push(`page ${query.page} (${query.pageSize} items per page)`);
+            viewDetails.push(`page ${query.page} of the list`);
           } else {
-            viewDetails.push('list/overview');
+            viewDetails.push('the overview list');
           }
 
           // Add filters
           const filters = [];
-          if (query.ageRange && query.ageRange !== 'All Ages') filters.push(`age: ${query.ageRange}`);
+          if (query.ageRange && query.ageRange !== 'All Ages') filters.push(`age range: ${query.ageRange}`);
           if (query.gender && query.gender !== 'All Genders') filters.push(`gender: ${query.gender}`);
-          if (query.joinMonth && query.joinMonth !== 'All Months') filters.push(`joined: ${query.joinMonth}`);
+          if (query.joinMonth && query.joinMonth !== 'All Months') filters.push(`joining month: ${query.joinMonth}`);
           if (query.start_date || query.end_date) filters.push(`date range: ${query.start_date || 'start'} to ${query.end_date || 'end'}`);
 
+          let viewDesc = `Accessed ${viewDetails.join(' ')} in ${module}`;
           if (filters.length > 0) {
-            viewDetails.push(`with filters: ${filters.join(', ')}`);
+            viewDesc += ` with active filters: ${filters.join(', ')}.`;
+          } else {
+            viewDesc += `.`;
           }
 
-          return `Viewed ${module} ${viewDetails.join(' - ')}`;
+          return viewDesc;
 
         case 'LOGIN':
-          return `User logged in successfully`;
+          return `User logged in to their account.`;
 
         case 'LOGOUT':
-          return `User logged out`;
+          return `User logged out of the session.`;
 
         default:
           return `${action} ${entityName}${entityId ? ` #${entityId}` : ''}`;
@@ -767,13 +743,21 @@ const auditTrailMiddleware = async (req, res, next) => {
   // Intercept response methods to log after response is sent
   res.json = function (data) {
     const actionDetails = determineActionDetails();
-    logAction(actionDetails);
+    logAction(actionDetails, data);
     return originalJson.call(this, data);
   };
 
   res.send = function (data) {
     const actionDetails = determineActionDetails();
-    logAction(actionDetails);
+    let responseData = data;
+    try {
+      if (typeof data === 'string') {
+        responseData = JSON.parse(data);
+      }
+    } catch (e) {
+      // Not JSON
+    }
+    logAction(actionDetails, responseData);
     return originalSend.call(this, data);
   };
 

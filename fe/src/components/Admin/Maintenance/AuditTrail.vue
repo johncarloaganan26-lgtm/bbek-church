@@ -166,10 +166,23 @@
 
         <el-table-column
           prop="description"
-          label="Description"
-          min-width="200"
-          show-overflow-tooltip
-        />
+          label="Activity Details"
+          min-width="300"
+        >
+          <template #default="{ row }">
+            <div class="description-cell">
+              <span class="human-description">{{ getCleanDescription(row.description) }}</span>
+              <el-tag 
+                v-if="row.description.includes('FAILED ATTEMPT:')" 
+                type="danger" 
+                size="small" 
+                class="ml-2"
+              >
+                Failed
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
 
         <el-table-column
           prop="date_created"
@@ -239,7 +252,6 @@
     <!-- Log Details Dialog -->
     <el-dialog
       v-model="detailsDialogVisible"
-      :title="`Log Details - ${selectedLog?.action_type || ''}`"
       width="800px"
       :before-close="handleDialogClose"
       class="log-details-dialog"
@@ -247,10 +259,8 @@
       <template #header>
         <div class="dialog-header">
           <div class="log-summary">
-            <el-tag :type="getActionTagType(selectedLog?.action_type)" size="large">
-              {{ selectedLog?.action_type }}
-            </el-tag>
-            <span class="module-name">{{ selectedLog?.module }}</span>
+            <el-icon class="mr-2" :color="getActionColor(selectedLog?.action_type)"><View /></el-icon>
+            <span class="module-name">Details for {{ selectedLog?.module || 'Action' }}</span>
           </div>
         </div>
       </template>
@@ -316,14 +326,24 @@
           </el-descriptions-item>
           <el-descriptions-item label="Description" :span="2">
             <div class="description-wrapper">
-              <div class="description-toolbar">
+              <div v-if="selectedLog.description.includes('FAILED ATTEMPT:')" class="failure-indicator mb-2">
+                <el-tag type="danger" effect="dark" size="small">
+                  <el-icon><Warning /></el-icon> FAILED ATTEMPT
+                </el-tag>
+              </div>
+
+              <div class="description-header mb-2">
+                <span class="plain-description">{{ parsedDescription.text }}</span>
+              </div>
+
+              <div class="description-toolbar mt-2">
                 <el-button-group>
                   <el-button 
-                    :type="showRawDescription ? 'default' : 'primary'" 
+                    :type="!showRawDescription ? 'primary' : 'default'" 
                     size="small"
                     @click="showRawDescription = false"
                   >
-                    <el-icon><Document /></el-icon> Formatted
+                    <el-icon><Document /></el-icon> Structured
                   </el-button>
                   <el-button 
                     :type="showRawDescription ? 'primary' : 'default'" 
@@ -336,17 +356,54 @@
                 <el-button 
                   type="primary" 
                   size="small"
+                  variant="text"
                   @click="copyDescription"
                   :icon="CopyDocument"
                 >
                   Copy
                 </el-button>
               </div>
+
               <div class="description-content">
                 <pre v-if="showRawDescription" class="raw-description">{{ selectedLog.description }}</pre>
-                <div v-else class="formatted-description">
-                  <pre v-if="isJsonDescription(selectedLog.description)" class="json-description">{{ formatJsonDescription(selectedLog.description) }}</pre>
-                  <span v-else class="plain-description">{{ selectedLog.description }}</span>
+                <div v-else class="structured-content">
+                  <!-- Update Diff View -->
+                  <div v-if="parsedDescription.type === 'update'" class="diff-view">
+                    <div class="section-label mb-2">Changes Detected:</div>
+                    <el-table :data="parsedDescription.diff" border size="small" stripe class="diff-table">
+                      <el-table-column prop="field" label="Field" width="150" font-weight="bold">
+                        <template #default="{ row }">
+                          <code class="field-name">{{ row.field }}</code>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="From" class-name="old-value-col">
+                        <template #default="{ row }">
+                          <span class="old-value">{{ row.old || '—' }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="To" class-name="new-value-col">
+                        <template #default="{ row }">
+                          <span class="new-value">{{ row.new || '—' }}</span>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+
+                  <!-- Data View -->
+                  <div v-else-if="parsedDescription.type === 'data'" class="data-view">
+                    <div class="section-label mb-2">{{ parsedDescription.label }}:</div>
+                    <pre class="json-description">{{ formatJson(parsedDescription.data) }}</pre>
+                  </div>
+
+                  <!-- Fallback to formatted JSON if plain string contains JSON -->
+                  <div v-else-if="isJsonDescription(selectedLog.description)" class="data-view">
+                    <pre class="json-description">{{ formatJsonDescription(selectedLog.description) }}</pre>
+                  </div>
+                  
+                  <!-- Plain fallback -->
+                  <div v-else-if="!parsedDescription.text.includes(selectedLog.description)" class="plain-data-fallback mt-2">
+                    <span class="text-caption text-grey">Additional info exists in raw view.</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -398,7 +455,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Filter, Refresh, Download, View, Printer, Close, CopyDocument, User, Clock, Location, Document } from '@element-plus/icons-vue'
+import { Filter, Refresh, Download, View, Printer, Close, CopyDocument, User, Clock, Location, Document, DocumentCopy, Warning } from '@element-plus/icons-vue'
 import { useAuditTrailStore } from '@/stores/auditTrailStore'
 
 // Store
@@ -712,6 +769,32 @@ ${selectedLog.value.error_message}` : ''}
   }
 }
 
+const getCleanDescription = (description) => {
+  if (!description) return ''
+  // Remove "FAILED ATTEMPT: " if present
+  let clean = description.replace('FAILED ATTEMPT: ', '')
+  // Split at " - Record Data", " - Complete Data", " - Before:", etc.
+  const splitters = [' - Record Data:', ' - Complete Data:', ' - Before:', ' - Updated Data:', ' - Removed Data:']
+  for (const s of splitters) {
+    if (clean.includes(s)) {
+      clean = clean.split(s)[0]
+    }
+  }
+  return clean.trim()
+}
+
+const getActionColor = (type) => {
+  const colors = {
+    'CREATE': '#67c23a',
+    'UPDATE': '#409eff',
+    'DELETE': '#f56c6c',
+    'VIEW': '#909399',
+    'LOGIN': '#e6a23c',
+    'LOGOUT': '#909399'
+  }
+  return colors[type] || '#409eff'
+}
+
 const formatDateTime = (dateString) => {
   if (!dateString) return ''
   const date = new Date(dateString)
@@ -760,14 +843,15 @@ const handleCurrentChange = (newPage) => {
 
 const isJsonDescription = (description) => {
   if (!description) return false
-  // Check if description contains JSON data (Complete Data: {...})
-  return description.includes('Complete Data: {')
+  return description.includes('Complete Data: {') || 
+         description.includes('Updated Data: {') || 
+         description.includes('Before: {')
 }
 
 const formatJsonDescription = (description) => {
   if (!description) return ''
-  // Extract and pretty-print the JSON part
-  const jsonMatch = description.match(/Complete Data: (\{.*\})$/)
+  const jsonMatch = description.match(/(?:Complete Data|Updated Data|record): (\{.*\})$/) || 
+                    description.match(/Before: (\{.*\})/)
   if (jsonMatch) {
     try {
       const jsonData = JSON.parse(jsonMatch[1])
@@ -778,6 +862,75 @@ const formatJsonDescription = (description) => {
   }
   return description
 }
+
+const formatJson = (obj) => {
+  try {
+    return JSON.stringify(obj, null, 2)
+  } catch (e) {
+    return String(obj)
+  }
+}
+
+const parsedDescription = computed(() => {
+  const description = selectedLog.value?.description
+  if (!description) return { text: '', type: 'plain' }
+
+  // 1. Check for update diff pattern
+  const updateMatch = description.match(/Before: (\{.*\}) \| After: (\{.*\})$/)
+  if (updateMatch) {
+    try {
+      const before = JSON.parse(updateMatch[1])
+      const after = JSON.parse(updateMatch[2])
+      const text = description.split(' - Before:')[0].replace('FAILED ATTEMPT: ', '')
+      
+      // Calculate diff
+      const diff = []
+      const allKeys = new Set([...Object.keys(before), ...Object.keys(after)])
+      
+      allKeys.forEach(key => {
+        // Skip some system fields
+        if (['created_at', 'updated_at', 'id', 'date_created'].includes(key)) return
+        
+        const oldVal = before[key]
+        const newVal = after[key]
+        
+        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+          diff.push({
+            field: key.split('_').map(word => word.charAt(0)).join('').toUpperCase() === key ? key : key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            old: oldVal,
+            new: newVal
+          })
+        }
+      })
+
+      return { text, type: 'update', diff }
+    } catch (e) {
+      console.error('Error parsing update diff:', e)
+    }
+  }
+
+  // 2. Check for single JSON block patterns
+  const patterns = [
+    { label: 'Complete Data', regex: /Complete Data: (\{.*\})$/ },
+    { label: 'Updated Data', regex: /Updated Data: (\{.*\})$/ },
+    { label: 'Record Data', regex: /record: (\{.*\})$/ }
+  ]
+
+  for (const p of patterns) {
+    const match = description.match(p.regex)
+    if (match) {
+      try {
+        const data = JSON.parse(match[1])
+        const text = description.split(new RegExp(` - ${p.label}|: ${p.label}`))[0].replace('FAILED ATTEMPT: ', '')
+        return { text, type: 'data', data, label: p.label }
+      } catch (e) {}
+    }
+  }
+
+  // Clean text for plain display
+  const cleanText = description.replace('FAILED ATTEMPT: ', '')
+  return { text: cleanText, type: 'plain' }
+})
 
 // Pagination handlers
 const handleSizeChange = (size) => {
@@ -810,10 +963,6 @@ watch(filters.value, () => {
 
 .w-100 {
   width: 100%;
-}
-
-.text-break {
-  word-break: break-all;
 }
 
 .font-weight-medium {
@@ -893,86 +1042,88 @@ watch(filters.value, () => {
   word-break: break-all;
 }
 
-.description-wrapper {
-  width: 100%;
-}
-
-.description-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.description-content {
-  width: 100%;
-  max-width: 100%;
-}
-
-.raw-description {
-  background-color: #1e1e1e;
-  color: #d4d4d4;
-  border-radius: 4px;
-  padding: 12px;
-  margin: 0;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-x: auto;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.formatted-description {
-  width: 100%;
-}
-
-.plain-description {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #303133;
-}
-
-.error-message {
-  width: 100%;
-}
-
-.raw-data-section {
-  margin-top: 16px;
-}
-
-.raw-data-section code {
-  background-color: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-}
-
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
 }
 
-.description-item :deep(.el-descriptions__content) {
-  max-width: none;
+/* Descriptions Layout */
+.description-cell {
+  line-height: 1.4;
 }
 
-.description-item :deep(.el-descriptions__content) {
-  max-width: none;
+.human-description {
+  font-weight: 500;
+  color: #303133;
 }
 
-.description-content {
+.section-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #606266;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.failure-indicator {
+  display: inline-block;
+}
+
+.description-header {
+  border-bottom: 1px solid #ebeef5;
+  padding-bottom: 8px;
+}
+
+.plain-description {
+  font-size: 15px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.structured-content {
+  margin-top: 8px;
+}
+
+.diff-table {
   width: 100%;
-  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.field-name {
+  color: #409eff;
+  background-color: #f0f9eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+}
+
+.old-value {
+  color: #f56c6c;
+  text-decoration: line-through;
+  font-size: 13px;
+}
+
+.new-value {
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.old-value-col {
+  background-color: #fff5f5 !important;
+}
+
+.new-value-col {
+  background-color: #f0f9eb !important;
 }
 
 .json-description {
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+  border: 1px solid #e4e7ed;
+  color: #303133;
   border-radius: 4px;
   padding: 12px;
   margin: 0;
@@ -981,11 +1132,21 @@ watch(filters.value, () => {
   line-height: 1.4;
   white-space: pre-wrap;
   word-wrap: break-word;
-  overflow-x: auto;
+}
+
+.raw-description {
+  background-color: #2b2b2b;
+  color: #a9b7c6;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 12px;
   max-height: 400px;
   overflow-y: auto;
-  width: 100%;
-  box-sizing: border-box;
+}
+
+.raw-date {
+  font-family: monospace;
+  opacity: 0.7;
 }
 
 /* Ensure dialog doesn't overflow viewport */
