@@ -341,8 +341,68 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+  .membership-journey-banner {
+    bottom: 0;
+    padding: 0;
+  }
+
   .banner-glass-container {
-    padding: 20px 16px;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 16px 32px;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .header-title {
+    font-size: 1.25rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.8rem;
+    padding: 0 10px;
+  }
+
+  .step-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .step-label {
+    font-size: 0.7rem;
+  }
+
+  .step-hint {
+    font-size: 0.6rem;
+    top: -22px;
+  }
+
+  .close-btn {
+    top: 10px;
+    right: 10px;
+    width: 44px; /* Better touch target for mobile */
+    height: 44px;
+    background: rgba(0, 0, 0, 0.08); /* Slightly clearer on mobile */
+  }
+
+  .cta-btn {
+    width: 100%;
+    height: 48px !important; /* Proper mobile button height */
+    padding: 0 !important;
+  }
+
+  .journey-steps {
+    margin: 15px 0 20px;
+  }
+}
+
+@media (max-height: 600px) and (max-width: 480px) {
+  .banner-glass-container {
+    padding: 16px 16px 20px;
+  }
+  .journey-steps {
+    margin: 5px 0 10px;
+  }
+  .header-section {
+    margin-bottom: 8px !important;
   }
 }
 </style>
