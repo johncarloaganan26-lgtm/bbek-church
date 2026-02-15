@@ -77,10 +77,8 @@
               {{ menu.label }}
             </el-button>
           </template>
-        </div>
-
-        <!-- Login Section (separate from menu) -->
-        <div class="login-section">
+          
+          <!-- Login Button -->
           <el-button
             v-if="showLoginButton"
             :type="'primary'"
@@ -757,7 +755,7 @@ const handleLogout = async () => {
 }
 
 .logo-title {
-  font-size: 1.25rem;
+  font-size: 1.75rem;
   font-weight: bold;
   color: #424242;
   margin: 0;
@@ -766,7 +764,7 @@ const handleLogout = async () => {
 }
 
 .logo-subtitle {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #757575;
   margin: 0;
@@ -778,19 +776,15 @@ const handleLogout = async () => {
 .desktop-menu {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex: 1;
-  margin: 0 40px;
-  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .menu-button {
-  padding: 8px 16px;
+  margin: 0 4px;
   text-transform: capitalize;
   transition: all 0.3s ease;
   color: #424242;
-  font-size: 15px;
-  font-weight: 500;
 }
 
 .menu-button:hover {
@@ -809,17 +803,8 @@ const handleLogout = async () => {
 }
 
 .login-button {
-  margin-left: 0;
+  margin-left: 16px;
   color: white;
-}
-
-/* Login Section */
-.login-section {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  padding-right: 24px;
 }
 
 /* User Menu */

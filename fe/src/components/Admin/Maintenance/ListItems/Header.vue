@@ -52,7 +52,7 @@
       </div>
       <div class="item-action">
         <el-input
-          v-model="headerData.fullName"
+          v-model="headerData.fullname"
           size="small"
           style="max-width: 300px;"
         ></el-input>
