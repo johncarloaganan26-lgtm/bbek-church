@@ -235,53 +235,17 @@ async function checkDuplicates(email, excludeRequestId = null) {
  * @param {object} data - Email data
  */
 async function sendStatusNotificationEmail({ email, firstname, lastname, status, scheduled_date, pastor_name, location }) {
-    const subject = `Discipleship Request Update - ${status}`;
-    let message = '';
-    
-    switch (status) {
-        case 'Scheduled':
-            message = `
-                <h2>Hello ${firstname} ${lastname},</h2>
-                <p>Good news! Your discipleship session has been scheduled.</p>
-                <p><strong>Details:</strong></p>
-                <ul>
-                    <li><strong>Date:</strong> ${new Date(scheduled_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</li>
-                    <li><strong>Pastor:</strong> ${pastor_name}</li>
-                    <li><strong>Location:</strong> ${location}</li>
-                </ul>
-                <p>Please arrive 15 minutes before your scheduled time.</p>
-                <p>God bless you!</p>
-            `;
-            break;
-            
-        case 'Completed':
-            message = `
-                <h2>Congratulations ${firstname} ${lastname}!</h2>
-                <p>You have successfully completed your discipleship session.</p>
-                <p>We encourage you to continue your spiritual journey by joining our water baptism program.</p>
-                <p>May God bless you abundantly!</p>
-            `;
-            break;
-            
-        case 'Cancelled':
-            message = `
-                <h2>Hello ${firstname} ${lastname},</h2>
-                <p>We regret to inform you that your discipleship session has been cancelled.</p>
-                <p>If you would like to reschedule, please submit a new request or contact our church office.</p>
-                <p>God bless you!</p>
-            `;
-            break;
-            
-        default:
-            message = `
-                <h2>Hello ${firstname} ${lastname},</h2>
-                <p>Your discipleship request status has been updated to: <strong>${status}</strong></p>
-                <p>Thank you for your patience!</p>
-            `;
-    }
-    
     try {
-        await emailHelper.sendEmail(email, subject, message);
+        await emailHelper.sendDiscipleshipDetails({
+            email,
+            status: status.toLowerCase(),
+            recipientName: `${firstname} ${lastname}`,
+            firstname,
+            lastname,
+            scheduled_date,
+            pastor_id: pastor_name,
+            location
+        });
         console.log(`Status notification email sent to ${email} for status: ${status}`);
     } catch (emailError) {
         console.error('Failed to send status notification email:', emailError);
@@ -827,6 +791,7 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
 
 // ADMIN: Bulk Mark Requests as Completed
 // Only "Scheduled" status can be marked as completed
+// Cannot complete future scheduled requests
 router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res) => {
     try {
         const { requestIds } = req.body;
@@ -841,6 +806,8 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
         
         const completedIds = [];
         const failedIds = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
         for (const request_id of requestIds) {
             try {
@@ -864,11 +831,42 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
                     continue;
                 }
                 
+                // Check if scheduled date is in the future
+                if (requestData.scheduled_date) {
+                    const scheduledDate = new Date(requestData.scheduled_date);
+                    scheduledDate.setHours(0, 0, 0, 0);
+                    
+                    if (scheduledDate > today) {
+                        failedIds.push({ 
+                            request_id, 
+                            error: 'Future scheduled date', 
+                            reason: `Cannot complete request scheduled for ${requestData.scheduled_date}. Please wait until the scheduled date.` 
+                        });
+                        continue;
+                    }
+                }
+                
                 // Update status to Completed
                 await query(
-                    'UPDATE tbl_discipleship_requests SET status = ?, completed_at = NOW() WHERE request_id = ?', 
+                    'UPDATE tbl_discipleship_requests SET status = ?, date_updated = NOW() WHERE request_id = ?', 
                     ['Completed', request_id]
                 );
+                
+                // Send completion email
+                try {
+                    await emailHelper.sendDiscipleshipDetails({
+                        email: requestData.email,
+                        status: 'completed',
+                        recipientName: `${requestData.firstname} ${requestData.lastname}`,
+                        firstname: requestData.firstname,
+                        lastname: requestData.lastname,
+                        scheduled_date: requestData.scheduled_date
+                    });
+                    console.log(`Completion email sent to ${requestData.email}`);
+                } catch (emailError) {
+                    console.error(`Failed to send completion email to ${requestData.email}:`, emailError.message);
+                    // Don't fail the request if email fails
+                }
                 
                 completedIds.push(request_id);
             } catch (err) {

@@ -362,18 +362,44 @@ const bulkComplete = async () => {
     return;
   }
   
+  // Get selected records
+  const selectedRecords = requests.value.filter(r => selectedRequests.value.includes(r.request_id));
+  
   // Check if any selected record is not in Scheduled status
-  const nonScheduledRecords = requests.value
-    .filter(r => selectedRequests.value.includes(r.request_id) && r.status !== 'Scheduled');
+  const nonScheduledRecords = selectedRecords.filter(r => r.status !== 'Scheduled');
   
   if (nonScheduledRecords.length > 0) {
     ElMessage.error(`Cannot complete ${nonScheduledRecords.length} record(s) that are not in "Scheduled" status. Only "Scheduled" records can be marked as completed.`);
     return;
   }
   
+  // Check dates: cannot complete future scheduled requests
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const validRecords = selectedRecords.filter(r => {
+    // If no scheduled date, allow completion (admin discretion)
+    if (!r.scheduled_date) return true;
+    const scheduledDate = new Date(r.scheduled_date);
+    scheduledDate.setHours(0, 0, 0, 0);
+    return scheduledDate <= today;
+  });
+
+  const skippedCount = selectedRecords.length - validRecords.length;
+
+  if (validRecords.length === 0) {
+    ElMessage.warning('Cannot mark future scheduled requests as completed. Please wait until the scheduled date.');
+    return;
+  }
+  
   try {
+    let confirmMessage = `Are you sure you want to mark ${validRecords.length} scheduled request(s) as completed?`;
+    if (skippedCount > 0) {
+      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
+    }
+
     await ElMessageBox.confirm(
-      `Are you sure you want to mark ${selectedRequests.value.length} selected request(s) as completed?`,
+      confirmMessage,
       'Bulk Complete Requests',
       {
         confirmButtonText: 'Yes, Complete',
@@ -382,12 +408,23 @@ const bulkComplete = async () => {
       }
     );
     
-    const result = await store.bulkCompleteRequests(selectedRequests.value);
+    // Only complete valid records (past scheduled dates)
+    const validRequestIds = validRecords.map(r => r.request_id);
+    const result = await store.bulkCompleteRequests(validRequestIds);
     if (result.success) {
-      ElMessage.success(`Successfully marked ${selectedRequests.value.length} request(s) as completed`);
+      const { completed, failed } = result.data || {};
+      
+      if (completed && completed.length > 0) {
+        ElMessage.success(`Successfully marked ${completed.length} request(s) as completed`);
+      }
+      
+      if (failed && failed.length > 0) {
+        ElMessage.warning(`${failed.length} request(s) failed to complete`);
+      }
+      
       clearSelection();
-    } else if (result.error) {
-      ElMessage.error(result.error);
+    } else if (result.message) {
+      ElMessage.error(result.message);
     }
   } catch {
     // User cancelled
