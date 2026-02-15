@@ -780,14 +780,17 @@ const handleLogout = async () => {
   align-items: center;
   justify-content: center;
   flex: 1;
-  margin: 0 24px;
+  margin: 0 40px;
+  gap: 8px;
 }
 
 .menu-button {
-  margin: 0 4px;
+  padding: 8px 16px;
   text-transform: capitalize;
   transition: all 0.3s ease;
   color: #424242;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .menu-button:hover {
@@ -806,7 +809,7 @@ const handleLogout = async () => {
 }
 
 .login-button {
-  margin-left: 16px;
+  margin-left: 0;
   color: white;
 }
 
@@ -816,6 +819,7 @@ const handleLogout = async () => {
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
+  padding-right: 24px;
 }
 
 /* User Menu */
