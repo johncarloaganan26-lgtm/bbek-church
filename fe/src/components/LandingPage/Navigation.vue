@@ -77,8 +77,10 @@
               {{ menu.label }}
             </el-button>
           </template>
-          
-          <!-- Login Button -->
+        </div>
+
+        <!-- Login Section (separate from menu) -->
+        <div class="login-section">
           <el-button
             v-if="showLoginButton"
             :type="'primary'"
@@ -776,8 +778,9 @@ const handleLogout = async () => {
 .desktop-menu {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
+  justify-content: center;
+  flex: 1;
+  margin: 0 24px;
 }
 
 .menu-button {
@@ -805,6 +808,14 @@ const handleLogout = async () => {
 .login-button {
   margin-left: 16px;
   color: white;
+}
+
+/* Login Section */
+.login-section {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* User Menu */
