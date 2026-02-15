@@ -346,7 +346,6 @@ onMounted(async () => {
   position: relative;
   padding-bottom: 80px !important;
   overflow: hidden;
-  font-family: 'Outfit', sans-serif; /* Modern typography */
 }
 
 /* Background Watermark */
@@ -357,7 +356,7 @@ onMounted(async () => {
   transform: translateY(-50%);
   width: 600px;
   height: 600px;
-  opacity: 0.1;
+  opacity: 0.15;
   pointer-events: none;
   z-index: 0;
 }
@@ -369,6 +368,10 @@ onMounted(async () => {
 }
 
 /* Logo and Church Identity */
+.logo-container {
+  position: relative;
+}
+
 .logo-circle {
   width: 64px;
   height: 64px;
@@ -379,117 +382,314 @@ onMounted(async () => {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  border: 4px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 2px solid #14b8a6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 /* Church Name Styling */
 .church-name {
-  font-weight: 800;
-  font-size: 1.5rem;
-  letter-spacing: -0.5px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   margin-bottom: 4px !important;
 }
 
 .church-subtitle {
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.3px;
   opacity: 0.9;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .bible-verse {
-  font-size: 0.85rem;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 12px;
   font-style: italic;
-  line-height: 1.5;
+  line-height: 1.4;
   opacity: 0.8;
   border-left: 3px solid rgba(255, 255, 255, 0.3);
-  padding-left: 12px;
-  margin-top: 12px !important;
+  padding-left: 8px;
+  margin-top: 8px !important;
 }
 
 /* Footer Headings */
 .footer-heading {
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  text-decoration: none;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 24px;
-  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 20px;
+  color: #ffffff;
 }
 
-/* Watch Live Button (Catchy) */
-.watch-live-btn {
-  position: absolute;
-  bottom: 24px;
-  right: 24px;
-  z-index: 10;
-  background: linear-gradient(135deg, #1a1a1a 0%, #333333 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  font-family: 'Outfit', sans-serif !important;
-}
-
-.watch-live-btn::after {
+.footer-heading::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 12px;
-  box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
-  animation: watch-pulse 2s infinite;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ffffff, transparent);
 }
 
-@keyframes watch-pulse {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.1); opacity: 0; }
+/* Service Info */
+.service-info {
+  margin-bottom: 16px;
+}
+
+.service-info .text-body-2 {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* Ministries Section */
+.ministries-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 12px;
+}
+
+.ministries-section .text-body-2 {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Contact Details */
+.contact-details {
+  margin-bottom: 16px;
+}
+
+.contact-details .text-body-2 {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Social Media */
+.social-media {
+  margin-top: 8px;
+}
+
+.social-btn {
+  transition: all 0.3s ease;
+}
+
+.social-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-1px);
+}
+
+/* Quick Links */
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.quick-link-btn {
+  text-transform: none !important;
+  font-size: 12px !important;
+  padding: 4px 12px !important;
+  min-height: auto !important;
+  border-radius: 16px !important;
+}
+
+.quick-link-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Border Top */
+.border-top {
+  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Watch Live Button */
+.watch-live-btn {
+  position: absolute;
+  bottom: 32px;
+  right: 32px;
+  z-index: 10;
+  background-color: rgba(33, 33, 33, 0.95) !important;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  transition: all 0.3s ease;
+  min-width: 160px !important;
+  height: 56px !important;
+  font-size: 16px !important;
 }
 
 .watch-live-btn:hover {
-  transform: translateY(-5px) scale(1.05);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+  background-color: rgba(33, 33, 33, 1) !important;
+  transform: translateY(-6px) scale(1.08);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Copyright Text */
+.copyright-text {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 12px;
+  font-style: italic;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+}
+
+/* Text Colors */
+.text-white-70 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.text-white-80 {
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Responsive Design */
-@media (max-width: 960px) {
+@media (max-width: 768px) {
   .footer-container {
-    padding-bottom: 120px !important;
+    padding-bottom: 100px !important;
+  }
+
+  .footer-watermark {
+    right: -150px;
+    width: 400px;
+    height: 400px;
   }
 
   .watch-live-btn {
-    position: fixed;
-    bottom: 24px;
-    left: 24px; /* Move to bottom left on mobile to avoid overlap with Journey Path */
+    bottom: 20px;
+    right: 20px;
+    min-width: 140px !important;
+    height: 48px !important;
+    font-size: 14px !important;
+  }
+
+  .watch-live-btn .v-icon {
+    font-size: 18px !important;
+  }
+
+  .quick-links {
+    gap: 4px;
+  }
+
+  .quick-link-btn {
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+  }
+}
+
+/* Ensure proper z-indexing */
+:deep(.v-col) {
+  position: relative;
+  z-index: 1;
+}
+
+:deep(.text-body-2),
+:deep(.text-caption) {
+  color: white !important;
+}
+
+:deep(h3),
+:deep(h4),
+:deep(p) {
+  color: white !important;
+}
+
+/* Social media button transitions */
+:deep(.v-btn) {
+  transition: all 0.3s ease;
+}
+
+:deep(.v-btn:hover) {
+  transform: scale(1.1);
+}
+
+@media (max-width: 960px) {
+  .floating-social-icons {
+    position: relative;
     right: auto;
-    width: auto;
-    min-width: 140px;
-    z-index: 1000;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-    border-radius: 50px !important; /* Circular pill for mobile */
+    top: auto;
+    transform: none;
+    flex-direction: row;
+    justify-content: center;
+    margin-top: 16px;
+    margin-bottom: 16px;
+  }
+
+  .watch-live-btn {
+    position: relative;
+    bottom: auto;
+    right: auto;
+    margin-top: 16px;
+    width: 100%;
   }
 
   .footer-watermark {
     display: none;
   }
+
+  .footer-container {
+    padding-bottom: 100px !important;
+  }
 }
 
 @media (max-width: 640px) {
-  .logo-circle {
-    width: 56px !important;
-    height: 56px !important;
-    margin: 0 auto;
+  .footer-container {
+    padding-bottom: 120px !important;
   }
 
-  .church-name {
-    font-size: 1.25rem;
+  .footer-container :deep(.v-container) {
+    padding: 24px 16px !important;
+  }
+
+  .footer-container :deep(.v-col) {
+    margin-bottom: 24px;
+  }
+
+  .logo-circle {
+    width: 48px !important;
+    height: 48px !important;
   }
 
   .footer-heading {
-    font-size: 0.9rem !important;
+    font-size: 11px !important;
+  }
+
+  .footer-container :deep(.text-h6) {
+    font-size: 1rem !important;
+  }
+
+  .footer-container :deep(.text-body-2) {
+    font-size: 0.8125rem !important;
+  }
+
+  .watch-live-btn {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    left: auto;
+    width: auto;
+    min-width: 120px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 }
 </style>
-
