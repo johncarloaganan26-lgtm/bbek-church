@@ -1,15 +1,15 @@
 <template>
   <transition name="slide-up">
-    <div v-if="isVisible" class="membership-journey-banner">
-      <div class="banner-glass-container">
+    <div v-if="isVisible" class="membership-journey-banner" role="complementary" aria-label="Membership Journey Guide">
+      <div class="banner-glass-container" role="dialog" aria-labelledby="journey-title">
         <!-- Close Button -->
-        <button class="close-btn" @click="dismissPermanently" aria-label="Close">
+        <button class="close-btn" @click="dismissPermanently" aria-label="Close guide and don't show again">
           <v-icon icon="mdi-close" size="small"></v-icon>
         </button>
 
         <div class="banner-content">
           <div class="header-section text-center mb-4">
-            <h3 class="header-title">Belong to the Family</h3>
+            <h3 id="journey-title" class="header-title">Belong to the Family</h3>
             <p class="header-subtitle">New here? We'd love to have you join our journey of faith.</p>
           </div>
 
@@ -138,10 +138,11 @@ onMounted(() => {
 }
 
 .banner-glass-container {
-  background: rgba(255, 255, 255, 0.7);
+  background: white; /* Solid fallback for old browsers */
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px) saturate(180%);
   -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 24px;
   padding: 24px;
   width: 100%;

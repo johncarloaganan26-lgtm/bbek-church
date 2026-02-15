@@ -41,7 +41,7 @@ import MembershipJourneyBanner from './components/LandingPage/MembershipJourneyB
 const announcementStore = useAnnouncementStore()
 const activeAnnouncements = ref([])
 const announcementDialogs = reactive({})
-const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')) || '{}' || null)
+const userInfo = ref(localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')) : null)
 const route = useRoute()
 const router = useRouter()
 
