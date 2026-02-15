@@ -225,6 +225,60 @@
         ></el-color-picker>
       </div>
     </div>
+    <el-divider />
+
+    <!-- Acronym Color -->
+    <div class="list-item">
+      <div class="item-label">Acronym Color</div>
+      <div class="item-preview">
+        <div
+          class="color-preview"
+          :style="{ backgroundColor: headerData.acronymColor }"
+        ></div>
+      </div>
+      <div class="item-action">
+        <el-color-picker
+          v-model="headerData.acronymColor"
+          size="small"
+        ></el-color-picker>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Border Color -->
+    <div class="list-item">
+      <div class="item-label">Border Color</div>
+      <div class="item-preview">
+        <div
+          class="color-preview"
+          :style="{ backgroundColor: headerData.borderColor }"
+        ></div>
+      </div>
+      <div class="item-action">
+        <el-color-picker
+          v-model="headerData.borderColor"
+          size="small"
+        ></el-color-picker>
+      </div>
+    </div>
+    <el-divider />
+
+    <!-- Active Menu Color -->
+    <div class="list-item">
+      <div class="item-label">Active Menu Color</div>
+      <div class="item-preview">
+        <div
+          class="color-preview"
+          :style="{ backgroundColor: headerData.activeColor }"
+        ></div>
+      </div>
+      <div class="item-action">
+        <el-color-picker
+          v-model="headerData.activeColor"
+          size="small"
+        ></el-color-picker>
+      </div>
+    </div>
 
   </div>
 
@@ -296,7 +350,10 @@ const defaultHeaderData = {
   ],
   hoverColor: '#14b8a6',
   buttonText: 'Dashboard',
-  buttonColor: '#14b8a6'
+  buttonColor: '#14b8a6',
+  acronymColor: '#0cbdaa',
+  borderColor: '#0cbdaa',
+  activeColor: '#14a79a'
 }
 
 // Create a reactive copy of prop data to allow mutations

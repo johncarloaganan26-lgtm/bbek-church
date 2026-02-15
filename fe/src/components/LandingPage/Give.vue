@@ -125,20 +125,6 @@
       </v-container>
     </section>
 
-    <!-- Back Button -->
-    <section class="py-12 text-center bg-white">
-      <v-btn
-        :color="giveData.backButtonColor"
-        class="text-white"
-        size="large"
-        rounded
-        @click="$router.push('/')"
-        style="font-family: 'Georgia', serif; font-style: italic;"
-      >
-        {{ giveData.backButtonText }}
-      </v-btn>
-    </section>
-
     <!-- Donation Proof Dialog -->
     <DonationProofDialog
       v-model="showDonationProofDialog"
@@ -183,9 +169,7 @@ const giveData = ref({
   mayaNumber: '',
   mayaLogoImage: '',
   mayaQrImage: '',
-  mayaInstructionText: 'Send your donation to this Maya account',
-  backButtonText: 'Back to Home',
-  backButtonColor: '#00bcd4'
+  mayaInstructionText: 'Send your donation to this Maya account'
 })
 
 const giveInPersonData = ref({

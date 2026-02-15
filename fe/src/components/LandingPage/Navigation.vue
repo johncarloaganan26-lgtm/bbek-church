@@ -1,4 +1,4 @@
-<template>
+ve<template>
   <header
     v-loading="isLoadingHeader"
     element-loading-text="Loading..."
@@ -18,14 +18,14 @@
     class="navigation-header"
   >
     <div class="navigation-container">
-      <div class="navigation-content">
+      <div class="navigation-content" :style="{ borderBottom: `3px solid ${headerData.borderColor || '#0cbdaa'}` }">
         <!-- Logo and Church Name -->
         <div class="logo-section" @click="scrollToHero">
           <el-avatar :size="64" class="logo-avatar" :src="headerData.logo">
             <img v-if="!headerData.logo" src="/img/logobbek.png" alt="BBEK Logo" />
           </el-avatar>
           <div class="logo-text">
-            <h1 class="logo-title">{{ headerData.acronym || 'BBEK' }}</h1>
+            <h1 class="logo-title" :style="{ color: headerData.acronymColor || '#0cbdaa' }">{{ headerData.acronym || 'BBEK' }}</h1>
             <p class="logo-subtitle">
               {{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}
             </p>
@@ -45,7 +45,8 @@
               <el-button
                 text
                 class="menu-button"
-                :style="{ '--hover-color': headerData.hoverColor || '#14b8a6' }"
+                :class="{ 'menu-button-active': isActiveRoute(menu.to) }"
+                :style="{ '--hover-color': headerData.hoverColor || '#14b8a6', '--active-color': headerData.activeColor || '#14a79a' }"
                 @click="navigateTo(menu.to)"
               >
                 {{ menu.label }}
@@ -71,7 +72,8 @@
               v-else
               text
               class="menu-button"
-              :style="{ '--hover-color': headerData.hoverColor || '#14b8a6' }"
+              :class="{ 'menu-button-active': isActiveRoute(menu.to) }"
+              :style="{ '--hover-color': headerData.hoverColor || '#14b8a6', '--active-color': headerData.activeColor || '#14a79a' }"
               @click="navigateTo(menu.to)"
             >
               {{ menu.label }}
@@ -474,7 +476,10 @@ const defaultHeaderData = {
   ],
   hoverColor: '#14b8a6',
   buttonText: 'Dashboard',
-  buttonColor: '#14b8a6'
+  buttonColor: '#14b8a6',
+  acronymColor: '#0cbdaa',
+  borderColor: '#0cbdaa',
+  activeColor: '#14a79a'
 }
 
 // Initialize headerData with default values
@@ -553,7 +558,10 @@ const fetchHeaderData = async () => {
         menus: menus,
         hoverColor: content.hoverColor || defaultHeaderData.hoverColor || '#14b8a6',
         buttonText: content.buttonText || defaultHeaderData.buttonText || 'Dashboard',
-        buttonColor: content.buttonColor || defaultHeaderData.buttonColor || '#14b8a6'
+        buttonColor: content.buttonColor || defaultHeaderData.buttonColor || '#14b8a6',
+        acronymColor: content.acronymColor || defaultHeaderData.acronymColor || '#0cbdaa',
+        borderColor: content.borderColor || defaultHeaderData.borderColor || '#0cbdaa',
+        activeColor: content.activeColor || defaultHeaderData.activeColor || '#14a79a'
       }
       
       console.log('Header data loaded from CMS:', headerData.value)
@@ -570,6 +578,22 @@ const navigateTo = (path) => {
   if (path) {
     router.push(path)
   }
+}
+
+// Check if current route matches the menu path
+const isActiveRoute = (path) => {
+  if (!path) return false
+  const currentPath = router.currentRoute.value.path
+  
+  // Exact match for simple paths
+  if (currentPath === path) return true
+  
+  // For root path, only match exact
+  if (path === '/') return currentPath === '/'
+  
+  // For other paths, check if current path starts with the menu path
+  // This handles sub-routes like /about/aboutus being active under /about
+  return currentPath.startsWith(path + '/') || currentPath === path
 }
 
 const handleScroll = () => {
@@ -757,7 +781,6 @@ const handleLogout = async () => {
 .logo-title {
   font-size: 1.75rem;
   font-weight: bold;
-  color: #424242;
   margin: 0;
   line-height: 1.2;
   display: block;
@@ -800,6 +823,12 @@ const handleLogout = async () => {
 .menu-button:hover :deep(.el-icon) {
   color: var(--hover-color, #14b8a6) !important;
   transform: translateY(-1px);
+}
+
+.menu-button-active {
+  color: var(--active-color, #14a79a) !important;
+  border-bottom: 2px solid var(--active-color, #14a79a);
+  border-radius: 0;
 }
 
 .login-button {
