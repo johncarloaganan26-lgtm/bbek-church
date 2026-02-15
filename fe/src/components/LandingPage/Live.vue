@@ -337,6 +337,16 @@
           </v-col>
         </v-row>
 
+        <!-- No Sermons Available -->
+        <div v-else class="no-sermons-container">
+          <v-icon size="80" color="grey-lighten-1">mdi-video-off</v-icon>
+          <h3 class="text-h5 text-grey-darken-1 mt-4">No Sermon Archive</h3>
+          <p class="text-body-1 text-grey-darken-1 mt-2 text-center">
+            There are no sermon recordings available at the moment.<br>
+            Please check back later for updates.
+          </p>
+        </div>
+
         <!-- View All Archive Button -->
         <div v-if="allSermons.length > 6" class="text-center mt-8">
           <v-btn
@@ -1030,6 +1040,15 @@ onMounted(async () => {
   color: #888888;
   font-weight: 400;
   margin: 0;
+}
+
+.no-sermons-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
 }
 
 .fade-in-up {
