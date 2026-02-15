@@ -16,7 +16,7 @@ export const useBurialServiceStore = defineStore('burialService', {
     pageSizeOptions: [10, 25, 50, 100],
     searchQuery: '',
     filters: {
-      status: 'All Statuses',
+      status: 'All Status',
       sortBy: 'Status (Pending First)'
     },
     memberOptions: [],
@@ -34,9 +34,9 @@ export const useBurialServiceStore = defineStore('burialService', {
           status: this.filters.status,
           sortBy: this.filters.sortBy
         }
-        
+
         const response = await axios.get('/church-records/burial-services/getAllBurialServices', { params })
-        
+
         if (response.data.success) {
           this.services = response.data.data || []
           this.totalPages = response.data.pagination?.totalPages || 1
@@ -104,16 +104,16 @@ export const useBurialServiceStore = defineStore('burialService', {
           status: this.filters.status,
           sortBy: this.filters.sortBy
         }
-        
-        const response = await axios.get('/church-records/burial-services/exportExcel', { 
+
+        const response = await axios.get('/church-records/burial-services/exportExcel', {
           params,
           responseType: 'blob'
         })
-        
+
         if (response.data) {
           // Create download link for Excel file
-          const blob = new Blob([response.data], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          const blob = new Blob([response.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
           })
           const url = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
@@ -123,7 +123,7 @@ export const useBurialServiceStore = defineStore('burialService', {
           link.click()
           link.remove()
           window.URL.revokeObjectURL(url)
-          
+
           return { success: true, message: 'Excel file downloaded successfully' }
         } else {
           return { success: false, error: 'No data to export' }

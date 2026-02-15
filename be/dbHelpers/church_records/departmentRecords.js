@@ -227,7 +227,7 @@ async function getUnavailableMembers(excludeDepartmentId = null) {
       officerParams.push(excludeDepartmentId);
     }
     const [officerRows] = await query(officerSql, officerParams);
-    
+
     const allOfficerIds = new Set();
     for (const row of officerRows) {
       try {
@@ -389,7 +389,7 @@ async function createDepartment(departmentData) {
     ];
 
     const [result] = await query(sql, params);
-    
+
     // Fetch the created department
     const createdDepartment = await getDepartmentById(result.insertId);
 
@@ -477,7 +477,7 @@ async function getAllDepartments(options = {}) {
     }
 
     // Add status filter
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('d.status = ?');
       countParams.push(status);
       params.push(status);
@@ -949,7 +949,7 @@ async function exportDepartmentsToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllDepartments(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No departments found to export');
     }
@@ -991,8 +991,8 @@ async function exportDepartmentsToExcel(options = {}) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Departments');
 
     // Generate Excel file buffer
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });

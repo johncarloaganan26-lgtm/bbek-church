@@ -14,21 +14,21 @@ async function updateMarriageMembersCivilStatus(marriageId) {
     // Get groom and bride member IDs (only update if member_id exists)
     const sql = 'SELECT groom_member_id, bride_member_id FROM tbl_marriageservice WHERE marriage_id = ?';
     const [rows] = await query(sql, [marriageId]);
-    
+
     if (rows.length === 0) {
       console.warn(`Marriage service ${marriageId} not found for civil status update`);
       return;
     }
-    
+
     const { groom_member_id, bride_member_id } = rows[0];
-    
+
     // Update civil status only for members who have member_id (not for external names)
     const updateSql = 'UPDATE tbl_members SET civil_status = ? WHERE member_id = ?';
-    
+
     if (groom_member_id) {
       await query(updateSql, ['married', groom_member_id]);
     }
-    
+
     if (bride_member_id) {
       await query(updateSql, ['married', bride_member_id]);
     }
@@ -152,15 +152,15 @@ async function getNextMarriageId() {
   try {
     const sql = 'SELECT MAX(marriage_id) AS max_marriage_id FROM tbl_marriageservice';
     const [rows] = await query(sql);
-    
+
     // If no records exist, start with 1, otherwise increment by 1
     const maxId = rows[0]?.max_marriage_id || null;
-    
+
     if (!maxId) {
       // First record - return "0000000001"
       return '0000000001';
     }
-    
+
     // Extract numeric part if marriage_id has prefix (e.g., "MARRIAGE0000000001" -> 1)
     // Or if it's just numeric, use it directly
     const numericMatch = maxId.match(/\d+$/);
@@ -169,7 +169,7 @@ async function getNextMarriageId() {
       const newNumericId = numericPart + 1;
       return newNumericId.toString().padStart(9, '0');
     }
-    
+
     // If no numeric part found, start from 1
     return '0000000001';
   } catch (error) {
@@ -188,7 +188,7 @@ async function createMarriageService(marriageData) {
     // Get next marriage_id if not provided
     const new_marriage_id = await getNextMarriageId();
     console.log('New marriage ID:', new_marriage_id);
-    
+
     const {
       marriage_id = new_marriage_id,
       groom_member_id,
@@ -208,12 +208,12 @@ async function createMarriageService(marriageData) {
     if (!groom_member_id && !bride_member_id) {
       throw new Error('At least one member (groom or bride) must be selected');
     }
-    
+
     // If groom_member_id is not provided, groom_name is required
     if (!groom_member_id && (!groom_name || !groom_name.trim())) {
       throw new Error('Groom name is required when groom member is not selected');
     }
-    
+
     // If bride_member_id is not provided, bride_name is required
     if (!bride_member_id && (!bride_name || !bride_name.trim())) {
       throw new Error('Bride name is required when bride member is not selected');
@@ -300,7 +300,7 @@ async function createMarriageService(marriageData) {
     ];
 
     const [result] = await query(sql, params);
-    
+
     // Fetch the created marriage service
     const createdMarriageService = await getMarriageServiceById(final_marriage_id);
 
@@ -333,12 +333,12 @@ async function createMarriageService(marriageData) {
       if (memberRows && memberRows.length > 0) {
         const row = memberRows[0];
         // Use groom_name if groom_member_id is null, otherwise use member name
-        const groomName = row.groom_member_id 
-          ? `${row.groom_firstname || ''} ${row.groom_middle_name ? row.groom_middle_name + ' ' : ''}${row.groom_lastname || ''}`.trim() 
+        const groomName = row.groom_member_id
+          ? `${row.groom_firstname || ''} ${row.groom_middle_name ? row.groom_middle_name + ' ' : ''}${row.groom_lastname || ''}`.trim()
           : (row.groom_name || 'Groom');
         // Use bride_name if bride_member_id is null, otherwise use member name
-        const brideName = row.bride_member_id 
-          ? `${row.bride_firstname || ''} ${row.bride_middle_name ? row.bride_middle_name + ' ' : ''}${row.bride_lastname || ''}`.trim() 
+        const brideName = row.bride_member_id
+          ? `${row.bride_firstname || ''} ${row.bride_middle_name ? row.bride_middle_name + ' ' : ''}${row.bride_lastname || ''}`.trim()
           : (row.bride_name || 'Bride');
         const marriageDate = createdMarriageService.data.marriage_date
           ? moment(createdMarriageService.data.marriage_date).format('YYYY-MM-DD HH:mm:ss')
@@ -451,7 +451,7 @@ async function getAllMarriageServices(options = {}) {
     }
 
     // Add status filter
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);
@@ -559,11 +559,11 @@ async function getAllMarriageServices(options = {}) {
       pending: 0,
       ongoing: 0
     };
-    
+
     // Get total count of all records
     const [allTotalResult] = await query('SELECT COUNT(*) as total FROM tbl_marriageservice');
     summaryStats.total = allTotalResult[0]?.total || 0;
-    
+
     // Map status counts
     allStatusCountsResult.forEach(row => {
       if (summaryStats.hasOwnProperty(row.status)) {
@@ -871,20 +871,20 @@ async function updateMarriageService(marriageId, marriageData) {
     // We need to check using the final values (new values if provided, otherwise current values)
     if (marriage_date !== undefined || groom_member_id !== undefined || bride_member_id !== undefined || pastor_id !== undefined) {
       const currentMarriage = marriageCheck.data;
-      const finalGroomMemberId = groom_member_id !== undefined 
+      const finalGroomMemberId = groom_member_id !== undefined
         ? (groom_member_id ? groom_member_id.trim() : null)
         : currentMarriage.groom_member_id;
-      const finalBrideMemberId = bride_member_id !== undefined 
+      const finalBrideMemberId = bride_member_id !== undefined
         ? (bride_member_id ? bride_member_id.trim() : null)
         : currentMarriage.bride_member_id;
-      const finalPastorId = pastor_id !== undefined 
+      const finalPastorId = pastor_id !== undefined
         ? (pastor_id ? pastor_id.trim() : null)
         : currentMarriage.pastor_id;
       const finalMarriageDate = marriage_date !== undefined ? marriage_date : currentMarriage.marriage_date;
 
       // Only check conflicts if marriage_date is provided and is being updated or if members/pastor are changing
-      if (finalMarriageDate && (marriage_date !== undefined || finalGroomMemberId !== currentMarriage.groom_member_id || 
-          finalBrideMemberId !== currentMarriage.bride_member_id || finalPastorId !== currentMarriage.pastor_id)) {
+      if (finalMarriageDate && (marriage_date !== undefined || finalGroomMemberId !== currentMarriage.groom_member_id ||
+        finalBrideMemberId !== currentMarriage.bride_member_id || finalPastorId !== currentMarriage.pastor_id)) {
         const conflictCheck = await checkMarriageDateConflict(
           finalMarriageDate,
           finalGroomMemberId,
@@ -989,12 +989,12 @@ async function updateMarriageService(marriageId, marriageData) {
       if (memberRows && memberRows.length > 0) {
         const row = memberRows[0];
         // Use groom_name if groom_member_id is null, otherwise use member name
-        const groomName = row.groom_member_id 
-          ? `${row.groom_firstname || ''} ${row.groom_middle_name ? row.groom_middle_name + ' ' : ''}${row.groom_lastname || ''}`.trim() 
+        const groomName = row.groom_member_id
+          ? `${row.groom_firstname || ''} ${row.groom_middle_name ? row.groom_middle_name + ' ' : ''}${row.groom_lastname || ''}`.trim()
           : (row.groom_name || 'Groom');
         // Use bride_name if bride_member_id is null, otherwise use member name
-        const brideName = row.bride_member_id 
-          ? `${row.bride_firstname || ''} ${row.bride_middle_name ? row.bride_middle_name + ' ' : ''}${row.bride_lastname || ''}`.trim() 
+        const brideName = row.bride_member_id
+          ? `${row.bride_firstname || ''} ${row.bride_middle_name ? row.bride_middle_name + ' ' : ''}${row.bride_lastname || ''}`.trim()
           : (row.bride_name || 'Bride');
         const marriageDate = updatedMarriageService.data.marriage_date
           ? moment(updatedMarriageService.data.marriage_date).format('YYYY-MM-DD HH:mm:ss')
@@ -1110,7 +1110,7 @@ async function exportMarriageServicesToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllMarriageServices(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No marriage services found to export');
     }
@@ -1174,8 +1174,8 @@ async function exportMarriageServicesToExcel(options = {}) {
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Marriage Services');
 
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });

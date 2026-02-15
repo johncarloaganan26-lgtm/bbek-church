@@ -434,7 +434,7 @@ const sortByOptions = [
   'Date Range (Oldest)'
 ]
 
-const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
+const statusOptions = ['All Status', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
 
 // Dialog state
 const childDedicationDialog = ref(false)

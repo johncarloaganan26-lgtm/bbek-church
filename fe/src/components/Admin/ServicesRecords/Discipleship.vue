@@ -30,7 +30,7 @@
           <v-col cols="12" md="3">
             <v-select
               v-model="statusFilter"
-              :items="['All', 'Pending', 'Scheduled', 'Completed', 'Promoted', 'Cancelled']"
+              :items="['All Status', 'Pending', 'Scheduled', 'Completed', 'Promoted', 'Cancelled']"
               label="Filter Status"
               variant="outlined"
               density="compact"
@@ -318,7 +318,7 @@ onMounted(() => {
 });
 
 const search = ref('');
-const statusFilter = ref('All'); // Changed from 'All Statuses' to 'All' to match existing code
+const statusFilter = ref('All Status'); // Standardized to 'All Status' for consistency across admin pages
 const sortBy = ref('Date Created (Newest)'); // Added
 const page = ref(1); // Added
 // pageSize is already destructured from storeToRefs, so no need to declare here.

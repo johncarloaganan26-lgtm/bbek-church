@@ -84,7 +84,7 @@ router.get('/getAllAccounts', async (req, res) => {
       params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    if (status && status !== 'All Statuses' && status !== 'All') {
+    if (status && status !== 'All Status' && status !== 'All') {
       sql += ` AND acc.status = ?`;
       params.push(status);
     }
@@ -479,7 +479,7 @@ router.get('/exportExcel', async (req, res) => {
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       sql += ` AND acc.status = ?`;
       params.push(status);
     }

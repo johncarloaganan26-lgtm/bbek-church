@@ -183,7 +183,7 @@ Return { account, member, accessToken }
   error: null,            // Error message
   searchQuery: '',        // Search filter
   filters: {              // Filter options
-    status: 'All Statuses',
+    status: 'All Status',
     position: 'All Positions',
     sortBy: 'Date Created (Newest)'
   },
@@ -396,7 +396,7 @@ Show success message
 ### 7.1 Filtering
 
 - **Search**: Search by email or position
-- **Status Filter**: All Statuses, Active, Inactive
+- **Status Filter**: All Status, Active, Inactive
 - **Position Filter**: All Positions, Admin, Staff, Member
 - **Sort By**: Date Created, Email, Position, Status
 

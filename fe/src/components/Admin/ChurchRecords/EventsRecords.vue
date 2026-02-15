@@ -553,7 +553,7 @@ const handleSearchChange = (value) => {
 }
 
 const handleFilterChange = () => {
-  const statusText = filters.value.status || 'All Statuses'
+  const statusText = filters.value.status || 'All Status'
   const typeText = filters.value.type || 'All Types'
   ElMessage.info(`Filtering by: ${statusText}, ${typeText}`)
   eventsRecordsStore.setFilters(filters.value)

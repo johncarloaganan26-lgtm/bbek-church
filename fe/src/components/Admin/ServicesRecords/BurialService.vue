@@ -436,7 +436,7 @@ const sortByOptions = [
   'Date Range (Oldest)'
 ]
 
-const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
+const statusOptions = ['All Status', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled']
 
 // Dialog state
 const burialServiceDialog = ref(false)
@@ -695,7 +695,7 @@ const handleSearchChange = (value) => {
 }
 
 const handleFilterChange = () => {
-  const statusText = filters.value.status || 'All Statuses'
+  const statusText = filters.value.status || 'All Status'
   ElMessage.info(`Filtering by: ${statusText}`)
   burialServiceStore.setFilters(filters.value)
 }

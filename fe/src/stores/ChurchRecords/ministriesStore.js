@@ -9,7 +9,7 @@ export const useMinistriesStore = defineStore('ministries', {
     searchQuery: '',
     filters: {
       sortBy: 'Date Created (Newest)',
-      status: 'All Statuses',
+      status: 'All Status',
       departmentNamePattern: '',
       dateRange: []
     },
@@ -78,7 +78,7 @@ export const useMinistriesStore = defineStore('ministries', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -391,7 +391,7 @@ export const useMinistriesStore = defineStore('ministries', {
           params.append('search', search.trim())
         }
 
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
 
@@ -520,7 +520,7 @@ export const useMinistriesStore = defineStore('ministries', {
         // Build query parameters
         const params = new URLSearchParams()
         if (options.search) params.append('search', options.search)
-        if (options.status && options.status !== 'All Statuses') {
+        if (options.status && options.status !== 'All Status') {
           params.append('status', options.status)
         }
         if (options.sortBy) {

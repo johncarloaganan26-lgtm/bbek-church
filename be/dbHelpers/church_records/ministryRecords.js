@@ -383,7 +383,7 @@ async function getAllMinistries(options = {}) {
     }
 
     // Add status filter (case-insensitive, aligns with FE options like "Active"/"active")
-    const normalizedStatus = status && status !== 'All Statuses'
+    const normalizedStatus = status && status !== 'All Status'
       ? status.toString().toLowerCase()
       : null;
     if (normalizedStatus) {
@@ -738,7 +738,7 @@ async function getMinistriesByMemberId(memberId, options = {}) {
     }
 
     // Add status filter
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       const normalizedStatus = status.toString().toLowerCase();
       whereConditions.push('LOWER(m.status) = ?');
       params.push(normalizedStatus);

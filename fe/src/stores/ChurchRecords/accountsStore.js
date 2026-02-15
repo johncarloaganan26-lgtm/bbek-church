@@ -9,7 +9,7 @@ export const useAccountsStore = defineStore('accounts', {
     error: null,
     searchQuery: '',
     filters: {
-      status: 'All Statuses',
+      status: 'All Status',
       position: 'All Positions',
       sortBy: 'Date Created (Newest)',
       dateRange: []
@@ -94,7 +94,7 @@ export const useAccountsStore = defineStore('accounts', {
         params.append('pageSize', pageSize.toString())
 
         // Add filter parameters (only if not default values)
-        if (status && status !== 'All Status' && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (position && position !== 'All Positions') {
@@ -394,7 +394,7 @@ export const useAccountsStore = defineStore('accounts', {
         if (position && position !== 'All Positions') {
           params.append('position', position)
         }
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {

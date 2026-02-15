@@ -463,7 +463,7 @@ async function getAllBurialServices(options = {}) {
       hasWhere = true;
     }
 
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);

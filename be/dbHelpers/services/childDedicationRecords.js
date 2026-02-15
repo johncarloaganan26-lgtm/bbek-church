@@ -300,7 +300,7 @@ async function createChildDedication(dedicationData) {
     // Validate that preferred dedication date is a Sunday (if provided)
     if (preferred_dedication_date) {
       let dateMoment;
-      
+
       // Try parsing as datetime first (from frontend combined format)
       if (preferred_dedication_date.includes(' ')) {
         dateMoment = moment(preferred_dedication_date, 'YYYY-MM-DD HH:mm:ss');
@@ -787,7 +787,7 @@ async function getAllChildDedications(options = {}) {
     }
 
     // Add status filter
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('cd.status = ?');
       countParams.push(status);
       params.push(status);

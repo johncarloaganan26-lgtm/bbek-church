@@ -138,7 +138,7 @@ async function getAllDiscipleshipRequests(options = {}) {
         let sql = 'SELECT * FROM tbl_discipleship_requests WHERE 1=1';
         const params = [];
 
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
             sql += ' AND status = ?';
             params.push(status);
         }
@@ -344,7 +344,7 @@ async function inviteToBaptism(request_id, isDecided = false) {
 
         // If undecided, send the invitation email
         console.log(`Candidate ${request_id} is undecided. Sending Water Baptism invitation email...`);
-        
+
         try {
             const result = await sendWaterBaptismInvitation({
                 request_id: req.request_id,
@@ -398,9 +398,9 @@ async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
         if (requestRows.length === 0) {
             throw new Error('Request not found');
         }
-        
+
         const requestData = requestRows[0];
-        
+
         // Prepare data for archive
         const archiveData = {
             table_name: 'tbl_discipleship_requests',
@@ -411,20 +411,20 @@ async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
             archive_reason: archiveInfo.archive_reason || 'No reason provided',
             original_status: requestData.status
         };
-        
+
         // Insert into archive_records table
         const { archiveRecord } = require('../archiveRecords');
-        
+
         // Convert record data to plain text
         const archiveDataText = JSON.stringify(requestData, null, 2);
-        
+
         await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, archiveInfo.archived_by || 'admin');
-        
+
         // Hard delete from original table
         await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             message: 'Request archived successfully',
             archived_id: request_id
         };

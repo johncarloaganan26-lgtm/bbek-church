@@ -9,8 +9,8 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
     searchQuery: '',
     filters: {
       sortBy: 'Baptism Date (Newest)',
-      status: 'All Statuses',
-      statusOptions: ['All Statuses', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled'],
+      status: 'All Status',
+      statusOptions: ['All Status', 'Pending', 'Approved', 'Disapproved', 'Completed', 'Cancelled'],
       dateRange: []
     },
     currentPage: 1,
@@ -112,7 +112,7 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -312,7 +312,7 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {

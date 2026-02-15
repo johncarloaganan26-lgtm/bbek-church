@@ -416,7 +416,7 @@ const isIndeterminate = computed(() => {
 })
 
 // Options for dropdowns
-const statusOptions = ['All Statuses', 'Pending', 'Approved', 'Rejected']
+const statusOptions = ['All Status', 'Pending', 'Approved', 'Rejected']
 const typeOptions = ['All Types', 'event', 'ministry', 'baptism', 'marriage', 'burial', 'child-dedication']
 const sortByOptions = [
   'Status (Pending First)',
@@ -451,7 +451,7 @@ const handleSearchChange = (value) => {
 }
 
 const handleFilterChange = () => {
-  const statusText = filters.value.status || 'All Statuses'
+  const statusText = filters.value.status || 'All Status'
   const typeText = filters.value.type || 'All Types'
   ElMessage.info(`Filtering by: ${statusText}, ${typeText}`)
   approvalsStore.setFilters(filters.value)

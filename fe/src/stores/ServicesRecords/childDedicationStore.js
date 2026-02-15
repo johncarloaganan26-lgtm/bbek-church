@@ -9,7 +9,7 @@ export const useChildDedicationStore = defineStore('childDedication', {
     searchQuery: '',
     filters: {
       sortBy: 'Dedication Date (Newest)',
-      status: 'All Statuses',
+      status: 'All Status',
       dateRange: []
     },
     currentPage: 1,
@@ -48,7 +48,7 @@ export const useChildDedicationStore = defineStore('childDedication', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -194,7 +194,7 @@ export const useChildDedicationStore = defineStore('childDedication', {
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {

@@ -372,7 +372,7 @@ const sortByOptions = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-const statusOptions = ['All Statuses', 'active', 'not_active']
+const statusOptions = ['All Status', 'active', 'not_active']
 
 // Category options for filtering
 const categoryOptions = [

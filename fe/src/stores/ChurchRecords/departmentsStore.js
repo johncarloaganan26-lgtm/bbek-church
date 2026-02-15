@@ -8,7 +8,7 @@ export const useDepartmentsStore = defineStore('departments', {
     error: null,
     searchQuery: '',
     filters: {
-      status: 'All Statuses',
+      status: 'All Status',
       sortBy: 'Date Created (Newest)',
       dateRange: []
     },
@@ -75,9 +75,9 @@ export const useDepartmentsStore = defineStore('departments', {
         params.append('offset', offset.toString())
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         // Add filter parameters
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -93,14 +93,14 @@ export const useDepartmentsStore = defineStore('departments', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data && response.data.success) {
           this.departments = response.data.data || []
-          
+
           // Update pagination state
           this.currentPage = page
           this.itemsPerPage = pageSize
-          
+
           // Use backend pagination data if available
           if (response.data.pagination) {
             this.totalPages = response.data.pagination.totalPages || 1
@@ -111,14 +111,14 @@ export const useDepartmentsStore = defineStore('departments', {
             this.totalCount = totalCount
             this.totalPages = Math.ceil(totalCount / pageSize) || 1
           }
-          
+
           // Update summary stats if available
           if (response.data.summaryStats) {
             this.summaryStats = {
               totalJoinedMembers: response.data.summaryStats.totalJoinedMembers || 0
             }
           }
-          
+
           // Update search query and filters if provided
           if (options.search !== undefined) {
             this.searchQuery = search
@@ -178,15 +178,15 @@ export const useDepartmentsStore = defineStore('departments', {
           }
         })
         console.log('Create department response:', response)
-        
+
         if (response.data && response.status === 201) {
           await this.fetchDepartments()
           return { success: true, data: response.data.data }
         } else {
           const errorMsg = response.data?.message || 'Failed to create department'
           this.error = errorMsg
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: errorMsg,
             validationErrors: response.data?.validationErrors || []
           }
@@ -195,8 +195,8 @@ export const useDepartmentsStore = defineStore('departments', {
         console.error('Error creating department:', error)
         const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create department'
         this.error = errorMsg
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: errorMsg,
           validationErrors: error.response?.data?.validationErrors || []
         }
@@ -217,15 +217,15 @@ export const useDepartmentsStore = defineStore('departments', {
           }
         })
         console.log('Update department response:', response)
-        
+
         if (response.data && response.status === 200) {
           await this.fetchDepartments()
           return { success: true, data: response.data.data }
         } else {
           const errorMsg = response.data?.message || 'Failed to update department'
           this.error = errorMsg
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: errorMsg,
             validationErrors: response.data?.validationErrors || []
           }
@@ -234,8 +234,8 @@ export const useDepartmentsStore = defineStore('departments', {
         console.error('Error updating department:', error)
         const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update department'
         this.error = errorMsg
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: errorMsg,
           validationErrors: error.response?.data?.validationErrors || []
         }
@@ -330,11 +330,11 @@ export const useDepartmentsStore = defineStore('departments', {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
       // Refetch with new filters
-      this.fetchDepartments({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchDepartments({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
@@ -367,7 +367,7 @@ export const useDepartmentsStore = defineStore('departments', {
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -430,7 +430,7 @@ export const useDepartmentsStore = defineStore('departments', {
         if (excludeDepartmentId) {
           params.append('excludeDepartmentId', excludeDepartmentId.toString())
         }
-        
+
         const response = await axios.get(`/church-records/departments/getUnavailableMembers?${params}`)
         if (response.data.success && response.data.data) {
           return response.data.data

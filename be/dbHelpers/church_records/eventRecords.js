@@ -243,7 +243,7 @@ async function getAllEvents(options = {}) {
       hasWhere = true;
     }
 
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);
@@ -280,7 +280,7 @@ async function getAllEvents(options = {}) {
       'May': 5, 'June': 6, 'July': 7, 'August': 8,
       'September': 9, 'October': 10, 'November': 11, 'December': 12
     };
-    
+
     if (monthMap[sortBy] !== undefined) {
       whereConditions.push('MONTH(start_date) = ?');
       countParams.push(monthMap[sortBy]);
@@ -383,7 +383,7 @@ async function getAllEvents(options = {}) {
 
     const processedRows = rows.map(event => {
       const processedEvent = { ...event };
-      
+
       // Process image - convert blob to base64 only once
       if (event.image && Buffer.isBuffer(event.image)) {
         const base64String = convertBlobToBase64(event.image);
@@ -393,7 +393,7 @@ async function getAllEvents(options = {}) {
         processedEvent.imageUrl = null;
         processedEvent.image = null;
       }
-      
+
       if (event.joined_members) {
         try {
           processedEvent.joined_members = JSON.parse(event.joined_members);
@@ -404,7 +404,7 @@ async function getAllEvents(options = {}) {
       } else {
         processedEvent.joined_members = [];
       }
-      
+
       return processedEvent;
     });
 
@@ -464,7 +464,7 @@ async function getEventById(eventId) {
     } else {
       event.image = null;
     }
-    
+
     if (event.joined_members) {
       try {
         event.joined_members = JSON.parse(event.joined_members);
@@ -780,7 +780,7 @@ async function exportEventsToExcel(options = {}) {
     delete exportOptions.pageSize;
 
     const result = await getAllEvents(exportOptions);
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       throw new Error('No events found to export');
     }
@@ -816,8 +816,8 @@ async function exportEventsToExcel(options = {}) {
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Events');
 
-    const excelBuffer = XLSX.write(workbook, { 
-      type: 'buffer', 
+    const excelBuffer = XLSX.write(workbook, {
+      type: 'buffer',
       bookType: 'xlsx',
       compression: true
     });
@@ -861,7 +861,7 @@ async function getEventsByMemberId(memberId, options = {}) {
       hasWhere = true;
     }
 
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('status = ?');
       params.push(status);
       hasWhere = true;
@@ -983,7 +983,7 @@ async function getEventsByMemberId(memberId, options = {}) {
       } else {
         processedEvent.image = null;
       }
-      
+
       if (event.joined_members) {
         try {
           processedEvent.joined_members = JSON.parse(event.joined_members);
@@ -993,7 +993,7 @@ async function getEventsByMemberId(memberId, options = {}) {
       } else {
         processedEvent.joined_members = [];
       }
-      
+
       return processedEvent;
     });
 
@@ -1038,7 +1038,7 @@ async function autoUpdateEventStatuses() {
         AND end_date >= NOW()
     `;
     const [pendingResult] = await query(pendingToOngoingSql);
-    
+
     // Update ongoing events to completed if end_date has passed
     const ongoingToCompletedSql = `
       UPDATE tbl_events
@@ -1254,7 +1254,7 @@ async function joinEvent(eventId, memberId) {
     // Check if event is completed or past (end_date < NOW())
     const now = new Date();
     const endDate = new Date(event.end_date);
-    
+
     if (event.status === 'completed') {
       return {
         success: false,
@@ -1273,7 +1273,7 @@ async function joinEvent(eventId, memberId) {
 
     // Get current joined_members array
     let joinedMembers = event.joined_members || [];
-    
+
     // Check if member already joined
     const memberIdNum = parseInt(memberId);
     const alreadyJoined = joinedMembers.some(id => parseInt(id) === memberIdNum);

@@ -9,7 +9,7 @@ export const useMarriageServiceStore = defineStore('marriageService', {
     searchQuery: '',
     filters: {
       sortBy: 'Marriage Date (Newest)',
-      status: 'All Statuses'
+      status: 'All Status'
     },
     currentPage: 1,
     totalPages: 1,
@@ -73,7 +73,7 @@ export const useMarriageServiceStore = defineStore('marriageService', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -208,7 +208,7 @@ export const useMarriageServiceStore = defineStore('marriageService', {
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (sortBy) {
@@ -262,11 +262,11 @@ export const useMarriageServiceStore = defineStore('marriageService', {
     setFilters(filters) {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
-      this.fetchMarriages({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchMarriages({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 

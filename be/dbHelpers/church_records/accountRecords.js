@@ -299,7 +299,7 @@ async function getAllAccounts(options = {}) {
     }
 
     // Add status filter
-    if (status && status !== 'All Statuses') {
+    if (status && status !== 'All Status') {
       whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);

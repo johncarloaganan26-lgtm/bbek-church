@@ -9,7 +9,7 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
     searchQuery: '',
     filters: {
       sortBy: 'Date Created (Newest)',
-      status: 'All Statuses',
+      status: 'All Status',
       type: 'All Types',
       dateRangeStart: null,
       dateRangeEnd: null
@@ -49,7 +49,7 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (type && type !== 'All Types') {
@@ -205,7 +205,7 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
           type: eventData.type || '',
           status: eventData.status || 'pending'
         }
-        
+
         // Add image as base64 if provided (new file or existing base64)
         if (eventData.imageFile) {
           // Convert File to base64 and strip data URL prefix if present
@@ -222,19 +222,19 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
           // Convert blob to base64
           eventPayload.image = eventData.image
         }
-        
+
         // Add joined_members if provided
         if (eventData.joined_members !== undefined) {
           eventPayload.joined_members = JSON.stringify(eventData.joined_members)
         }
-        
+
         const response = await axios.put(`/church-records/events/updateEvent/${id}`, eventPayload, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data.success) {
           await this.fetchEvents({
             page: this.currentPage,
@@ -298,7 +298,7 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
 
         const params = new URLSearchParams()
         if (search) params.append('search', search)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (type && type !== 'All Types') {
@@ -373,11 +373,11 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
       // Refetch with new filters
-      this.fetchEvents({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchEvents({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
@@ -419,10 +419,10 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
      */
     async fetchUserEvents(memberId, options = {}) {
       const { page = 1, pageSize = 10, search = '', status = '', type = '', sortBy = 'Date Created (Newest)' } = options
-      
+
       this.loading = true
       this.error = null
-      
+
       try {
         if (!memberId) {
           throw new Error('Member ID is required')
@@ -432,26 +432,26 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
         const params = new URLSearchParams()
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         if (search && search.trim()) {
           params.append('search', search.trim())
         }
-        
-        if (status && status !== 'All Statuses') {
+
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
-        
+
         if (type && type !== 'All Types') {
           params.append('type', type)
         }
-        
+
         if (sortBy) {
           params.append('sortBy', sortBy)
         }
-        
+
         // Call backend API
         const response = await axios.get(`/church-records/events/getEventsByMemberId/${memberId}?${params.toString()}`)
-        
+
         if (response.data.success) {
           // Map backend response to frontend format
           const events = response.data.data || []
@@ -460,11 +460,11 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
             let imageUrl = event.imageUrl || null
             if (!imageUrl && event.image) {
               // Fallback: If imageUrl not provided, convert base64 image to data URL
-              imageUrl = event.image.startsWith('data:') 
-                ? event.image 
+              imageUrl = event.image.startsWith('data:')
+                ? event.image
                 : `data:image/jpeg;base64,${event.image}`
             }
-            
+
             return {
               event_id: event.event_id,
               eventName: event.title, // Map title to eventName for frontend compatibility
@@ -480,9 +480,9 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
               ...event // Include all other fields
             }
           })
-          
+
           const totalPages = response.data.pagination?.totalPages || 1
-          
+
           return {
             success: true,
             data: formattedEvents,
@@ -521,16 +521,16 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
      */
     async fetchPublicEvents(options = {}) {
       const { page = 1, pageSize = 3, search = '', selectedStatus = '' } = options
-      
+
       this.loading = true
       this.error = null
-      
+
       try {
         // Build query parameters
         const params = new URLSearchParams()
         params.append('page', page.toString())
         params.append('pageSize', pageSize.toString())
-        
+
         if (search && search.trim()) {
           params.append('search', search.trim())
         }
@@ -553,10 +553,10 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
           // All upcoming events - show upcoming events only (future dates)
           params.append('sortBy', 'Start Date (Newest)')
         }
-        
+
         // Call backend API
         const response = await axios.get(`/church-records/events/getAllEvents?${params.toString()}`)
-        
+
         if (response.data.success) {
           // Map backend response to frontend format
           const events = response.data.data || []
@@ -565,11 +565,11 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
             let imageUrl = event.imageUrl || null
             if (!imageUrl && event.image) {
               // Fallback: If imageUrl not provided, convert base64 image to data URL
-              imageUrl = event.image.startsWith('data:') 
-                ? event.image 
+              imageUrl = event.image.startsWith('data:')
+                ? event.image
                 : `data:image/jpeg;base64,${event.image}`
             }
-            
+
             return {
               event_id: event.event_id,
               eventName: event.title, // Map title to eventName for frontend compatibility
@@ -585,9 +585,9 @@ export const useEventsRecordsStore = defineStore('eventsRecords', {
               ...event // Include all other fields
             }
           })
-          
+
           const totalPages = response.data.pagination?.totalPages || 1
-          
+
           return {
             success: true,
             data: formattedEvents,

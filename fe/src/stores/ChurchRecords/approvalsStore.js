@@ -9,7 +9,7 @@ export const useApprovalsStore = defineStore('approvals', {
     searchQuery: '',
     filters: {
       sortBy: 'Date Created (Newest)',
-      status: 'All Statuses',
+      status: 'All Status',
       type: 'All Types',
       dateRange: []
     },
@@ -77,7 +77,7 @@ export const useApprovalsStore = defineStore('approvals', {
         if (search) params.append('search', search)
         if (page) params.append('page', page)
         if (pageSize) params.append('pageSize', pageSize)
-        if (status && status !== 'All Statuses') {
+        if (status && status !== 'All Status') {
           params.append('status', status)
         }
         if (type && type !== 'All Types') {
@@ -96,7 +96,7 @@ export const useApprovalsStore = defineStore('approvals', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         if (response.data.success) {
           this.approvals = response.data.data || []
           this.totalCount = response.data.totalCount || 0
@@ -151,7 +151,7 @@ export const useApprovalsStore = defineStore('approvals', {
       const accessToken = localStorage.getItem('accessToken')
       try {
         const payload = { status };
-        
+
         // Include schedule date/time for child dedication approvals
         if (scheduleDate) {
           payload.schedule_date = scheduleDate;
@@ -159,8 +159,8 @@ export const useApprovalsStore = defineStore('approvals', {
         if (scheduleTime) {
           payload.schedule_time = scheduleTime;
         }
-        
-        const response = await axios.put(`/church-records/approvals/updateApprovalStatus/${id}`, 
+
+        const response = await axios.put(`/church-records/approvals/updateApprovalStatus/${id}`,
           payload,
           {
             headers: {
@@ -169,7 +169,7 @@ export const useApprovalsStore = defineStore('approvals', {
             }
           }
         )
-        
+
         if (response.data.success) {
           await this.fetchApprovals({
             page: this.currentPage,
@@ -243,11 +243,11 @@ export const useApprovalsStore = defineStore('approvals', {
     setFilters(filters) {
       this.filters = { ...this.filters, ...filters }
       this.currentPage = 1
-      this.fetchApprovals({ 
-        ...filters, 
-        page: 1, 
-        pageSize: this.itemsPerPage, 
-        search: this.searchQuery 
+      this.fetchApprovals({
+        ...filters,
+        page: 1,
+        pageSize: this.itemsPerPage,
+        search: this.searchQuery
       })
     },
 
@@ -273,7 +273,7 @@ export const useApprovalsStore = defineStore('approvals', {
         // Build query parameters
         const params = new URLSearchParams()
         if (options.search) params.append('search', options.search)
-        if (options.status && options.status !== 'All Statuses') {
+        if (options.status && options.status !== 'All Status') {
           params.append('status', options.status)
         }
         if (options.type && options.type !== 'All Types') {
@@ -285,7 +285,7 @@ export const useApprovalsStore = defineStore('approvals', {
         if (options.dateRange && options.dateRange.length === 2) {
           params.append('dateRange', JSON.stringify(options.dateRange))
         }
-        
+
         // Make request with responseType: 'blob' to handle binary data
         const response = await axios.get(`/church-records/approvals/exportExcel?${params}`, {
           responseType: 'blob',
@@ -294,7 +294,7 @@ export const useApprovalsStore = defineStore('approvals', {
             'Content-Type': 'application/json'
           }
         })
-        
+
         // Extract filename from content-disposition header or use default
         const contentDisposition = response.headers['content-disposition']
         let filename = 'approvals_export.xlsx'
@@ -304,7 +304,7 @@ export const useApprovalsStore = defineStore('approvals', {
             filename = filenameMatch[1]
           }
         }
-        
+
         // Create download link and trigger download
         const url = window.URL.createObjectURL(new Blob([response.data]))
         const link = document.createElement('a')
@@ -312,11 +312,11 @@ export const useApprovalsStore = defineStore('approvals', {
         link.setAttribute('download', filename)
         document.body.appendChild(link)
         link.click()
-        
+
         // Cleanup
         link.parentNode.removeChild(link)
         window.URL.revokeObjectURL(url)
-        
+
         return { success: true, message: 'Excel file downloaded successfully' }
       } catch (error) {
         this.error = error.response?.data?.error || error.message || 'Failed to export approvals to Excel'

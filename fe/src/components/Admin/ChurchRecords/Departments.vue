@@ -412,7 +412,7 @@ const isIndeterminate = computed(() => {
 
 // Filter options
 const statusOptions = [
-  { title: 'All Statuses', value: 'All Statuses' },
+  { title: 'All Status', value: 'All Status' },
   { title: 'Active', value: 'active' },
   { title: 'Not Active', value: 'not_active' }
 ]

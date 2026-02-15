@@ -16,7 +16,8 @@ body {
 }
 
 /* Ensure all pages start at the top */
-html, body {
+html,
+body {
   scroll-behavior: smooth;
 }
 

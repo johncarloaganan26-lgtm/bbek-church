@@ -315,7 +315,7 @@ const isIndeterminate = computed(() => {
 
 
 
-const statusOptions = ['All Statuses', 'active', 'inactive']
+const statusOptions = ['All Status', 'active', 'inactive']
 const positionOptions = ['All Positions', 'admin', 'staff', 'member']
 const createdMonthOptions = ['All Months', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const sortByOptions = [

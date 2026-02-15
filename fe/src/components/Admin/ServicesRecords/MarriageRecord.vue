@@ -386,7 +386,7 @@ const sortByOptions = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ]
 
-const statusOptions = ['All Statuses', 'Pending', 'Ongoing', 'Completed']
+const statusOptions = ['All Status', 'Pending', 'Ongoing', 'Completed']
 
 // Dialog state
 const marriageServiceDialog = ref(false)
