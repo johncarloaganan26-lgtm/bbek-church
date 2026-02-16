@@ -1,4 +1,4 @@
-<template>
+  <template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -60,7 +60,13 @@
             :key="leader.id"
             :label="leader.name"
             :value="leader.id"
-          />
+          >
+            <div class="option-item">
+              <span class="option-name">{{ leader.name }}</span>
+              <span v-if="leader.email" class="option-email">({{ leader.email }})</span>
+              <span v-if="leader.position" class="option-position">{{ leader.position }}</span>
+            </div>
+          </el-option>
         </el-select>
       </el-form-item>
 
@@ -104,7 +110,13 @@
             :key="member.id"
             :label="member.name"
             :value="member.id"
-          />
+          >
+            <div class="option-item">
+              <span class="option-name">{{ member.name }}</span>
+              <span v-if="member.email" class="option-email">({{ member.email }})</span>
+              <span v-if="member.position" class="option-position">{{ member.position }}</span>
+            </div>
+          </el-option>
         </el-select>
       </el-form-item>
 
@@ -869,6 +881,33 @@ defineExpose({
   font-size: 12px;
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.option-name {
+  font-weight: 500;
+  color: #303133;
+}
+
+.option-email {
+  font-size: 12px;
+  color: #909399;
+}
+
+.option-position {
+  margin-left: auto;
+  font-size: 11px;
+  color: #14b8a6;
+  background-color: #f0fdfa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ccfbf1;
 }
 </style>
 
