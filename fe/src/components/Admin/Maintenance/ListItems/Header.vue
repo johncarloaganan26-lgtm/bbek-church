@@ -245,6 +245,24 @@
     </div>
     <el-divider />
 
+    <!-- Full Name Color -->
+    <div class="list-item">
+      <div class="item-label">Full Name Color</div>
+      <div class="item-preview">
+        <div
+          class="color-preview"
+          :style="{ backgroundColor: headerData.fullnameColor }"
+        ></div>
+      </div>
+      <div class="item-action">
+        <el-color-picker
+          v-model="headerData.fullnameColor"
+          size="small"
+        ></el-color-picker>
+      </div>
+    </div>
+    <el-divider />
+
     <!-- Border Color -->
     <div class="list-item">
       <div class="item-label">Border Color</div>
@@ -352,6 +370,7 @@ const defaultHeaderData = {
   buttonText: 'Dashboard',
   buttonColor: '#14b8a6',
   acronymColor: '#0cbdaa',
+  fullnameColor: '#757575',
   borderColor: '#0cbdaa',
   activeColor: '#14a79a'
 }

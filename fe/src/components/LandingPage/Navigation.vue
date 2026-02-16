@@ -26,7 +26,7 @@ ve<template>
           </el-avatar>
           <div class="logo-text">
             <h1 class="logo-title" :style="{ color: headerData.acronymColor || '#0cbdaa' }">{{ headerData.acronym || 'BBEK' }}</h1>
-            <p class="logo-subtitle">
+            <p class="logo-subtitle" :style="{ color: headerData.fullnameColor || '#757575' }">
               {{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}
             </p>
           </div>
@@ -171,7 +171,7 @@ ve<template>
             </el-avatar>
             <div class="logo-text ml-3">
               <h3 class="logo-title">{{ headerData.acronym || 'BBEK' }}</h3>
-              <p class="logo-subtitle">{{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}</p>
+              <p class="logo-subtitle" :style="{ color: headerData.fullnameColor || '#757575' }">{{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}</p>
             </div>
           </div>
         </div>
@@ -478,6 +478,7 @@ const defaultHeaderData = {
   buttonText: 'Dashboard',
   buttonColor: '#14b8a6',
   acronymColor: '#0cbdaa',
+  fullnameColor: '#757575',
   borderColor: '#0cbdaa',
   activeColor: '#14a79a'
 }
@@ -560,6 +561,7 @@ const fetchHeaderData = async () => {
         buttonText: content.buttonText || defaultHeaderData.buttonText || 'Dashboard',
         buttonColor: content.buttonColor || defaultHeaderData.buttonColor || '#14b8a6',
         acronymColor: content.acronymColor || defaultHeaderData.acronymColor || '#0cbdaa',
+        fullnameColor: content.fullnameColor || defaultHeaderData.fullnameColor || '#757575',
         borderColor: content.borderColor || defaultHeaderData.borderColor || '#0cbdaa',
         activeColor: content.activeColor || defaultHeaderData.activeColor || '#14a79a'
       }

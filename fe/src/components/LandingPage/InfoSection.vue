@@ -15,17 +15,17 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column1Icon || 'mdi-clock-outline'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
+              <v-icon :icon="infoData.column1Icon || 'mdi-clock-outline'" size="32" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
             <h3
-              class="text-h5 font-weight-bold mb-4"
+              class="info-title font-weight-bold"
               :style="`font-family: 'Georgia', serif; font-style: italic; color: ${infoData.buttonColor || '#008080'}`"
             >
               {{ infoData.column1Title || 'SUNDAY SERVICE' }}
             </h3>
             <div
-              class="text-body-2 text-grey-darken-2"
-              style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.8;"
+              class="info-text text-grey-darken-2"
+              style="font-family: 'Georgia', serif; font-style: italic;"
               v-html="formatText(infoData.column1Text)"
             ></div>
           </div>
@@ -35,23 +35,23 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column2Icon || 'mdi-laptop'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
+              <v-icon :icon="infoData.column2Icon || 'mdi-laptop'" size="32" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
             <h3
-              class="text-h5 font-weight-bold mb-4"
+              class="info-title font-weight-bold"
               :style="`font-family: 'Georgia', serif; font-style: italic; color: ${infoData.buttonColor || '#008080'}`"
             >
               {{ infoData.column2Title || 'WATCH ONLINE' }}
             </h3>
             <div
-              class="text-body-2 text-grey-darken-2 mb-6"
-              style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.8;"
+              class="info-text text-grey-darken-2 mb-3"
+              style="font-family: 'Georgia', serif; font-style: italic;"
               v-html="formatText(infoData.column2Text)"
             ></div>
             <v-btn
               variant="outlined"
-              size="large"
-              class="info-btn px-8"
+              size="default"
+              class="info-btn px-5"
               :style="`font-family: Poppins, sans-serif; font-weight: 600; border-color: ${infoData.buttonColor || '#008080'}`"
               @click="$router.push(infoData.watchLiveLink || '/live')"
             >
@@ -64,23 +64,23 @@
         <v-col cols="12" md="4">
           <div class="info-column text-center">
             <div class="icon-wrapper">
-              <v-icon :icon="infoData.column3Icon || 'mdi-cash'" size="40" :color="infoData.buttonColor || '#008080'"></v-icon>
+              <v-icon :icon="infoData.column3Icon || 'mdi-cash'" size="32" :color="infoData.buttonColor || '#008080'"></v-icon>
             </div>
             <h3
-              class="text-h5 font-weight-bold mb-4"
+              class="info-title font-weight-bold"
               :style="`font-family: 'Georgia', serif; font-style: italic; color: ${infoData.buttonColor || '#008080'}`"
             >
               {{ infoData.column3Title || 'GIVE' }}
             </h3>
             <div
-              class="text-body-2 text-grey-darken-2 mb-6"
-              style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.8;"
+              class="info-text text-grey-darken-2 mb-3"
+              style="font-family: 'Georgia', serif; font-style: italic;"
               v-html="formatText(infoData.column3Text)"
             ></div>
             <v-btn
               variant="outlined"
-              size="large"
-              class="info-btn px-8"
+              size="default"
+              class="info-btn px-5"
               :style="`font-family: Poppins, sans-serif; font-weight: 600; border-color: ${infoData.buttonColor || '#008080'}`"
               @click="$router.push(infoData.giveLink || '/give')"
             >
@@ -190,10 +190,10 @@ onMounted(async () => {
 <style scoped>
 .info-section {
   position: relative;
-  min-height: 80vh;
+  min-height: 220px;
   display: flex;
   align-items: center;
-  padding: 80px 0;
+  padding: 16px 0;
   --btn-color: #008080;
 }
 
@@ -205,7 +205,7 @@ onMounted(async () => {
 }
 
 .info-column {
-  padding: 32px 24px;
+  padding: 12px 10px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -215,14 +215,25 @@ onMounted(async () => {
 }
 
 .icon-wrapper {
-  width: 80px;
-  height: 80px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: rgba(0, 128, 128, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
+}
+
+.info-title {
+  font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+  line-height: 1.25;
+  margin-bottom: 10px;
+}
+
+.info-text {
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 /* Info Button Styles */
@@ -230,6 +241,8 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
   color: var(--btn-color) !important;
+  font-size: 0.82rem;
+  min-height: 36px;
   transition: color 0.3s ease;
   z-index: 1;
 }
@@ -256,13 +269,22 @@ onMounted(async () => {
 
 @media (max-width: 960px) {
   .info-section {
-    min-height: 60vh;
-    padding: 48px 0;
+    min-height: auto;
+    padding: 14px 0;
   }
 
   .info-column {
-    padding: 24px 16px;
-    margin-bottom: 32px;
+    padding: 10px 8px;
+    margin-bottom: 12px;
+  }
+
+  .info-title {
+    margin-bottom: 8px;
+    font-size: 1rem;
+  }
+
+  .info-text {
+    font-size: 0.9rem;
   }
 
   .info-column:last-child {
@@ -272,23 +294,38 @@ onMounted(async () => {
 
 @media (max-width: 600px) {
   .info-section {
-    min-height: 70vh;
-    padding: 32px 0;
+    min-height: auto;
+    padding: 10px 0;
   }
 
   .info-column {
-    padding: 20px 12px;
-    margin-bottom: 24px;
+    padding: 8px 6px;
+    margin-bottom: 10px;
   }
 
   .icon-wrapper {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 16px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;
+  }
+
+  .info-title {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+  }
+
+  .info-text {
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+
+  .info-btn {
+    font-size: 0.78rem;
+    min-height: 32px;
   }
 
   .icon-wrapper :deep(.v-icon) {
-    font-size: 32px !important;
+    font-size: 24px !important;
   }
 }
 </style>

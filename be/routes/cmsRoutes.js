@@ -41,14 +41,42 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
     const timestamp = Date.now();
     const randomNum = Math.floor(Math.random() * 10000);
     
-    let imageFile;
     let imageBuffer;
+
+    const saveBufferToPublicImg = (buffer, extension = '.jpg') => {
+      const safeExt = extension.startsWith('.') ? extension : `.${extension}`;
+      const filename = `cms_${type}_${timestamp}_${randomNum}${safeExt}`;
+
+      // Save to frontend public/img folder
+      const uploadDir = path.resolve(__dirname, '../../fe/public/img');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      const filePath = path.join(uploadDir, filename);
+      fs.writeFileSync(filePath, buffer);
+
+      return `/img/${filename}`;
+    };
     
     // Check if file was uploaded via multer (multipart/form-data)
     if (req.file) {
-      imageFile = req.file;
-      imageBuffer = imageFile.buffer;
-      console.log('File uploaded via multer:', imageFile.originalname, imageFile.size, 'bytes');
+      imageBuffer = req.file.buffer;
+      console.log('File uploaded via multer:', req.file.originalname, req.file.size, 'bytes');
+
+      const originalExt = path.extname(req.file.originalname || '').toLowerCase();
+      const mimeExt = req.file.mimetype && req.file.mimetype.startsWith('image/')
+        ? `.${req.file.mimetype.split('/')[1].toLowerCase()}`
+        : '.jpg';
+      const extension = originalExt || mimeExt;
+
+      const imagePath = saveBufferToPublicImg(imageBuffer, extension);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Image uploaded successfully',
+        imagePath
+      });
     } else if (req.body.image && typeof req.body.image === 'string') {
       // Check if image is provided as base64 string
       if (req.body.image.startsWith('data:')) {
@@ -58,19 +86,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
           const ext = matches[1];
           const base64Data = matches[2];
           imageBuffer = Buffer.from(base64Data, 'base64');
-          const extWithDot = '.' + ext;
-          const filename = `cms_${type}_${timestamp}_${randomNum}${extWithDot}`;
-          
-          // Save to frontend public/img folder
-          const uploadDir = path.resolve(__dirname, '../../fe/public/img');
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-          
-          const filePath = path.join(uploadDir, filename);
-          fs.writeFileSync(filePath, imageBuffer);
-          
-          const imagePath = `/img/${filename}`;
+          const imagePath = saveBufferToPublicImg(imageBuffer, `.${ext}`);
           
           return res.status(200).json({
             success: true,
@@ -83,17 +99,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
       // Try to decode base64 directly
       try {
         imageBuffer = Buffer.from(req.body.image, 'base64');
-        const filename = `cms_${type}_${timestamp}_${randomNum}.jpg`;
-        
-        const uploadDir = path.resolve(__dirname, '../../fe/public/img');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        
-        const filePath = path.join(uploadDir, filename);
-        fs.writeFileSync(filePath, imageBuffer);
-        
-        const imagePath = `/img/${filename}`;
+        const imagePath = saveBufferToPublicImg(imageBuffer, '.jpg');
         
         return res.status(200).json({
           success: true,
