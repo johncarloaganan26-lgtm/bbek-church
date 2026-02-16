@@ -35,7 +35,7 @@ router.get('/getAllArchives', requireAdmin, async (req, res) => {
   try {
     const options = req.query;
     const result = await getAllArchives(options);
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -69,7 +69,7 @@ router.get('/getArchiveById/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await getArchiveById(parseInt(id));
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -100,11 +100,12 @@ router.get('/getArchiveById/:id', requireAdmin, async (req, res) => {
 router.post('/restoreArchive/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { restored_by, restore_notes } = req.body;
+    const { restored_by, restore_notes, reason } = req.body;
+    const final_notes = restore_notes || reason || null;
     const userId = restored_by || req.user?.acc_id || null;
 
-    const result = await restoreArchive(parseInt(id), userId, restore_notes);
-    
+    const result = await restoreArchive(parseInt(id), userId, final_notes);
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -136,7 +137,8 @@ router.post('/bulkRestoreArchives', requireAdmin, async (req, res) => {
   // Skip audit trail middleware for bulk operations to improve performance
   req.skipAuditTrail = true;
   try {
-    const { archive_ids, restored_by, restore_notes } = req.body;
+    const { archive_ids, restored_by, restore_notes, reason } = req.body;
+    const final_notes = restore_notes || reason || null;
     const userId = restored_by || req.user?.acc_id || null;
 
     if (!archive_ids || !Array.isArray(archive_ids) || archive_ids.length === 0) {
@@ -162,10 +164,10 @@ router.post('/bulkRestoreArchives', requireAdmin, async (req, res) => {
     req.bulk_restore_data = {
       archive_ids: archiveIds,
       count: archiveIds.length,
-      restore_notes: reason
+      restore_notes: final_notes
     };
 
-    const result = await bulkRestoreArchives(archiveIds, userId, restore_notes);
+    const result = await bulkRestoreArchives(archiveIds, userId, final_notes);
 
     if (result.success) {
       res.status(200).json({
@@ -196,7 +198,7 @@ router.post('/bulkRestoreArchives', requireAdmin, async (req, res) => {
 router.get('/getArchiveSummary', requireAdmin, async (req, res) => {
   try {
     const result = await getArchiveSummary();
-    
+
     if (result.success) {
       res.status(200).json({
         success: true,
@@ -346,7 +348,8 @@ router.post('/restoreAllArchives', requireAdmin, async (req, res) => {
   // Skip audit trail middleware for bulk operations to improve performance
   req.skipAuditTrail = true;
   try {
-    const { restored_by, restore_notes } = req.body;
+    const { restored_by, restore_notes, reason } = req.body;
+    const final_notes = restore_notes || reason || null;
     const userId = restored_by || req.user?.acc_id || null;
 
     // First, get all non-restored archive IDs
@@ -381,11 +384,11 @@ router.post('/restoreAllArchives', requireAdmin, async (req, res) => {
       archive_ids: allArchiveIds,
       count: allArchiveIds.length,
       restore_all: true,
-      restore_notes: restore_notes
+      restore_notes: final_notes
     };
 
     // Use bulk restore to process all archives
-    const result = await bulkRestoreArchives(allArchiveIds, userId, restore_notes);
+    const result = await bulkRestoreArchives(allArchiveIds, userId, final_notes);
 
     if (result.success) {
       res.status(200).json({

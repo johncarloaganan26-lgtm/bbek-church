@@ -31,7 +31,17 @@
         </div>
         <div class="info-row">
           <span class="info-label">Email</span>
-          <span class="info-value">{{ donation?.donor_email || donation?.email || 'N/A' }}</span>
+          <span class="info-value">
+            <template v-if="donation?.is_anonymous">
+              <span class="anonymous-email">
+                <v-icon size="x-small" class="mr-1">mdi-shield-check</v-icon>
+                {{ maskEmail(donation?.donor_email || donation?.email) }}
+              </span>
+            </template>
+            <template v-else>
+              {{ donation?.donor_email || donation?.email || 'N/A' }}
+            </template>
+          </span>
         </div>
         <div class="info-row">
           <span class="info-label">Amount</span>
@@ -286,6 +296,17 @@ const getStatusType = (status) => {
   return statusTypes[status] || 'info'
 }
 
+// Mask email for anonymity
+const maskEmail = (email) => {
+  if (!email || email === 'N/A') return 'N/A'
+  const [user, domain] = email.split('@')
+  if (!domain) return email
+  const maskedUser = user.length > 2 
+    ? user.substring(0, 2) + '*'.repeat(user.length - 2)
+    : user.substring(0, 1) + '*'
+  return `${maskedUser}@${domain}`
+}
+
 // Open fullscreen image
 const openImageFullscreen = () => {
   if (proofImage.value) {
@@ -538,6 +559,14 @@ watch(
   align-items: center;
   color: #9ca3af;
   font-style: italic;
+}
+
+.anonymous-email {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Proof Image Section */

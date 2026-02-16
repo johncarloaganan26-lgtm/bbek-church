@@ -42,21 +42,21 @@ const ALLOWED_SCHEDULE_DAY = 'Sunday';
  */
 function validateStatusTransition(currentStatus, newStatus) {
     const allowedTransitions = VALID_STATUS_TRANSITIONS[currentStatus] || [];
-    
+
     if (allowedTransitions.length === 0) {
         return {
             valid: false,
             message: `Cannot change status from '${currentStatus}'. This is a terminal state.`
         };
     }
-    
+
     if (!allowedTransitions.includes(newStatus)) {
         return {
             valid: false,
             message: `Cannot transition from '${currentStatus}' to '${newStatus}'. Valid transitions: ${allowedTransitions.join(', ') || 'None'}`
         };
     }
-    
+
     return { valid: true };
 }
 
@@ -69,11 +69,11 @@ function validateScheduledDate(scheduledDate) {
     if (!scheduledDate) {
         return { valid: true }; // No date to validate
     }
-    
+
     const date = new Date(scheduledDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Check if date is in the past
     if (date < today) {
         return {
@@ -81,7 +81,7 @@ function validateScheduledDate(scheduledDate) {
             message: 'Cannot schedule in the past. Please select a future date.'
         };
     }
-    
+
     // Check if date is a Sunday (only allowed day for discipleship)
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     if (dayOfWeek !== ALLOWED_SCHEDULE_DAY) {
@@ -90,7 +90,7 @@ function validateScheduledDate(scheduledDate) {
             message: `Discipleship sessions can only be scheduled on ${ALLOWED_SCHEDULE_DAY}. Please select a Sunday date.`
         };
     }
-    
+
     return { valid: true };
 }
 
@@ -105,7 +105,7 @@ async function checkSchedulingConflict(pastorId, scheduledDate, excludeRequestId
     if (!pastorId || !scheduledDate) {
         return { valid: true };
     }
-    
+
     let sql = `
         SELECT request_id, firstname, lastname, scheduled_date, pastor_id 
         FROM tbl_discipleship_requests 
@@ -114,14 +114,14 @@ async function checkSchedulingConflict(pastorId, scheduledDate, excludeRequestId
         AND status NOT IN ('Promoted', 'Cancelled')
     `;
     const params = [pastorId, scheduledDate];
-    
+
     if (excludeRequestId) {
         sql += ' AND request_id != ?';
         params.push(excludeRequestId);
     }
-    
+
     const [rows] = await query(sql, params);
-    
+
     if (rows.length > 0) {
         const conflictPerson = `${rows[0].firstname} ${rows[0].lastname}`;
         return {
@@ -129,7 +129,7 @@ async function checkSchedulingConflict(pastorId, scheduledDate, excludeRequestId
             message: `Pastor already has a session scheduled with ${conflictPerson} on this date. Please select a different date or time.`
         };
     }
-    
+
     return { valid: true };
 }
 
@@ -141,7 +141,7 @@ async function checkSchedulingConflict(pastorId, scheduledDate, excludeRequestId
  */
 function validateRequiredFields(action, data) {
     const errors = [];
-    
+
     switch (action) {
         case 'schedule':
             if (!data.pastor_id || data.pastor_id === '') {
@@ -154,19 +154,19 @@ function validateRequiredFields(action, data) {
                 errors.push('Location is required');
             }
             break;
-            
+
         case 'update_status':
             if (!data.status) {
                 errors.push('Status is required');
             }
             break;
-            
+
         case 'promote':
             if (data.status && data.status !== 'Completed') {
                 errors.push('Can only promote requests with "Completed" status');
             }
             break;
-            
+
         case 'update':
             if (data.pastor_id === '' && data.scheduled_date) {
                 errors.push('Cannot schedule without assigning a pastor');
@@ -176,11 +176,11 @@ function validateRequiredFields(action, data) {
             }
             break;
     }
-    
+
     if (errors.length > 0) {
         return { valid: false, message: errors.join('; ') };
     }
-    
+
     return { valid: true };
 }
 
@@ -193,18 +193,18 @@ function validateRequiredFields(action, data) {
 async function checkDuplicates(email, excludeRequestId = null) {
     let sql = 'SELECT request_id, status FROM tbl_discipleship_requests WHERE email = ?';
     const params = [email.toLowerCase().trim()];
-    
+
     if (excludeRequestId) {
         sql += ' AND request_id != ?';
         params.push(excludeRequestId);
     }
-    
+
     const [rows] = await query(sql, params);
-    
+
     if (rows.length > 0) {
         const status = rows[0].status;
         const requestId = rows[0].request_id;
-        
+
         if (['Pending', 'Scheduled'].includes(status)) {
             return {
                 valid: false,
@@ -222,7 +222,7 @@ async function checkDuplicates(email, excludeRequestId = null) {
             };
         }
     }
-    
+
     return { valid: true };
 }
 
@@ -260,19 +260,19 @@ async function sendStatusNotificationEmail({ email, firstname, lastname, status,
 router.post('/submit', async (req, res) => {
     try {
         const { email, firstname, lastname } = req.body;
-        
+
         // Check for duplicates before creating
         const duplicateCheck = await checkDuplicates(email);
         if (!duplicateCheck.valid) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: duplicateCheck.message,
                 errorCode: 'DUPLICATE_REQUEST'
             });
         }
-        
+
         const result = await createDiscipleshipRequest(req.body);
-        
+
         // Log successful submission
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_SUBMITTED',
@@ -283,12 +283,12 @@ router.post('/submit', async (req, res) => {
             user_name: 'Public User',
             user_position: 'public'
         });
-        
+
         res.status(201).json(result);
     } catch (error) {
         console.error('Submit error:', error);
-        res.status(400).json({ 
-            success: false, 
+        res.status(400).json({
+            success: false,
             message: error.message,
             errorCode: 'SUBMIT_ERROR'
         });
@@ -307,8 +307,8 @@ router.get('/', authenticateToken, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Get All error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'FETCH_ERROR'
         });
@@ -320,20 +320,20 @@ router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
-        
+
         if (rows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         res.json({ success: true, data: rows[0] });
     } catch (error) {
         console.error('Get details error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'FETCH_ERROR'
         });
@@ -345,73 +345,73 @@ router.put('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { status, scheduled_date, pastor_id, location, notes, firstname, lastname, email } = req.body;
-        
+
         // Get current status
         const [currentRows] = await query('SELECT status, scheduled_date, pastor_id FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         const currentStatus = currentRows[0].status;
         const currentPastorId = currentRows[0].pastor_id;
         const currentScheduledDate = currentRows[0].scheduled_date;
-        
+
         // Validate status transition if status is being changed
         if (status && status !== currentStatus) {
             const statusValidation = validateStatusTransition(currentStatus, status);
             if (!statusValidation.valid) {
-                return res.status(400).json({ 
-                    success: false, 
+                return res.status(400).json({
+                    success: false,
                     message: statusValidation.message,
                     errorCode: 'INVALID_STATUS_TRANSITION'
                 });
             }
         }
-        
+
         // Validate scheduled date if being changed
         if (scheduled_date && scheduled_date !== currentScheduledDate) {
             const dateValidation = validateScheduledDate(scheduled_date);
             if (!dateValidation.valid) {
-                return res.status(400).json({ 
-                    success: false, 
+                return res.status(400).json({
+                    success: false,
                     message: dateValidation.message,
                     errorCode: 'INVALID_SCHEDULE_DATE'
                 });
             }
-            
+
             // Check for scheduling conflicts
             const pastorIdForCheck = pastor_id || currentPastorId;
             if (pastorIdForCheck) {
                 const conflictCheck = await checkSchedulingConflict(pastorIdForCheck, scheduled_date, id);
                 if (!conflictCheck.valid) {
-                    return res.status(400).json({ 
-                        success: false, 
+                    return res.status(400).json({
+                        success: false,
                         message: conflictCheck.message,
                         errorCode: 'SCHEDULING_CONFLICT'
                     });
                 }
             }
         }
-        
+
         // Validate required fields if scheduling
         if (scheduled_date || pastor_id !== undefined) {
             const requiredValidation = validateRequiredFields('schedule', { pastor_id, scheduled_date, location });
             if (!requiredValidation.valid) {
-                return res.status(400).json({ 
-                    success: false, 
+                return res.status(400).json({
+                    success: false,
                     message: requiredValidation.message,
                     errorCode: 'MISSING_REQUIRED_FIELDS'
                 });
             }
         }
-        
+
         // Perform the update
         const result = await updateDiscipleshipRequest(id, req.body);
-        
+
         // Log status change
         if (status && status !== currentStatus) {
             await auditTrailRecords.createAuditLog({
@@ -429,7 +429,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 user_name: req.user?.firstname || null,
                 user_position: req.user?.position || null
             });
-            
+
             // Send email notification for status change
             if (email) {
                 let pastor_name = '';
@@ -443,7 +443,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                         console.error('Error fetching pastor:', e);
                     }
                 }
-                
+
                 await sendStatusNotificationEmail({
                     email,
                     firstname,
@@ -455,7 +455,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 });
             }
         }
-        
+
         // Log scheduling
         if (scheduled_date && scheduled_date !== currentScheduledDate) {
             await auditTrailRecords.createAuditLog({
@@ -473,7 +473,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 user_name: req.user?.firstname || null,
                 user_position: req.user?.position || null
             });
-            
+
             // Send email notification for scheduling if status is Scheduled
             if (email && status === 'Scheduled') {
                 let pastor_name = '';
@@ -487,7 +487,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                         console.error('Error fetching pastor:', e);
                     }
                 }
-                
+
                 await sendStatusNotificationEmail({
                     email,
                     firstname,
@@ -499,12 +499,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 });
             }
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error('Update error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'UPDATE_ERROR'
         });
@@ -515,30 +515,30 @@ router.put('/:id', authenticateToken, async (req, res) => {
 router.post('/promote/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Get current status
         const [currentRows] = await query('SELECT status, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         const currentStatus = currentRows[0].status;
-        
+
         // Validate - only Completed status can be promoted
         if (currentStatus !== 'Completed') {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: `Cannot promote request with status "${currentStatus}". Only "Completed" requests can be promoted to water baptism.`,
                 errorCode: 'INVALID_STATUS_FOR_PROMOTION'
             });
         }
-        
+
         const result = await promoteToBaptism(id);
-        
+
         // Log promotion
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_PROMOTED',
@@ -556,12 +556,12 @@ router.post('/promote/:id', authenticateToken, async (req, res) => {
             user_name: req.user?.firstname || null,
             user_position: req.user?.position || null
         });
-        
+
         res.json(result);
     } catch (error) {
         console.error('Promote error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'PROMOTE_ERROR'
         });
@@ -573,30 +573,30 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { isDecided } = req.body;
-        
+
         // Get current status
         const [currentRows] = await query('SELECT status, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         const currentStatus = currentRows[0].status;
-        
+
         // Can't invite if already promoted
         if (currentStatus === 'Promoted') {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'This request has already been promoted to water baptism.',
                 errorCode: 'ALREADY_PROMOTED'
             });
         }
-        
+
         const result = await inviteToBaptism(id, isDecided);
-        
+
         // Log invitation
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_INVITATION_SENT',
@@ -613,12 +613,12 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
             user_name: req.user?.firstname || null,
             user_position: req.user?.position || null
         });
-        
+
         res.json(result);
     } catch (error) {
         console.error('Invite error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'INVITE_ERROR'
         });
@@ -630,26 +630,26 @@ router.delete('/:id', authenticateToken, checkAdminRole, async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body || {}; // DELETE requests may not have body
-        
+
         // Get request details before archiving
         const [currentRows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         const requestData = currentRows[0];
-        
+
         // Archive instead of hard delete
         const result = await archiveDiscipleshipRequest(id, {
             archived_at: new Date(),
-            archived_by: req.user?.id || 'admin',
+            archived_by: req.user?.acc_id || 'admin',
             archive_reason: reason || 'Deleted by admin'
         });
-        
+
         // Log archival
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_ARCHIVED',
@@ -666,12 +666,12 @@ router.delete('/:id', authenticateToken, checkAdminRole, async (req, res) => {
             user_name: req.user?.firstname || null,
             user_position: req.user?.position || null
         });
-        
+
         res.json(result);
     } catch (error) {
         console.error('Archive error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'ARCHIVE_ERROR'
         });
@@ -683,20 +683,20 @@ router.get('/registration-data/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const [rows] = await query('SELECT firstname, lastname, email, phone_number, birthdate, age, gender, address FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
-        
+
         if (rows.length === 0) {
-            return res.status(404).json({ 
-                success: false, 
+            return res.status(404).json({
+                success: false,
                 message: 'Request not found',
                 errorCode: 'NOT_FOUND'
             });
         }
-        
+
         res.json({ success: true, data: rows[0] });
     } catch (error) {
         console.error('Get Registration Data error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'FETCH_ERROR'
         });
@@ -707,54 +707,58 @@ router.get('/registration-data/:id', async (req, res) => {
 router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res) => {
     try {
         const { requestIds, reason } = req.body;
-        
+
         if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'No requests selected',
                 errorCode: 'NO_SELECTION'
             });
         }
-        
+
         if (!reason || reason.trim() === '') {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'Reason is required for bulk archive',
                 errorCode: 'MISSING_REASON'
             });
         }
-        
+
         const archivedIds = [];
         const failedIds = [];
-        
+
         for (const request_id of requestIds) {
             try {
                 // Get request data
                 const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
-                
+
                 if (rows.length === 0) {
                     failedIds.push({ request_id, error: 'Not found' });
                     continue;
                 }
-                
+
                 const requestData = rows[0];
-                
+
                 // Prepare archive data
                 const archiveDataText = JSON.stringify(requestData, null, 2);
-                
-                // Archive the record
-                await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, req.user?.firstname || 'admin');
-                
+
+                // Archive the record using the helper
+                await archiveDiscipleshipRequest(request_id, {
+                    archived_at: new Date(),
+                    archived_by: req.user?.acc_id || 'admin',
+                    archive_reason: reason
+                });
+
                 // Delete from original table
                 await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
-                
+
                 archivedIds.push(request_id);
             } catch (err) {
                 console.error(`Error archiving ${request_id}:`, err);
                 failedIds.push({ request_id, error: err.message });
             }
         }
-        
+
         // Log bulk archival
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_BULK_ARCHIVED',
@@ -770,7 +774,7 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
             user_name: req.user?.firstname || null,
             user_position: req.user?.position || null
         });
-        
+
         res.json({
             success: true,
             message: `Successfully archived ${archivedIds.length} requests`,
@@ -781,8 +785,8 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
         });
     } catch (error) {
         console.error('Bulk archive error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'BULK_ARCHIVE_ERROR'
         });
@@ -795,63 +799,63 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
 router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res) => {
     try {
         const { requestIds } = req.body;
-        
+
         if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'No requests selected',
                 errorCode: 'NO_SELECTION'
             });
         }
-        
+
         const completedIds = [];
         const failedIds = [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
+
         for (const request_id of requestIds) {
             try {
                 // Get request data
                 const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
-                
+
                 if (rows.length === 0) {
                     failedIds.push({ request_id, error: 'Not found', reason: 'Record does not exist' });
                     continue;
                 }
-                
+
                 const requestData = rows[0];
-                
+
                 // Only allow completing "Scheduled" status
                 if (requestData.status !== 'Scheduled') {
-                    failedIds.push({ 
-                        request_id, 
-                        error: `Invalid status: ${requestData.status}`, 
-                        reason: 'Only "Scheduled" records can be marked as completed' 
+                    failedIds.push({
+                        request_id,
+                        error: `Invalid status: ${requestData.status}`,
+                        reason: 'Only "Scheduled" records can be marked as completed'
                     });
                     continue;
                 }
-                
+
                 // Check if scheduled date is in the future
                 if (requestData.scheduled_date) {
                     const scheduledDate = new Date(requestData.scheduled_date);
                     scheduledDate.setHours(0, 0, 0, 0);
-                    
+
                     if (scheduledDate > today) {
-                        failedIds.push({ 
-                            request_id, 
-                            error: 'Future scheduled date', 
-                            reason: `Cannot complete request scheduled for ${requestData.scheduled_date}. Please wait until the scheduled date.` 
+                        failedIds.push({
+                            request_id,
+                            error: 'Future scheduled date',
+                            reason: `Cannot complete request scheduled for ${requestData.scheduled_date}. Please wait until the scheduled date.`
                         });
                         continue;
                     }
                 }
-                
+
                 // Update status to Completed
                 await query(
-                    'UPDATE tbl_discipleship_requests SET status = ?, date_updated = NOW() WHERE request_id = ?', 
+                    'UPDATE tbl_discipleship_requests SET status = ?, date_updated = NOW() WHERE request_id = ?',
                     ['Completed', request_id]
                 );
-                
+
                 // Send completion email
                 try {
                     await emailHelper.sendDiscipleshipDetails({
@@ -867,14 +871,14 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
                     console.error(`Failed to send completion email to ${requestData.email}:`, emailError.message);
                     // Don't fail the request if email fails
                 }
-                
+
                 completedIds.push(request_id);
             } catch (err) {
                 console.error(`Error completing ${request_id}:`, err);
                 failedIds.push({ request_id, error: err.message, reason: 'Database error' });
             }
         }
-        
+
         // Log bulk completion
         if (completedIds.length > 0) {
             await auditTrailRecords.createAuditLog({
@@ -891,7 +895,7 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
                 user_position: req.user?.position || null
             });
         }
-        
+
         res.json({
             success: true,
             message: `Successfully completed ${completedIds.length} requests`,
@@ -902,8 +906,8 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
         });
     } catch (error) {
         console.error('Bulk complete error:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: error.message,
             errorCode: 'BULK_COMPLETE_ERROR'
         });

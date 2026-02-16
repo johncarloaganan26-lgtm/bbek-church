@@ -418,7 +418,7 @@ async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
         // Convert record data to plain text
         const archiveDataText = JSON.stringify(requestData, null, 2);
 
-        await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, archiveInfo.archived_by || 'admin');
+        await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, archiveInfo.archived_by || 'admin', archiveInfo.archive_reason);
 
         // Hard delete from original table
         await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
