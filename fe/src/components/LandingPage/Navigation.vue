@@ -1,4 +1,4 @@
-ve<template>
+<template>
   <header
     v-loading="isLoadingHeader"
     element-loading-text="Loading..."
@@ -61,7 +61,26 @@ ve<template>
                       class="menu-dropdown-item"
                       :style="{ '--hover-color': headerData.hoverColor || '#14b8a6' }"
                     >
-                      {{ child.label }}
+                      <div class="submenu-item-content">
+                        <span class="submenu-icon-wrap" :class="getSubmenuIconTheme(menu)">
+                          <img
+                            v-if="getSubmenuLogo(child)"
+                            :src="getSubmenuLogo(child)"
+                            :alt="`${child.label} logo`"
+                            class="submenu-logo"
+                          />
+                          <i
+                            v-else-if="getSubmenuMdiIcon(menu, child)"
+                            class="mdi submenu-mdi-icon"
+                            :class="getSubmenuMdiIcon(menu, child)"
+                            aria-hidden="true"
+                          ></i>
+                          <el-icon v-else class="submenu-item-icon">
+                            <component :is="getSubmenuIcon(menu, child)" />
+                          </el-icon>
+                        </span>
+                        <span class="submenu-item-label">{{ child.label }}</span>
+                      </div>
                     </el-dropdown-item>
                   </template>
                 </el-dropdown-menu>
@@ -191,7 +210,26 @@ ve<template>
                     class="mobile-submenu-item"
                     @click="handleMobileMenuClick(child)"
                   >
-                    {{ child?.label || '' }}
+                    <div class="mobile-submenu-item-content">
+                      <span class="mobile-submenu-icon-wrap" :class="getSubmenuIconTheme(menu)">
+                        <img
+                          v-if="getSubmenuLogo(child)"
+                          :src="getSubmenuLogo(child)"
+                          :alt="`${child?.label || 'Menu'} logo`"
+                          class="submenu-logo"
+                        />
+                        <i
+                          v-else-if="getSubmenuMdiIcon(menu, child)"
+                          class="mdi mobile-submenu-mdi-icon"
+                          :class="getSubmenuMdiIcon(menu, child)"
+                          aria-hidden="true"
+                        ></i>
+                        <el-icon v-else class="mobile-submenu-item-icon">
+                          <component :is="getSubmenuIcon(menu, child)" />
+                        </el-icon>
+                      </span>
+                      <span>{{ child?.label || '' }}</span>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -265,14 +303,11 @@ import {
   ArrowDown,
   User,
   Lock,
-  Coin,
   Clock,
   Message,
   Calendar,
   SwitchButton,
-  Close,
   Menu as MenuIcon,
-  Guide
 } from '@element-plus/icons-vue'
 import axios from '@/api/axios'
 
@@ -374,6 +409,80 @@ const SERVICES_SUBMENU_ORDER = [
   'Burial Service',
   'Child Dedication'
 ]
+
+const ABOUT_SUBMENU_MDI_ICONS = {
+  'our-story': 'mdi-book-open-page-variant',
+  'our story': 'mdi-book-open-page-variant',
+  'church-leadership': 'mdi-account-tie',
+  'church leadership': 'mdi-account-tie',
+  'department-officers': 'mdi-office-building',
+  'department officers': 'mdi-office-building'
+}
+
+const SERVICES_SUBMENU_MDI_ICONS = {
+  'water-baptism': 'mdi-water-outline',
+  'water baptism': 'mdi-water-outline',
+  'burial-service': 'mdi-cross',
+  'burial service': 'mdi-cross',
+  'child-dedication': 'mdi-baby-face-outline',
+  'child dedication': 'mdi-baby-face-outline'
+}
+
+const normalizeMenuKey = (value) => String(value || '').trim().toLowerCase()
+const isMdiIconName = (value) => typeof value === 'string' && value.trim().startsWith('mdi-')
+
+const getSubmenuLogo = (child) => {
+  const logoCandidates = [
+    child?.logo,
+    child?.image,
+    child?.imageUrl,
+    child?.iconUrl,
+    child?.icon
+  ]
+
+  for (const logo of logoCandidates) {
+    if (typeof logo === 'string' && logo.trim() && !isMdiIconName(logo)) {
+      return logo
+    }
+  }
+
+  return ''
+}
+
+const getSubmenuMdiIcon = (menu, child) => {
+  const customIcon = [child?.mdiIcon, child?.iconClass, child?.icon].find(isMdiIconName)
+  if (customIcon) {
+    return customIcon
+  }
+
+  const menuKey = normalizeMenuKey(menu?.value || menu?.label)
+  const childKey = normalizeMenuKey(child?.value || child?.label)
+
+  if (menuKey === 'about') {
+    return ABOUT_SUBMENU_MDI_ICONS[childKey] || 'mdi-book-open-variant'
+  }
+
+  if (menuKey === 'services') {
+    return SERVICES_SUBMENU_MDI_ICONS[childKey] || 'mdi-church'
+  }
+
+  return ''
+}
+
+const getSubmenuIcon = (menu, child) => {
+  // Fallback for submenu entries without a logo or mdi icon.
+  return MenuIcon
+}
+
+const getSubmenuIconTheme = (menu) => {
+  const menuKey = normalizeMenuKey(menu?.value || menu?.label)
+
+  if (menuKey === 'about' || menuKey === 'services') {
+    return 'submenu-icon-services'
+  }
+
+  return 'submenu-icon-default'
+}
 
 // Computed property to ensure menus are always sorted correctly
 const sortedMenus = computed(() => {
@@ -896,9 +1005,78 @@ const handleLogout = async () => {
   transition: background-color 0.3s ease;
 }
 
+.submenu-item-content {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  background: rgba(20, 184, 166, 0.12);
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.08);
+}
+
+.submenu-icon-wrap {
+  width: 34px;
+  min-height: 34px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.submenu-icon-about {
+  background: rgba(20, 184, 166, 0.9);
+  color: #ffffff;
+}
+
+.submenu-icon-services {
+  background: rgba(20, 184, 166, 0.9);
+  color: #ffffff;
+}
+
+.submenu-icon-default {
+  background: rgba(107, 114, 128, 0.75);
+  color: #ffffff;
+}
+
+.submenu-item-icon {
+  font-size: 15px;
+}
+
+.submenu-mdi-icon {
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+}
+
+.submenu-item-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px 0 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #0f766e;
+  white-space: nowrap;
+}
+
+.submenu-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
 .menu-dropdown-item:hover {
   background-color: rgba(0, 0, 0, 0.05) !important;
   color: var(--hover-color, #14b8a6) !important;
+}
+
+.menu-dropdown-item:hover .submenu-item-content {
+  border-color: rgba(20, 184, 166, 0.4);
+  background: rgba(20, 184, 166, 0.18);
 }
 
 /* Mobile Menu Button */
@@ -1077,9 +1255,54 @@ const handleLogout = async () => {
   font-size: 0.875rem;
 }
 
+.mobile-submenu-item-content {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.mobile-submenu-icon-wrap {
+  width: 32px;
+  min-height: 32px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.mobile-submenu-item-icon {
+  font-size: 14px;
+}
+
+.mobile-submenu-mdi-icon {
+  font-size: 17px;
+  line-height: 1;
+  color: inherit;
+}
+
+.mobile-submenu-item-content > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px 0 10px;
+  color: #0f766e;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .mobile-submenu-item:hover {
   background-color: rgba(0, 0, 0, 0.05);
   color: var(--hover-color, #14b8a6);
+}
+
+.mobile-submenu-item:hover .mobile-submenu-item-content {
+  border-color: rgba(20, 184, 166, 0.4);
+  background: rgba(20, 184, 166, 0.18);
 }
 
 .mobile-menu-divider {
