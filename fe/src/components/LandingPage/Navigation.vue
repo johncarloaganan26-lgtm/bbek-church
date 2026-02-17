@@ -128,25 +128,60 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="handleChangePassword" class="menu-item">
-                  <el-icon><Lock /></el-icon>
-                  <span>Change Password</span>
+                <el-dropdown-item
+                  @click="handleChangePassword"
+                  class="menu-item menu-dropdown-item member-dropdown-item"
+                >
+                  <div class="submenu-item-content">
+                    <span class="submenu-icon-wrap submenu-icon-services">
+                      <el-icon class="submenu-item-icon"><Lock /></el-icon>
+                    </span>
+                    <span class="submenu-item-label">Change Password</span>
+                  </div>
                 </el-dropdown-item>
-                <el-dropdown-item @click="navigateTo('/landpage/transactions')" class="menu-item">
-                  <el-icon><Clock /></el-icon>
-                  <span>View Transactions</span>
+                <el-dropdown-item
+                  @click="navigateTo('/landpage/transactions')"
+                  class="menu-item menu-dropdown-item member-dropdown-item"
+                >
+                  <div class="submenu-item-content">
+                    <span class="submenu-icon-wrap submenu-icon-services">
+                      <el-icon class="submenu-item-icon"><Clock /></el-icon>
+                    </span>
+                    <span class="submenu-item-label">View Transactions</span>
+                  </div>
                 </el-dropdown-item>
-                <el-dropdown-item @click="navigateTo('/schedule-change')" class="menu-item">
-                  <el-icon><Calendar /></el-icon>
-                  <span>Request Schedule Change</span>
+                <el-dropdown-item
+                  @click="navigateTo('/schedule-change')"
+                  class="menu-item menu-dropdown-item member-dropdown-item"
+                >
+                  <div class="submenu-item-content">
+                    <span class="submenu-icon-wrap submenu-icon-services">
+                      <el-icon class="submenu-item-icon"><Calendar /></el-icon>
+                    </span>
+                    <span class="submenu-item-label">Request Schedule Change</span>
+                  </div>
                 </el-dropdown-item>
-                <el-dropdown-item @click="navigateTo('/beoneofus/send-prayer')" class="menu-item">
-                  <el-icon><Message /></el-icon>
-                  <span>Submit Prayer Request</span>
+                <el-dropdown-item
+                  @click="navigateTo('/beoneofus/send-prayer')"
+                  class="menu-item menu-dropdown-item member-dropdown-item"
+                >
+                  <div class="submenu-item-content">
+                    <span class="submenu-icon-wrap submenu-icon-services">
+                      <el-icon class="submenu-item-icon"><Message /></el-icon>
+                    </span>
+                    <span class="submenu-item-label">Submit Prayer Request</span>
+                  </div>
                 </el-dropdown-item>
-                <el-dropdown-item @click="handleLogout" class="menu-item">
-                  <el-icon><SwitchButton /></el-icon>
-                  <span>Logout</span>
+                <el-dropdown-item
+                  @click="handleLogout"
+                  class="menu-item menu-dropdown-item member-dropdown-item member-dropdown-item-danger"
+                >
+                  <div class="submenu-item-content member-submenu-item-content-danger">
+                    <span class="submenu-icon-wrap submenu-icon-danger">
+                      <el-icon class="submenu-item-icon"><SwitchButton /></el-icon>
+                    </span>
+                    <span class="submenu-item-label submenu-item-label-danger">Logout</span>
+                  </div>
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -262,25 +297,45 @@
               </div>
             </div>
             <div class="mobile-user-menu">
-              <div class="mobile-menu-item" @click="handleChangePassword">
-                <el-icon><Lock /></el-icon>
-                <span>Change Password</span>
+              <div class="mobile-menu-item mobile-member-menu-item" @click="handleChangePassword">
+                <div class="mobile-submenu-item-content">
+                  <span class="mobile-submenu-icon-wrap submenu-icon-services">
+                    <el-icon class="mobile-submenu-item-icon"><Lock /></el-icon>
+                  </span>
+                  <span class="mobile-submenu-item-label">Change Password</span>
+                </div>
               </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/landpage/transactions' })">
-                <el-icon><Clock /></el-icon>
-                <span>View Transactions</span>
+              <div class="mobile-menu-item mobile-member-menu-item" @click="handleMobileMenuClick({ to: '/landpage/transactions' })">
+                <div class="mobile-submenu-item-content">
+                  <span class="mobile-submenu-icon-wrap submenu-icon-services">
+                    <el-icon class="mobile-submenu-item-icon"><Clock /></el-icon>
+                  </span>
+                  <span class="mobile-submenu-item-label">View Transactions</span>
+                </div>
               </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/schedule-change' })">
-                <el-icon><Calendar /></el-icon>
-                <span>Request Schedule Change</span>
+              <div class="mobile-menu-item mobile-member-menu-item" @click="handleMobileMenuClick({ to: '/schedule-change' })">
+                <div class="mobile-submenu-item-content">
+                  <span class="mobile-submenu-icon-wrap submenu-icon-services">
+                    <el-icon class="mobile-submenu-item-icon"><Calendar /></el-icon>
+                  </span>
+                  <span class="mobile-submenu-item-label">Request Schedule Change</span>
+                </div>
               </div>
-              <div class="mobile-menu-item" @click="handleMobileMenuClick({ to: '/beoneofus/send-prayer' })">
-                <el-icon><Message /></el-icon>
-                <span>Submit Prayer Request</span>
+              <div class="mobile-menu-item mobile-member-menu-item" @click="handleMobileMenuClick({ to: '/beoneofus/send-prayer' })">
+                <div class="mobile-submenu-item-content">
+                  <span class="mobile-submenu-icon-wrap submenu-icon-services">
+                    <el-icon class="mobile-submenu-item-icon"><Message /></el-icon>
+                  </span>
+                  <span class="mobile-submenu-item-label">Submit Prayer Request</span>
+                </div>
               </div>
-              <div class="mobile-menu-item mobile-menu-item-danger" @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                <span>Logout</span>
+              <div class="mobile-menu-item mobile-menu-item-danger mobile-member-menu-item" @click="handleLogout">
+                <div class="mobile-submenu-item-content mobile-submenu-item-content-danger">
+                  <span class="mobile-submenu-icon-wrap submenu-icon-danger">
+                    <el-icon class="mobile-submenu-item-icon"><SwitchButton /></el-icon>
+                  </span>
+                  <span class="mobile-submenu-item-label mobile-submenu-item-label-danger">Logout</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1005,6 +1060,14 @@ const handleLogout = async () => {
   transition: background-color 0.3s ease;
 }
 
+.member-dropdown-item .submenu-item-content {
+  width: 100%;
+}
+
+.member-dropdown-item .submenu-item-label {
+  flex: 1;
+}
+
 .submenu-item-content {
   display: inline-flex;
   align-items: stretch;
@@ -1042,6 +1105,11 @@ const handleLogout = async () => {
   color: #ffffff;
 }
 
+.submenu-icon-danger {
+  background: rgba(239, 68, 68, 0.9);
+  color: #ffffff;
+}
+
 .submenu-item-icon {
   font-size: 15px;
 }
@@ -1062,6 +1130,15 @@ const handleLogout = async () => {
   white-space: nowrap;
 }
 
+.submenu-item-label-danger {
+  color: #b91c1c;
+}
+
+.member-submenu-item-content-danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .submenu-logo {
   width: 20px;
   height: 20px;
@@ -1077,6 +1154,11 @@ const handleLogout = async () => {
 .menu-dropdown-item:hover .submenu-item-content {
   border-color: rgba(20, 184, 166, 0.4);
   background: rgba(20, 184, 166, 0.18);
+}
+
+.menu-dropdown-item:hover .member-submenu-item-content-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.18);
 }
 
 /* Mobile Menu Button */
@@ -1265,6 +1347,11 @@ const handleLogout = async () => {
   background: rgba(20, 184, 166, 0.12);
 }
 
+.mobile-submenu-item-content-danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .mobile-submenu-icon-wrap {
   width: 32px;
   min-height: 32px;
@@ -1295,6 +1382,10 @@ const handleLogout = async () => {
   white-space: nowrap;
 }
 
+.mobile-submenu-item-label-danger {
+  color: #b91c1c !important;
+}
+
 .mobile-submenu-item:hover {
   background-color: rgba(0, 0, 0, 0.05);
   color: var(--hover-color, #14b8a6);
@@ -1303,6 +1394,24 @@ const handleLogout = async () => {
 .mobile-submenu-item:hover .mobile-submenu-item-content {
   border-color: rgba(20, 184, 166, 0.4);
   background: rgba(20, 184, 166, 0.18);
+}
+
+.mobile-member-menu-item .mobile-submenu-item-content {
+  width: 100%;
+}
+
+.mobile-member-menu-item .mobile-submenu-item-label {
+  flex: 1;
+}
+
+.mobile-member-menu-item:hover .mobile-submenu-item-content {
+  border-color: rgba(20, 184, 166, 0.4);
+  background: rgba(20, 184, 166, 0.18);
+}
+
+.mobile-member-menu-item.mobile-menu-item-danger:hover .mobile-submenu-item-content-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.18);
 }
 
 .mobile-menu-divider {
@@ -1343,7 +1452,8 @@ const handleLogout = async () => {
   padding: 12px 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 0;
 }
 
 .mobile-user-menu .mobile-menu-item .el-icon {
