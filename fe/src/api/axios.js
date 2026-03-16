@@ -6,18 +6,17 @@ import { checkAccessTokenValidity } from '@/utils/tokenValidation'
 // Development: '/api' is proxied by Vite dev server (configured in vite.config.js)
 // Production: Must set VITE_API_URL environment variable (e.g., in Vercel settings)
 // Helper to clean and format the API URL
-const formatApiUrl = () => {
-  if (!import.meta.env.PROD) return '/api'
+const formatBaseUrl = () => {
+  if (!import.meta.env.PROD) return '' // In dev, we use relative paths handled by Vite proxy
   
   const baseUrl = import.meta.env.VITE_API_URL
   if (!baseUrl) return ''
   
-  // Remove trailing slash if exists, then add /api
-  const cleanedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
-  return `${cleanedBase}/api`
+  // Return just the domain root, trailing slash removed
+  return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
 }
 
-const API_URL = formatApiUrl()
+const BASE_URL = formatBaseUrl()
 
 // Log configuration for debugging
 if (import.meta.env.PROD) {
@@ -25,25 +24,39 @@ if (import.meta.env.PROD) {
     console.error('❌ VITE_API_URL not set in production!')
     console.error('💡 Set VITE_API_URL in Vercel environment variables to your backend URL')
   } else {
-    console.log('🔧 Production API URL:', API_URL)
+    console.log('🔧 Production Base URL:', BASE_URL)
   }
 } else {
-  console.log('🔧 Development API URL:', API_URL, '(proxied by Vite)')
+  console.log('🔧 Development Mode: Using Vite proxy')
 }
 
 // Create axios instance with base configuration
 const instance = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_URL,
   timeout: 60000, // 60 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Request interceptor - Add auth token if available and validate token
+// Request interceptor - Add auth token and ensure /api prefix
 instance.interceptors.request.use(
   (config) => {
-    // Check accessToken validity before making request
+    // 1. Ensure the URL starts with /api if it's a relative path
+    if (config.url && !config.url.startsWith('http') && !config.url.startsWith('//')) {
+      // Normalize URL - remove leading slash if any
+      const urlPath = config.url.startsWith('/') ? config.url.slice(1) : config.url
+      
+      // Prepend /api if not already present
+      if (!urlPath.startsWith('api/')) {
+        config.url = `/api/${urlPath}`
+      } else if (!config.url.startsWith('/')) {
+        // Ensure it starts with /api/ even if it was api/
+        config.url = `/${urlPath}`
+      }
+    }
+
+    // 2. Check accessToken validity before making request
     const tokenValidation = checkAccessTokenValidity()
     
     if (!tokenValidation.success) {
@@ -53,13 +66,13 @@ instance.interceptors.request.use(
       localStorage.removeItem('token')
     }
     
-    // Get token from localStorage (prioritize accessToken)
+    // 3. Get token from localStorage (prioritize accessToken)
     const token = localStorage.getItem('accessToken') || localStorage.getItem('auth_token') || localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     
-    // Don't set Content-Type for FormData - let browser set it with boundary
+    // 4. Don't set Content-Type for FormData - let browser set it with boundary
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     }
