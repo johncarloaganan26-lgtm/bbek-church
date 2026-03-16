@@ -5,16 +5,25 @@ import { checkAccessTokenValidity } from '@/utils/tokenValidation'
 // Vite environment configuration for API URL
 // Development: '/api' is proxied by Vite dev server (configured in vite.config.js)
 // Production: Must set VITE_API_URL environment variable (e.g., in Vercel settings)
-const API_URL = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '')
-  : '/api'
+// Helper to clean and format the API URL
+const formatApiUrl = () => {
+  if (!import.meta.env.PROD) return '/api'
+  
+  const baseUrl = import.meta.env.VITE_API_URL
+  if (!baseUrl) return ''
+  
+  // Remove trailing slash if exists, then add /api
+  const cleanedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
+  return `${cleanedBase}/api`
+}
+
+const API_URL = formatApiUrl()
 
 // Log configuration for debugging
 if (import.meta.env.PROD) {
   if (!import.meta.env.VITE_API_URL) {
     console.error('❌ VITE_API_URL not set in production!')
     console.error('💡 Set VITE_API_URL in Vercel environment variables to your backend URL')
-    console.error('💡 Example: https://your-backend-api.vercel.app')
   } else {
     console.log('🔧 Production API URL:', API_URL)
   }
@@ -65,45 +74,32 @@ instance.interceptors.request.use(
 // Response interceptor - Handle common errors and show messages
 instance.interceptors.response.use(
   (response) => {
-    // Check if response has a success message field
-    if (response.data?.message && response.status >= 200 && response.status < 300) {
-      // Optionally show success messages (uncomment if needed)
-      // ElMessage.success(response.data.message)
-    }
-    // Return response data directly for convenience
     return response
   },
   async (error) => {
     const originalRequest = error.config
+    if (!originalRequest) return Promise.reject(error)
 
-    // Check if this is a public endpoint
+    // Check if this is a login request to avoid redirect loops
     const isLoginRequest = originalRequest.url?.includes('/accounts/login')
-    const isCmsEndpoint = originalRequest.url?.includes('/cms/')
-    const isPublicEndpoint = originalRequest.url?.includes('/public/') ||
-                             originalRequest.url?.includes('/church-records/') || 
-                             originalRequest.url?.includes('/services/') ||
-                             originalRequest.url?.includes('/events/') ||
-                             originalRequest.url?.includes('/ministries/')
     
-    // Check if current path is a public route (services pages, etc.)
+    // Check if this is truly a public endpoint (no auth required)
+    // We only suppress errors for routes that are explicitly public and don't need a token
+    const isPublicEndpoint = 
+      originalRequest.url?.includes('/public/') ||
+      originalRequest.url?.endsWith('/submit') ||
+      originalRequest.url?.endsWith('/available-slots') ||
+      originalRequest.url?.includes('/cms/') ||
+      originalRequest.url?.includes('/api/health')
+    
+    // Check if current page is public
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
-    const isPublicPath = currentPath.startsWith('/services/') || 
-                        currentPath.startsWith('/events/') ||
-                        currentPath.startsWith('/ministries/') ||
-                        currentPath.startsWith('/about/') ||
-                        currentPath === '/' ||
-                        currentPath === '/live' ||
-                        currentPath === '/give' ||
-                        currentPath === '/new' ||
-                        currentPath === '/plan-your-visit' ||
-                        currentPath === '/messages' ||
-                        currentPath === '/schedule-change' ||
-                        currentPath.startsWith('/beoneofus/')
+    const isPublicPath = !currentPath.startsWith('/admin') && !currentPath.startsWith('/dashboard')
     
-    // Don't show error messages or redirect for public endpoints
-    if (isPublicEndpoint || isCmsEndpoint || isPublicPath) {
-      // For public endpoints, just log and return (no error message)
-      console.log('Public endpoint error (ignored):', error.message)
+    // Don't show error messages for public endpoints when on public pages
+    // This prevents "Authentication required" messages for casual browsers
+    if (isPublicEndpoint && isPublicPath) {
+      console.log('Public endpoint error on public path (ignored):', error.message)
       return Promise.reject(error)
     }
 

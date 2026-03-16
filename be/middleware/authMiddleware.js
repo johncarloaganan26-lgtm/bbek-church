@@ -138,12 +138,17 @@ const publicRoutes = [
   '/api/church-records/child-dedications/createChildDedication',
   '/api/church-records/child-dedications/check-duplicate',
   '/api/church-records/child-dedications/check-member-dedication',
+  '/api/church-records/child-dedications/available-slots',
+  '/api/services/child-dedications/available-slots',
+  '/api/services/burial-services/available-slots',
+  '/api/services/water-baptisms/available-slots',
   // Online donation route (public - no auth required)
   '/api/church-records/tithes/submitOnlineDonation',
   // Discipleship routes (public for form submission)
   '/api/services/discipleship-requests/submit',
   '/api/services/discipleship-requests/registration-data',
   '/api/services/discipleship-requests/available-slots',
+  '/api/services/biblestudy-requests/submit',
   '/api/services/salvation-availability',
   // Water baptism public registration (no auth required)
   '/api/public/water-baptism/register',
