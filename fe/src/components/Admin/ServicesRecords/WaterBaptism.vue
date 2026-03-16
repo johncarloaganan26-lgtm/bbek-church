@@ -7,16 +7,44 @@
     />
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Water Baptism Records</h1>
-      <v-btn 
-        color="success" 
-        prepend-icon="mdi-file-document" 
-        size="small" 
-        :disabled="loading"
-        :loading="loading"
-        @click="openBaptismDialog"
-      >
-        New Baptism
-      </v-btn>
+      
+      <div class="d-flex align-center gap-4">
+        <!-- Global Completion Toggle -->
+        <v-card variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
+          <div class="mr-4">
+            <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
+            <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
+          </div>
+          <v-switch
+            v-model="settings.allow_complete_without_schedule"
+            color="success"
+            hide-details
+            inset
+            density="compact"
+            @update:model-value="toggleRestriction"
+            :loading="settingsLoading"
+          ></v-switch>
+          <v-tooltip activator="parent" location="bottom">
+            {{ settings.allow_complete_without_schedule 
+              ? 'RESTRICTION OFF: You can mark any record as completed regardless of schedule.' 
+              : 'RESTRICTION ON: Records must be scheduled before they can be marked as completed.' 
+            }}
+          </v-tooltip>
+        </v-card>
+
+        <v-btn 
+          color="success" 
+          prepend-icon="mdi-file-document" 
+          size="small" 
+          :disabled="loading"
+          :loading="loading"
+          @click="openBaptismDialog"
+          class="h-100"
+          style="min-height: 48px;"
+        >
+          New Baptism
+        </v-btn>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -262,6 +290,20 @@
             </td>
             <td>{{ formatDateTime(baptism.date_created) }}</td>
             <td>
+              <v-tooltip v-if="['pending', 'approved'].includes(baptism.status) && (baptism.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
+                <template v-slot:activator="{ props }">
+                  <v-btn 
+                    icon="mdi-check" 
+                    variant="text" 
+                    size="small" 
+                    color="success"
+                    class="mr-2"
+                    :disabled="loading"
+                    v-bind="props"
+                    @click="markIndividualComplete(baptism)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip v-if="baptism.status === 'completed'" text="Print Certificate" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
@@ -333,11 +375,15 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore'
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
+import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WaterBaptismDialog from '@/components/Dialogs/WaterBaptismDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
 
 const waterBaptismStore = useWaterBaptismStore()
+const settingsStore = useSystemSettingsStore()
+const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedBaptisms = ref([])
@@ -532,11 +578,18 @@ const clearSelection = () => {
 }
 
 const bulkCompleteBaptisms = async () => {
-  // Filter for approved baptisms first
-  const approvedBaptisms = selectedBaptisms.value.filter(b => b.status === 'approved');
+  // Filter for approved/pending baptisms based on settings
+  const targetBaptisms = selectedBaptisms.value.filter(b => {
+    if (settings.value.allow_complete_without_schedule) {
+      return b.status === 'approved' || b.status === 'pending';
+    }
+    return b.status === 'approved';
+  });
   
-  if (approvedBaptisms.length === 0) {
-    ElMessage.warning('No approved baptisms selected.');
+  if (targetBaptisms.length === 0) {
+    ElMessage.warning(settings.value.allow_complete_without_schedule 
+      ? 'No pending or approved baptisms selected.' 
+      : 'No approved baptisms selected.');
     return;
   }
 
@@ -544,17 +597,18 @@ const bulkCompleteBaptisms = async () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const validBaptisms = approvedBaptisms.filter(b => {
+  const validBaptisms = targetBaptisms.filter(b => {
+    if (settings.value.allow_complete_without_schedule) return true;
     if (!b.baptism_date) return false;
     const baptismDate = new Date(b.baptism_date);
     baptismDate.setHours(0, 0, 0, 0);
     return baptismDate <= today;
   });
 
-  const skippedCount = approvedBaptisms.length - validBaptisms.length;
+  const skippedCount = targetBaptisms.length - validBaptisms.length;
 
   if (validBaptisms.length === 0) {
-    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date.');
+    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date or turn off Completion Restriction.');
     return;
   }
   
@@ -604,6 +658,42 @@ const bulkCompleteBaptisms = async () => {
     }
   }
 }
+
+const markIndividualComplete = async (baptism) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (baptism.baptism_date && !settings.value.allow_complete_without_schedule) {
+        const baptismDate = new Date(baptism.baptism_date);
+        baptismDate.setHours(0, 0, 0, 0);
+        if (baptismDate > today) {
+            ElMessage.warning(`Cannot complete baptism scheduled for a future date (${baptism.baptism_date}) unless Manual Completion is ON.`);
+            return;
+        }
+    }
+
+    await ElMessageBox.confirm(
+      `Mark water baptism for ${baptism.fullname || baptism.firstname + ' ' + baptism.lastname} as completed?`,
+      'Mark Completed',
+      {
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        type: 'success',
+      }
+    );
+    
+    const result = await waterBaptismStore.bulkCompleteWaterBaptisms([baptism.baptism_id]);
+    if (result.success) {
+      ElMessage.success('Water baptism marked as completed');
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error completing individual baptism:', error);
+      ElMessage.error('Failed to complete water baptism');
+    }
+  }
+};
 
 const bulkDeleteBaptisms = async () => {
   try {
@@ -1017,10 +1107,15 @@ watch(() => currentPage.value, () => {
   clearSelection()
 })
 
-// Initialize on mount
-onMounted(async () => {
-  await waterBaptismStore.fetchBaptisms()
+// Lifecycle
+onMounted(() => {
+    waterBaptismStore.fetchBaptisms()
+    settingsStore.fetchSettings()
 })
+
+const toggleRestriction = async (val) => {
+    await settingsStore.toggleAllowComplete(val)
+}
 
 // Cleanup timeout on unmount
 onUnmounted(() => {

@@ -553,8 +553,56 @@ router.put('/bulkCompleteBurialServices', async (req, res) => {
       });
     }
 
-    // Skip audit trail for bulk operations to improve performance
-    req.skipAuditTrail = true;
+    // Fetch the global toggle setting
+    const { getCmsPage } = require('../../dbHelpers/cmsRecords');
+    const settingsResult = await getCmsPage('system_settings');
+    const allowWithoutSchedule = settingsResult.success && settingsResult.data && settingsResult.data.content 
+        ? settingsResult.data.content.allow_complete_without_schedule 
+        : false;
+
+    if (!allowWithoutSchedule) {
+        // If restriction is ON, validate each request's status and date
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const filteredIds = [];
+        const errors = [];
+
+        for (const id of burialIds) {
+            const [rows] = await query('SELECT status, service_date FROM tbl_burial_services WHERE burial_id = ?', [id]);
+            if (rows.length === 0) {
+                errors.push({ id, reason: 'Not found' });
+                continue;
+            }
+
+            const burial = rows[0];
+            if (burial.status !== 'approved') {
+                errors.push({ id, reason: 'Status must be approved' });
+                continue;
+            }
+
+            if (burial.service_date) {
+                const scheduledDate = new Date(burial.service_date);
+                scheduledDate.setHours(0, 0, 0, 0);
+                if (scheduledDate > today) {
+                    errors.push({ id, reason: 'Future service date' });
+                    continue;
+                }
+            }
+            filteredIds.push(id);
+        }
+
+        if (filteredIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No eligible records found for completion (must be approved and not in future)',
+                errors
+            });
+        }
+
+        const result = await bulkCompleteBurialServices(filteredIds);
+        return res.json({ ...result, errors });
+    }
 
     const result = await bulkCompleteBurialServices(burialIds);
 

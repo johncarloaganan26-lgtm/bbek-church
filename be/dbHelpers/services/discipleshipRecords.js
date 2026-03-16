@@ -203,9 +203,6 @@ async function getAllDiscipleshipRequests(options = {}) {
         const offset = (parseInt(page) - 1) * limit;
 
         // Count total
-        const countSql = `SELECT COUNT(*) as total FROM (${sql}) as sub`;
-        // We need to reconstruct count query properly or just run it separately?
-        // Using simple replacement for count on WHERE clause is safer
         let whereClause = sql.substring(sql.indexOf('WHERE'));
         let orderByIdx = whereClause.lastIndexOf('ORDER BY');
         if (orderByIdx > -1) whereClause = whereClause.substring(0, orderByIdx);
@@ -218,12 +215,16 @@ async function getAllDiscipleshipRequests(options = {}) {
 
         const [rows] = await query(sql, params);
 
-        // Convert any Buffers (notes, etc.) to strings
+        // Convert any Buffers (notes, address, etc.) to strings
         const cleanedRows = rows.map(row => {
+            const formatted = { ...row };
             if (row.notes && Buffer.isBuffer(row.notes)) {
-                row.notes = row.notes.toString('utf8');
+                formatted.notes = row.notes.toString('utf8');
             }
-            return row;
+            if (row.address && Buffer.isBuffer(row.address)) {
+                formatted.address = row.address.toString('utf8');
+            }
+            return formatted;
         });
 
         return {
@@ -343,19 +344,6 @@ async function promoteToBaptism(request_id, isDecided = false) {
             // 4. Update request status to Promoted
             await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
 
-            // Send Email Notification - Removed as per user request (no more send email for decided ones)
-            /*
-            try {
-                await sendDiscipleshipDetails({
-                    email: req.email,
-                    firstname: req.firstname,
-                    status: 'Promoted'
-                });
-            } catch (emailError) {
-                console.error('Email promotion notification failed:', emailError);
-            }
-            */
-
             return {
                 success: true,
                 message: 'Promoted to Baptism successfully',
@@ -370,9 +358,6 @@ async function promoteToBaptism(request_id, isDecided = false) {
     }
 }
 
-/**
- * Delete a request
- */
 /**
  * Send Water Baptism Invitation
  */
@@ -422,6 +407,7 @@ async function inviteToBaptism(request_id, isDecided = false) {
         throw error;
     }
 }
+
 async function deleteDiscipleshipRequest(request_id) {
     try {
         await query('DELETE FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
@@ -434,9 +420,6 @@ async function deleteDiscipleshipRequest(request_id) {
 
 /**
  * Archive Discipleship Request (Soft Delete)
- * Instead of hard delete, move data to archive_records table
- * @param {string} request_id - The request ID to archive
- * @param {object} archiveInfo - Archive metadata
  */
 async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
     try {
@@ -447,22 +430,7 @@ async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
         }
 
         const requestData = requestRows[0];
-
-        // Prepare data for archive
-        const archiveData = {
-            table_name: 'tbl_discipleship_requests',
-            record_id: request_id,
-            record_data: JSON.stringify(requestData),
-            archived_at: archiveInfo.archived_at || new Date(),
-            archived_by: archiveInfo.archived_by || 'system',
-            archive_reason: archiveInfo.archive_reason || 'No reason provided',
-            original_status: requestData.status
-        };
-
-        // Insert into archive_records table
         const { archiveRecord } = require('../archiveRecords');
-
-        // Convert record data to plain text
         const archiveDataText = JSON.stringify(requestData, null, 2);
 
         await archiveRecord('tbl_discipleship_requests', request_id, archiveDataText, archiveInfo.archived_by || 'admin', archiveInfo.archive_reason);

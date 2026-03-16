@@ -111,14 +111,15 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         }
     };
 
-    const promoteToBibleStudy = async (id, isDecided = true) => {
+    const promoteToBibleStudy = async (id, payload) => {
         loading.value = true;
         try {
-            const response = await axios.post(`/services/discipleship-requests/promote-to-bible-study/${id}`, { isDecided });
+            const data = typeof payload === 'object' ? payload : { isDecided: !!payload };
+            const response = await axios.post(`/services/discipleship-requests/promote-to-bible-study/${id}`, data);
             if (response.data.success) {
-                ElMessage.success(response.data.message || (isDecided
+                ElMessage.success(response.data.message || (data.isDecided
                     ? 'Promoted to Bible Study! Please schedule the sessions.'
-                    : 'Record updated and form link sent to candidate.'));
+                    : 'Record updated and invitation form link sent to candidate.'));
                 await fetchRequests();
                 return true;
             }

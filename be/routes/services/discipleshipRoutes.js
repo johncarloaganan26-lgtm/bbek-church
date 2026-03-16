@@ -814,6 +814,30 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
                 notes,
                 status: scheduled_date ? 'Scheduled' : 'Pending'
             });
+
+            // Send confirmation email
+            if (current.email) {
+                let pastor_name = 'Church Leader';
+                if (pastor_id) {
+                    try {
+                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [pastor_id]);
+                        if (pastorRows.length > 0) {
+                            pastor_name = `Pastor ${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                        }
+                    } catch (e) {
+                        console.error('Error fetching pastor for email:', e);
+                    }
+                }
+
+                await emailHelper.sendBibleStudyInvitation({
+                    email: current.email,
+                    firstname: current.firstname,
+                    lastname: current.lastname,
+                    scheduled_date,
+                    location,
+                    pastor_name
+                });
+            }
         } else {
             // Hesitant: Send form link
             const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
@@ -838,7 +862,7 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
 
         res.json({ 
             success: true, 
-            message: isDecided ? 'Promoted and Bible Study scheduled!' : 'Updated and form link sent.' 
+            message: isDecided ? 'Bible Study record created and scheduled!' : 'Record updated and invitation form link sent.' 
         });
 
     } catch (error) {
@@ -1169,6 +1193,13 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // Fetch the global toggle setting
+        const { getCmsPage } = require('../../dbHelpers/cmsRecords');
+        const settingsResult = await getCmsPage('system_settings');
+        const allowWithoutSchedule = settingsResult.success && settingsResult.data && settingsResult.data.content 
+            ? settingsResult.data.content.allow_complete_without_schedule 
+            : false;
+
         for (const request_id of requestIds) {
             try {
                 // Get request data
@@ -1181,18 +1212,28 @@ router.post('/bulk-complete', authenticateToken, checkAdminRole, async (req, res
 
                 const requestData = rows[0];
 
-                // Only allow completing "Scheduled" status
-                if (requestData.status !== 'Scheduled') {
+                // Only allow completing "Scheduled" status unless the toggle is on
+                if (requestData.status !== 'Scheduled' && !allowWithoutSchedule) {
                     failedIds.push({
                         request_id,
                         error: `Invalid status: ${requestData.status}`,
-                        reason: 'Only "Scheduled" records can be marked as completed'
+                        reason: 'Only "Scheduled" records can be marked as completed when restriction is ON'
+                    });
+                    continue;
+                }
+                
+                // If restriction is ON, prevent completing other statuses like Completed/Promoted
+                if (['Completed', 'Promoted', 'Cancelled', 'Rejected'].includes(requestData.status)) {
+                    failedIds.push({
+                        request_id,
+                        error: `Invalid status: ${requestData.status}`,
+                        reason: `Record is already in a terminal/completed state (${requestData.status})`
                     });
                     continue;
                 }
 
-                // Check if scheduled date is in the future
-                if (requestData.scheduled_date) {
+                // Check if scheduled date is in the future (only if restriction is ON)
+                if (requestData.scheduled_date && !allowWithoutSchedule) {
                     const scheduledDate = new Date(requestData.scheduled_date);
                     scheduledDate.setHours(0, 0, 0, 0);
 

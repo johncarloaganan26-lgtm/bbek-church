@@ -2,16 +2,44 @@
   <div class="burial-service">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Burial Services</h1>
-      <v-btn 
-        color="success" 
-        prepend-icon="mdi-plus" 
-        size="small" 
-        :disabled="loading"
-        :loading="loading"
-        @click="handleBurialServiceDialog"
-      >
-        New Burial Service
-      </v-btn>
+      
+      <div class="d-flex align-center gap-4">
+        <!-- Global Completion Toggle -->
+        <v-card variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
+          <div class="mr-4">
+            <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
+            <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
+          </div>
+          <v-switch
+            v-model="settings.allow_complete_without_schedule"
+            color="success"
+            hide-details
+            inset
+            density="compact"
+            @update:model-value="toggleRestriction"
+            :loading="settingsLoading"
+          ></v-switch>
+          <v-tooltip activator="parent" location="bottom">
+            {{ settings.allow_complete_without_schedule 
+              ? 'RESTRICTION OFF: You can mark any record as completed regardless of schedule.' 
+              : 'RESTRICTION ON: Records must be scheduled before they can be marked as completed.' 
+            }}
+          </v-tooltip>
+        </v-card>
+
+        <v-btn 
+          color="success" 
+          prepend-icon="mdi-plus" 
+          size="small" 
+          :disabled="loading"
+          :loading="loading"
+          @click="handleBurialServiceDialog"
+          class="h-100"
+          style="min-height: 48px;"
+        >
+          New Burial Service
+        </v-btn>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -287,6 +315,20 @@
             </td>
             <td>{{ formatDateTime(service.date_created) }}</td>
             <td>
+              <v-tooltip v-if="['pending', 'approved'].includes(service.status) && (service.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
+                <template v-slot:activator="{ props }">
+                  <v-btn 
+                    icon="mdi-check" 
+                    variant="text" 
+                    size="small" 
+                    color="success"
+                    class="mr-2"
+                    :disabled="loading"
+                    v-bind="props"
+                    @click="markIndividualComplete(service)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip text="Edit Burial Service" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn
@@ -345,10 +387,14 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
+import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
 
 const burialServiceStore = useBurialServiceStore()
+const settingsStore = useSystemSettingsStore()
+const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedServices = ref([])
@@ -539,11 +585,18 @@ const clearSelection = () => {
 }
 
 const bulkCompleteServices = async () => {
-  // Count only approved services in the selection
-  const approvedServices = selectedServices.value.filter(s => s.status === 'approved');
+  // Filter for approved/pending services based on settings
+  const targetServices = selectedServices.value.filter(s => {
+    if (settings.value.allow_complete_without_schedule) {
+      return s.status === 'approved' || s.status === 'pending';
+    }
+    return s.status === 'approved';
+  });
   
-  if (approvedServices.length === 0) {
-    ElMessage.warning('No approved services selected.');
+  if (targetServices.length === 0) {
+    ElMessage.warning(settings.value.allow_complete_without_schedule 
+      ? 'No pending or approved burial services selected.' 
+      : 'No approved burial services selected.');
     return;
   }
 
@@ -551,17 +604,18 @@ const bulkCompleteServices = async () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const validServices = approvedServices.filter(s => {
+  const validServices = targetServices.filter(s => {
+    if (settings.value.allow_complete_without_schedule) return true;
     if (!s.service_date) return false;
     const serviceDate = new Date(s.service_date);
     serviceDate.setHours(0, 0, 0, 0);
     return serviceDate <= today;
   });
 
-  const skippedCount = approvedServices.length - validServices.length;
+  const skippedCount = targetServices.length - validServices.length;
 
   if (validServices.length === 0) {
-    ElMessage.warning('Cannot mark future services as completed. Please wait until the scheduled date.');
+    ElMessage.warning('Cannot mark future services as completed. Please wait until the scheduled date or turn off Completion Restriction.');
     return;
   }
   
@@ -611,6 +665,42 @@ const bulkCompleteServices = async () => {
     }
   }
 }
+
+const markIndividualComplete = async (service) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (service.service_date && !settings.value.allow_complete_without_schedule) {
+        const serviceDate = new Date(service.service_date);
+        serviceDate.setHours(0, 0, 0, 0);
+        if (serviceDate > today) {
+            ElMessage.warning(`Cannot complete service scheduled for a future date (${service.service_date}) unless Manual Completion is ON.`);
+            return;
+        }
+    }
+
+    await ElMessageBox.confirm(
+      `Mark burial service for ${service.deceased_name} as completed?`,
+      'Mark Completed',
+      {
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        type: 'success',
+      }
+    );
+    
+    const result = await burialServiceStore.bulkCompleteBurialServices([service.burial_id]);
+    if (result.success) {
+      ElMessage.success('Burial service marked as completed');
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error completing individual service:', error);
+      ElMessage.error('Failed to complete burial service');
+    }
+  }
+};
 
 const bulkDeleteServices = async () => {
   try {
@@ -1081,17 +1171,21 @@ watch(() => currentPage.value, () => {
   clearSelection()
 })
 
-// Initialize on mount
-onMounted(async () => {
-  await burialServiceStore.fetchServices()
+// Maintenance Actions
+onMounted(() => {
+    burialServiceStore.fetchServices()
+    settingsStore.fetchSettings()
 })
 
-// Cleanup timeout on unmount
 onUnmounted(() => {
   if (window.burialSearchTimeout) {
     clearTimeout(window.burialSearchTimeout)
   }
 })
+
+const toggleRestriction = async (val) => {
+    await settingsStore.toggleAllowComplete(val)
+}
 </script>
 
 <style scoped>

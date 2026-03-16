@@ -105,13 +105,12 @@ async function createBibleStudyRequest(data) {
 
         let sql = '';
         let params = [];
-
         if (hasAddressColumn) {
             sql = `
                 INSERT INTO tbl_biblestudy_requests (
                     request_id, salvation_id, firstname, lastname, email, phone_number,
                     address, scheduled_date, pastor_id, location, notes, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             params = [
                 request_id, salvation_id, firstname, lastname, normalizedEmail, phone_number,
@@ -174,6 +173,18 @@ async function getAllBibleStudyRequests(params = {}) {
 
         const [rows] = await query(sql, queryParams);
 
+        // Ensure text fields are returned as strings (handles potential Buffer issues from DB)
+        const formattedRows = rows.map(row => {
+            const formatted = { ...row };
+            if (row.address && typeof row.address !== 'string' && Buffer.isBuffer(row.address)) {
+                formatted.address = row.address.toString('utf8');
+            }
+            if (row.notes && typeof row.notes !== 'string' && Buffer.isBuffer(row.notes)) {
+                formatted.notes = row.notes.toString('utf8');
+            }
+            return formatted;
+        });
+
         // Get total count
         let countSql = 'SELECT COUNT(*) as total FROM tbl_biblestudy_requests WHERE 1=1';
         const countParams = [];
@@ -189,7 +200,7 @@ async function getAllBibleStudyRequests(params = {}) {
 
         return {
             success: true,
-            data: rows,
+            data: formattedRows,
             pagination: {
                 total: countRows[0].total,
                 page: parseInt(page),
@@ -236,8 +247,73 @@ async function updateBibleStudyRequest(id, data) {
     }
 }
 
+/**
+ * Bulk complete Bible Study requests
+ */
+async function bulkCompleteBibleStudies(requestIds) {
+    try {
+        if (!Array.isArray(requestIds) || requestIds.length === 0) {
+            return {
+                success: false,
+                message: 'requestIds array is required and cannot be empty'
+            };
+        }
+
+        let completed = 0;
+        let failed = 0;
+        let skipped = 0;
+        let skippedMessages = [];
+
+        for (const id of requestIds) {
+            try {
+                const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+                if (rows.length === 0) {
+                    failed++;
+                    continue;
+                }
+
+                const request = rows[0];
+
+                if (request.status === 'Completed') {
+                    skipped++;
+                    skippedMessages.push(`Bible Study for ${request.firstname} ${request.lastname} was skipped because it is already completed.`);
+                    continue;
+                }
+
+                // Update status to Completed
+                await query('UPDATE tbl_biblestudy_requests SET status = \'Completed\', date_updated = NOW() WHERE request_id = ?', [id]);
+
+                // Send completion email
+                try {
+                    await sendBibleStudyDetails({
+                        ...request,
+                        status: 'Completed'
+                    });
+                } catch (emailError) {
+                    console.warn(`Email notification failed for Bible Study completion (${id}):`, emailError.message);
+                }
+
+                completed++;
+            } catch (err) {
+                console.error(`Error completing Bible Study ${id}:`, err);
+                failed++;
+            }
+        }
+
+        return {
+            success: true,
+            message: `Processed ${requestIds.length} requests: ${completed} completed, ${skipped} skipped, ${failed} failed.`,
+            data: { completed, skipped, failed, skippedMessages }
+        };
+    } catch (error) {
+        console.error('Error in bulkCompleteBibleStudies:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createBibleStudyRequest,
     getAllBibleStudyRequests,
-    updateBibleStudyRequest
+    updateBibleStudyRequest,
+    bulkCompleteBibleStudies
 };

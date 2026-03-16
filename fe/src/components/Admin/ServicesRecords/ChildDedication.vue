@@ -7,16 +7,44 @@
     />
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Child Dedication Records</h1>
-      <v-btn 
-        color="success" 
-        prepend-icon="mdi-file-document" 
-        size="small" 
-        :disabled="loading"
-        :loading="loading"
-        @click="handleDedicationDialog"
-      >
-        New Child Dedication
-      </v-btn>
+      
+      <div class="d-flex align-center gap-4">
+        <!-- Global Completion Toggle -->
+        <v-card variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
+          <div class="mr-4">
+            <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
+            <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
+          </div>
+          <v-switch
+            v-model="settings.allow_complete_without_schedule"
+            color="success"
+            hide-details
+            inset
+            density="compact"
+            @update:model-value="toggleRestriction"
+            :loading="settingsLoading"
+          ></v-switch>
+          <v-tooltip activator="parent" location="bottom">
+            {{ settings.allow_complete_without_schedule 
+              ? 'RESTRICTION OFF: You can mark any record as completed regardless of schedule.' 
+              : 'RESTRICTION ON: Records must be scheduled before they can be marked as completed.' 
+            }}
+          </v-tooltip>
+        </v-card>
+
+        <v-btn 
+          color="success" 
+          prepend-icon="mdi-file-document" 
+          size="small" 
+          :disabled="loading"
+          :loading="loading"
+          @click="handleDedicationDialog"
+          class="h-100"
+          style="min-height: 48px;"
+        >
+          New Child Dedication
+        </v-btn>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -272,6 +300,20 @@
             </td>
             <td>{{ formatDateTime(dedication.date_created) }}</td>
             <td>
+              <v-tooltip v-if="['pending', 'approved'].includes(dedication.status) && (dedication.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
+                <template v-slot:activator="{ props }">
+                  <v-btn 
+                    icon="mdi-check" 
+                    variant="text" 
+                    size="small" 
+                    color="success"
+                    class="mr-2"
+                    :disabled="loading"
+                    v-bind="props"
+                    @click="markIndividualComplete(dedication)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip v-if="dedication.status === 'completed'" text="Print Certificate" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
@@ -343,11 +385,15 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useChildDedicationStore } from '@/stores/ServicesRecords/childDedicationStore'
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
+import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
 
 const childDedicationStore = useChildDedicationStore()
+const settingsStore = useSystemSettingsStore()
+const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedDedications = ref([])
@@ -543,11 +589,18 @@ const clearSelection = () => {
 }
 
 const bulkCompleteDedications = async () => {
-  // Count only approved dedications in the selection
-  const approvedDedications = selectedDedications.value.filter(d => d.status === 'approved');
+  // Filter for approved/pending dedications based on settings
+  const targetDedications = selectedDedications.value.filter(d => {
+    if (settings.value.allow_complete_without_schedule) {
+      return d.status === 'approved' || d.status === 'pending';
+    }
+    return d.status === 'approved';
+  });
   
-  if (approvedDedications.length === 0) {
-    ElMessage.warning('No approved dedications selected.');
+  if (targetDedications.length === 0) {
+    ElMessage.warning(settings.value.allow_complete_without_schedule 
+      ? 'No pending or approved dedications selected.' 
+      : 'No approved dedications selected.');
     return;
   }
 
@@ -555,17 +608,18 @@ const bulkCompleteDedications = async () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const validDedications = approvedDedications.filter(d => {
+  const validDedications = targetDedications.filter(d => {
+    if (settings.value.allow_complete_without_schedule) return true;
     if (!d.preferred_dedication_date) return false;
     const dedicationDate = new Date(d.preferred_dedication_date);
     dedicationDate.setHours(0, 0, 0, 0);
     return dedicationDate <= today;
   });
 
-  const skippedCount = approvedDedications.length - validDedications.length;
+  const skippedCount = targetDedications.length - validDedications.length;
 
   if (validDedications.length === 0) {
-    ElMessage.warning('Cannot mark future dedications as completed. Please wait until the scheduled date.');
+    ElMessage.warning('Cannot mark future dedications as completed. Please wait until the scheduled date or turn off Completion Restriction.');
     return;
   }
   
@@ -615,6 +669,42 @@ const bulkCompleteDedications = async () => {
     }
   }
 }
+
+const markIndividualComplete = async (dedication) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (dedication.preferred_dedication_date && !settings.value.allow_complete_without_schedule) {
+        const dedicationDate = new Date(dedication.preferred_dedication_date);
+        dedicationDate.setHours(0, 0, 0, 0);
+        if (dedicationDate > today) {
+            ElMessage.warning(`Cannot complete dedication scheduled for a future date (${dedication.preferred_dedication_date}) unless Manual Completion is ON.`);
+            return;
+        }
+    }
+
+    await ElMessageBox.confirm(
+      `Mark child dedication for ${dedication.child_fullname || dedication.child_firstname + ' ' + dedication.child_lastname} as completed?`,
+      'Mark Completed',
+      {
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        type: 'success',
+      }
+    );
+    
+    const result = await childDedicationStore.bulkCompleteChildDedications([dedication.child_id]);
+    if (result.success) {
+      ElMessage.success('Child dedication marked as completed');
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Error completing individual dedication:', error);
+      ElMessage.error('Failed to complete child dedication');
+    }
+  }
+};
 
 const bulkDeleteDedications = async () => {
   try {
@@ -1051,10 +1141,15 @@ watch(() => currentPage.value, () => {
   clearSelection()
 })
 
-// Initialize on mount
-onMounted(async () => {
-  await childDedicationStore.fetchDedications()
+// Lifecycle
+onMounted(() => {
+    childDedicationStore.fetchDedications()
+    settingsStore.fetchSettings()
 })
+
+const toggleRestriction = async (val) => {
+    await settingsStore.toggleAllowComplete(val)
+}
 
 // Cleanup timeout on unmount
 onUnmounted(() => {

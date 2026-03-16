@@ -100,6 +100,25 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         fetchRequests();
     };
 
+    const bulkCompleteRequests = async (requestIds) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/biblestudy-requests/bulk-complete', { requestIds });
+            if (response.data.success) {
+                ElMessage.success(response.data.message || 'Requests completed successfully');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error bulk completing Bible Study:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to bulk complete requests');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -111,6 +130,7 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         fetchPastors,
         fetchRequests,
         updateRequest,
+        bulkCompleteRequests,
         inviteToBaptism,
         setPage,
         setFilters

@@ -1409,10 +1409,10 @@ async function bulkCompleteBurialServices(burialIds) {
           continue;
         }
 
-        // Skip if not approved (only approved services can be marked as completed)
-        if (burial.status !== 'approved') {
+        // Allow 'pending' or 'approved' records for bulk completion
+        if (burial.status !== 'approved' && burial.status !== 'pending') {
           skipped++;
-          skippedMessages.push(`Burial service ${burialId} is not approved (current status: ${burial.status})`);
+          skippedMessages.push(`Burial service ${burialId} is not eligible (status: ${burial.status}, must be pending or approved)`);
           continue;
         }
 

@@ -47,10 +47,9 @@ function getAllowedTimeRanges(serviceType, dayOfWeek) {
   }
 
   if (serviceType === 'bible_study') {
-    if (dayOfWeek === 0) return []; // Sunday: No schedule
     if (dayOfWeek === 3) return [TIME_RANGES.MORNING_NOON]; // Wednesday: No evening
     if (dayOfWeek === 6) return [TIME_RANGES.MORNING_NOON]; // Saturday: No evening
-    return [TIME_RANGES.ALL_DAY]; // Weekdays: Any time except Wed Eve
+    return []; // Bible Study is ONLY Wed/Sat
   }
 
   return [];

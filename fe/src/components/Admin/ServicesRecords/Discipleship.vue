@@ -2,14 +2,42 @@
   <div class="discipleship-records pa-6">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Salvation Request</h1>
-      <v-btn
-        color="success"
-        prepend-icon="mdi-plus"
-        size="small"
-        @click="openAddDialog"
-      >
-        New Request
-      </v-btn>
+      
+      <div class="d-flex align-center gap-4">
+        <!-- Global Completion Toggle -->
+        <v-card variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
+          <div class="mr-4">
+            <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
+            <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
+          </div>
+          <v-switch
+            v-model="settings.allow_complete_without_schedule"
+            color="success"
+            hide-details
+            inset
+            density="compact"
+            @update:model-value="toggleRestriction"
+            :loading="settingsLoading"
+          ></v-switch>
+          <v-tooltip activator="parent" location="bottom">
+            {{ settings.allow_complete_without_schedule 
+              ? 'RESTRICTION OFF: You can mark any record as completed regardless of schedule.' 
+              : 'RESTRICTION ON: Records must be scheduled before they can be marked as completed.' 
+            }}
+          </v-tooltip>
+        </v-card>
+
+        <v-btn
+          color="success"
+          prepend-icon="mdi-plus"
+          size="small"
+          @click="openAddDialog"
+          class="h-100"
+          style="min-height: 48px;"
+        >
+          New Request
+        </v-btn>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -121,12 +149,23 @@
                 <v-btn
                   variant="tonal"
                   size="small"
+                  color="success"
+                  @click="markIndividualComplete(item)"
+                  v-if="['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
+                >
+                  <v-icon>mdi-check</v-icon>
+                  <v-tooltip activator="parent" location="top">Mark Completed</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="tonal"
+                  size="small"
                   color="teal-darken-1"
                   @click="openBibleStudyDialog(item)"
                   v-if="item.status === 'Completed' && item.request_type === 'Salvation'"
                 >
                   <v-icon>mdi-book-open-variant</v-icon>
-                  <v-tooltip activator="parent" location="top">Promote to Bible Study</v-tooltip>
+                  <v-tooltip activator="parent" location="top">Set Bible Study Schedule</v-tooltip>
                 </v-btn>
 
 
@@ -308,54 +347,197 @@
 
 
     <!-- Bible Study Promotion Dialog -->
-    <v-dialog v-model="bibleStudyDialogVisible" max-width="460px">
+    <v-dialog v-model="bibleStudyDialogVisible" :max-width="isPromotionScheduling ? '900px' : '460px'">
       <v-card class="rounded-xl overflow-hidden">
         <v-card-title class="bg-teal-darken-2 text-white text-center py-4">
-          <v-icon large class="mr-2">mdi-book-open-variant</v-icon>
-          Promote to Bible Study
+          <v-icon large class="mr-2">{{ isPromotionScheduling ? 'mdi-calendar-clock' : 'mdi-calendar-check' }}</v-icon>
+          {{ isPromotionScheduling ? 'Schedule Bible Study Session' : 'Salvation Talk Result' }}
         </v-card-title>
         <v-card-text class="pa-6">
-          <p class="text-body-1 mb-2 text-center">Salvation Talk completed for:</p>
-          <p class="text-center text-h6 font-weight-bold mb-4">
-            {{ bibleStudyItem?.firstname }} {{ bibleStudyItem?.lastname }}
-          </p>
-          <p class="text-body-2 text-grey-darken-1 text-center mb-5">
-            This will mark the Salvation Talk as <strong>Promoted</strong> and create a 
-            <strong>separate record</strong> in the Bible Study module.
-            You can then assign a Wed/Sat session in the Bible Study tab.
-          </p>
+          <div v-if="!isPromotionScheduling">
+            <p class="text-body-1 mb-2 text-center">Phase 1 (Salvation Talk) completed for:</p>
+            <p class="text-center text-h6 font-weight-bold mb-4">
+              {{ bibleStudyItem?.firstname }} {{ bibleStudyItem?.lastname }}
+            </p>
+            <p class="text-body-2 text-grey-darken-1 text-center mb-5">
+              Select how to proceed with this candidate's discipleship journey.
+            </p>
 
-          <v-btn
-            block
-            color="teal-darken-1"
-            size="large"
-            variant="tonal"
-            class="mb-4 py-5"
-            @click="handleBibleStudyAction(true)"
-            :loading="loadingBibleStudy"
-          >
-            <div class="d-flex flex-column align-start" style="width: 100%">
-              <div class="font-weight-bold">&#x2705; Candidate is Ready / Decided</div>
-              <div class="text-caption">Upgrade record to Bible Study — assign pastor &amp; schedule</div>
-            </div>
-          </v-btn>
+            <v-btn
+              block
+              color="teal-darken-1"
+              size="large"
+              variant="tonal"
+              class="mb-4 py-5"
+              @click="handleBibleStudyAction(true)"
+              :loading="loadingBibleStudy"
+            >
+              <div class="d-flex flex-column align-start" style="width: 100%">
+                <div class="font-weight-bold">&#x1F4C5; Schedule Next Bible Study</div>
+                <div class="text-caption">Candidate is ready. Proceed to set their next session schedule.</div>
+              </div>
+            </v-btn>
 
-          <v-btn
-            block
-            color="orange-darken-2"
-            size="large"
-            variant="tonal"
-            class="py-5"
-            @click="handleBibleStudyAction(false)"
-            :loading="loadingBibleStudy"
-          >
-            <div class="d-flex flex-column align-start" style="width: 100%">
-              <div class="font-weight-bold">&#x1F4E7; Candidate is Hesitant — Send Form Link</div>
-              <div class="text-caption">Upgrade record + email a Bible Study invitation link to candidate</div>
+            <v-btn
+              block
+              color="grey-darken-1"
+              size="large"
+              variant="tonal"
+              class="py-5"
+              @click="handleBibleStudyAction(false)"
+              :loading="loadingBibleStudy"
+            >
+              <div class="d-flex flex-column align-start" style="width: 100%">
+                <div class="font-weight-bold">&#x2709;&#xFE0F; Send Bible Study Form Link</div>
+                <div class="text-caption">Candidate is hesitant. Send them a link to choose their own schedule later.</div>
+              </div>
+            </v-btn>
+          </div>
+
+          <div v-else>
+            <div class="d-flex flex-column flex-md-row">
+              <!-- Left Column: Slots Selection -->
+              <div class="pa-4 bg-grey-lighten-5 rounded-lg mr-md-4 mb-4 mb-md-0" style="flex: 1; max-height: 60vh; overflow-y: auto; border: 1px solid #e0e0e0;">
+                <div class="d-flex align-center mb-4">
+                  <v-icon color="teal-darken-2" class="mr-2">mdi-clock-outline</v-icon>
+                  <span class="text-subtitle-1 font-weight-bold teal--text">Available Bible Study Slots</span>
+                </div>
+                
+                <p class="text-caption text-grey-darken-1 mb-4">
+                  <v-icon size="14">mdi-information-outline</v-icon>
+                  Bible Study sessions are restricted to <b>Wednesdays and Saturdays</b> only.
+                </p>
+
+                <div v-if="slotsLoading" class="text-center pa-8">
+                  <v-progress-circular indeterminate color="teal" size="32" class="mb-2" />
+                  <div class="text-caption">Loading available schedules...</div>
+                </div>
+
+                <div v-else-if="availableSlots.length > 0">
+                  <v-expansion-panels variant="accordion" class="border rounded shadow-sm">
+                    <v-expansion-panel
+                      v-for="(dateGroup, idx) in availableSlots.slice(0, 8)"
+                      :key="dateGroup.date"
+                      :value="idx"
+                    >
+                      <v-expansion-panel-title class="py-2">
+                        <div class="d-flex align-center justify-space-between w-100 pr-2">
+                          <span class="text-subtitle-2 font-weight-bold">{{ formatBibleStudyDate(dateGroup.date) }}</span>
+                          <v-chip size="x-small" color="teal" variant="flat" class="text-white">{{ dateGroup.availableSlots }} slots</v-chip>
+                        </div>
+                      </v-expansion-panel-title>
+                      <v-expansion-panel-text>
+                        <div class="d-flex flex-wrap gap-1 mt-2">
+                          <v-chip
+                            v-for="slot in dateGroup.timeSlots"
+                            :key="slot.datetime"
+                            size="small"
+                            :variant="promotionForm.scheduled_date === slot.datetime ? 'flat' : 'outlined'"
+                            :color="promotionForm.scheduled_date === slot.datetime ? 'teal' : 'grey-darken-1'"
+                            @click="selectSlot(slot.datetime)"
+                            class="cursor-pointer font-weight-medium"
+                          >
+                            {{ formatTime(slot.time) }}
+                          </v-chip>
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                  </v-expansion-panels>
+                  <p v-if="availableSlots.length > 8" class="text-center text-caption text-grey mt-2">
+                    + {{ availableSlots.length - 8 }} more dates available
+                  </p>
+                </div>
+
+                <v-alert v-else type="info" variant="tonal" density="compact" class="mt-4">
+                  No slots found for the next 14 days.
+                </v-alert>
+              </div>
+
+              <!-- Right Column: Form Details -->
+              <div style="flex: 1.2;">
+                <p class="text-h6 font-weight-bold mb-4 teal--text d-flex align-center">
+                  <v-icon color="teal" class="mr-2">mdi-account-plus</v-icon>
+                  Schedule for {{ bibleStudyItem?.firstname }} {{ bibleStudyItem?.lastname }}
+                </p>
+                
+                <v-row dense>
+                  <v-col cols="12" sm="6">
+                    <v-select
+                      v-model="promotionForm.pastor_id"
+                      :items="pastors"
+                      item-title="name"
+                      item-value="acc_id"
+                      label="Assigned Pastor"
+                      variant="outlined"
+                      density="comfortable"
+                      hide-details="auto"
+                      class="mb-4"
+                      prepend-inner-icon="mdi-account-tie"
+                    ></v-select>
+                  </v-col>
+                  <v-col cols="12" sm="6">
+                    <v-text-field 
+                      v-model="promotionForm.location" 
+                      label="Meeting Location" 
+                      variant="outlined" 
+                      density="comfortable"
+                      hide-details="auto"
+                      class="mb-4"
+                      prepend-inner-icon="mdi-map-marker"
+                      placeholder="e.g., Church, Online, or Home Address"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <div v-if="promotionForm.scheduled_date" class="selected-schedule-confirm pa-3 bg-teal-lighten-5 rounded border-teal mb-4 d-flex align-center">
+                  <v-icon color="teal" class="mr-3">mdi-calendar-check</v-icon>
+                  <div>
+                    <div class="text-caption font-weight-bold text-teal-darken-2">CONFIRMED SCHEDULE:</div>
+                    <div class="text-subtitle-1 font-weight-bold text-teal-darken-4">
+                      {{ formatSelectedSchedule(promotionForm.scheduled_date) }}
+                    </div>
+                  </div>
+                </div>
+                
+                <v-alert v-else type="warning" variant="tonal" density="compact" class="mb-4" icon="mdi-calendar-alert">
+                  Please select a date and time slot from the left.
+                </v-alert>
+
+                <v-textarea
+                  v-model="promotionForm.notes"
+                  label="Additional Notes / Remarks"
+                  variant="outlined"
+                  rows="4"
+                  class="mt-2"
+                  hide-details="auto"
+                  prepend-inner-icon="mdi-note-text-outline"
+                  placeholder="Any specific instructions for this Bible Study session..."
+                ></v-textarea>
+
+                <div class="d-flex gap-2 mt-8">
+                  <v-btn
+                    variant="outlined"
+                    color="grey-darken-1"
+                    @click="isPromotionScheduling = false"
+                    :disabled="loadingBibleStudy"
+                    prepend-icon="mdi-arrow-left"
+                  >Back</v-btn>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    color="teal-darken-1"
+                    size="large"
+                    @click="handleBibleStudyAction(true)"
+                    :loading="loadingBibleStudy"
+                    :disabled="!promotionForm.scheduled_date"
+                    prepend-icon="mdi-calendar-check"
+                    class="px-6"
+                  >Confirm & Schedule</v-btn>
+                </div>
+              </div>
             </div>
-          </v-btn>
+          </div>
         </v-card-text>
-        <v-card-actions class="pa-4 bg-grey-lighten-4">
+        <v-card-actions class="pa-4 bg-grey-lighten-4" v-if="!isPromotionScheduling">
           <v-spacer></v-spacer>
           <v-btn color="grey" variant="text" @click="bibleStudyDialogVisible = false">Cancel</v-btn>
         </v-card-actions>
@@ -368,18 +550,26 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAdminDiscipleshipStore } from '@/stores/admin/discipleshipStore';
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore';
 import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from '@/api/axios';
 
 const store = useAdminDiscipleshipStore();
+const settingsStore = useSystemSettingsStore();
 const router = useRouter();
 const { requests, loading, totalCount, currentPage, pageSize, pastors } = storeToRefs(store);
+const { settings, loading: settingsLoading } = storeToRefs(settingsStore);
 
 onMounted(() => {
     store.fetchRequests();
     store.fetchPastors();
+    settingsStore.fetchSettings();
 });
+
+const toggleRestriction = async (val) => {
+    await settingsStore.toggleAllowComplete(val);
+};
 
 const search = ref('');
 const statusFilter = ref('All Status'); // Standardized to 'All Status' for consistency across admin pages
@@ -740,17 +930,100 @@ const saveUpdate = async () => {
 
 
 // ── Bible Study promotion ────────────────────────────────
+const isPromotionScheduling = ref(false);
+const promotionForm = ref({
+  pastor_id: null,
+  location: '',
+  scheduled_date: '',
+  notes: ''
+});
+
 const openBibleStudyDialog = (item) => {
   bibleStudyItem.value = item;
   bibleStudyDialogVisible.value = true;
+  isPromotionScheduling.value = false;
+  
+  promotionForm.value = {
+    pastor_id: item.pastor_id || null,
+    location: item.location || item.address || '',
+    scheduled_date: '',
+    notes: ''
+  };
+
+  fetchSlotsForBibleStudy();
+};
+
+const fetchSlotsForBibleStudy = async () => {
+  slotsLoading.value = true;
+  availableSlots.value = [];
+  try {
+    const response = await axios.get('/services/discipleship-requests/available-slots', {
+      params: { service: 'bible_study', days: 14 }
+    });
+    if (response.data.success) {
+      availableSlots.value = response.data.data || [];
+    }
+  } catch (error) {
+    console.error('Error fetching slots:', error);
+  } finally {
+    slotsLoading.value = false;
+  }
+};
+
+const selectSlot = (slotDateTime) => {
+  promotionForm.value.scheduled_date = slotDateTime;
+};
+
+const formatBibleStudyDate = (dateStr) => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  const [hours, minutes] = timeStr.split(':');
+  const h = parseInt(hours);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${minutes} ${ampm}`;
+};
+
+const formatSelectedSchedule = (dateTimeStr) => {
+  if (!dateTimeStr) return '';
+  return new Date(dateTimeStr).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 };
 
 const handleBibleStudyAction = async (isDecided) => {
   if (!bibleStudyItem.value) return;
+
+  // If decided and we haven't shown the scheduling form yet, show it
+  if (isDecided && !isPromotionScheduling.value) {
+    isPromotionScheduling.value = true;
+    return;
+  }
+
   loadingBibleStudy.value = true;
   try {
-    const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, isDecided);
-    if (success) bibleStudyDialogVisible.value = false;
+    // Send form data if decided, otherwise just send hesitancy flag
+    const payload = isDecided ? { ...promotionForm.value, isDecided: true } : { isDecided: false };
+    const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, payload);
+    
+    if (success) {
+      bibleStudyDialogVisible.value = false;
+      isPromotionScheduling.value = false;
+    }
   } finally {
     loadingBibleStudy.value = false;
   }

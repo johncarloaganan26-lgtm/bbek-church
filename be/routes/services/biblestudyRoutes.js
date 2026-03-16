@@ -59,6 +59,22 @@ router.post('/submit', async (req, res) => {
             status: 'Pending'
         });
 
+        // Send confirmation email to public user
+        if (email) {
+            try {
+                await sendBibleStudyDetails({
+                    email,
+                    firstname,
+                    lastname,
+                    status: 'Pending',
+                    scheduled_date,
+                    location: 'To be determined (Pastor will contact you)'
+                });
+            } catch (e) {
+                console.warn('Email notification failed for public Bible Study submission:', e.message);
+            }
+        }
+
         // Audit log (public)
         try {
             await auditTrailRecords.createAuditLog({
@@ -183,6 +199,78 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
         }
     } catch (error) {
         console.error('Invite error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ADMIN: Bulk Complete Bible Study requests
+router.post('/bulk-complete', authenticateToken, async (req, res) => {
+    try {
+        const { requestIds } = req.body;
+
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No requests selected'
+            });
+        }
+
+        // Fetch the global toggle setting
+        const { getCmsPage } = require('../../dbHelpers/cmsRecords');
+        const settingsResult = await getCmsPage('system_settings');
+        const allowWithoutSchedule = settingsResult.success && settingsResult.data && settingsResult.data.content 
+            ? settingsResult.data.content.allow_complete_without_schedule 
+            : false;
+
+        if (!allowWithoutSchedule) {
+            // If restriction is ON, validate each request's status and date
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const filteredIds = [];
+            const errors = [];
+
+            for (const id of requestIds) {
+                const [rows] = await query('SELECT status, scheduled_date FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+                if (rows.length === 0) {
+                    errors.push({ id, reason: 'Not found' });
+                    continue;
+                }
+
+                const request = rows[0];
+                if (request.status !== 'Scheduled') {
+                    errors.push({ id, reason: 'Status must be Scheduled' });
+                    continue;
+                }
+
+                if (request.scheduled_date) {
+                    const scheduledDate = new Date(request.scheduled_date);
+                    scheduledDate.setHours(0, 0, 0, 0);
+                    if (scheduledDate > today) {
+                        errors.push({ id, reason: 'Future scheduled date' });
+                        continue;
+                    }
+                }
+                filteredIds.push(id);
+            }
+
+            if (filteredIds.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No eligible requests found for completion',
+                    errors
+                });
+            }
+
+            const result = await require('../../dbHelpers/services/biblestudyRecords').bulkCompleteBibleStudies(filteredIds);
+            return res.json({ ...result, errors });
+        } else {
+            // If toggle is OFF (allow_complete_without_schedule is true), just do it
+            const result = await require('../../dbHelpers/services/biblestudyRecords').bulkCompleteBibleStudies(requestIds);
+            return res.json(result);
+        }
+    } catch (error) {
+        console.error('Bulk complete error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

@@ -2101,10 +2101,10 @@ async function bulkCompleteChildDedications(childIds) {
           continue;
         }
 
-        // Skip if not approved (only approved services can be marked as completed)
-        if (dedication.status !== 'approved') {
+        // Allow 'pending' or 'approved' records for bulk completion
+        if (dedication.status !== 'approved' && dedication.status !== 'pending') {
           skipped++;
-          skippedMessages.push(`Child dedication for ${dedication.child_fullname || dedication.child_id} was skipped because it is not approved (current status: ${dedication.status}).`);
+          skippedMessages.push(`Child dedication for ${dedication.child_fullname || dedication.child_id} was skipped because it is not eligible (status: ${dedication.status}, must be pending or approved).`);
           continue;
         }
 
