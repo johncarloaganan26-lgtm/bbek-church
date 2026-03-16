@@ -2,7 +2,7 @@
   <div class="audit-trail">
     <div class="d-flex justify-space-between align-center mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold mb-2">Audit Trail</h1>
+        <h1 class="text-h4 font-weight-bold mb-2">Audist Trail</h1>
         <p class="text-body-1 text-medium-emphasis">Monitor all system activities and user actions</p>
       </div>
       <div class="d-flex gap-3">
