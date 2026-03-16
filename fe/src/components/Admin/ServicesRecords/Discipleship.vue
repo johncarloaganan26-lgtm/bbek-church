@@ -1,7 +1,7 @@
 <template>
   <div class="discipleship-records pa-6">
     <div class="d-flex justify-space-between align-center mb-6">
-      <h1 class="text-h4 font-weight-bold">Discipleship Requests</h1>
+      <h1 class="text-h4 font-weight-bold">Salvation Request</h1>
       <v-btn
         color="success"
         prepend-icon="mdi-plus"
@@ -56,11 +56,6 @@
           Archive Selected
         </v-btn>
         <v-btn size="small" variant="text" class="ml-2" @click="clearSelection">Clear</v-btn>
-        <v-spacer></v-spacer>
-        <span class="text-caption text-grey-darken-1 mr-4" v-if="hasNonScheduled">
-          <v-icon size="small" color="warning">mdi-alert</v-icon>
-          Only "Scheduled" records can be completed
-        </span>
       </div>
       <v-table>
         <thead>
@@ -126,13 +121,15 @@
                 <v-btn
                   variant="tonal"
                   size="small"
-                  color="success"
-                  @click="promoteRequest(item)"
-                  v-if="item.status === 'Completed'"
+                  color="teal-darken-1"
+                  @click="openBibleStudyDialog(item)"
+                  v-if="item.status === 'Completed' && item.request_type === 'Salvation'"
                 >
-                  <v-icon>mdi-water</v-icon>
-                  <v-tooltip activator="parent" location="top">Promote to Water Baptism</v-tooltip>
+                  <v-icon>mdi-book-open-variant</v-icon>
+                  <v-tooltip activator="parent" location="top">Promote to Bible Study</v-tooltip>
                 </v-btn>
+
+
 
                 <v-btn
                   variant="tonal"
@@ -162,84 +159,142 @@
     </v-card>
 
     <!-- Update Dialog -->
-    <v-dialog v-model="dialogVisible" max-width="500px">
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-           Update Request
+    <v-dialog v-model="dialogVisible" :max-width="showAvailableSlots ? '900px' : '500px'">
+      <v-card class="discipleship-dialog">
+        <v-card-title class="bg-primary text-white d-flex align-center">
+          <span>{{ isEditing ? 'Update' : 'Add' }} Request</span>
+          <v-btn 
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            @click="showAvailableSlots = !showAvailableSlots"
+            class="ml-auto"
+          >
+            <v-tooltip activator="parent" location="top">{{ showAvailableSlots ? 'Hide' : 'Show' }} Time Slots</v-tooltip>
+          </v-btn>
         </v-card-title>
-        <v-card-text class="mt-4">
-          <div v-if="!isEditing">
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-text-field v-model="selectedRequest.firstname" label="First Name" variant="outlined" density="compact"></v-text-field>
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field v-model="selectedRequest.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field>
-              </v-col>
-            </v-row>
-            <v-text-field v-model="selectedRequest.email" label="Email Address" variant="outlined" density="compact"></v-text-field>
-            <v-text-field v-model="selectedRequest.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-text-field v-model="selectedRequest.birthdate" label="Birthday" type="date" variant="outlined" density="compact"></v-text-field>
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field v-model="selectedRequest.age" label="Age" type="number" variant="outlined" density="compact" readonly></v-text-field>
-              </v-col>
-            </v-row>
+        <v-card-text class="pa-0 d-flex">
+          <!-- Left Panel: Available Slots -->
+          <div v-if="showAvailableSlots" class="pa-4" style="width: 35%; border-right: 1px solid #e0e0e0; overflow-y: auto; max-height: 60vh;">
+            <div class="font-weight-bold mb-3">Available Time Slots</div>
+            <div v-if="slotsLoading" class="text-center pa-4">
+              <v-progress-circular indeterminate></v-progress-circular>
+              <div class="text-caption mt-2">Loading time slots...</div>
+            </div>
+            <div v-else-if="availableSlots.length === 0" class="text-center text-caption grey--text pa-4">
+              No available slots
+            </div>
+            <div v-else>
+              <v-expansion-panels accordion>
+                <v-expansion-panel v-for="dateGroup in availableSlots" :key="dateGroup.date">
+                  <template #title>
+                    <div>{{ formatDate(dateGroup.date) }}</div>
+                    <v-chip size="small" color="success" class="ml-2">{{ dateGroup.availableSlots }}</v-chip>
+                  </template>
+                  <div class="pa-2">
+                    <v-btn
+                      v-for="slot in dateGroup.timeSlots"
+                      :key="slot.datetime"
+                      variant="outlined"
+                      size="small"
+                      :color="isSlotSelected(slot.datetime) ? 'primary' : 'default'"
+                      :class="{ 'selected-slot': isSlotSelected(slot.datetime) }"
+                      class="mb-2 mr-2"
+                      @click="selectAvailableSlot(dateGroup.date, slot.time)"
+                    >
+                      {{ new Date(`${dateGroup.date} ${slot.time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}
+                    </v-btn>
+                  </div>
+                </v-expansion-panel>
+              </v-expansion-panels>
+              <div v-if="selectedSlotDisplay" class="mt-3 pa-2 bg-teal-lighten-5 rounded">
+                <div class="text-caption font-weight-bold teal--text">Selected: {{ selectedSlotDisplay }}</div>
+              </div>
+            </div>
           </div>
+          <!-- Right Panel: Form -->
+          <div :class="['flex-grow-1', 'pa-4']" style="overflow-y: auto; max-height: 60vh;">
+            <div v-if="!isEditing">
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field v-model="selectedRequest.firstname" label="First Name" variant="outlined" density="compact"></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field v-model="selectedRequest.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field>
+                </v-col>
+              </v-row>
+              <v-text-field v-model="selectedRequest.email" label="Email Address" variant="outlined" density="compact"></v-text-field>
+              <v-text-field v-model="selectedRequest.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field v-model="selectedRequest.birthdate" label="Birthday" type="date" variant="outlined" density="compact"></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field v-model="selectedRequest.age" label="Age" type="number" variant="outlined" density="compact" readonly></v-text-field>
+                </v-col>
+              </v-row>
+            </div>
 
-          <v-row>
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="selectedRequest.pastor_id"
-                :items="pastors"
-                item-title="name"
-                item-value="acc_id"
-                label="Assigned Pastor"
-                variant="outlined"
-                density="compact"
-                clearable
-              ></v-select>
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field v-model="selectedRequest.location" label="Location" variant="outlined" density="compact"></v-text-field>
-            </v-col>
-          </v-row>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="selectedRequest.pastor_id"
+                  :items="pastors"
+                  item-title="name"
+                  item-value="acc_id"
+                  label="Assigned Pastor"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="selectedRequest.location" label="Location" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+            </v-row>
 
-          <v-select
-            v-model="selectedRequest.status"
-            :items="statusItems"
-            label="Status"
-            variant="outlined"
-            density="compact"
-          ></v-select>
+            <v-select
+              v-model="selectedRequest.status"
+              :items="statusItems"
+              label="Status"
+              variant="outlined"
+              density="compact"
+            ></v-select>
 
-          <label class="text-caption grey--text mb-1 d-block">Schedule Date & Time</label>
-          <el-date-picker
-            v-model="selectedRequest.scheduled_date"
-            type="datetime"
-            placeholder="Select Sunday date and time"
-            style="width: 100%"
-            :disabled-date="disabledDate"
-            format="YYYY-MM-DD hh:mm A"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            :default-time="new Date(0, 0, 0, 9, 0, 0)"
-            popper-class="discipleship-date-picker"
-          />
-          <div class="text-caption grey--text mt-1">Schedules are strictly limited to Sundays</div>
+            <v-select
+              v-model="selectedRequest.request_type"
+              :items="requestTypeItems"
+              label="Stage (Request Type)"
+              variant="outlined"
+              density="compact"
+            ></v-select>
 
-          <v-textarea
-            v-model="selectedRequest.notes"
-            label="Notes / Remarks"
-            variant="outlined"
-            rows="3"
-            class="mt-3"
-          ></v-textarea>
+            <label class="text-caption grey--text mb-1 d-block">Schedule Date & Time</label>
+            <el-date-picker
+              v-model="selectedRequest.scheduled_date"
+              type="datetime"
+              :placeholder="schedulePlaceholder"
+              style="width: 100%"
+              :disabled-date="disabledDate"
+              format="YYYY-MM-DD hh:mm A"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              :default-time="new Date(0, 0, 0, 9, 0, 0)"
+              popper-class="discipleship-date-picker"
+            />
+            <div class="text-caption grey--text mt-1">{{ scheduleHelperText }}</div>
 
-          <div v-if="formattedSchedulePreview" class="mt-4 pa-3 bg-teal-lighten-5 rounded border-teal">
-            <div class="text-caption text-teal-darken-3 font-weight-bold">VALIDATED SCHEDULE (SUNDAY)</div>
-            <div class="text-h6 text-teal-darken-4">{{ formattedSchedulePreview }}</div>
+            <v-textarea
+              v-model="selectedRequest.notes"
+              label="Notes / Remarks"
+              variant="outlined"
+              rows="3"
+              class="mt-3"
+            ></v-textarea>
+
+            <div v-if="formattedSchedulePreview" class="mt-4 pa-3 bg-teal-lighten-5 rounded border-teal">
+              <div class="text-caption text-teal-darken-3 font-weight-bold">VALIDATED SCHEDULE ({{ selectedRequest.request_type || 'Salvation' }})</div>
+              <div class="text-h6 text-teal-darken-4">{{ formattedSchedulePreview }}</div>
+            </div>
           </div>
         </v-card-text>
         <v-card-actions>
@@ -250,51 +305,59 @@
       </v-card>
     </v-dialog>
 
-    <!-- Promotion Choice Dialog -->
-    <v-dialog v-model="promotionDialogVisible" max-width="450px">
+
+
+    <!-- Bible Study Promotion Dialog -->
+    <v-dialog v-model="bibleStudyDialogVisible" max-width="460px">
       <v-card class="rounded-xl overflow-hidden">
-        <v-card-title class="bg-teal text-white text-center py-4">
-          <v-icon large class="mr-2">mdi-water-check</v-icon>
-          Water Baptism Promotion
+        <v-card-title class="bg-teal-darken-2 text-white text-center py-4">
+          <v-icon large class="mr-2">mdi-book-open-variant</v-icon>
+          Promote to Bible Study
         </v-card-title>
         <v-card-text class="pa-6">
-          <p class="text-body-1 mb-6 text-center">
-            How would you like to proceed with <b>{{ promotingItem?.firstname }} {{ promotingItem?.lastname }}</b>?
+          <p class="text-body-1 mb-2 text-center">Salvation Talk completed for:</p>
+          <p class="text-center text-h6 font-weight-bold mb-4">
+            {{ bibleStudyItem?.firstname }} {{ bibleStudyItem?.lastname }}
           </p>
-          
+          <p class="text-body-2 text-grey-darken-1 text-center mb-5">
+            This will mark the Salvation Talk as <strong>Promoted</strong> and create a 
+            <strong>separate record</strong> in the Bible Study module.
+            You can then assign a Wed/Sat session in the Bible Study tab.
+          </p>
+
           <v-btn
             block
             color="teal-darken-1"
             size="large"
             variant="tonal"
-            class="mb-4 py-6"
-            @click="handlePromotionAction(true)"
-            :loading="loadingPromotion"
+            class="mb-4 py-5"
+            @click="handleBibleStudyAction(true)"
+            :loading="loadingBibleStudy"
           >
             <div class="d-flex flex-column align-start" style="width: 100%">
-              <div class="font-weight-bold">Candidate Decided</div>
-              <div class="text-caption">Promote directly to Water Baptism module</div>
+              <div class="font-weight-bold">&#x2705; Candidate is Ready / Decided</div>
+              <div class="text-caption">Upgrade record to Bible Study — assign pastor &amp; schedule</div>
             </div>
           </v-btn>
 
           <v-btn
             block
-            color="grey-darken-2"
+            color="orange-darken-2"
             size="large"
             variant="tonal"
-            class="py-6"
-            @click="handlePromotionAction(false)"
-            :loading="loadingPromotion"
+            class="py-5"
+            @click="handleBibleStudyAction(false)"
+            :loading="loadingBibleStudy"
           >
             <div class="d-flex flex-column align-start" style="width: 100%">
-              <div class="font-weight-bold">Requester Undecided</div>
-              <div class="text-caption">Send invitation link for consideration</div>
+              <div class="font-weight-bold">&#x1F4E7; Candidate is Hesitant — Send Form Link</div>
+              <div class="text-caption">Upgrade record + email a Bible Study invitation link to candidate</div>
             </div>
           </v-btn>
         </v-card-text>
         <v-card-actions class="pa-4 bg-grey-lighten-4">
           <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="promotionDialogVisible = false">Cancel</v-btn>
+          <v-btn color="grey" variant="text" @click="bibleStudyDialogVisible = false">Cancel</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -307,6 +370,7 @@ import { useRouter } from 'vue-router';
 import { useAdminDiscipleshipStore } from '@/stores/admin/discipleshipStore';
 import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import axios from '@/api/axios';
 
 const store = useAdminDiscipleshipStore();
 const router = useRouter();
@@ -323,10 +387,16 @@ const sortBy = ref('Date Created (Newest)'); // Added
 const page = ref(1); // Added
 // pageSize is already destructured from storeToRefs, so no need to declare here.
 const dialogVisible = ref(false);
-const promotionDialogVisible = ref(false);
-const promotingItem = ref(null);
-const loadingPromotion = ref(false);
 const selectedRequest = ref({});
+// Available slots state
+const availableSlots = ref([]);
+const slotsLoading = ref(false);
+const showAvailableSlots = ref(true);
+const selectedSlotDisplay = ref(null);
+// Bible Study promotion state
+const bibleStudyDialogVisible = ref(false);
+const bibleStudyItem = ref(null);
+const loadingBibleStudy = ref(false);
 const isEditing = ref(false);
 const deleteReason = ref('');
 const showDeleteReasonDialog = ref(false);
@@ -342,23 +412,31 @@ const toggleSelectAll = (value) => {
   }
 };
 
-const statusItems = computed(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  let isFutureOrMissing = true;
-  if (selectedRequest.value.scheduled_date) {
-    const scheduledDate = new Date(selectedRequest.value.scheduled_date);
-    scheduledDate.setHours(0, 0, 0, 0);
-    isFutureOrMissing = scheduledDate > today;
+const statusItems = computed(() => [
+  { title: 'Pending', value: 'Pending' },
+  { title: 'Scheduled', value: 'Scheduled' },
+  { title: 'Completed', value: 'Completed' },
+  { title: 'Cancelled', value: 'Cancelled' }
+]);
+
+const requestTypeItems = [
+  { title: 'Salvation', value: 'Salvation' },
+  { title: 'Bible Study', value: 'Bible Study' },
+  { title: 'Both (Legacy)', value: 'Both' }
+];
+
+const schedulePlaceholder = computed(() => {
+  if (selectedRequest.value?.request_type === 'Bible Study') {
+    return 'Select Wednesday or Saturday date and time';
   }
-  
-  return [
-    { title: 'Pending', value: 'Pending' },
-    { title: 'Scheduled', value: 'Scheduled' },
-    { title: 'Completed', value: 'Completed', props: { disabled: isFutureOrMissing } },
-    { title: 'Cancelled', value: 'Cancelled' }
-  ];
+  return 'Select date and time';
+});
+
+const scheduleHelperText = computed(() => {
+  if (selectedRequest.value?.request_type === 'Bible Study') {
+    return 'Bible Study schedules are limited to Wednesdays and Saturdays';
+  }
+  return 'Salvation Talk schedules are available every day, any time';
 });
 
 const clearSelection = () => {
@@ -366,59 +444,16 @@ const clearSelection = () => {
   selectAll.value = false;
 };
 
-// Check if selected requests contain non-Scheduled records
-const hasNonScheduled = computed(() => {
-  if (selectedRequests.value.length === 0) return false;
-  return requests.value
-    .filter(r => selectedRequests.value.includes(r.request_id))
-    .some(r => r.status !== 'Scheduled');
-});
-
-// Bulk complete selected requests (only Scheduled status can be completed)
+// Bulk complete selected requests
 const bulkComplete = async () => {
   if (selectedRequests.value.length === 0) {
     ElMessage.warning('No requests selected');
     return;
   }
-  
-  // Get selected records
-  const selectedRecords = requests.value.filter(r => selectedRequests.value.includes(r.request_id));
-  
-  // Check if any selected record is not in Scheduled status
-  const nonScheduledRecords = selectedRecords.filter(r => r.status !== 'Scheduled');
-  
-  if (nonScheduledRecords.length > 0) {
-    ElMessage.error(`Cannot complete ${nonScheduledRecords.length} record(s) that are not in "Scheduled" status. Only "Scheduled" records can be marked as completed.`);
-    return;
-  }
-  
-  // Check dates: cannot complete future scheduled requests
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  const validRecords = selectedRecords.filter(r => {
-    // If no scheduled date, allow completion (admin discretion)
-    if (!r.scheduled_date) return true;
-    const scheduledDate = new Date(r.scheduled_date);
-    scheduledDate.setHours(0, 0, 0, 0);
-    return scheduledDate <= today;
-  });
-
-  const skippedCount = selectedRecords.length - validRecords.length;
-
-  if (validRecords.length === 0) {
-    ElMessage.warning('Cannot mark future scheduled requests as completed. Please wait until the scheduled date.');
-    return;
-  }
-  
   try {
-    let confirmMessage = `Are you sure you want to mark ${validRecords.length} scheduled request(s) as completed?`;
-    if (skippedCount > 0) {
-      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
-    }
-
     await ElMessageBox.confirm(
-      confirmMessage,
+      `Mark ${selectedRequests.value.length} request(s) as completed?`,
       'Bulk Complete Requests',
       {
         confirmButtonText: 'Yes, Complete',
@@ -427,14 +462,14 @@ const bulkComplete = async () => {
       }
     );
     
-    // Only complete valid records (past scheduled dates)
-    const validRequestIds = validRecords.map(r => r.request_id);
-    const result = await store.bulkCompleteRequests(validRequestIds);
+    const result = await store.bulkCompleteRequests(selectedRequests.value);
     if (result.success) {
       const { completed, failed } = result.data || {};
       
       if (completed && completed.length > 0) {
         ElMessage.success(`Successfully marked ${completed.length} request(s) as completed`);
+      } else {
+        ElMessage.success('Requests marked as completed');
       }
       
       if (failed && failed.length > 0) {
@@ -588,7 +623,7 @@ const openAddDialog = () => {
     lastname: '',
     email: '',
     phone_number: '',
-    request_type: 'Both',
+    request_type: 'Salvation',
     status: 'Pending',
     scheduled_date: '',
     notes: ''
@@ -610,6 +645,68 @@ const openScheduleDialog = (item) => {
   dialogVisible.value = true;
 };
 
+// Fetch available slots for admin
+const fetchAvailableSlots = async (days = 7) => {
+  try {
+    slotsLoading.value = true;
+    const response = await axios.get('/services/discipleship-requests/available-slots', {
+      params: { days, service: selectedRequest.value?.request_type || 'Salvation' }
+    });
+    
+    if (response.data.success) {
+      availableSlots.value = response.data.data || [];
+    }
+  } catch (error) {
+    console.error('Error fetching available slots:', error);
+    ElMessage.error('Failed to load available time slots');
+  } finally {
+    slotsLoading.value = false;
+  }
+};
+
+// Select an available slot
+const selectAvailableSlot = (date, time) => {
+  selectedRequest.value.scheduled_date = `${date} ${time}`;
+  selectedSlotDisplay.value = formatSlotDisplay(date, time);
+  ElMessage.success('Slot selected! Date and time have been filled.');
+};
+
+// Format slot for display
+const formatSlotDisplay = (date, time) => {
+  const dateObj = new Date(`${date} ${time}`);
+  return dateObj.toLocaleString('en-US', { 
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+// Format date for display
+const formatDate = (dateStr) => {
+  return dateStr ? new Date(dateStr).toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  }) : '';
+};
+
+// Check if slot is selected
+const isSlotSelected = (datetime) => {
+  if (!selectedRequest.value.scheduled_date) return false;
+  return selectedRequest.value.scheduled_date === datetime;
+};
+
+// Watch dialog visibility to fetch slots when it opens
+watch(dialogVisible, async (isOpen) => {
+  if (isOpen) {
+    fetchAvailableSlots(7);
+  }
+});
+
 const saveUpdate = async () => {
   if (!isEditing.value) {
     if (!selectedRequest.value.firstname || !selectedRequest.value.lastname || !selectedRequest.value.email) {
@@ -625,6 +722,7 @@ const saveUpdate = async () => {
       firstname: selectedRequest.value.firstname,
       lastname: selectedRequest.value.lastname,
       email: selectedRequest.value.email,
+      request_type: selectedRequest.value.request_type,
       status: selectedRequest.value.status,
       scheduled_date: selectedRequest.value.scheduled_date,
       notes: selectedRequest.value.notes,
@@ -638,22 +736,23 @@ const saveUpdate = async () => {
   }
 };
 
-const promoteRequest = (item) => {
-  promotingItem.value = item;
-  promotionDialogVisible.value = true;
+
+
+
+// ── Bible Study promotion ────────────────────────────────
+const openBibleStudyDialog = (item) => {
+  bibleStudyItem.value = item;
+  bibleStudyDialogVisible.value = true;
 };
 
-const handlePromotionAction = async (isDecided) => {
-  if (!promotingItem.value) return;
-  
-  loadingPromotion.value = true;
+const handleBibleStudyAction = async (isDecided) => {
+  if (!bibleStudyItem.value) return;
+  loadingBibleStudy.value = true;
   try {
-    const success = await store.inviteToBaptism(promotingItem.value.request_id, isDecided);
-    if (success) {
-      promotionDialogVisible.value = false;
-    }
+    const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, isDecided);
+    if (success) bibleStudyDialogVisible.value = false;
   } finally {
-    loadingPromotion.value = false;
+    loadingBibleStudy.value = false;
   }
 };
 
@@ -688,8 +787,15 @@ const deleteItem = async (item) => {
 };
 
 const disabledDate = (time) => {
-  // 0 is Sunday
-  return time.getDay() !== 0;
+  const type = selectedRequest.value?.request_type;
+  const day = time.getDay();
+
+  if (type === 'Bible Study') {
+    return day !== 3 && day !== 6; // Wed or Sat only
+  }
+
+  // Salvation (and legacy "Both") can be scheduled any day.
+  return false;
 };
 </script>
 

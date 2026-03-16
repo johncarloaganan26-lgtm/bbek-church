@@ -59,7 +59,87 @@
           <div class="content-grid">
             <!-- Left Column: What is Child Dedication -->
             <div class="left-column">
-              <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
+              <!-- Available Sunday Dates Section (Only for logged in users) -->
+              <template v-if="userInfo.account && userInfo.account.acc_id">
+                <h2 class="section-title fade-in" style="animation-delay: 100ms;">
+                  Select Available Dates
+                </h2>
+                
+                <v-card 
+                  class="mb-4 fade-in-up sunday-schedule-card" 
+                  style="animation-delay: 200ms;" 
+                  variant="flat"
+                >
+                <v-card-title class="card-title" style="font-size: 1.25rem; font-weight: 600; background-color: #0d9488; color: white; padding: 16px;">
+                  <v-icon color="white" class="mr-2">mdi-calendar-clock</v-icon>
+                  Available Dates
+                </v-card-title>
+                <v-card-text>
+                  <div v-if="loadingAvailableDates" class="text-center py-4">
+                    <v-progress-circular indeterminate color="primary" size="24"></v-progress-circular>
+                    <p class="mt-2 text-teal-darken-1" style="font-family: 'Georgia', serif;">Loading available dates...</p>
+                  </div>
+                  <div v-else-if="availableSundayDates.length === 0" class="text-center py-4">
+                    <v-icon color="grey" size="48">mdi-calendar-remove</v-icon>
+                    <p class="mt-2 text-grey-darken-1" style="font-family: 'Georgia', serif;">No available dates at this time</p>
+                  </div>
+                  <div v-else class="available-dates-list">
+                    <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
+                      <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
+                      Select a Sunday date and time slot for your child dedication
+                    </p>
+                    <v-expansion-panels variant="accordion" class="dates-panel">
+                      <v-expansion-panel
+                        v-for="(sunday, index) in availableSundayDates.slice(0, 4)"
+                        :key="sunday.date"
+                        variant="flat"
+                        class="mb-2 sunday-panel"
+                      >
+                        <v-expansion-panel-title>
+                          <div class="d-flex align-center justify-space-between w-100 pr-2">
+                            <div>
+                              <v-icon color="teal-darken-2" class="mr-2">mdi-calendar</v-icon>
+                              <span class="font-weight-medium text-teal-darken-3">{{ sunday.displayDate }}</span>
+                            </div>
+                            <v-chip 
+                              size="small" 
+                              color="teal" 
+                              variant="flat"
+                              class="mr-2"
+                              style="color: white !important;"
+                            >
+                              {{ sunday.availableSlots }} slots
+                            </v-chip>
+                          </div>
+                        </v-expansion-panel-title>
+                        <v-expansion-panel-text>
+                          <div class="time-slots-grid">
+                            <v-chip
+                              v-for="slot in sunday.timeSlots"
+                              :key="slot.time"
+                              size="small"
+                              variant="outlined"
+                              color="teal-darken-2"
+                              class="ma-1 time-slot-chip"
+                              @click="selectTimeSlot(sunday.date, slot.time)"
+                            >
+                              {{ slot.displayTime }}
+                            </v-chip>
+                          </div>
+                        </v-expansion-panel-text>
+                      </v-expansion-panel>
+                    </v-expansion-panels>
+                    <p v-if="availableSundayDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
+                      + {{ availableSundayDates.length - 4 }} more Sundays available
+                    </p>
+                  </div>
+                </v-card-text>
+              </v-card>
+              </template>
+
+              <!-- What is Child Dedication? - ONLY show when NOT logged in -->
+              <div v-if="!userInfo.account || !userInfo.account.acc_id">
+                <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
                 {{ childDedicationData.sectionTitle }}
               </h2>
               
@@ -106,6 +186,7 @@
                   </ul>
                 </v-card-text>
               </v-card>
+              </div>
             </div>
 
             <!-- Right Column: Register for Child Dedication (Only for logged in users) -->
@@ -572,6 +653,37 @@ import { useCms } from '@/composables/useCms'
 const childDedicationStore = useChildDedicationStore()
 const showLoginDialog = ref(false)
 
+// Available Sunday dates state
+const availableSundayDates = ref([])
+const loadingAvailableDates = ref(false)
+
+// Fetch available Sunday dates for logged-in members
+const fetchAvailableSundayDates = async () => {
+  // Only fetch if user is logged in
+  if (!userInfo.value.account || !userInfo.value.account.acc_id) {
+    return
+  }
+  
+  loadingAvailableDates.value = true
+  try {
+    const accessToken = localStorage.getItem('accessToken')
+    const response = await axios.get('/church-records/child-dedications/getAvailableSundayDates', {
+      params: { weeksAhead: 8 },
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+    
+    if (response.data.success) {
+      availableSundayDates.value = response.data.data.availableDates || []
+    }
+  } catch (error) {
+    console.error('Error fetching available Sunday dates:', error)
+  } finally {
+    loadingAvailableDates.value = false
+  }
+}
+
 // CMS Data
 const childDedicationData = ref({
   heroImage: '/img/child-dedication.jpg',
@@ -970,6 +1082,11 @@ onMounted(async () => {
     if (userInfo.value?.member?.member_id) {
       inlineFormData.requested_by = userInfo.value.member.member_id
     }
+    
+    // Fetch available Sunday dates for logged-in members
+    if (userInfo.value?.account?.acc_id) {
+      await fetchAvailableSundayDates()
+    }
   } catch (error) {
     console.error('Error loading user info:', error)
     userInfo.value = {}
@@ -992,6 +1109,21 @@ const showSuccessDialog = (title, message) => {
 // Close success dialog
 const closeSuccessDialog = () => {
   successDialog.value.show = false
+}
+
+// Select time slot from available dates and populate form
+const selectTimeSlot = (date, time) => {
+  // Create datetime string in format YYYY-MM-DD HH:mm:ss
+  const dateTime = `${date} ${time}:00`
+  inlineFormData.preferred_dedication_date = dateTime
+  
+  ElMessage.success(`Selected: ${date} at ${time}`)
+  
+  // Scroll to the form
+  const registerSection = document.getElementById('register')
+  if (registerSection) {
+    registerSection.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 
 const handleChildDedicationDialogSubmit = async (payload) => {
@@ -1270,6 +1402,12 @@ const handleSwitchToEdit = (dedication) => {
 @media (min-width: 1024px) {
   .content-grid {
     grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+  .content-grid > .left-column,
+  .content-grid > .right-column {
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -1350,6 +1488,38 @@ const handleSwitchToEdit = (dedication) => {
   gap: 12px;
 }
 
+/* Available Dates Section Styles */
+.available-dates-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dates-panel {
+  background: transparent !important;
+}
+
+.dates-panel .v-expansion-panel {
+  background: white !important;
+  border: 1px solid #0d9488 !important;
+}
+
+.time-slots-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.time-slot-chip {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.time-slot-chip:hover {
+  background: #14b8a6 !important;
+  color: white !important;
+  border-color: #14b8a6 !important;
+}
+
 .baptized-item {
   display: flex;
   align-items: flex-start;
@@ -1364,6 +1534,56 @@ const handleSwitchToEdit = (dedication) => {
 .check-icon {
   margin-top: 2px;
   flex-shrink: 0;
+}
+
+/* Sunday Schedule Card - System Branding */
+.sunday-schedule-card {
+  border: 2px solid #0d9488;
+  border-top: 4px solid #0d9488;
+  background: #ffffff;
+}
+
+.sunday-schedule-card .v-card-title {
+  color: #0d9488;
+  border-bottom: 2px solid #0d9488;
+  padding-bottom: 12px;
+}
+
+.sunday-panel {
+  background: #f0fdfa !important;
+  margin-bottom: 8px !important;
+  border: 2px solid #0d9488 !important;
+  box-shadow: none !important;
+}
+
+.sunday-panel::before {
+  display: none !important;
+}
+
+.sunday-panel .v-expansion-panel-title {
+  background: transparent !important;
+}
+
+.sunday-panel:hover {
+  background: #ccfbf1 !important;
+}
+
+.time-slot-chip {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.time-slot-chip:hover {
+  background-color: #0d9488 !important;
+  color: white !important;
+  border-color: #0d9488 !important;
+  transform: scale(1.05);
+}
+
+.time-slots-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* Login Alert */

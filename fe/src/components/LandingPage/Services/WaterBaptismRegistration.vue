@@ -1,8 +1,52 @@
 <template>
   <div class="registration-container">
-    <v-container>
+    <v-container :class="{'px-6': adminMode}">
       <v-row justify="center">
-        <v-col cols="12" md="8" lg="6">
+        <!-- Available Slots Side Panel -->
+        <v-col cols="12" md="4">
+          <v-card class="pa-6 rounded-xl border-teal elevation-2 mb-6" style="border-top: 6px solid #0d9488">
+            <div class="d-flex align-center mb-4">
+              <v-icon color="teal" class="mr-2">mdi-calendar-clock</v-icon>
+              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Sunday Slots</h3>
+            </div>
+            <p class="text-body-2 grey--text mb-6">
+              Select one of the upcoming Sunday schedules to automatically fill the form.
+            </p>
+            
+            <div class="slots-list">
+              <v-hover v-for="slot in availableSlots" :key="slot.date" v-slot="{ isHovering, props }">
+                <v-card
+                  v-bind="props"
+                  :elevation="isHovering ? 4 : 1"
+                  :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
+                  @click="selectSlot(slot)"
+                >
+                  <div class="d-flex justify-space-between align-center">
+                    <div>
+                      <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
+                      <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.time }}</div>
+                    </div>
+                    <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
+                      {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                    </v-icon>
+                  </div>
+                </v-card>
+              </v-hover>
+            </div>
+            
+            <v-alert
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mt-4 text-caption"
+              color="teal"
+            >
+              Slots are set to 1:00 PM every Sunday.
+            </v-alert>
+          </v-card>
+        </v-col>
+
+        <v-col cols="12" md="8" lg="7">
           <v-card elevation="4" class="pa-6 registration-card">
             <div class="text-center mb-6">
               <v-img src="/logo.png" height="80" contain class="mb-4"></v-img>
@@ -134,8 +178,43 @@
                 </v-col>
               </v-row>
 
+              <!-- Baptism Scheduling Section -->
+              <h3 class="text-h6 mt-2 mb-4 teal--text">Baptism Details</h3>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="formData.baptism_date"
+                    label="Preferred Date"
+                    type="date"
+                    variant="outlined"
+                    density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Baptism Date is required']"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="formData.baptism_time"
+                    label="Preferred Time"
+                    type="time"
+                    variant="outlined"
+                    density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Baptism Time is required']"
+                  ></v-text-field>
+                </v-col>
+                <v-col v-if="adminMode" cols="12">
+                  <v-text-field
+                    v-model="formData.location"
+                    label="Location (Admin Only)"
+                    variant="outlined"
+                    density="comfortable"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+
               <!-- Guardian Section (for minors or as standard requirement) -->
-              <h3 class="text-h6 mt-6 mb-4 teal--text">Guardian Information</h3>
+              <h3 class="text-h6 mt-4 mb-4 teal--text">Guardian Information</h3>
               <v-text-field
                 v-model="formData.guardian_name"
                 label="Guardian Name"
@@ -168,10 +247,10 @@
                 size="x-large"
                 type="submit"
                 :loading="submitting"
-                class="mt-6"
+                class="mt-6 font-weight-bold"
                 elevation="2"
               >
-                Submit Registration
+                SUBMIT REGISTRATION
               </v-btn>
             </v-form>
           </v-card>
@@ -187,6 +266,18 @@ import { useRoute, useRouter } from 'vue-router';
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import publicAxios from '@/api/publicAxios';
+
+const props = defineProps({
+  adminMode: {
+    type: Boolean,
+    default: false
+  },
+  adminData: {
+    type: Object,
+    default: null
+  }
+});
+const emit = defineEmits(['success']);
 
 const route = useRoute();
 const router = useRouter();
@@ -212,9 +303,52 @@ const formData = reactive({
   guardian_name: '',
   guardian_contact: '',
   guardian_relationship: '',
+  baptism_date: '',
+  baptism_time: '',
+  location: '',
   is_member: false,
   status: 'pending'
 });
+
+const availableSlots = ref([]);
+
+const generateSundaySlots = () => {
+  const slots = [];
+  const today = new Date();
+  let current = new Date();
+  
+  // Find next Sunday
+  const daysUntilSunday = (7 - today.getDay()) % 7;
+  current.setDate(today.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
+  
+  // Generate next 4 Sundays
+  for (let i = 0; i < 4; i++) {
+    const slotDate = new Date(current);
+    const dateStr = slotDate.toISOString().split('T')[0];
+    const displayDate = slotDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    
+    slots.push({
+      date: dateStr,
+      displayDate: displayDate,
+      time: '13:00',
+      timeDisplay: '1:00 PM'
+    });
+    
+    current.setDate(current.getDate() + 7);
+  }
+  availableSlots.value = slots;
+};
+
+const selectSlot = (slot) => {
+  formData.baptism_date = slot.date;
+  formData.baptism_time = slot.time;
+  ElMessage.success(`Selected Sunday: ${slot.displayDate}`);
+};
 
 // Auto-calculate age from birthdate
 watch(() => formData.birthdate, (newDate) => {
@@ -233,6 +367,20 @@ watch(() => formData.birthdate, (newDate) => {
 });
 
 onMounted(async () => {
+  generateSundaySlots();
+  
+  // If we're in adminMode, pre-hydrate the data passed from parent instead
+  if (props.adminMode && props.adminData) {
+    requestId.value = props.adminData._activeItem?.request_id || null;
+    formData.firstname = props.adminData.firstname || '';
+    formData.lastname = props.adminData.lastname || '';
+    formData.email = props.adminData.email || '';
+    formData.phone_number = props.adminData.phone_number || '';
+    formData.address = props.adminData.address || '';
+    formData.status = 'approved'; // Admin setting implies it's ready/scheduled
+    return;
+  }
+
   // If reqId is provided (from discipleship invitation), fetch the data
   if (requestId.value) {
     loadingRegistrationData.value = true;
@@ -276,12 +424,17 @@ const handleSubmit = async () => {
     console.log('Water baptism registration result:', result);
 
     if (result.success) {
-      await ElMessageBox.alert(
-        'Thank you! Your water baptism registration has been submitted. Our pastor/staff will reach out to you once the schedule is finalized.',
-        'Registration Successful',
-        { type: 'success' }
-      );
-      router.push('/');
+      if (props.adminMode) {
+        ElMessage.success('Water Baptism scheduled successfully!');
+        emit('success');
+      } else {
+        await ElMessageBox.alert(
+          'Thank you! Your water baptism registration has been submitted. Our pastor/staff will reach out to you once the schedule is finalized.',
+          'Registration Successful',
+          { type: 'success' }
+        );
+        router.push('/');
+      }
     } else {
       ElMessage.error(result.error || 'Failed to submit registration. Please try again.');
     }
@@ -306,5 +459,22 @@ const handleSubmit = async () => {
 }
 .teal--text {
   color: #0d9488 !important;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.border-teal-active {
+  border: 2px solid #0d9488 !important;
+  background-color: #f0fdfa;
+}
+
+.transition-swing {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.slot-item {
+  border: 1px solid #e0e0e0;
 }
 </style>

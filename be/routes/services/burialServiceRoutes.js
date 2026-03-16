@@ -11,8 +11,10 @@ const {
   bulkCompleteBurialServices,
   exportBurialServicesToExcel,
   searchBurialServicesFulltext,
-  analyzeBurialServiceAvailability
+  analyzeBurialServiceAvailability,
+  getAvailableBurialDates
 } = require('../../dbHelpers/services/burialServiceRecords');
+const { query } = require('../../database/db');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -751,6 +753,128 @@ router.post('/analyzeAvailability', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to analyze burial service availability'
+    });
+  }
+});
+
+/**
+ * GET AVAILABLE BURIAL DATES - Get available burial service dates with night shift
+ * GET /api/church-records/burial-services/getAvailableBurialDates
+ * Query params: daysAhead (optional, default: 30)
+ * 
+ * This endpoint is PUBLIC - anyone can view available dates
+ * It analyzes all burial service records that are NOT approved/scheduled
+ * and returns available daily dates between 5pm-10pm (night shift) for the next N days
+ */
+router.get('/getAvailableBurialDates', async (req, res) => {
+  try {
+    const daysAhead = parseInt(req.query.daysAhead) || 30;
+    
+    const result = await getAvailableBurialDates(daysAhead);
+    
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error getting available burial dates:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get available burial dates'
+    });
+  }
+});
+
+/**
+ * AVAILABLE SLOTS - Get available burial service slots for admin
+ * GET /api/services/burial-services/available-slots?days=14
+ * Returns available dates (any day) with evening time slots only (6 PM - 10 PM)
+ */
+router.get('/available-slots', async (req, res) => {
+  try {
+    const timezone = 'Asia/Manila';
+    const daysRaw = req.query.days;
+    const requestedDays = Number.parseInt(String(daysRaw || '14'), 10);
+    const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 14;
+
+    const momentTz = require('moment-timezone');
+    const start = momentTz().tz(timezone).startOf('day');
+    const endExclusive = start.clone().add(days, 'days');
+
+    // Get all booked burial service slots within the date range
+    const [bookedRows] = await query(`
+      SELECT DATE_FORMAT(service_date, '%Y-%m-%d') AS booked_date, preferred_service_time as service_time
+      FROM tbl_burialservice
+      WHERE preferred_service_time IS NOT NULL
+        AND service_date IS NOT NULL
+        AND service_date >= ?
+        AND service_date < ?
+        AND status IN ('Approved', 'Scheduled')
+      ORDER BY service_date ASC
+    `, [
+      start.format('YYYY-MM-DD HH:mm:ss'),
+      endExclusive.format('YYYY-MM-DD HH:mm:ss')
+    ]);
+
+    const bookedMap = {};
+    (bookedRows || []).forEach(row => {
+      const dateKey = row.booked_date;
+      if (!bookedMap[dateKey]) {
+        bookedMap[dateKey] = [];
+      }
+      if (row.service_time) {
+        bookedMap[dateKey].push(row.service_time);
+      }
+    });
+
+    // Generate available dates with time slots (evening only: 6 PM - 10 PM, 30-min intervals)
+    const dateGroups = [];
+    for (let i = 0; i < days; i++) {
+      const date = start.clone().add(i, 'days');
+      const dateStr = date.format('YYYY-MM-DD');
+      const dayName = date.format('dddd');
+      const bookedTimes = bookedMap[dateStr] || [];
+
+      // Evening service times: 6:00 PM, 6:30 PM, 7:00 PM, 7:30 PM, 8:00 PM, 8:30 PM, 9:00 PM, 9:30 PM, 10:00 PM
+      const defaultSlots = [
+        '18:00:00', '18:30:00', '19:00:00', '19:30:00', 
+        '20:00:00', '20:30:00', '21:00:00', '21:30:00', '22:00:00'
+      ];
+      
+      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
+
+      if (availableSlots.length > 0) {
+        dateGroups.push({
+          date: dateStr,
+          dayName: dayName,
+          availableSlots: availableSlots.length,
+          bookedSlots: bookedTimes.length,
+          timeSlots: availableSlots.map(slot => {
+            const [hours, minutes] = slot.split(':');
+            const hour12 = parseInt(hours) % 12 || 12;
+            const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+            return {
+              time: slot,
+              datetime: `${dateStr} ${slot}`,
+              display: `${hour12}:${minutes} ${ampm}`
+            };
+          })
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: dateGroups,
+      meta: {
+        timezone,
+        days,
+        startDate: start.format('YYYY-MM-DD'),
+        endDate: endExclusive.format('YYYY-MM-DD')
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching available burial slots:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch available slots'
     });
   }
 });

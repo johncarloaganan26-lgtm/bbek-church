@@ -13,6 +13,11 @@ const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const archiveRecord = require('../../dbHelpers/archiveRecords').archiveRecord;
 const { query } = require('../../database/db');
 const emailHelper = require('../../dbHelpers/emailHelper');
+const moment = require('moment-timezone');
+const { generateCandidateSlotsForDate, validateSelectedSlot } = require('../../utils/scheduling');
+
+// Keep date validation consistent with stored scheduling values.
+moment.tz.setDefault('Asia/Manila');
 
 // =============================================================================
 // ERROR TRAPPING CONSTANTS
@@ -20,15 +25,180 @@ const emailHelper = require('../../dbHelpers/emailHelper');
 
 // Valid status transitions: Current Status → [Allowed Next Statuses]
 const VALID_STATUS_TRANSITIONS = {
-    'Pending': ['Scheduled', 'Completed', 'Cancelled'],
-    'Scheduled': ['Completed', 'Cancelled'],
+    'Pending': ['Scheduled', 'Completed', 'Cancelled', 'Rejected'],
+    'Scheduled': ['Completed', 'Cancelled', 'Rejected'],
     'Completed': ['Promoted'], // Can only be promoted, not cancelled
     'Promoted': [], // Terminal state - no transitions allowed
-    'Cancelled': [] // Terminal state - no transitions allowed
+    'Cancelled': [], // Terminal state - no transitions allowed
+    'Rejected': [] // Terminal state - no transitions allowed
 };
 
-// Church open days (discipleship only on Sundays)
-const ALLOWED_SCHEDULE_DAY = 'Sunday';
+// =============================================================================
+// PUBLIC ROUTES
+// =============================================================================
+
+/**
+ * GET available schedule slots (Automatic)
+ *
+ * Query params:
+ * - date: YYYY-MM-DD (defaults to today in Asia/Manila)
+ * - service: salvation | bible_study (defaults to salvation)
+ */
+async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
+    try {
+        const timezone = 'Asia/Manila';
+        const dateStr = req.query.date;
+        const serviceParam = serviceOverride || req.query.service || req.query.type || 'salvation';
+
+        // If date is supplied, return slots for that specific date.
+        if (dateStr) {
+            const generated = generateCandidateSlotsForDate({ serviceType: serviceParam, dateStr, timezone });
+            if (!generated.success) {
+                return res.status(400).json({ success: false, message: generated.message });
+            }
+
+            const serviceType = generated.meta.serviceType;
+
+            // Get booked slots for that date + service.
+            let bookedSql = '';
+            let bookedParams = [generated.meta.date];
+
+            if (serviceType === 'salvation') {
+                bookedSql = `
+                  SELECT DATE_FORMAT(
+                    IF(
+                      scheduled_time IS NOT NULL AND TIME(scheduled_date) = '00:00:00',
+                      TIMESTAMP(DATE(scheduled_date), scheduled_time),
+                      scheduled_date
+                    ),
+                    '%Y-%m-%d %H:%i:%s'
+                  ) AS slot_datetime
+                  FROM tbl_discipleship_requests
+                  WHERE request_type = 'Salvation'
+                    AND status IN ('Pending', 'Scheduled')
+                    AND scheduled_date IS NOT NULL
+                    AND DATE(scheduled_date) = ?
+                `;
+            } else {
+                bookedSql = `
+                  SELECT DATE_FORMAT(scheduled_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
+                  FROM tbl_biblestudy_requests
+                  WHERE status IN ('Pending', 'Scheduled')
+                    AND scheduled_date IS NOT NULL
+                    AND DATE(scheduled_date) = ?
+                `;
+            }
+
+            const [bookedRows] = await query(bookedSql, bookedParams);
+            const bookedSet = new Set((bookedRows || []).map(r => r.slot_datetime).filter(Boolean));
+
+            const available = (generated.data || []).filter((slot) => !bookedSet.has(slot.datetime));
+
+            return res.json({
+                success: true,
+                data: available,
+                meta: generated.meta
+            });
+        }
+
+        // Otherwise, return grouped dates (Burial-like UI): next N days with time slots.
+        const daysRaw = req.query.days;
+        const requestedDays = Number.parseInt(String(daysRaw || '7'), 10);
+        const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 30) : 7;
+
+        const start = moment().tz(timezone).startOf('day');
+        const endExclusive = start.clone().add(days, 'days');
+
+        // Determine normalized service type (via generator's meta, reusing its validator).
+        const normalizedProbe = generateCandidateSlotsForDate({
+            serviceType: serviceParam,
+            dateStr: start.format('YYYY-MM-DD'),
+            timezone
+        });
+        if (!normalizedProbe.success) {
+            return res.status(400).json({ success: false, message: normalizedProbe.message });
+        }
+        const serviceType = normalizedProbe.meta.serviceType;
+
+        // Fetch all booked slots within range in one query.
+        let bookedRangeSql = '';
+        let bookedRangeParams = [
+            start.format('YYYY-MM-DD HH:mm:ss'),
+            endExclusive.format('YYYY-MM-DD HH:mm:ss')
+        ];
+
+        if (serviceType === 'salvation') {
+            bookedRangeSql = `
+              SELECT DATE_FORMAT(
+                IF(
+                  scheduled_time IS NOT NULL AND TIME(scheduled_date) = '00:00:00',
+                  TIMESTAMP(DATE(scheduled_date), scheduled_time),
+                  scheduled_date
+                ),
+                '%Y-%m-%d %H:%i:%s'
+              ) AS slot_datetime
+              FROM tbl_discipleship_requests
+              WHERE request_type = 'Salvation'
+                AND status IN ('Pending', 'Scheduled')
+                AND scheduled_date IS NOT NULL
+                AND scheduled_date >= ?
+                AND scheduled_date < ?
+            `;
+        } else {
+            bookedRangeSql = `
+              SELECT DATE_FORMAT(scheduled_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
+              FROM tbl_biblestudy_requests
+              WHERE status IN ('Pending', 'Scheduled')
+                AND scheduled_date IS NOT NULL
+                AND scheduled_date >= ?
+                AND scheduled_date < ?
+            `;
+        }
+
+        const [bookedRows] = await query(bookedRangeSql, bookedRangeParams);
+        const bookedSet = new Set((bookedRows || []).map(r => r.slot_datetime).filter(Boolean));
+
+        const dateGroups = [];
+        for (let i = 0; i < days; i++) {
+            const date = start.clone().add(i, 'days').format('YYYY-MM-DD');
+            const generated = generateCandidateSlotsForDate({ serviceType, dateStr: date, timezone });
+            if (!generated.success) continue;
+
+            const available = (generated.data || []).filter((slot) => !bookedSet.has(slot.datetime));
+            if (available.length === 0) continue;
+
+            dateGroups.push({
+                date: generated.meta.date,
+                availableSlots: available.length,
+                timeSlots: available.map((slot) => ({
+                    time: slot.time,
+                    datetime: slot.datetime
+                }))
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: dateGroups,
+            meta: {
+                timezone,
+                serviceType,
+                days,
+                startDate: start.format('YYYY-MM-DD')
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+router.get('/available-slots', async (req, res) => {
+    return handleAvailableSlotsRequest(req, res);
+});
+
+router.get('/salvation-availability', async (req, res) => {
+    return handleAvailableSlotsRequest(req, res, 'salvation');
+});
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -65,30 +235,22 @@ function validateStatusTransition(currentStatus, newStatus) {
  * @param {string} scheduledDate - Proposed scheduled date
  * @returns {object} - { valid: boolean, message: string }
  */
-function validateScheduledDate(scheduledDate) {
+function validateScheduledDate(scheduledDate, requestType = 'Salvation') {
     if (!scheduledDate) {
         return { valid: true }; // No date to validate
     }
 
-    const date = new Date(scheduledDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const normalizedType = String(requestType || '').trim().toLowerCase();
+    const serviceType = normalizedType === 'bible study' ? 'bible_study' : 'salvation';
 
-    // Check if date is in the past
-    if (date < today) {
-        return {
-            valid: false,
-            message: 'Cannot schedule in the past. Please select a future date.'
-        };
-    }
+    const validation = validateSelectedSlot({
+        serviceType,
+        scheduledDateTimeStr: scheduledDate,
+        timezone: 'Asia/Manila'
+    });
 
-    // Check if date is a Sunday (only allowed day for discipleship)
-    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-    if (dayOfWeek !== ALLOWED_SCHEDULE_DAY) {
-        return {
-            valid: false,
-            message: `Discipleship sessions can only be scheduled on ${ALLOWED_SCHEDULE_DAY}. Please select a Sunday date.`
-        };
+    if (!validation.valid) {
+        return { valid: false, message: validation.message };
     }
 
     return { valid: true };
@@ -191,7 +353,7 @@ function validateRequiredFields(action, data) {
  * @returns {object} - { valid: boolean, message: string }
  */
 async function checkDuplicates(email, excludeRequestId = null) {
-    let sql = 'SELECT request_id, status FROM tbl_discipleship_requests WHERE email = ?';
+    let sql = 'SELECT request_id, status, request_type FROM tbl_discipleship_requests WHERE email = ?';
     const params = [email.toLowerCase().trim()];
 
     if (excludeRequestId) {
@@ -204,6 +366,7 @@ async function checkDuplicates(email, excludeRequestId = null) {
     if (rows.length > 0) {
         const status = rows[0].status;
         const requestId = rows[0].request_id;
+        const requestType = rows[0].request_type;
 
         if (['Pending', 'Scheduled'].includes(status)) {
             return {
@@ -211,6 +374,12 @@ async function checkDuplicates(email, excludeRequestId = null) {
                 message: `A discipleship request with this email already exists (${requestId}) with status "${status}". Please check the existing request instead of creating a duplicate.`
             };
         } else if (status === 'Completed') {
+            if (requestType === 'Salvation') {
+                return {
+                    valid: false,
+                    message: `This person has already completed the Salvation Talk stage (${requestId}). Please proceed to schedule Bible Study (Wednesdays/Saturdays) for this existing request.`
+                };
+            }
             return {
                 valid: false,
                 message: `This person has already completed discipleship (${requestId}). They should be promoted to water baptism.`
@@ -234,7 +403,7 @@ async function checkDuplicates(email, excludeRequestId = null) {
  * Send status notification email
  * @param {object} data - Email data
  */
-async function sendStatusNotificationEmail({ email, firstname, lastname, status, scheduled_date, pastor_name, location }) {
+async function sendStatusNotificationEmail({ email, firstname, lastname, request_type, status, scheduled_date, pastor_name, location }) {
     try {
         await emailHelper.sendDiscipleshipDetails({
             email,
@@ -242,6 +411,7 @@ async function sendStatusNotificationEmail({ email, firstname, lastname, status,
             recipientName: `${firstname} ${lastname}`,
             firstname,
             lastname,
+            request_type,
             scheduled_date,
             pastor_id: pastor_name,
             location
@@ -260,6 +430,9 @@ async function sendStatusNotificationEmail({ email, firstname, lastname, status,
 router.post('/submit', async (req, res) => {
     try {
         const { email, firstname, lastname } = req.body;
+
+        // Public landing page is Salvation-only per spec.
+        req.body.request_type = 'Salvation';
 
         // Check for duplicates before creating
         const duplicateCheck = await checkDuplicates(email);
@@ -344,10 +517,16 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, scheduled_date, pastor_id, location, notes, firstname, lastname, email } = req.body;
 
-        // Get current status
-        const [currentRows] = await query('SELECT status, scheduled_date, pastor_id FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
+        // Allow server-side normalization without mutating req.body.
+        const updatePayload = { ...req.body };
+        const { firstname, lastname, email, request_type } = updatePayload;
+
+        // Get current record for validations/fallbacks
+        const [currentRows] = await query(
+            'SELECT status, scheduled_date, pastor_id, location, request_type FROM tbl_discipleship_requests WHERE request_id = ?',
+            [id]
+        );
         if (currentRows.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -358,23 +537,82 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
         const currentStatus = currentRows[0].status;
         const currentPastorId = currentRows[0].pastor_id;
+        const currentLocation = currentRows[0].location;
         const currentScheduledDate = currentRows[0].scheduled_date;
+        const currentRequestType = currentRows[0].request_type;
 
-        // Validate status transition if status is being changed
-        if (status && status !== currentStatus) {
-            const statusValidation = validateStatusTransition(currentStatus, status);
-            if (!statusValidation.valid) {
+        const effectiveRequestType = request_type || currentRequestType;
+
+        const isStartingBibleStudy =
+            request_type &&
+            request_type !== currentRequestType &&
+            request_type === 'Bible Study';
+
+        // Flow rule: Bible Study should only happen after Salvation Talk is completed.
+        if (isStartingBibleStudy) {
+            if (currentStatus !== 'Completed') {
                 return res.status(400).json({
                     success: false,
-                    message: statusValidation.message,
-                    errorCode: 'INVALID_STATUS_TRANSITION'
+                    message: 'Please mark the Salvation Talk as "Completed" before starting Bible Study scheduling.',
+                    errorCode: 'INVALID_REQUEST_TYPE_FLOW'
+                });
+            }
+
+            // Default the next stage status if not explicitly provided.
+            if (!updatePayload.status) {
+                updatePayload.status = updatePayload.scheduled_date ? 'Scheduled' : 'Pending';
+            }
+
+            // Avoid accidentally carrying over the Salvation schedule into the Bible Study stage.
+            if (updatePayload.status === 'Pending') {
+                updatePayload.scheduled_date = null;
+            }
+
+            if (updatePayload.status === 'Scheduled') {
+                const incoming = updatePayload.scheduled_date
+                    ? moment.tz(updatePayload.scheduled_date, ['YYYY-MM-DD HH:mm:ss', moment.ISO_8601], 'Asia/Manila')
+                    : null;
+                const current = currentScheduledDate ? moment.tz(currentScheduledDate, 'Asia/Manila') : null;
+                const isSameSchedule = incoming && current && incoming.isValid() && current.isValid() && incoming.isSame(current);
+
+                // Require a new schedule when switching to Bible Study to prevent keeping the old Salvation schedule.
+                if (!incoming || !incoming.isValid() || isSameSchedule) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Please select a new Bible Study schedule date and time.',
+                        errorCode: 'MISSING_BIBLE_STUDY_SCHEDULE'
+                    });
+                }
+            }
+
+            // Allow stage restart statuses only.
+            if (!['Pending', 'Scheduled', 'Cancelled'].includes(updatePayload.status)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid status for Bible Study stage start. Valid statuses: Pending, Scheduled, Cancelled.',
+                    errorCode: 'INVALID_STATUS_FOR_STAGE_START'
                 });
             }
         }
 
+        // Validate status transition if status is being changed
+        if (updatePayload.status && updatePayload.status !== currentStatus) {
+            // When starting Bible Study, we intentionally allow resetting status from Completed -> Pending/Scheduled.
+            if (!isStartingBibleStudy) {
+                const statusValidation = validateStatusTransition(currentStatus, updatePayload.status);
+                if (!statusValidation.valid) {
+                    return res.status(400).json({
+                        success: false,
+                        message: statusValidation.message,
+                        errorCode: 'INVALID_STATUS_TRANSITION'
+                    });
+                }
+            }
+        }
+
         // Validate scheduled date if being changed
-        if (scheduled_date && scheduled_date !== currentScheduledDate) {
-            const dateValidation = validateScheduledDate(scheduled_date);
+        if (updatePayload.scheduled_date && updatePayload.scheduled_date !== currentScheduledDate) {
+            const dateValidation = validateScheduledDate(updatePayload.scheduled_date, effectiveRequestType);
             if (!dateValidation.valid) {
                 return res.status(400).json({
                     success: false,
@@ -384,9 +622,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
             }
 
             // Check for scheduling conflicts
-            const pastorIdForCheck = pastor_id || currentPastorId;
+            const pastorIdForCheck = updatePayload.pastor_id || currentPastorId;
             if (pastorIdForCheck) {
-                const conflictCheck = await checkSchedulingConflict(pastorIdForCheck, scheduled_date, id);
+                const conflictCheck = await checkSchedulingConflict(pastorIdForCheck, updatePayload.scheduled_date, id);
                 if (!conflictCheck.valid) {
                     return res.status(400).json({
                         success: false,
@@ -397,9 +635,24 @@ router.put('/:id', authenticateToken, async (req, res) => {
             }
         }
 
-        // Validate required fields if scheduling
-        if (scheduled_date || pastor_id !== undefined) {
-            const requiredValidation = validateRequiredFields('schedule', { pastor_id, scheduled_date, location });
+        // Validate required fields only when scheduling is intended.
+        const scheduledDateForValidation =
+            updatePayload.scheduled_date !== undefined ? updatePayload.scheduled_date : currentScheduledDate;
+        const pastorIdForValidation =
+            updatePayload.pastor_id !== undefined ? updatePayload.pastor_id : currentPastorId;
+        const locationForValidation =
+            updatePayload.location !== undefined ? updatePayload.location : currentLocation;
+
+        const isSchedulingAction =
+            updatePayload.status === 'Scheduled' ||
+            (updatePayload.scheduled_date !== undefined && !!updatePayload.scheduled_date);
+
+        if (isSchedulingAction) {
+            const requiredValidation = validateRequiredFields('schedule', {
+                pastor_id: pastorIdForValidation,
+                scheduled_date: scheduledDateForValidation,
+                location: locationForValidation
+            });
             if (!requiredValidation.valid) {
                 return res.status(400).json({
                     success: false,
@@ -410,10 +663,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
         }
 
         // Perform the update
-        const result = await updateDiscipleshipRequest(id, req.body);
+        const result = await updateDiscipleshipRequest(id, updatePayload);
 
         // Log status change
-        if (status && status !== currentStatus) {
+        if (updatePayload.status && updatePayload.status !== currentStatus) {
             await auditTrailRecords.createAuditLog({
                 action_type: 'DISCIPLESHIP_STATUS_CHANGED',
                 module: 'Discipleship',
@@ -422,7 +675,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     firstname,
                     lastname,
                     previous_status: currentStatus,
-                    new_status: status
+                    new_status: updatePayload.status
                 }),
                 user_id: req.user?.acc_id || null,
                 user_email: req.user?.email || null,
@@ -433,9 +686,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
             // Send email notification for status change
             if (email) {
                 let pastor_name = '';
-                if (pastor_id && typeof pastor_id === 'number') {
+                if (updatePayload.pastor_id) {
                     try {
-                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [updatePayload.pastor_id]);
                         if (pastorRows.length > 0) {
                             pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
                         }
@@ -448,16 +701,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     email,
                     firstname,
                     lastname,
-                    status,
-                    scheduled_date,
+                    request_type: effectiveRequestType,
+                    status: updatePayload.status,
+                    scheduled_date: updatePayload.scheduled_date !== undefined ? updatePayload.scheduled_date : currentScheduledDate,
                     pastor_name,
-                    location
+                    location: updatePayload.location !== undefined ? updatePayload.location : currentLocation
                 });
             }
         }
 
         // Log scheduling
-        if (scheduled_date && scheduled_date !== currentScheduledDate) {
+        if (updatePayload.scheduled_date && updatePayload.scheduled_date !== currentScheduledDate) {
             await auditTrailRecords.createAuditLog({
                 action_type: 'DISCIPLESHIP_SCHEDULED',
                 module: 'Discipleship',
@@ -466,7 +720,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     firstname,
                     lastname,
                     previous_date: currentScheduledDate,
-                    new_date: scheduled_date
+                    new_date: updatePayload.scheduled_date
                 }),
                 user_id: req.user?.acc_id || null,
                 user_email: req.user?.email || null,
@@ -475,11 +729,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
             });
 
             // Send email notification for scheduling if status is Scheduled
-            if (email && status === 'Scheduled') {
+            if (email && updatePayload.status === 'Scheduled') {
                 let pastor_name = '';
-                if (pastor_id && typeof pastor_id === 'number') {
+                if (updatePayload.pastor_id) {
                     try {
-                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_church_leaders WHERE acc_id = ?', [pastor_id]);
+                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [updatePayload.pastor_id]);
                         if (pastorRows.length > 0) {
                             pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
                         }
@@ -492,10 +746,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     email,
                     firstname,
                     lastname,
+                    request_type: effectiveRequestType,
                     status: 'Scheduled',
-                    scheduled_date,
+                    scheduled_date: updatePayload.scheduled_date,
                     pastor_name,
-                    location
+                    location: updatePayload.location !== undefined ? updatePayload.location : currentLocation
                 });
             }
         }
@@ -511,13 +766,94 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ADMIN: Promote from Salvation to Bible Study
+// This clears the salvation record (sets to Promoted) and creates a record in tbl_biblestudy_requests.
+router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            isDecided = true,
+            scheduled_date,
+            pastor_id,
+            location,
+            notes
+        } = req.body;
+
+        const [currentRows] = await query(
+            'SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [id]
+        );
+        if (currentRows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Request not found' });
+        }
+        const current = currentRows[0];
+
+        if (current.request_type !== 'Salvation') {
+            return res.status(400).json({ success: false, message: 'Only Salvation Talks can be promoted.' });
+        }
+
+        // 1. Mark Salvation as Promoted
+        await query(
+            'UPDATE tbl_discipleship_requests SET status = \'Promoted\', date_updated = NOW() WHERE request_id = ?',
+            [id]
+        );
+
+        // 2. Create Bible Study record in tbl_biblestudy_requests IF user is decided
+        // (Even if not decided, we might want to track it, but based on user req, 
+        // if they hesitate we send a form link. Once they fill the form, it will create a record.)
+        if (isDecided) {
+            const { createBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+            await createBibleStudyRequest({
+                salvation_id: id,
+                firstname: current.firstname,
+                lastname: current.lastname,
+                email: current.email,
+                phone_number: current.phone_number,
+                scheduled_date,
+                pastor_id,
+                location,
+                notes,
+                status: scheduled_date ? 'Scheduled' : 'Pending'
+            });
+        } else {
+            // Hesitant: Send form link
+            const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
+            const bibleStudyLink = `${frontendUrl}/beoneofus/bible-study?ref=${id}`;
+            await emailHelper.sendBibleStudyFormLink({
+                email: current.email,
+                firstname: current.firstname,
+                lastname: current.lastname,
+                formLink: bibleStudyLink,
+                request_id: id
+            });
+        }
+
+        // Audit Log
+        await auditTrailRecords.createAuditLog({
+            action_type: 'SALVATION_PROMOTED',
+            module: 'Discipleship',
+            description: `Promoted ${id} to Bible Study. Decided: ${isDecided}`,
+            user_id: req.user?.acc_id,
+            user_name: req.user?.firstname
+        });
+
+        res.json({ 
+            success: true, 
+            message: isDecided ? 'Promoted and Bible Study scheduled!' : 'Updated and form link sent.' 
+        });
+
+    } catch (error) {
+        console.error('Promote error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // ADMIN: Promote to Baptism (Direct)
 router.post('/promote/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
 
         // Get current status
-        const [currentRows] = await query('SELECT status, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
+        const [currentRows] = await query('SELECT status, request_type, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -527,6 +863,7 @@ router.post('/promote/:id', authenticateToken, async (req, res) => {
         }
 
         const currentStatus = currentRows[0].status;
+        const currentRequestType = currentRows[0].request_type;
 
         // Validate - only Completed status can be promoted
         if (currentStatus !== 'Completed') {
@@ -534,6 +871,15 @@ router.post('/promote/:id', authenticateToken, async (req, res) => {
                 success: false,
                 message: `Cannot promote request with status "${currentStatus}". Only "Completed" requests can be promoted to water baptism.`,
                 errorCode: 'INVALID_STATUS_FOR_PROMOTION'
+            });
+        }
+
+        // Flow rule: promotion happens after Bible Study is completed.
+        if (currentRequestType === 'Salvation') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot promote yet. Please complete the Bible Study stage first before promoting to water baptism.',
+                errorCode: 'BIBLE_STUDY_REQUIRED'
             });
         }
 
@@ -575,7 +921,7 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
         const { isDecided } = req.body;
 
         // Get current status
-        const [currentRows] = await query('SELECT status, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
+        const [currentRows] = await query('SELECT status, request_type, firstname, lastname, email FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
         if (currentRows.length === 0) {
             return res.status(404).json({
                 success: false,
@@ -585,6 +931,7 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
         }
 
         const currentStatus = currentRows[0].status;
+        const currentRequestType = currentRows[0].request_type;
 
         // Can't invite if already promoted
         if (currentStatus === 'Promoted') {
@@ -592,6 +939,15 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
                 success: false,
                 message: 'This request has already been promoted to water baptism.',
                 errorCode: 'ALREADY_PROMOTED'
+            });
+        }
+
+        // Flow rule: invitation/promotion happens after Bible Study is completed.
+        if (currentRequestType === 'Salvation') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot invite to water baptism yet. Please complete the Bible Study stage first.',
+                errorCode: 'BIBLE_STUDY_REQUIRED'
             });
         }
 

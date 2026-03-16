@@ -3,7 +3,7 @@
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
     :title="isEditMode ? 'Update Water Baptism Record' : 'Add Water Baptism Record'"
-    :width="dialogWidth"
+    :width="showAvailableSlots ? '1000px' : (dialogWidth)"
     :close-on-click-modal="false"
     :close-on-press-escape="true"
     :show-close="true"
@@ -12,13 +12,71 @@
     v-loading="loading"
     element-loading-text="Processing..."
   >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="rules"
-      :label-width="labelWidth"
-      :label-position="labelPosition"
-    >
+    <!-- Main Container: Two Columns Layout -->
+    <div class="dialog-content-wrapper">
+      <!-- LEFT COLUMN: Available Slots Panel -->
+      <div v-if="showAvailableSlots" class="available-slots-panel">
+        <div class="slots-header">
+          <h4>Available Sundays</h4>
+          <el-button link type="primary" size="small" @click="showAvailableSlots = false">
+            <i class="el-icon-arrow-left"></i> Hide
+          </el-button>
+        </div>
+        <div v-if="slotsLoading" class="slots-loading">
+          <el-progress type="circle" :percentage="0" indeterminate></el-progress>
+          <p>Loading available dates...</p>
+        </div>
+        <div v-else-if="availableSlots && availableSlots.length > 0" class="slots-content">
+          <el-collapse accordion>
+            <el-collapse-item
+              v-for="dateGroup in availableSlots"
+              :key="dateGroup.date"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} (${dateGroup.availableSlots} available)`"
+              :name="dateGroup.date"
+              class="slot-date-group"
+            >
+              <div class="time-slots-grid">
+                <el-button
+                  v-for="timeSlot in dateGroup.timeSlots"
+                  :key="timeSlot.datetime"
+                  size="small"
+                  :type="isSlotSelected(timeSlot.datetime) ? 'primary' : 'default'"
+                  :plain="!isSlotSelected(timeSlot.datetime)"
+                  @click="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display)"
+                  class="time-slot-button"
+                >
+                  {{ timeSlot.display }}
+                </el-button>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+          <div v-if="selectedSlotDisplay" class="selected-slot-info">
+            <el-tag type="success" closable @close="clearSlotSelection">
+              Selected: {{ selectedSlotDisplay }}
+            </el-tag>
+          </div>
+        </div>
+        <div v-else class="slots-empty">
+          <el-empty description="No available slots"></el-empty>
+        </div>
+      </div>
+
+      <!-- Show/Hide Slots Button (when slots are hidden) -->
+      <div v-if="!showAvailableSlots" class="show-slots-button">
+        <el-button text @click="showAvailableSlots = true" class="toggle-slots-btn">
+          <i class="el-icon-arrow-right"></i> View Available Slots
+        </el-button>
+      </div>
+
+      <!-- RIGHT COLUMN: Form -->
+      <div :class="['form-panel', { 'form-panel-full': !showAvailableSlots }]">
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="rules"
+          :label-width="labelWidth"
+          :label-position="labelPosition"
+        >
        <!-- Member Selection (Admin/Staff only) -->
        <el-form-item label="Member Name" prop="selected_member_id" v-if="!isEditMode">
          <el-select
@@ -361,7 +419,9 @@
           <el-option label="Other" value="other" />
         </el-select>
       </el-form-item>
-    </el-form>
+        </el-form>
+      </div>
+    </div>
 
     <template #footer>
       <div class="dialog-footer">
@@ -529,13 +589,69 @@ const fetchMinistryOptions = async () => {
   }
 }
 
+// ============================================
+// AVAILABLE SLOTS FUNCTIONALITY
+// ============================================
+
+// Available slots state
+const showAvailableSlots = ref(true)
+const slotsLoading = ref(false)
+const availableSlots = ref([])
+const selectedSlotDisplay = ref(null)
+
+// Fetch available water baptism slots
+const fetchAvailableSlots = async (days = 14) => {
+  slotsLoading.value = true
+  try {
+    const response = await axios.get('/services/water-baptisms/available-slots', {
+      params: { days }
+    })
+    
+    if (response.data.success && response.data.data) {
+      availableSlots.value = response.data.data
+    }
+  } catch (error) {
+    console.error('Error fetching available slots:', error)
+    ElMessage.error('Failed to fetch available slots')
+  } finally {
+    slotsLoading.value = false
+  }
+}
+
+// Format date for display
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Check if a slot is selected
+const isSlotSelected = (datetime) => {
+  if (!formData.baptism_date || !formData.baptism_time) return false
+  const selectedDatetime = `${formData.baptism_date} ${formData.baptism_time}:00`
+  return datetime === selectedDatetime
+}
+
+// Select an available slot and populate the form
+const selectAvailableSlot = (date, time, displayTime) => {
+  formData.baptism_date = date
+  formData.baptism_time = time
+  selectedSlotDisplay.value = `${formatDate(date)} at ${displayTime}`
+  ElMessage.success('Slot selected! Date and time have been filled.')
+}
+
+// Clear slot selection
+const clearSlotSelection = () => {
+  selectedSlotDisplay.value = null
+}
+
 // Fetch options when component mounts
 onMounted(async () => {
   await Promise.all([
     waterBaptismStore.fetchPastorOptions(),
     fetchMembersWithoutBaptism(),
     fetchMinistryOptions(),
-    fetchUnavailableTimeSlots()
+    fetchUnavailableTimeSlots(),
+    fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
   ])
 })
 
@@ -1162,6 +1278,192 @@ defineExpose({
 </script>
 
 <style scoped>
+/* Main dialog content wrapper */
+.dialog-content-wrapper {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Available Slots Panel (Left Column) */
+.available-slots-panel {
+  flex: 0 0 320px;
+  border-right: 1px solid #dcdfe6;
+  padding-right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.available-slots-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.available-slots-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.available-slots-panel::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+.available-slots-panel::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+
+/* Slots Header */
+.slots-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.slots-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* Loading State */
+.slots-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  gap: 12px;
+  color: #909399;
+}
+
+.slots-loading p {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Slots Content */
+.slots-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.slot-date-group :deep(.el-collapse-item__header) {
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.slot-date-group :deep(.el-collapse-item__content) {
+  padding: 12px;
+}
+
+/* Time Slots Grid */
+.time-slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.time-slot-button {
+  font-size: 11px;
+  padding: 6px 8px;
+  min-width: auto;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.time-slot-button:hover {
+  transform: translateY(-2px);
+}
+
+/* Selected Slot Info */
+.selected-slot-info {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #f0f9ff;
+  border-radius: 6px;
+  border: 1px solid #b3d8ff;
+}
+
+.selected-slot-info :deep(.el-tag) {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Empty State */
+.slots-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+
+/* Show/Hide Slots Button */
+.show-slots-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 0;
+}
+
+.toggle-slots-btn {
+  font-size: 12px;
+  color: #409eff;
+  padding: 4px 8px;
+}
+
+.toggle-slots-btn:hover {
+  color: #66b1ff;
+}
+
+/* Form Panel (Right Column) */
+.form-panel {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.form-panel-full {
+  flex: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1000px) {
+  .dialog-content-wrapper {
+    flex-direction: column;
+  }
+
+  .available-slots-panel {
+    flex: 0 0 auto;
+    border-right: none;
+    border-bottom: 1px solid #dcdfe6;
+    padding-right: 0;
+    padding-bottom: 16px;
+    max-height: none;
+  }
+
+  .form-panel {
+    max-height: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .time-slots-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 .water-baptism-dialog :deep(.el-dialog__body) {
   padding: 24px;
   max-height: 70vh;

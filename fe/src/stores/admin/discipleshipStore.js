@@ -11,7 +11,8 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
     const pageSize = ref(10);
     const filters = ref({
         status: 'All',
-        search: ''
+        search: '',
+        request_type: 'Salvation'
     });
 
     const pastors = ref([]);
@@ -34,7 +35,8 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
                 page: currentPage.value,
                 pageSize: pageSize.value,
                 search: filters.value.search,
-                status: filters.value.status === 'All' ? undefined : filters.value.status
+                status: filters.value.status === 'All' ? undefined : filters.value.status,
+                request_type: filters.value.request_type
             };
 
             const response = await axios.get('/services/discipleship-requests', { params });
@@ -103,6 +105,28 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         } catch (error) {
             console.error('Error promoting request:', error);
             ElMessage.error(error.response?.data?.message || 'Failed to promote request');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const promoteToBibleStudy = async (id, isDecided = true) => {
+        loading.value = true;
+        try {
+            const response = await axios.post(`/services/discipleship-requests/promote-to-bible-study/${id}`, { isDecided });
+            if (response.data.success) {
+                ElMessage.success(response.data.message || (isDecided
+                    ? 'Promoted to Bible Study! Please schedule the sessions.'
+                    : 'Record updated and form link sent to candidate.'));
+                await fetchRequests();
+                return true;
+            }
+            ElMessage.error(response.data?.message || 'Failed to promote to Bible Study');
+            return false;
+        } catch (error) {
+            console.error('Error promoting to Bible Study:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to promote to Bible Study');
             return false;
         } finally {
             loading.value = false;
@@ -240,6 +264,35 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         }
     };
 
+    const schedulePromotionVisit = async (id, data) => {
+        loading.value = true;
+        try {
+            const response = await axios.post(`/services/promotion-visits/${id}`, data);
+            if (response.data.success) {
+                ElMessage.success('Promotion visit scheduled successfully');
+                return true;
+            }
+            ElMessage.error(response.data.message || 'Failed to schedule promotion visit');
+            return false;
+        } catch (error) {
+            console.error('Error scheduling promotion visit:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to schedule promotion visit');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchPromotionVisit = async (id) => {
+        try {
+            const response = await axios.get(`/services/promotion-visits/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching promotion visit:', error);
+            return { success: false };
+        }
+    };
+
     return {
         requests,
         loading,
@@ -252,12 +305,15 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         fetchRequests,
         updateRequest,
         promoteToBaptism,
+        promoteToBibleStudy,
         inviteToBaptism,
         fetchRegistrationData,
         deleteRequest,
         bulkArchiveRequests,
         bulkCompleteRequests,
         createRequest,
+        schedulePromotionVisit,
+        fetchPromotionVisit,
         setPage,
         setFilters
     };

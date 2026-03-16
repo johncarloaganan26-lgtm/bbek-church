@@ -186,8 +186,8 @@
                         <div class="roadmap-item">
                           <div class="roadmap-icon">1</div>
                           <div class="roadmap-content">
-                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Discipleship & Salvation</h3>
-                            <p style="font-family: 'Georgia', serif; font-style: italic;">The first step is establishing a firm foundation in your salvation and understanding the basics of the Christian faith.</p>
+                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Salvation Talk</h3>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">Start with a short Salvation Talk (about 5-10 minutes). Salvation Talk schedules are available every day, any time.</p>
                           </div>
                         </div>
 
@@ -196,8 +196,8 @@
                         <div class="roadmap-item">
                           <div class="roadmap-icon">2</div>
                           <div class="roadmap-content">
-                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Prerequisite Bible Studies</h3>
-                            <p style="font-family: 'Georgia', serif; font-style: italic;">Complete a series of lessons designed to prepare your heart and mind for the significance of water baptism.</p>
+                            <h3 style="font-family: 'Georgia', serif; font-style: italic;">Bible Study</h3>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">After the Salvation Talk, we will help you schedule Bible Study. Bible Study schedules are on Wednesdays and Saturdays only.</p>
                           </div>
                         </div>
 
@@ -209,7 +209,7 @@
                           </div>
                           <div class="roadmap-content">
                             <h3 style="font-family: 'Georgia', serif; font-style: italic;">Water Baptism</h3>
-                            <p style="font-family: 'Georgia', serif; font-style: italic;">Once prerequisites are completed, you will be officially scheduled for our next baptism service!</p>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">After Bible Study is completed, you will be scheduled for Water Baptism. Water Baptism is on Sundays only.</p>
                           </div>
                         </div>
                       </div>
@@ -225,7 +225,7 @@
                           class="action-btn"
                           elevation="4"
                         >
-                          Sign Up for Discipleship
+                          Request Salvation Talk
                           <v-icon end>mdi-arrow-right</v-icon>
                         </v-btn>
                       </div>

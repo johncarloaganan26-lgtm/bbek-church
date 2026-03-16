@@ -11,8 +11,10 @@ const {
   bulkCompleteChildDedications,
   exportChildDedicationsToExcel,
   checkDuplicateChildDedication,
-  checkTimeSlotAvailability
+  checkTimeSlotAvailability,
+  getAvailableSundayDates
 } = require('../../dbHelpers/services/childDedicationRecords');
+const { query } = require('../../database/db');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -546,6 +548,121 @@ router.post('/exportExcel', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to export child dedications to Excel'
+    });
+  }
+});
+
+/**
+ * GET AVAILABLE SUNDAY DATES - Get available Sunday dates for child dedication scheduling
+ * GET /api/church-records/child-dedications/getAvailableSundayDates
+ * Query params: weeksAhead (optional, default: 12)
+ * 
+ * This endpoint analyzes all child dedication records that are NOT approved/scheduled
+ * and returns available Sunday dates between 8am-5pm for the next N weeks
+ */
+router.get('/getAvailableSundayDates', async (req, res) => {
+  try {
+    const weeksAhead = parseInt(req.query.weeksAhead) || 12;
+    
+    const result = await getAvailableSundayDates(weeksAhead);
+    
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error getting available Sunday dates:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get available Sunday dates'
+    });
+  }
+});
+
+/**
+ * AVAILABLE SLOTS - Get available child dedication slots for admin
+ * GET /api/services/child-dedications/available-slots?days=14
+ * Returns available Sunday dates with time slots (same as water baptism: 10 AM, 11 AM, 2 PM, 3 PM, 4 PM)
+ */
+router.get('/available-slots', async (req, res) => {
+  try {
+    const timezone = 'Asia/Manila';
+    const daysRaw = req.query.days;
+    const requestedDays = Number.parseInt(String(daysRaw || '14'), 10);
+    const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 14;
+
+    const momentTz = require('moment-timezone');
+    const start = momentTz().tz(timezone).startOf('day');
+    const endExclusive = start.clone().add(days, 'days');
+
+    // Get all booked dedication slots within the date range
+    const [bookedRows] = await query(`
+      SELECT DATE_FORMAT(preferred_dedication_date, '%Y-%m-%d') AS booked_date, preferred_dedication_time as dedication_time
+      FROM tbl_childdedications
+      WHERE status IN ('Approved', 'Pending', 'Scheduled')
+        AND preferred_dedication_date IS NOT NULL
+        AND preferred_dedication_date >= ?
+        AND preferred_dedication_date < ?
+        AND preferred_dedication_time IS NOT NULL
+      ORDER BY preferred_dedication_date ASC, preferred_dedication_time ASC
+    `, [
+      start.format('YYYY-MM-DD HH:mm:ss'),
+      endExclusive.format('YYYY-MM-DD HH:mm:ss')
+    ]);
+
+    const bookedMap = {};
+    (bookedRows || []).forEach(row => {
+      const dateKey = row.booked_date;
+      if (!bookedMap[dateKey]) {
+        bookedMap[dateKey] = [];
+      }
+      if (row.dedication_time) {
+        bookedMap[dateKey].push(row.dedication_time);
+      }
+    });
+
+    // Generate available Sundays with time slots
+    const dateGroups = [];
+    for (let i = 0; i < days; i++) {
+      const date = start.clone().add(i, 'days');
+      // Child Dedication only on Sundays (day 0)
+      if (date.day() !== 0) continue;
+
+      const dateStr = date.format('YYYY-MM-DD');
+      const bookedTimes = bookedMap[dateStr] || [];
+
+      // Default time slots for child dedication (same as water baptism): 10:00 AM, 11:00 AM, 2:00 PM, 3:00 PM, 4:00 PM
+      const defaultSlots = ['10:00:00', '11:00:00', '14:00:00', '15:00:00', '16:00:00'];
+      
+      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
+
+      if (availableSlots.length > 0) {
+        dateGroups.push({
+          date: dateStr,
+          dayName: date.format('dddd'),
+          availableSlots: availableSlots.length,
+          bookedSlots: bookedTimes.length,
+          timeSlots: availableSlots.map(slot => ({
+            time: slot,
+            datetime: `${dateStr} ${slot}`,
+            display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A')
+          }))
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: dateGroups,
+      meta: {
+        timezone,
+        days,
+        startDate: start.format('YYYY-MM-DD'),
+        endDate: endExclusive.format('YYYY-MM-DD')
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching available child dedication slots:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch available slots'
     });
   }
 });

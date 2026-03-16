@@ -2109,6 +2109,26 @@ const sendDiscipleshipDetails = async (details) => {
 
     const transporter = createTransporter();
     const status = details.status.toLowerCase();
+
+    const rawRequestType = details.request_type || details.requestType || '';
+    const normalizedRequestType = String(rawRequestType).trim().toLowerCase();
+    const serviceLabel =
+      normalizedRequestType === 'salvation'
+        ? 'Salvation Talk'
+        : normalizedRequestType === 'bible study'
+          ? 'Bible Study'
+          : 'Discipleship';
+
+    const getCompletedMessage = () => {
+      if (serviceLabel === 'Salvation Talk') {
+        return 'Your Salvation Talk has been marked as completed. Next, we can schedule your Bible Study (Wednesdays and Saturdays only).';
+      }
+      if (serviceLabel === 'Bible Study') {
+        return 'Your Bible Study session has been marked as completed. Next step: Water Baptism (Sundays only).';
+      }
+      return `Your ${serviceLabel} session has been marked as completed.`;
+    };
+
     const statusColors = {
       pending: '#f39c12',
       scheduled: '#3498db',
@@ -2117,11 +2137,11 @@ const sendDiscipleshipDetails = async (details) => {
       cancelled: '#95a5a6',
     };
     const statusMessages = {
-      pending: 'Your discipleship request has been received and is currently pending review.',
-      scheduled: 'Your discipleship session has been scheduled!',
-      completed: 'Your discipleship phase has been marked as completed.',
+      pending: `Your ${serviceLabel} request has been received and is currently pending review.`,
+      scheduled: `Your ${serviceLabel} session has been scheduled!`,
+      completed: getCompletedMessage(),
       promoted: 'Congratulations! You have been promoted to Water Baptism candidate.',
-      cancelled: 'Your discipleship request has been cancelled.',
+      cancelled: `Your ${serviceLabel} request has been cancelled.`,
     };
 
     const recipientName = details.recipientName || details.firstname || 'Valued Member';
@@ -2130,22 +2150,23 @@ const sendDiscipleshipDetails = async (details) => {
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: details.email,
-      subject: `Discipleship Request Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      subject: `${serviceLabel} Request Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Discipleship Update</title>
+          <title>${serviceLabel} Update</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">Discipleship Update</h2>
+            <h2 style="color: #2c3e50; margin-top: 0;">${serviceLabel} Update</h2>
             <p>Dear ${recipientName},</p>
-            <p>${statusMessages[status] || 'Your discipleship request status has been updated.'}</p>
+            <p>${statusMessages[status] || `Your ${serviceLabel} request status has been updated.`}</p>
             
             <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
+              <p style="margin: 0 0 10px 0;"><strong>Service:</strong> ${serviceLabel}</p>
               <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
                 <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
                   ${status}
@@ -2260,6 +2281,294 @@ const sendWaterBaptismInvitation = async (details) => {
   }
 };
 
+
+/**
+ * Send Bible Study form link to a hesitant candidate
+ * Called when admin promotes a Salvation-completed candidate who is not yet fully decided
+ * @param {Object} data
+ * @param {string} data.email - Recipient email
+ * @param {string} data.firstname - Recipient first name
+ * @param {string} data.lastname - Recipient last name
+ * @param {string} data.formLink - Full URL to the Bible Study registration form
+ * @param {string} data.request_id - The discipleship request ID
+ */
+const sendBibleStudyFormLink = async ({ email, firstname, lastname, formLink, request_id }) => {
+  try {
+    if (!email || !formLink) {
+      return { success: false, message: 'Email and formLink are required' };
+    }
+    const transporter = createTransporter();
+    const recipientName = `${firstname || ''} ${lastname || ''}`.trim() || 'Friend';
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: 'You\'re Invited: Bible Study Sessions — Bible Baptist Ekklesia of Kawit',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Bible Study Invitation</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f4f4f4; padding: 30px; border-radius: 8px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #0f766e; margin-top: 0;">📖 Bible Study Invitation</h2>
+              <p style="color: #555; font-size: 14px;">Reference ID: ${request_id}</p>
+            </div>
+
+            <p>Dear <strong>${recipientName}</strong>,</p>
+
+            <p>Congratulations on completing your <strong>Salvation Talk</strong>! 🎉 We are so glad you took that step of faith.</p>
+
+            <p>As the next step in your spiritual journey, we warmly invite you to join our <strong>Bible Study sessions</strong>, held every <strong>Wednesday and Saturday</strong>.</p>
+
+            <div style="background-color: #e0f2f1; border-left: 4px solid #0f766e; padding: 15px; border-radius: 4px; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #0f766e;">📅 Schedule: Wednesdays & Saturdays</p>
+              <p style="margin: 8px 0 0 0; color: #555;">Our pastor will personally guide you through God's Word at your own pace.</p>
+            </div>
+
+            <p>Whenever you feel ready, please click the button below to confirm your interest in Bible Study. Once you submit, our team will reach out to schedule your sessions.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${formLink}"
+                 style="background-color: #0f766e; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">
+                I'm Ready for Bible Study
+              </a>
+            </div>
+
+            <p style="color: #7f8c8d; font-size: 12px;">
+              Or copy and paste this link into your browser:<br>
+              <a href="${formLink}" style="color: #0f766e; word-break: break-all;">${formLink}</a>
+            </p>
+
+            <p>There is no pressure — take all the time you need. We are here whenever you are ready. 🙏</p>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+
+            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
+              This is an automated message from Bible Baptist Ekklesia of Kawit.<br>
+              Please do not reply to this email. Contact us at ${CHURCH_EMAIL} for any questions.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending Bible Study form link email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send Salvation Rejection email (No-show after 30 mins)
+ */
+const sendSalvationRejection = async ({ email, firstname, lastname, scheduled_date }) => {
+  try {
+    const transporter = createTransporter();
+    const recipientName = `${firstname || ''} ${lastname || ''}`.trim() || 'Friend';
+    const formattedDate = moment(scheduled_date).tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: 'Update on Your Salvation Talk Request - Bible Baptist Ekklesia of Kawit',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #fce7e7; padding: 30px; border-radius: 8px;">
+            <h2 style="color: #c53030; margin-top: 0;">Update: Missed Appointment</h2>
+            <p>Dear <strong>${recipientName}</strong>,</p>
+            <p>We noticed that you were unable to attend your scheduled Salvation Talk on <strong>${formattedDate}</strong>.</p>
+            <p>As per our policy, we have marked this request as "Rejected" due to the no-show. However, we still want to help you on your spiritual journey!</p>
+            <p>If you would like to reschedule, please visit our website and submit a new request. We look forward to meeting you soon!</p>
+            <hr style="border: none; border-top: 1px solid #feb2b2; margin: 20px 0;">
+            <p style="color: #a0aec0; font-size: 12px; margin-bottom: 0;">
+              This is an automated message from Bible Baptist Ekklesia of Kawit.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending salvation rejection email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send Bible Study Invitation (Promotion)
+ */
+const sendBibleStudyInvitation = async ({ email, firstname, lastname, scheduled_date, location, pastor_name }) => {
+  try {
+    const transporter = createTransporter();
+    const recipientName = `${firstname || ''} ${lastname || ''}`.trim() || 'Friend';
+    const formattedDate = moment(scheduled_date).tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: 'Next Step: Bible Study Scheduled! - Bible Baptist Ekklesia of Kawit',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #e6fffa; padding: 30px; border-radius: 8px;">
+            <h2 style="color: #2c7a7b; margin-top: 0;">📖 Bible Study Scheduled</h2>
+            <p>Congratulations <strong>${recipientName}</strong> on completing your Salvation Talk!</p>
+            <p>Your first Bible Study session has been scheduled as part of your growth journey.</p>
+            <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #285e61;">
+              <p style="margin: 0 0 10px 0;"><strong>Schedule:</strong> ${formattedDate}</p>
+              <p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${location || 'To be determined'}</p>
+              <p style="margin: 0;"><strong>Assigned Pastor:</strong> ${pastor_name || 'To be determined'}</p>
+            </div>
+            <p>We look forward to seeing you grow in God's grace!</p>
+            <hr style="border: none; border-top: 1px solid #b2f5ea; margin: 20px 0;">
+            <p style="color: #718096; font-size: 12px; margin-bottom: 0;">
+              This is an automated message from Bible Baptist Ekklesia of Kawit.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending bible study invitation email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send Bible Study Update (Status changed)
+ */
+const sendBibleStudyDetails = async (details) => {
+  try {
+    const transporter = createTransporter();
+    const status = (details.status || '').toLowerCase();
+    const recipientName = `${details.firstname || ''} ${details.lastname || ''}`.trim() || 'Member';
+    const formattedDate = details.scheduled_date ? moment(details.scheduled_date).tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A') : 'To be determined';
+
+    const statusColors = {
+      pending: '#f39c12',
+      scheduled: '#3498db',
+      completed: '#27ae60',
+      cancelled: '#95a5a6',
+      rejected: '#e74c3c'
+    };
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: details.email,
+      subject: `Bible Study Update: ${status.charAt(0).toUpperCase() + status.slice(1)} - BBEK`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f7fafc; padding: 30px; border-radius: 8px;">
+            <h2 style="color: #2d3748; margin-top: 0;">Bible Study Update</h2>
+            <p>Dear ${recipientName},</p>
+            <p>Your Bible Study request status has been updated to <strong>${status}</strong>.</p>
+            <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
+              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">${status}</span></p>
+              <p style="margin: 0 0 10px 0;"><strong>Schedule:</strong> ${formattedDate}</p>
+              <p style="margin: 0;"><strong>Location:</strong> ${details.location || 'N/A'}</p>
+            </div>
+            <p>God bless you!</p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending bible study details email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send Promotion Visit details email
+ * @param {Object} details - Visit details object
+ */
+const sendPromotionVisitDetails = async (details) => {
+  try {
+    if (!details || !details.email || !details.status) {
+      return { success: false, message: 'Email and status are required' };
+    }
+
+    const transporter = createTransporter();
+    const status = (details.status || '').toLowerCase();
+    const recipientName = `${details.firstname || ''} ${details.lastname || ''}`.trim() || 'Member';
+    const formattedDate = details.visit_date ? moment(details.visit_date).tz('Asia/Manila').format('MMMM D, YYYY') : 'To be determined';
+    const formattedTime = details.visit_time || 'To be determined';
+
+    const statusColors = {
+      scheduled: '#3498db',
+      completed: '#27ae60',
+      cancelled: '#95a5a6',
+    };
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: details.email,
+      subject: `Promotion Visit Update: ${status.charAt(0).toUpperCase() + status.slice(1)} - BBEK`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f0f7ff; padding: 30px; border-radius: 8px;">
+            <h2 style="color: #1e40af; margin-top: 0;">🏡 Promotion Visit Update</h2>
+            <p>Dear ${recipientName},</p>
+            <p>We have an update regarding your scheduled <strong>Promotion Visit</strong> from our church leaders.</p>
+            
+            <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
+              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">${status}</span></p>
+              <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${formattedDate}</p>
+              <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${formattedTime}</p>
+              <p style="margin: 0;"><strong>Location:</strong> ${details.location || 'N/A'}</p>
+            </div>
+
+            ${status === 'scheduled' ? `
+            <p>Our team will visit you at the specified location and time. We look forward to meeting you and your family!</p>
+            ` : ''}
+
+            ${status === 'completed' ? `
+            <p>Thank you for welcoming us! We are so glad to have connected with you. We hope to see you in our upcoming church services.</p>
+            ` : ''}
+
+            <p>If you have any questions or need to reschedule, please contact the church office.</p>
+            <p>God bless you!</p>
+            <p>BBEK Church Administration</p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending promotion visit details email:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendAccountDetails,
   sendMarriageDetails,
@@ -2276,6 +2585,11 @@ module.exports = {
   sendDonorStatusUpdateEmail,
   sendDiscipleshipDetails,
   sendWaterBaptismInvitation,
+  sendBibleStudyFormLink,
+  sendSalvationRejection,
+  sendBibleStudyInvitation,
+  sendBibleStudyDetails,
+  sendPromotionVisitDetails,
   generateResetToken,
 };
 

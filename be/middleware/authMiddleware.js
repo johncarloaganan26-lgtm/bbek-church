@@ -48,6 +48,7 @@ const publicRoutes = [
   '/api/church-records/burial-services/createBurialService',
   '/api/church-records/burial-services/getAllBurialServices',
   '/api/church-records/burial-services/getBurialServiceById',
+  '/api/church-records/burial-services/getAvailableBurialDates',
   '/api/church-records/burial-services/check-duplicate',
   '/api/church-records/burial-services/check-member-burial',
   // Notification routes (require authentication)
@@ -142,6 +143,8 @@ const publicRoutes = [
   // Discipleship routes (public for form submission)
   '/api/services/discipleship-requests/submit',
   '/api/services/discipleship-requests/registration-data',
+  '/api/services/discipleship-requests/available-slots',
+  '/api/services/salvation-availability',
   // Water baptism public registration (no auth required)
   '/api/public/water-baptism/register',
   // Give page recommendation/routes (public)

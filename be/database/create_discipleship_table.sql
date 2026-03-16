@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS tbl_discipleship_requests (
   spouse_name VARCHAR(100) NULL,
   marriage_date DATE NULL,
   children TEXT NULL, -- JSON string for children data
-  request_type ENUM('Salvation', 'Bible Study', 'Both') DEFAULT 'Both',
+  request_type ENUM('Salvation', 'Bible Study', 'Both') DEFAULT 'Salvation',
   status ENUM('Pending', 'Scheduled', 'Completed', 'Cancelled', 'Promoted') DEFAULT 'Pending',
   scheduled_date DATETIME NULL,
   scheduled_time TIME NULL,

@@ -2,6 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment-timezone');
 const { createWaterBaptism } = require('./waterBaptismRecords');
 const { sendDiscipleshipDetails, sendWaterBaptismInvitation } = require('../emailHelper');
+const { validateSelectedSlot } = require('../../utils/scheduling');
 
 // Set default timezone to Philippines (Asia/Manila, UTC+8)
 moment.tz.setDefault('Asia/Manila');
@@ -58,10 +59,11 @@ async function createDiscipleshipRequest(data) {
             firstname, lastname, middle_name, email, phone_number,
             birthdate, age, gender, address, civil_status, profession,
             spouse_name, marriage_date, children,
-            request_type = 'Both',
+            request_type = 'Salvation',
             notes,
             pastor_id = null,
-            location = null
+            location = null,
+            scheduled_date: scheduledDateTime = null
         } = data;
 
         // Validation
@@ -69,29 +71,66 @@ async function createDiscipleshipRequest(data) {
             throw new Error('Missing required fields: firstname, lastname, email');
         }
 
+        const normalizedEmail = String(email).trim().toLowerCase();
+
         // Age Verification
         if (age && parseInt(age) < 12) {
             throw new Error('Only 12 years old and above are allowed to request discipleship.');
         }
 
-        // Email Duplication Check - Check Discipleship Requests
-        const [existingReq] = await query('SELECT request_id FROM tbl_discipleship_requests WHERE email = ?', [email]);
+        // Email Duplication Check - block only active requests (allow re-apply if Cancelled/Rejected)
+        const [existingReq] = await query(
+            "SELECT request_id, status FROM tbl_discipleship_requests WHERE email = ? AND status IN ('Pending','Scheduled','Completed','Promoted') LIMIT 1",
+            [normalizedEmail]
+        );
         if (existingReq.length > 0) {
-            throw new Error('You have already submitted a request with this email. Please wait for our team to contact you.');
+            throw new Error('You already have an active request with this email. Please wait for our team to contact you.');
         }
 
         // Email Duplication Check - Check Member Records
-        const [existingMember] = await query('SELECT member_id FROM tbl_members WHERE email = ?', [email]);
+        const [existingMember] = await query('SELECT member_id FROM tbl_members WHERE email = ?', [normalizedEmail]);
         if (existingMember.length > 0) {
             throw new Error('This email is already registered as an official member. Please log in to your account.');
+        }
+
+        const normalizedType = String(request_type || 'Salvation').trim().toLowerCase();
+        const serviceType = normalizedType === 'bible study' ? 'bible_study' : 'salvation';
+
+        if (!scheduledDateTime) {
+            throw new Error('Scheduled date and time is required.');
+        }
+
+        const slotValidation = validateSelectedSlot({
+            serviceType,
+            scheduledDateTimeStr: scheduledDateTime,
+            timezone: 'Asia/Manila'
+        });
+        if (!slotValidation.valid) {
+            throw new Error(slotValidation.message);
+        }
+
+        const scheduled_date = slotValidation.slot.format('YYYY-MM-DD HH:mm:ss');
+        const scheduled_time = slotValidation.slot.format('HH:mm:ss');
+        const initialStatus = 'Pending';
+
+        // Prevent double-booking of the same slot.
+        if (serviceType === 'salvation') {
+            const [conflicts] = await query(
+                "SELECT request_id FROM tbl_discipleship_requests WHERE request_type = 'Salvation' AND status IN ('Pending','Scheduled') AND scheduled_date = ? LIMIT 1",
+                [scheduled_date]
+            );
+            if (conflicts.length > 0) {
+                throw new Error('Selected time slot is no longer available. Please choose a different slot.');
+            }
         }
 
         const sql = `
       INSERT INTO tbl_discipleship_requests (
         request_id, firstname, lastname, middle_name, email, phone_number,
         birthdate, age, gender, address, civil_status, profession,
-        spouse_name, marriage_date, children, request_type, notes, pastor_id, location
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        spouse_name, marriage_date, children, request_type, notes, pastor_id, location,
+        scheduled_date, scheduled_time, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
         const formattedBirth = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
@@ -100,9 +139,10 @@ async function createDiscipleshipRequest(data) {
         const notesStr = (notes && typeof notes === 'object') ? JSON.stringify(notes) : (notes || null);
 
         const params = [
-            request_id, firstname, lastname, middle_name || null, email, phone_number || null,
+            request_id, firstname, lastname, middle_name || null, normalizedEmail, phone_number || null,
             formattedBirth, age || null, gender || null, address || null, civil_status || null, profession || null,
-            spouse_name || null, formattedMarriage, childrenStr, request_type, notesStr, pastor_id, location
+            spouse_name || null, formattedMarriage, childrenStr, request_type, notesStr, pastor_id, location,
+            scheduled_date, scheduled_time, initialStatus
         ];
 
         await query(sql, params);
@@ -110,9 +150,11 @@ async function createDiscipleshipRequest(data) {
         // Send Email Notification
         try {
             await sendDiscipleshipDetails({
-                email,
+                email: normalizedEmail,
                 firstname,
-                status: 'Pending'
+                status: initialStatus,
+                request_type,
+                scheduled_date
             });
         } catch (emailError) {
             console.error('Email notification failed for discipleship request:', emailError);
@@ -134,13 +176,18 @@ async function createDiscipleshipRequest(data) {
  */
 async function getAllDiscipleshipRequests(options = {}) {
     try {
-        const { status, search, page = 1, pageSize = 10 } = options;
+        const { status, search, request_type, page = 1, pageSize = 10 } = options;
         let sql = 'SELECT * FROM tbl_discipleship_requests WHERE 1=1';
         const params = [];
 
         if (status && status !== 'All Status') {
             sql += ' AND status = ?';
             params.push(status);
+        }
+
+        if (request_type) {
+            sql += ' AND request_type = ?';
+            params.push(request_type);
         }
 
         if (search) {

@@ -7,44 +7,123 @@
         <div class="hero-overlay"></div>
         <div class="hero-content">
           <h1 class="hero-title fade-in-up" style="font-family: 'Georgia', serif; font-style: italic;">
-            Start Your Spiritual Journey
+            The Road to Discipleship
           </h1>
           <p class="hero-subtitle fade-in-up-delay" style="font-family: 'Georgia', serif; font-style: italic;">
-            "But grow in the grace and knowledge of our Lord and Savior Jesus Christ." - 2 Peter 3:18
+            "For by grace are ye saved through faith..." - Ephesians 2:8
           </p>
+
+          <v-btn
+            color="teal-darken-1"
+            size="large"
+            class="mt-6"
+            @click="scrollToSchedule"
+          >
+            Schedule a Discipleship Talk
+          </v-btn>
         </div>
       </section>
 
       <!-- Content Section -->
-      <section class="content-section">
+      <section class="content-section" id="schedule-section">
         <v-container>
           <div class="content-grid">
             <!-- Left: Information -->
             <div class="left-column">
               <h2 class="section-title fade-in" style="font-family: 'Georgia', serif; font-style: italic;">
-                Why Take This Step?
+                Available Schedule Slots
               </h2>
               
-              <v-card class="info-card fade-in-up" variant="flat" color="teal-lighten-5">
-                <v-card-title class="card-title d-flex align-center" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
-                  <v-icon color="teal" class="mr-2">mdi-shield-check</v-icon>
-                  Assurance of Salvation
+              <v-card class="slots-card fade-in-up" variant="flat" color="teal-lighten-5">
+                <v-card-title
+                  class="card-title"
+                  style="font-size: 1.25rem; font-weight: 600; background-color: #0d9488; color: white; padding: 16px;"
+                >
+                  <v-icon color="white" class="mr-2">mdi-calendar-clock</v-icon>
+                  Available Dates
                 </v-card-title>
                 <v-card-text>
-                  <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
-                    Understand God's plan for your life and secure your eternal future. Learn what it means to be saved by grace through faith.
+                  <p class="text-subtitle-2 text-teal-darken-3 mb-4" style="font-family: 'Georgia', serif; font-style: italic;">
+                    Pick a date and time for your 5-10 minute Discipleship Talk.
                   </p>
+                  
+                  <div v-if="slotsLoading" class="text-center pa-8">
+                    <v-progress-circular indeterminate color="teal" class="mb-3" />
+                    <p class="mt-2 grey--text">Loading available slots...</p>
+                  </div>
+
+                  <div v-else-if="availableScheduleDates && availableScheduleDates.length > 0">
+                    <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
+                      <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
+                      Select a date and time slot for your Discipleship Talk
+                    </p>
+
+                    <v-expansion-panels variant="accordion" class="dates-panel">
+                      <v-expansion-panel
+                        v-for="dateGroup in availableScheduleDates.slice(0, 4)"
+                        :key="dateGroup.date"
+                        variant="flat"
+                        class="mb-2"
+                      >
+                        <v-expansion-panel-title>
+                          <div class="d-flex align-center justify-space-between w-100 pr-2">
+                            <div>
+                              <v-icon color="teal-darken-2" class="mr-2">mdi-calendar</v-icon>
+                              <span class="font-weight-medium text-teal-darken-3">{{ formatDate(dateGroup.date) }}</span>
+                            </div>
+                            <v-chip size="small" color="teal" variant="flat" style="color: white !important;">
+                              {{ dateGroup.availableSlots }} slots
+                            </v-chip>
+                          </div>
+                        </v-expansion-panel-title>
+                        <v-expansion-panel-text>
+                          <div v-if="dateGroup.timeSlots && dateGroup.timeSlots.length > 0" class="time-slots-grid">
+                            <v-chip
+                              v-for="slot in dateGroup.timeSlots"
+                              :key="slot.datetime"
+                              size="small"
+                              :variant="formData.scheduled_date === slot.datetime ? 'flat' : 'outlined'"
+                              :color="formData.scheduled_date === slot.datetime ? 'teal' : 'teal-darken-2'"
+                              class="ma-1 time-slot-chip"
+                              @click="selectSlot(slot.datetime)"
+                            >
+                              {{ formatTime(slot.time) }}
+                            </v-chip>
+                          </div>
+                          <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
+                            No time slots available for this date.
+                          </p>
+                        </v-expansion-panel-text>
+                      </v-expansion-panel>
+                    </v-expansion-panels>
+
+                    <p v-if="availableScheduleDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
+                      + {{ availableScheduleDates.length - 4 }} more dates available
+                    </p>
+                  </div>
+
+                  <div v-else class="text-center pa-8">
+                    <v-icon size="48" color="teal-lighten-3">mdi-calendar-blank</v-icon>
+                    <p class="mt-2 grey--text">No slots currently available. Please check back later.</p>
+                  </div>
+
+                  <div v-if="formData.scheduled_date" class="mt-4">
+                    <div class="selected-slot-badge">
+                      <v-icon size="18" class="mr-2">mdi-calendar-check</v-icon>
+                      Selected: {{ formatSelectedSchedule(formData.scheduled_date) }}
+                    </div>
+                  </div>
                 </v-card-text>
               </v-card>
 
-              <v-card class="info-card fade-in-up" variant="flat" color="teal-lighten-5">
+              <v-card class="info-card fade-in-up mt-6" variant="flat" color="teal-lighten-5">
                 <v-card-title class="card-title d-flex align-center" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
                   <v-icon color="teal" class="mr-2">mdi-book-open-variant</v-icon>
-                  Bible Studies
+                  The Next Steps
                 </v-card-title>
                 <v-card-text>
                   <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
-                    Deepen your understanding of God's Word. Our Bible studies are designed to help you grow spiritually and prepare you for baptism.
+                    After your Salvation Talk, our team will guide you through the next steps in your faith journey.
                   </p>
                 </v-card-text>
               </v-card>
@@ -52,18 +131,18 @@
 
             <!-- Right: Application Form -->
             <div class="right-column">
-              <h2 class="section-title fade-in" style="font-family: 'Georgia', serif; font-style: italic;">
-                {{ isLoggedIn ? "Member's Growth & Service" : "I Want to Know More" }}
-              </h2>
+              <h2 class="section-title fade-in" style="font-family: 'Georgia', serif; font-style: italic;">I Want to Know More</h2>
               
               <el-card class="registration-card fade-in-up" shadow="hover">
                 <template #header>
                   <div class="registration-header-content d-flex align-center">
                     <img src="/img/logobbek.png" alt="BBEK Logo" class="registration-logo mr-4">
                     <div>
-                      <h3 class="registration-title" style="font-family: 'Georgia', serif; font-style: italic; margin-bottom: 0;">Discipleship Request Form</h3>
+                      <h3 class="registration-title" style="font-family: 'Georgia', serif; font-style: italic; margin-bottom: 0;">
+                        Discipleship Request Form
+                      </h3>
                       <p class="registration-subtitle" style="font-family: 'Georgia', serif; font-style: italic; margin-bottom: 0;">
-                        {{ isLoggedIn ? 'Select your area of interest below.' : 'Please fill out your details below.' }}
+                        {{ isLoggedIn ? 'Please confirm your details below.' : 'Please fill out your details below.' }}
                       </p>
                     </div>
                   </div>
@@ -130,10 +209,10 @@
                     </el-form-item>
                   </template>
 
-                  <el-form-item label="I am interested in:" required>
-                    <div class="text-caption grey--text">
-                      <v-icon size="small" color="teal">mdi-check-circle</v-icon>
-                      Salvation Talk & Bible Study (Included)
+                  <el-form-item label="Selected Schedule" prop="scheduled_date" required>
+                    <el-input v-model="formData.scheduled_date" placeholder="Select a slot from the left" readonly />
+                    <div v-if="formData.scheduled_date" class="text-caption text-teal-darken-3 mt-1">
+                      {{ formatSelectedSchedule(formData.scheduled_date) }}
                     </div>
                   </el-form-item>
 
@@ -153,12 +232,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from 'vue';
+import { ref, reactive, watch, computed, onMounted } from 'vue';
 import { useDiscipleshipStore } from '@/stores/discipleshipStore';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
+import moment from 'moment';
 
 const discipleshipStore = useDiscipleshipStore();
 const formRef = ref(null);
+
+const slotsLoading = ref(false);
+const availableScheduleDates = ref([]);
 
 const isLoggedIn = computed(() => {
   return !!localStorage.getItem('accessToken')
@@ -181,8 +264,38 @@ const formData = reactive({
   age: null,
   gender: '',
   address: '',
-  request_type: 'Both'
+  request_type: 'Salvation',
+  scheduled_date: null
 });
+
+const fetchSlots = async () => {
+  slotsLoading.value = true;
+  availableScheduleDates.value = [];
+  formData.scheduled_date = null;
+
+  const result = await discipleshipStore.fetchAvailableSlots({
+    service: 'salvation',
+    days: 14
+  });
+
+  if (result.success) {
+    availableScheduleDates.value = result.data || [];
+  }
+
+  slotsLoading.value = false;
+};
+
+onMounted(async () => {
+  await fetchSlots();
+});
+
+const selectSlot = (slotDateTime) => {
+  formData.scheduled_date = slotDateTime;
+};
+
+const formatDate = (dateStr) => moment(dateStr, 'YYYY-MM-DD').format('MMMM D, YYYY');
+const formatTime = (timeStr) => moment(timeStr, 'HH:mm').format('h:mm A');
+const formatSelectedSchedule = (dateTimeStr) => moment(dateTimeStr, 'YYYY-MM-DD HH:mm:ss').format('MMMM D, YYYY [at] h:mm A');
 
 // Auto-calculate age from birthdate
 watch(() => formData.birthdate, (newDate) => {
@@ -224,8 +337,6 @@ watch(() => userInfo.value, (newVal) => {
   }
 }, { immediate: true });
 
-const selectedinterests = ref(['Salvation Talk', 'Bible Study']);
-
 const rules = {
   firstname: [{ required: true, message: 'First name is required', trigger: 'blur' }],
   lastname: [{ required: true, message: 'Last name is required', trigger: 'blur' }],
@@ -241,31 +352,40 @@ const rules = {
   ],
   gender: [{ required: true, message: 'Gender is required', trigger: 'change' }],
   address: [{ required: true, message: 'Address is required', trigger: 'blur' }],
+  scheduled_date: [{ required: true, message: 'Please select an available schedule slot', trigger: 'change' }],
 };
 
 const handleSubmit = async () => {
   if (!formRef.value) return;
-  formData.request_type = 'Both';
+  formData.request_type = 'Salvation';
   
   await formRef.value.validate(async (valid) => {
     if (valid) {
       const success = await discipleshipStore.submitDiscipleshipRequest(formData);
       if (success) {
+        const msg = 'Your Discipleship Talk request has been successfully sent! Your schedule is pending approval. Our team will email you to confirm the approved time, location, and assigned pastor.';
+        
         ElMessageBox.alert(
-          'Your discipleship request has been successfully sent! Our team will review your information and reach out to you via email or phone to schedule your session. Thank you!',
+          msg,
           'Request Submitted',
           {
             confirmButtonText: 'OK',
             type: 'success',
             callback: () => {
               formRef.value.resetFields();
-              selectedinterests.value = ['Salvation Talk', 'Bible Study'];
+              fetchSlots();
             }
           }
         );
       }
     }
   });
+};
+
+const scrollToSchedule = () => {
+  const el = document.getElementById('schedule-section');
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth' });
 };
 </script>
 
@@ -333,5 +453,31 @@ const handleSubmit = async () => {
 }
 .registration-header-content {
   padding: 5px 0;
+}
+.slot-item {
+  border: 1px solid #e0f2f1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: white;
+}
+.slot-item:hover {
+  border-color: #4db6ac;
+  background-color: #f0fdfa;
+  transform: translateX(5px);
+}
+.slot-item.v-list-item--active {
+  border-color: #0b9387;
+  background-color: #e0f2f1;
+}
+.selected-slot-badge {
+  background-color: #0d9488;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
 }
 </style>

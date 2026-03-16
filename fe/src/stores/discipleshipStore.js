@@ -24,8 +24,44 @@ export const useDiscipleshipStore = defineStore('discipleship', () => {
         }
     };
 
+    const submitBibleStudyRequest = async (data) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/biblestudy-requests/submit', data);
+            if (response.data.success) {
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Bible Study submission error:', error);
+            const message = error.response?.data?.message || 'Failed to submit Bible Study request. Please try again later.';
+            ElMessage.error(message);
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const fetchAvailableSlots = async ({ date, service = 'salvation', days } = {}) => {
+        try {
+            const params = { service };
+            if (date) params.date = date;
+            if (days) params.days = days;
+
+            const response = await axios.get('/services/discipleship-requests/available-slots', {
+                params
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Fetch available slots error:', error);
+            return { success: false, data: [] };
+        }
+    };
+
     return {
         loading,
-        submitDiscipleshipRequest
+        submitDiscipleshipRequest,
+        submitBibleStudyRequest,
+        fetchAvailableSlots
     };
 });

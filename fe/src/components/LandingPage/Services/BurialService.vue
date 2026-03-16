@@ -59,53 +59,91 @@
           <div class="content-grid">
             <!-- Left Column: What is Burial Service -->
             <div class="left-column">
-              <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
-                {{ burialServiceData.sectionTitle }}
+              <!-- Available Burial Dates Card (Visible to everyone) - MOVED TO TOP -->
+              <h2 class="section-title fade-in" style="animation-delay: 100ms;">
+                Select Available Dates
               </h2>
               
-              <div class="info-cards">
-                <v-card class="info-card fade-in-up" style="animation-delay: 300ms;" variant="flat" color="teal-lighten-5">
-                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
-                    {{ burialServiceData.biblicalFoundationTitle }}
-                  </v-card-title>
-                  <v-card-text>
-                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
-                      {{ burialServiceData.biblicalFoundationText }}
-                    </p>
-                  </v-card-text>
-                </v-card>
-
-                <v-card class="info-card fade-in-up" style="animation-delay: 400ms;" variant="flat" color="teal-lighten-5">
-                  <v-card-title class="card-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">
-                    {{ burialServiceData.ourCommitmentTitle }}
-                  </v-card-title>
-                  <v-card-text>
-                    <p style="font-family: 'Georgia', serif; font-style: italic; line-height: 1.7; color: #115e59;">
-                      {{ burialServiceData.ourCommitmentText }}
-                    </p>
-                  </v-card-text>
-                </v-card>
-              </div>
-
-              <v-card class="who-baptized-card fade-in" style="animation-delay: 500ms;" variant="flat" color="teal-lighten-5">
-                <v-card-title class="who-title" style="font-family: 'Georgia', serif; font-style: italic; color: #0f766e;">{{ burialServiceData.whatWeOfferTitle }}</v-card-title>
+              <v-card 
+                class="available-dates-card fade-in" 
+                style="animation-delay: 200ms; margin-bottom: 20px;" 
+                variant="flat" 
+                color="teal-lighten-5"
+              >
+                <v-card-title class="card-title" style="font-size: 1.25rem; font-weight: 600; background-color: #0d9488; color: white; padding: 16px;">
+                  <v-icon color="white" class="mr-2">mdi-calendar-clock</v-icon>
+                  Available Dates
+                </v-card-title>
                 <v-card-text>
-                  <ul class="baptized-list">
-                    <li class="baptized-item">
-                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ burialServiceData.offerPoint1 }}</span>
-                    </li>
-                    <li class="baptized-item">
-                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ burialServiceData.offerPoint2 }}</span>
-                    </li>
-                    <li class="baptized-item">
-                      <v-icon color="teal-darken-3" size="20" class="check-icon">mdi-check-circle</v-icon>
-                      <span style="font-family: 'Georgia', serif; font-style: italic; color: #115e59;">{{ burialServiceData.offerPoint3 }}</span>
-                    </li>
-                  </ul>
+                  <!-- Loading state -->
+                  <div v-if="loadingAvailableDates" class="text-center py-4">
+                    <v-progress-circular indeterminate color="teal" size="24"></v-progress-circular>
+                    <p class="mt-2 text-teal-darken-1" style="font-family: 'Georgia', serif;">Loading available dates...</p>
+                  </div>
+                  <!-- Has dates -->
+                  <div v-else-if="availableBurialDates && availableBurialDates.length > 0">
+                    <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
+                      <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
+                      Select a date and time slot for your burial service
+                    </p>
+                    <v-expansion-panels variant="accordion" class="dates-panel">
+                      <v-expansion-panel
+                        v-for="(dateGroup, index) in availableBurialDates.slice(0, 4)" 
+                        :key="dateGroup.date"
+                        variant="flat"
+                        class="mb-2 sunday-panel"
+                      >
+                        <v-expansion-panel-title>
+                          <div class="d-flex align-center justify-space-between w-100 pr-2">
+                            <div>
+                              <v-icon color="teal-darken-2" class="mr-2">mdi-calendar</v-icon>
+                              <span class="font-weight-medium text-teal-darken-3">{{ formatDate(dateGroup.date) }}</span>
+                            </div>
+                            <v-chip 
+                              size="small" 
+                              color="teal" 
+                              variant="flat"
+                              class="mr-2"
+                              style="color: white !important;"
+                            >
+                              {{ dateGroup.availableSlotsCount || dateGroup.availableSlots }} slots
+                            </v-chip>
+                          </div>
+                        </v-expansion-panel-title>
+                        <v-expansion-panel-text>
+                          <div v-if="dateGroup.timeSlots && dateGroup.timeSlots.length > 0" class="time-slots-grid">
+                            <v-chip
+                              v-for="slot in dateGroup.timeSlots"
+                              :key="slot.time"
+                              size="small"
+                              variant="outlined"
+                              color="teal-darken-2"
+                              class="ma-1 time-slot-chip"
+                              @click="selectBurialTimeSlot(dateGroup.date, slot.time || slot.displayTime)"
+                            >
+                              {{ slot.displayTime || slot.time }}
+                            </v-chip>
+                          </div>
+                          <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
+                            No time slots available for this date.
+                          </p>
+                        </v-expansion-panel-text>
+                      </v-expansion-panel>
+                    </v-expansion-panels>
+                    <p v-if="availableBurialDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
+                      + {{ availableBurialDates.length - 4 }} more dates available
+                    </p>
+                  </div>
+                  <!-- No dates available -->
+                  <div v-else class="text-center py-4">
+                    <v-icon color="teal" size="48" class="mb-2">mdi-calendar-check</v-icon>
+                    <p style="font-family: 'Georgia', serif; color: #115e59;">
+                      All dates are currently available!
+                    </p>
+                  </div>
                 </v-card-text>
               </v-card>
+
             </div>
 
             <!-- Right Column: Register for Burial Service -->
@@ -663,9 +701,7 @@ const burialServiceData = ref({
   ourCommitmentTitle: 'Our Commitment',
   ourCommitmentText: 'We provide compassionate support, meaningful ceremonies, and spiritual guidance during difficult times. Our services reflect God\'s love and the promise of eternal life.',
   whatWeOfferTitle: 'What We Offer',
-  offerPoint1: 'Compassionate pastoral care and counseling',
-  offerPoint2: 'Meaningful memorial services and ceremonies',
-  offerPoint3: 'Support for grieving families and loved ones'
+  offerPoint1: 'Compassionate pastoral care and counseling'
 })
 
 const { loadPageData, loading } = useCms('burialservice')
@@ -675,6 +711,48 @@ const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const isLoggedIn = computed(() => {
   return userInfo.value.account && userInfo.value.account.account_id && userInfo.value.account.account_id.trim() !== ''
 })
+
+// Available burial dates (for logged-in members)
+const availableBurialDates = ref([])
+const loadingAvailableDates = ref(false)
+
+// Fetch available burial dates (for all users - logged in or not)
+const fetchAvailableBurialDates = async () => {
+  loadingAvailableDates.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+    
+    const response = await axios.get('/church-records/burial-services/getAvailableBurialDates', {
+      params: { daysAhead: 30 },
+      headers
+    })
+    
+    if (response.data && response.data.success) {
+      // API returns { success: true, data: { availableDates: [...] } }
+      const responseData = response.data.data || response.data
+      availableBurialDates.value = responseData.availableDates || responseData.dates || response.data.dates || []
+    } else {
+      availableBurialDates.value = []
+    }
+  } catch (error) {
+    console.error('Error fetching available burial dates:', error)
+    availableBurialDates.value = []
+  } finally {
+    loadingAvailableDates.value = false
+  }
+}
+
+// Format date for display
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  })
+}
 
 // Form fields
 const firstname = ref('')
@@ -786,6 +864,9 @@ onMounted(async () => {
     gender.value = userInfo.value.member.gender || ''
     age.value = userInfo.value.member.age || 0
   }
+  
+  // Fetch available burial dates for all users (logged in or not)
+  fetchAvailableBurialDates()
 })
 
 // Watch birthdate to calculate age
@@ -1035,6 +1116,15 @@ const handleBurialDialogSubmit = async (payload) => {
     burialDialogRef.value?.resetLoading()
   }
 }
+const selectBurialTimeSlot = (date, time) => {
+  const dateTime = `${date} ${time}:00`
+  preferredServiceDate.value = dateTime
+  ElMessage.success(`Selected: ${date} at ${time}`)
+  const registerSection = document.getElementById('register')
+  if (registerSection) {
+    registerSection.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 </script>
 
 <style scoped>
@@ -1175,6 +1265,55 @@ const handleBurialDialogSubmit = async (payload) => {
 
 .fade-in-up {
   animation: fadeInUp 0.8s ease-out;
+}
+
+/* Available Dates Card Styles */
+.available-dates-card {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.dates-expansion-panels {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.dates-expansion-panels .v-expansion-panel {
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px solid #0d9488 !important;
+}
+
+.dates-expansion-panels .v-expansion-panel-title {
+  min-height: 48px;
+  padding: 12px 16px;
+}
+
+.dates-expansion-panels .v-expansion-panel-text__wrapper {
+  padding: 8px 16px 16px;
+}
+
+/* Make left column scrollable when logged in to match right column height */
+@media (min-width: 1024px) {
+  .left-column {
+    max-height: 800px;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  
+  .left-column::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .left-column::-webkit-scrollbar-track {
+    background: rgba(13, 148, 136, 0.1);
+    border-radius: 3px;
+  }
+  
+  .left-column::-webkit-scrollbar-thumb {
+    background: rgba(13, 148, 136, 0.3);
+    border-radius: 3px;
+  }
 }
 
 .fade-in-up-delay {

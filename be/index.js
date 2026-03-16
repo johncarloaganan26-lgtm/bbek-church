@@ -54,7 +54,10 @@ const childDedicationRouter = require('./routes/services/childDedicationRoutes')
 const burialServiceRouter = require('./routes/services/burialServiceRoutes');
 const waterBaptismRouter = require('./routes/services/waterBaptismRoutes');
 const discipleshipRouter = require('./routes/services/discipleshipRoutes');
+const biblestudyRouter = require('./routes/services/biblestudyRoutes');
 const marriageServiceRouter = require('./routes/services/marriageServiceRoutes');
+const salvationAvailabilityRouter = require('./routes/services/salvationAvailabilityRoutes');
+const promotionVisitRouter = require('./routes/services/promotionVisitRoutes');
 const transactionRouter = require('./routes/transactionRoutes');
 const memberRegistrationRouter = require('./routes/memberRegistrationRoute');
 const archiveRouter = require('./routes/archiveRoutes');
@@ -66,6 +69,7 @@ const auditTrailRouter = require('./routes/auditTrailRoutes');
 const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
 const authRouter = require('./routes/authRoutes');
 const notificationRouter = require('./routes/notificationRoutes');
+const { autoRejectSalvationNoShows } = require('./utils/cronJobs');
 
 const app = express();
 
@@ -258,6 +262,8 @@ app.use('/api/church-records/approvals', approvalRoutes);
 app.use('/api/church-records/child-dedications', childDedicationRouter);
 app.use('/api/church-records/burial-services', burialServiceRouter);
 app.use('/api/services/water-baptisms', waterBaptismRouter);
+app.use('/api/services/burial-services', burialServiceRouter);
+app.use('/api/services/child-dedications', childDedicationRouter);
 
 // PUBLIC WATER BAPTISM REGISTRATION ROUTE (no auth required)
 app.post('/api/public/water-baptism/register', async (req, res) => {
@@ -333,7 +339,10 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
 });
 
 app.use('/api/services/discipleship-requests', discipleshipRouter);
+app.use('/api/services/biblestudy-requests', biblestudyRouter);
+app.use('/api/services/salvation-availability', salvationAvailabilityRouter);
 app.use('/api/services/marriage-services', marriageServiceRouter);
+app.use('/api/services/promotion-visits', promotionVisitRouter);
 app.use('/api/transactions', transactionRouter);
 
 // Member registration routes
@@ -453,6 +462,20 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`💾 Database: ${dbName} @ ${dbHost}`);
   console.log('='.repeat(60));
 
+  // Initialize background jobs
+  console.log('⏰ Initializing background jobs...');
+  
+  // 1. Auto-reject Salvation no-shows (Check every 5 minutes)
+  const DISCIPLESHIP_CRON_INTERVAL = 5 * 60 * 1000;
+  global.discipleshipCronInterval = setInterval(async () => {
+    await autoRejectSalvationNoShows();
+  }, DISCIPLESHIP_CRON_INTERVAL);
+  
+  // Run once on startup
+  autoRejectSalvationNoShows();
+
+  console.log('✅ Background jobs initialized');
+  console.log('='.repeat(60));
 });
 
 // Graceful shutdown for cloud platforms
@@ -463,6 +486,12 @@ const gracefulShutdown = (signal) => {
   if (global.tokenCleanupInterval) {
     clearInterval(global.tokenCleanupInterval);
     console.log('Token cleanup interval stopped.');
+  }
+
+  // Stop discipleship cron interval
+  if (global.discipleshipCronInterval) {
+    clearInterval(global.discipleshipCronInterval);
+    console.log('Discipleship cron interval stopped.');
   }
 
   server.close(() => {

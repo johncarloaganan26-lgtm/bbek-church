@@ -1,4 +1,4 @@
- hre<template>
+<template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -12,14 +12,69 @@
     v-loading="loading"
     element-loading-text="Processing..."
   >
-    <el-form
-      ref="formRef"
-      :model="formData"
-      :rules="rules"
-      :label-width="labelWidth"
-      :label-position="labelPosition"
-      :hide-required-asterisk="true"
-    >
+    <div class="dialog-content-wrapper">
+      <!-- Left Panel: Available Slots -->
+      <div class="available-slots-panel" v-if="!isEditMode">
+        <div class="slots-header">
+          <span>Available Sundays</span>
+          <el-button 
+            link 
+            size="small"
+            @click="showAvailableSlots = !showAvailableSlots"
+          >
+            {{ showAvailableSlots ? 'Hide' : 'Show' }}
+          </el-button>
+        </div>
+        
+        <div v-if="showAvailableSlots" class="slots-content"
+          :class="{ 'slots-loading': slotsLoading }">
+          <div v-if="slotsLoading" class="loading-message">
+            <el-progress :percentage="100" :indeterminate="true"></el-progress>
+            Loading time slots...
+          </div>
+          <div v-else-if="availableSlots.length === 0" class="empty-slots">
+            No available slots
+          </div>
+          <el-collapse v-else class="time-slots-accordion" accordion>
+            <el-collapse-item
+              v-for="dateGroup in availableSlots"
+              :key="dateGroup.date"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)}`"
+              :name="dateGroup.date"
+            >
+              <div class="slots-info">
+                <span>Available: <el-tag type="success">{{ dateGroup.availableSlots }}</el-tag></span>
+                <span>Booked: <el-tag type="info">{{ dateGroup.bookedSlots }}</el-tag></span>
+              </div>
+              <div class="time-slots-grid">
+                <button
+                  v-for="slot in dateGroup.timeSlots"
+                  :key="slot.time"
+                  class="slot-button"
+                  :class="{ 'selected': isSlotSelected(slot.datetime) }"
+                  @click="selectAvailableSlot(dateGroup.date, slot.time, slot.display)"
+                >
+                  {{ slot.display }}
+                </button>
+              </div>
+              <div v-if="selectedSlotDisplay" class="selected-display">
+                Selected: {{ selectedSlotDisplay }}
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+      </div>
+
+      <!-- Right Panel: Form -->
+      <div class="form-panel">
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="rules"
+          :label-width="labelWidth"
+          :label-position="labelPosition"
+          :hide-required-asterisk="true"
+        >
       <!-- Requested By (Member) - Hidden for member users, auto-filled -->
       <el-form-item v-if="!isMemberUser" prop="requested_by">
         <template #label>
@@ -590,7 +645,9 @@
           :disabled="loading"
         />
       </el-form-item>
-    </el-form>
+        </el-form>
+      </div>
+    </div>
 
     <template #footer>
       <div class="dialog-footer">
@@ -689,6 +746,12 @@ const pastorOptions = ref([])
 // Unavailable dates and time slots for scheduling
 const unavailableDates = ref([])
 const unavailableTimeSlots = ref([]) // Array of {date: 'YYYY-MM-DD', time: 'HH:mm'} objects
+
+// Available slots for admin (left panel)
+const showAvailableSlots = ref(true)
+const slotsLoading = ref(false)
+const availableSlots = ref([])
+const selectedSlotDisplay = ref('')
 
 // Check if user is a member (has member object and is not admin/staff)
 const isMemberUser = computed(() => {
@@ -1394,6 +1457,7 @@ watch(() => props.modelValue, async (isOpen) => {
     await fetchMemberOptions()
     await fetchPastorOptions()
     await fetchUnavailableTimeSlots()
+    fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
 
     if (props.dedicationData) {
       // Populate form when dialog opens in edit mode
@@ -1494,6 +1558,7 @@ onMounted(async () => {
   await fetchMemberOptions()
   await fetchPastorOptions()
   await fetchUnavailableTimeSlots()
+  fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
 })
 
 // Reset form
@@ -1536,6 +1601,54 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.clearValidate()
   }
+}
+
+// Fetch available slots for admin
+const fetchAvailableSlots = async (days = 14) => {
+  try {
+    slotsLoading.value = true
+    const response = await axios.get('/services/child-dedications/available-slots', {
+      params: { days }
+    })
+    
+    if (response.data.success) {
+      availableSlots.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('Error fetching available slots:', error)
+    ElMessage.error('Failed to load available time slots')
+  } finally {
+    slotsLoading.value = false
+  }
+}
+
+// Select an available slot
+const selectAvailableSlot = (date, time, displayTime) => {
+  formData.preferred_dedication_date = date
+  formData.preferred_dedication_time = time
+  selectedSlotDisplay.value = `${formatDate(date)} at ${displayTime}`
+  ElMessage.success('Slot selected! Date and time have been filled.')
+}
+
+// Format date for display
+const formatDate = (dateStr) => {
+  return dateStr ? new Date(dateStr).toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  }) : ''
+}
+
+// Check if slot is selected
+const isSlotSelected = (datetime) => {
+  if (!formData.preferred_dedication_date || !formData.preferred_dedication_time) return false
+  const selectedDatetime = `${formData.preferred_dedication_date} ${formData.preferred_dedication_time}`
+  return selectedDatetime === datetime
+}
+
+// Clear slot selection
+const clearSlotSelection = () => {
+  selectedSlotDisplay.value = ''
 }
 
 // Handle close
@@ -2010,6 +2123,156 @@ defineExpose({
   .sponsors-table :deep(.el-table td) {
     padding: 4px 2px;
     font-size: 0.75rem;
+  }
+}
+
+/* Two-Column Dialog Layout */
+.dialog-content-wrapper {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.available-slots-panel {
+  width: 300px;
+  max-height: 65vh;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 16px;
+  background: #f5f7fa;
+  flex-shrink: 0;
+}
+
+.slots-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409eff;
+}
+
+.slots-content {
+  min-height: 200px;
+}
+
+.slots-content.slots-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.loading-message {
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+}
+
+.empty-slots {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  padding: 20px;
+}
+
+.time-slots-accordion :deep(.el-collapse-item__header) {
+  font-size: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 8px;
+  border-radius: 2px;
+}
+
+.time-slots-accordion :deep(.el-collapse-item__wrap) {
+  background: transparent;
+  border: none;
+}
+
+.time-slots-accordion :deep(.el-collapse-item__body) {
+  padding: 12px 0;
+}
+
+.slots-info {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.time-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.slot-button {
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.3s;
+}
+
+.slot-button:hover {
+  background: #e6f7ff;
+  border-color: #409eff;
+}
+
+.slot-button.selected {
+  background: #409eff;
+  color: #fff;
+  border-color: #409eff;
+}
+
+.selected-display {
+  background: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  padding: 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  color: #0050b3;
+}
+
+.form-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Responsive Layout */
+@media (max-width: 1200px) {
+  .dialog-content-wrapper {
+    flex-direction: column;
+  }
+
+  .available-slots-panel {
+    width: 100%;
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dialog-content-wrapper {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .available-slots-panel {
+    width: 100%;
+    padding: 12px;
+    max-height: 250px;
+  }
+
+  .time-slots-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 </style>

@@ -100,9 +100,16 @@
           </template>
            <v-list-item
             prepend-icon="mdi-account-plus"
-            title="Discipleship Requests"
+            title="Salvation Requests"
             :to="{ name: 'DiscipleshipAdmin' }"
             :active="$route.name === 'DiscipleshipAdmin'"
+            @click="closeDrawerOnMobile"
+          ></v-list-item>
+          <v-list-item
+            prepend-icon="mdi-book-open-variant"
+            title="Bible Study"
+            :to="{ name: 'BibleStudy' }"
+            :active="$route.name === 'BibleStudy'"
             @click="closeDrawerOnMobile"
           ></v-list-item>
            <v-list-item
@@ -389,10 +396,22 @@ const adminRouteMetadata = {
     keywords: ['payments', 'history']
   },
   DiscipleshipAdmin: {
-    title: 'Discipleship Requests',
+    title: 'Salvation Requests',
     section: 'Services',
     icon: 'mdi-account-plus',
-    keywords: ['discipleship', 'requests']
+    keywords: ['discipleship', 'requests', 'salvation']
+  },
+  SalvationAvailability: {
+    title: 'Salvation Slots',
+    section: 'Services',
+    icon: 'mdi-calendar-clock',
+    keywords: ['salvation', 'slots', 'availability']
+  },
+  BibleStudy: {
+    title: 'Bible Study',
+    section: 'Services',
+    icon: 'mdi-book-open-variant',
+    keywords: ['bible', 'study', 'discipleship']
   },
   WaterBaptism: {
     title: 'Water Baptism',

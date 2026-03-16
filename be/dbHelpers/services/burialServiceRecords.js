@@ -1487,6 +1487,129 @@ async function bulkCompleteBurialServices(burialIds) {
   }
 }
 
+/**
+ * Get available burial service dates (daily with night shift 5pm-10pm)
+ * Analyzes all burial services that are NOT approved/scheduled
+ * Returns available daily dates between 5pm-10pm
+ * @param {Number} daysAhead - Number of days to look ahead (default: 30)
+ * @returns {Promise<Object>} Available daily dates with night shift time slots
+ */
+async function getAvailableBurialDates(daysAhead = 30) {
+  try {
+    // Get all burial services that are NOT approved (i.e., pending, rejected, etc.)
+    const sql = `SELECT 
+                  burial_id, 
+                  deceased_name, 
+                  service_date, 
+                  status
+                FROM tbl_burialservice 
+                WHERE status != 'Approved'
+                AND status != 'completed'
+                AND status != 'Scheduled'
+                ORDER BY service_date ASC`;
+    
+    const [rows] = await query(sql);
+    
+    // Generate all upcoming days for the next N days
+    const availableDays = [];
+    const today = moment().startOf('day');
+    
+    for (let i = 0; i < daysAhead; i++) {
+      const currentDay = today.clone().add(i, 'days');
+      
+      // Only add future days
+      if (currentDay.isAfter(today) || currentDay.isSame(today, 'day')) {
+        availableDays.push({
+          date: currentDay.format('YYYY-MM-DD'),
+          displayDate: currentDay.format('MMMM DD, YYYY'),
+          dayOfWeek: currentDay.format('dddd'),
+          timeSlots: generateBurialTimeSlots()
+        });
+      }
+    }
+    
+    // Get all scheduled/approved burial services to mark time slots as taken
+    const scheduledSql = `SELECT 
+                          service_date, 
+                          status
+                        FROM tbl_burialservice 
+                        WHERE status = 'Approved'
+                        OR status = 'completed'
+                        OR status = 'Scheduled'
+                        OR (service_date IS NOT NULL 
+                            AND service_date >= NOW())`;
+    
+    const [scheduledRows] = await query(scheduledSql);
+    
+    // Mark taken time slots
+    const takenSlots = {};
+    scheduledRows.forEach(row => {
+      if (row.service_date) {
+        const dateKey = moment(row.service_date).format('YYYY-MM-DD');
+        if (!takenSlots[dateKey]) {
+          takenSlots[dateKey] = new Set();
+        }
+        const timeKey = moment(row.service_date).format('HH:mm');
+        takenSlots[dateKey].add(timeKey);
+      }
+    });
+    
+    // Filter available days and mark taken slots
+    const result = availableDays.map(day => {
+      const dateKey = day.date;
+      const taken = takenSlots[dateKey] || new Set();
+      
+      // Filter time slots that are not taken
+      const availableSlots = day.timeSlots.filter(slot => !taken.has(slot.time));
+      
+      return {
+        ...day,
+        timeSlots: availableSlots,
+        totalSlots: day.timeSlots.length,
+        availableSlotsCount: availableSlots.length,
+        isFullyBooked: availableSlots.length === 0
+      };
+    }).filter(day => day.availableSlotsCount > 0);
+    
+    // Get pending burial services count
+    const pendingCount = rows.length;
+    
+    return {
+      success: true,
+      data: {
+        availableDates: result,
+        pendingBurialServices: rows,
+        pendingCount: pendingCount,
+        generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
+      }
+    };
+  } catch (error) {
+    console.error('Error getting available burial dates:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate time slots from 5pm to 10pm (night shift, 1 hour each)
+ * @returns {Array} Array of time slot objects
+ */
+function generateBurialTimeSlots() {
+  const slots = [];
+  for (let hour = 17; hour < 22; hour++) {
+    const time24 = `${hour.toString().padStart(2, '0')}:00`;
+    const endTime24 = `${(hour + 1).toString().padStart(2, '0')}:00`;
+    const time12 = moment(time24, 'HH:mm').format('h:mm A');
+    const endTime12 = moment(endTime24, 'HH:mm').format('h:mm A');
+    
+    slots.push({
+      time: time24,
+      displayTime: `${time12} - ${endTime12}`,
+      hour: hour
+    });
+  }
+  return slots;
+}
+
 module.exports = {
   createBurialService,
   getAllBurialServices,
@@ -1500,5 +1623,6 @@ module.exports = {
   searchBurialServicesFulltext,
   analyzeBurialServiceAvailability,
   checkTimeSlotAvailability,
-  checkPendingBurialServiceApproval
+  checkPendingBurialServiceApproval,
+  getAvailableBurialDates
 };

@@ -19,6 +19,8 @@ import ChildDedicationAdmin from '../components/Admin/ServicesRecords/ChildDedic
 import BurialServiceAdmin from '../components/Admin/ServicesRecords/BurialService.vue'
 import MarriageRecordAdmin from '../components/Admin/ServicesRecords/MarriageRecord.vue'
 import DiscipleshipAdmin from '../components/Admin/ServicesRecords/Discipleship.vue'
+import SalvationAvailabilityAdmin from '../components/Admin/ServicesRecords/SalvationAvailability.vue'
+import BibleStudyAdmin from '../components/Admin/ServicesRecords/BibleStudy.vue'
 // Communication
 import Messages from '../components/Admin/CommunicationRecords/Messages.vue'
 // Maintenance Pages
@@ -184,6 +186,11 @@ const routes = [
     component: () => import('../components/LandingPage/BeOneOfUs/Discipleship.vue')
   },
   {
+    path: '/beoneofus/bible-study',
+    name: 'BibleStudyForm',
+    component: () => import('../components/LandingPage/BeOneOfUs/BibleStudyForm.vue')
+  },
+  {
     path: '/about',
     component: About,
     children: [
@@ -319,6 +326,16 @@ const routes = [
         path: 'discipleship-requests',
         name: 'DiscipleshipAdmin',
         component: DiscipleshipAdmin
+      },
+      {
+        path: 'salvation-availability',
+        name: 'SalvationAvailability',
+        component: SalvationAvailabilityAdmin
+      },
+      {
+        path: 'bible-study-requests',
+        name: 'BibleStudy',
+        component: BibleStudyAdmin
       },
       {
         path: 'child-dedication-admin',
@@ -473,6 +490,7 @@ router.beforeEach((to, from, next) => {
     'PasswordManagementFromEmail',
     'CertificatePreview',
     'Discipleship',
+    'BibleStudyForm',
   ]
 
   // Check if the route is public

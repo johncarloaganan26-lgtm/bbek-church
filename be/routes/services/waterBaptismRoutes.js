@@ -20,6 +20,26 @@ const { query } = require('../../database/db');
 
 const router = express.Router();
 
+// Water Baptism is held on Sundays only (0 = Sunday).
+const ALLOWED_BAPTISM_DAY = 0;
+
+function validateBaptismDate(baptismDate) {
+  if (!baptismDate) return { valid: true };
+
+  const d = moment(baptismDate, ['YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss', moment.ISO_8601], true);
+  const parsed = d.isValid() ? d : moment(baptismDate);
+
+  if (!parsed.isValid()) {
+    return { valid: false, message: 'Invalid baptism date. Please select a valid date.' };
+  }
+
+  if (parsed.day() !== ALLOWED_BAPTISM_DAY) {
+    return { valid: false, message: 'Water Baptism can only be scheduled on Sundays. Please select a Sunday date.' };
+  }
+
+  return { valid: true };
+}
+
 /**
  * CREATE - Insert a new water baptism record
  * POST /api/services/water-baptisms/createWaterBaptism
@@ -49,6 +69,16 @@ const router = express.Router();
  */
 router.post('/createWaterBaptism', async (req, res) => {
   try {
+    if (req.body && req.body.baptism_date) {
+      const dateValidation = validateBaptismDate(req.body.baptism_date);
+      if (!dateValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: dateValidation.message
+        });
+      }
+    }
+
     // Check if creating a completed baptism for non-member
     const isNonMemberCompleted =
       (req.body.is_member === false || req.body.is_member === 0 || req.body.is_member === 'false' || req.body.is_member === '0' || req.body.member_id === null) &&
@@ -415,6 +445,16 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
       });
     }
 
+    if (req.body && req.body.baptism_date) {
+      const dateValidation = validateBaptismDate(req.body.baptism_date);
+      if (!dateValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: dateValidation.message
+        });
+      }
+    }
+
     const isStatusCompleted =
       req.body.status &&
       req.body.status.toLowerCase() === 'completed';
@@ -617,6 +657,16 @@ router.post('/exportExcel', async (req, res) => {
  */
 router.post('/register-non-member', async (req, res) => {
   try {
+    if (req.body && req.body.baptism_date) {
+      const dateValidation = validateBaptismDate(req.body.baptism_date);
+      if (!dateValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: dateValidation.message
+        });
+      }
+    }
+
     // Validate required fields for non-member
     const { firstname, lastname, email } = req.body;
 
@@ -863,6 +913,96 @@ router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to bulk complete water baptisms'
+    });
+  }
+});
+
+/**
+ * AVAILABLE SLOTS - Get available water baptism slots for admin
+ * GET /api/services/water-baptisms/available-slots?days=14
+ * Returns available Sunday dates with time slots and existing bookings
+ */
+router.get('/available-slots', async (req, res) => {
+  try {
+    const timezone = 'Asia/Manila';
+    const daysRaw = req.query.days;
+    const requestedDays = Number.parseInt(String(daysRaw || '14'), 10);
+    const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 14;
+
+    const momentTz = require('moment-timezone');
+    const start = momentTz().tz(timezone).startOf('day');
+    const endExclusive = start.clone().add(days, 'days');
+
+    // Get all booked baptism slots within the date range
+    const [bookedRows] = await query(`
+      SELECT DATE_FORMAT(baptism_date, '%Y-%m-%d') AS booked_date, preferred_baptism_time as baptism_time
+      FROM tbl_waterbaptism
+      WHERE status IN ('Pending', 'Scheduled')
+        AND baptism_date IS NOT NULL
+        AND baptism_date >= ?
+        AND baptism_date < ?
+      ORDER BY baptism_date ASC, preferred_baptism_time ASC
+    `, [
+      start.format('YYYY-MM-DD HH:mm:ss'),
+      endExclusive.format('YYYY-MM-DD HH:mm:ss')
+    ]);
+
+    const bookedMap = {};
+    (bookedRows || []).forEach(row => {
+      const dateKey = row.booked_date;
+      if (!bookedMap[dateKey]) {
+        bookedMap[dateKey] = [];
+      }
+      if (row.baptism_time) {
+        bookedMap[dateKey].push(row.baptism_time);
+      }
+    });
+
+    // Generate available Sundays with time slots
+    const dateGroups = [];
+    for (let i = 0; i < days; i++) {
+      const date = start.clone().add(i, 'days');
+      // Water Baptism only on Sundays (day 0)
+      if (date.day() !== 0) continue;
+
+      const dateStr = date.format('YYYY-MM-DD');
+      const bookedTimes = bookedMap[dateStr] || [];
+
+      // Default time slots for water baptism: 10:00 AM, 11:00 AM, 2:00 PM, 3:00 PM, 4:00 PM
+      const defaultSlots = ['10:00:00', '11:00:00', '14:00:00', '15:00:00', '16:00:00'];
+      
+      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
+
+      if (availableSlots.length > 0) {
+        dateGroups.push({
+          date: dateStr,
+          dayName: date.format('dddd'),
+          availableSlots: availableSlots.length,
+          bookedSlots: bookedTimes.length,
+          timeSlots: availableSlots.map(slot => ({
+            time: slot,
+            datetime: `${dateStr} ${slot}`,
+            display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A')
+          }))
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: dateGroups,
+      meta: {
+        timezone,
+        days,
+        startDate: start.format('YYYY-MM-DD'),
+        endDate: endExclusive.format('YYYY-MM-DD')
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching available baptism slots:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch available slots'
     });
   }
 });
