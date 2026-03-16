@@ -47,6 +47,7 @@ console.log('🚀 Starting API server initialization...');
 let authenticateToken, memberRouter, accountRouter, departmentOfficerRouter, departmentRouter;
 let tithesRouter, ministryRouter, eventRouter, churchLeaderRouter, approvalRoutes;
 let childDedicationRouter, burialServiceRouter, waterBaptismRouter, discipleshipRouter, marriageServiceRouter;
+let biblestudyRouter, salvationAvailabilityRouter, promotionVisitRouter;
 let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRouter;
 let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
 let notificationRouter;
@@ -68,7 +69,10 @@ try {
   burialServiceRouter = require('../routes/services/burialServiceRoutes');
   waterBaptismRouter = require('../routes/services/waterBaptismRoutes');
   discipleshipRouter = require('../routes/services/discipleshipRoutes');
+  biblestudyRouter = require('../routes/services/biblestudyRoutes');
+  salvationAvailabilityRouter = require('../routes/services/salvationAvailabilityRoutes');
   marriageServiceRouter = require('../routes/services/marriageServiceRoutes');
+  promotionVisitRouter = require('../routes/services/promotionVisitRoutes');
   transactionRouter = require('../routes/transactionRoutes');
   memberRegistrationRouter = require('../routes/memberRegistrationRoute');
   archiveRouter = require('../routes/archiveRoutes');
@@ -457,8 +461,14 @@ if (approvalRoutes) app.use('/api/church-records/approvals', approvalRoutes);
 if (childDedicationRouter) app.use('/api/church-records/child-dedications', childDedicationRouter);
 if (burialServiceRouter) app.use('/api/church-records/burial-services', burialServiceRouter);
 if (waterBaptismRouter) app.use('/api/services/water-baptisms', waterBaptismRouter);
+if (burialServiceRouter) app.use('/api/services/burial-services', burialServiceRouter);
+if (childDedicationRouter) app.use('/api/services/child-dedications', childDedicationRouter);
+
 if (discipleshipRouter) app.use('/api/services/discipleship-requests', discipleshipRouter);
+if (biblestudyRouter) app.use('/api/services/biblestudy-requests', biblestudyRouter);
+if (salvationAvailabilityRouter) app.use('/api/services/salvation-availability', salvationAvailabilityRouter);
 if (marriageServiceRouter) app.use('/api/services/marriage-services', marriageServiceRouter);
+if (promotionVisitRouter) app.use('/api/services/promotion-visits', promotionVisitRouter);
 if (transactionRouter) app.use('/api/transactions', transactionRouter);
 
 // Member registration routes
