@@ -171,9 +171,21 @@
 
 
                 <v-btn
+                  v-if="['Pending', 'Scheduled'].includes(item.status)"
                   variant="tonal"
                   size="small"
                   color="error"
+                  @click="rejectItem(item)"
+                  class="reject-btn"
+                >
+                  <v-icon>mdi-close-circle</v-icon>
+                  <v-tooltip activator="parent" location="top">Reject / Suggest New Dates</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="tonal"
+                  size="small"
+                  color="grey"
                   @click="deleteItem(item)"
                 >
                   <v-icon>mdi-archive</v-icon>
@@ -288,7 +300,14 @@
                 ></v-select>
               </v-col>
               <v-col cols="12" md="6">
-                <v-text-field v-model="selectedRequest.location" label="Location" variant="outlined" density="compact"></v-text-field>
+                <v-text-field 
+                  v-model="selectedRequest.location" 
+                  label="Location" 
+                  variant="outlined" 
+                  density="compact"
+                  persistent-hint
+                  hint="Defaults to the church address."
+                ></v-text-field>
               </v-col>
             </v-row>
 
@@ -822,6 +841,7 @@ const openAddDialog = () => {
     request_type: 'Salvation',
     status: 'Pending',
     scheduled_date: '',
+    location: '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
     notes: ''
   };
   dialogVisible.value = true;
@@ -830,6 +850,11 @@ const openAddDialog = () => {
 const openScheduleDialog = (item) => {
   isEditing.value = true;
   selectedRequest.value = { ...item };
+  
+  // Default location to church address if blank
+  if (!selectedRequest.value.location) {
+    selectedRequest.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
+  }
   
   // Ensure notes is a string and not [object Object]
   if (typeof selectedRequest.value.notes === 'object' && selectedRequest.value.notes !== null) {
@@ -951,7 +976,7 @@ const openBibleStudyDialog = (item) => {
   
   promotionForm.value = {
     pastor_id: null,
-    location: item.address || '',
+    location: item.location || item.address || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
     scheduled_date: '',
     notes: ''
   };
@@ -1032,6 +1057,32 @@ const handleBibleStudyAction = async (isDecided) => {
     }
   } finally {
     loadingBibleStudy.value = false;
+  }
+};
+
+const rejectItem = async (item) => {
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      `Please provide a reason for rejecting the request from ${item.firstname} ${item.lastname}. This will be sent to their email along with alternative suggestions.`,
+      'Reject Request',
+      {
+        confirmButtonText: 'Send Rejection',
+        cancelButtonText: 'Cancel',
+        inputPattern: /.+/,
+        inputPlaceholder: 'e.g., The assigned pastor is unavailable. Please check the suggested dates.',
+        inputErrorMessage: 'Rejection reason is required',
+        type: 'warning'
+      }
+    );
+
+    if (reason) {
+      const success = await store.rejectRequest(item.request_id, reason);
+      if (success) {
+        ElMessage.success('Rejection sent successfully');
+      }
+    }
+  } catch {
+    // User cancelled
   }
 };
 
