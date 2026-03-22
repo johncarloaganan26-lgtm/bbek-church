@@ -315,20 +315,6 @@
             </td>
             <td>{{ formatDateTime(service.date_created) }}</td>
             <td>
-              <v-tooltip v-if="['pending', 'approved'].includes(service.status) && (service.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn 
-                    icon="mdi-check" 
-                    variant="text" 
-                    size="small" 
-                    color="success"
-                    class="mr-2"
-                    :disabled="loading"
-                    v-bind="props"
-                    @click="markIndividualComplete(service)"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
               <v-tooltip text="Edit Burial Service" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn
@@ -503,6 +489,7 @@ const editService = async (service) => {
       burialServiceData.value = {
         burial_id: fullService.burial_id,
         member_id: fullService.member_id,
+        _originalStatus: fullService.status,
         requester_name: fullService.requester_name,
         requester_email: fullService.requester_email,
         deceased_name: fullService.deceased_name,
@@ -606,27 +593,23 @@ const bulkCompleteServices = async () => {
 
   const validServices = targetServices.filter(s => {
     if (settings.value.allow_complete_without_schedule) return true;
-    if (!s.service_date) return false;
+    
+    // Restriction ON: Must be approved AND date must be today or past
+    if (s.status === 'pending' || !s.service_date) return false;
+    
     const serviceDate = new Date(s.service_date);
     serviceDate.setHours(0, 0, 0, 0);
     return serviceDate <= today;
   });
 
-  const skippedCount = targetServices.length - validServices.length;
-
   if (validServices.length === 0) {
-    ElMessage.warning('Cannot mark future services as completed. Please wait until the scheduled date or turn off Completion Restriction.');
+    ElMessage.warning('Completion restricted: Records must be scheduled for today or a past date unless Manual Completion is ON.');
     return;
   }
   
   try {
-    let confirmMessage = `Are you sure you want to mark ${validServices.length} approved burial service(s) as completed?`;
-    if (skippedCount > 0) {
-      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
-    }
-
     await ElMessageBox.confirm(
-      confirmMessage,
+      `Are you sure you want to mark ${validServices.length} burial service(s) as completed?`,
       'Confirm Bulk Complete',
       {
         confirmButtonText: 'Yes, Mark as Completed',
@@ -671,11 +654,17 @@ const markIndividualComplete = async (service) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (service.service_date && !settings.value.allow_complete_without_schedule) {
+    // Manual Completion Logic
+    if (!settings.value.allow_complete_without_schedule) {
+        if (service.status === 'pending' || !service.service_date) {
+            ElMessage.warning('Completion restricted: This record must be scheduled before it can be marked as completed.');
+            return;
+        }
+
         const serviceDate = new Date(service.service_date);
         serviceDate.setHours(0, 0, 0, 0);
         if (serviceDate > today) {
-            ElMessage.warning(`Cannot complete service scheduled for a future date (${service.service_date}) unless Manual Completion is ON.`);
+            ElMessage.warning(`Completion restricted: This record is scheduled for a future date (${service.service_date.split('T')[0]}).`);
             return;
         }
     }
@@ -749,6 +738,24 @@ const bulkDeleteServices = async () => {
 
 const handleSubmit = async (data) => {
   try {
+    // Manual Completion Validation
+    if (data.status === 'completed' && !settings.value.allow_complete_without_schedule) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (burialServiceData.value?._originalStatus === 'pending' || !data.service_date) {
+        ElMessage.warning('Completion restricted: This record must be scheduled before it can be marked as completed.');
+        return;
+      }
+
+      const serviceDate = new Date(data.service_date);
+      serviceDate.setHours(0, 0, 0, 0);
+      if (serviceDate > today) {
+        ElMessage.warning(`Completion restricted: This record is scheduled for a future date (${data.service_date.split('T')[0]}).`);
+        return;
+      }
+    }
+
     let result
     if (burialServiceData.value && burialServiceData.value.burial_id) {
       result = await burialServiceStore.updateService(burialServiceData.value.burial_id, data)

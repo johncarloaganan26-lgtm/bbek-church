@@ -91,7 +91,9 @@
             <!-- <th class="text-left font-weight-bold">Officer ID</th> -->
             <th class="text-left font-weight-bold">Member ID</th>
             <th class="text-left font-weight-bold">Full Name</th>
-            <th class="text-left font-weight-bold">Joined Date</th>
+            <th class="text-left font-weight-bold">Department</th>
+            <th class="text-left font-weight-bold">Role</th>
+            <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Date Created</th>
             <th class="text-left font-weight-bold">Actions</th>
           </tr>
@@ -115,8 +117,19 @@
             <!-- <td>{{ officer.officer_id }}</td> -->
             <td>{{ officer.member_id }}</td>
             <td>{{ officer.fullname || 'N/A' }}</td>
-            <td>{{ officer.joined_date }}</td>
-            <td>{{ officer.date_created }}</td>
+            <td>{{ officer.department_name || 'N/A' }}</td>
+            <td>{{ officer.role || 'N/A' }}</td>
+            <td>
+              <v-chip
+                :color="officer.status === 'Active' ? 'success' : 'grey'"
+                size="x-small"
+                label
+                class="text-uppercase font-weight-bold"
+              >
+                {{ officer.status || 'Active' }}
+              </v-chip>
+            </td>
+            <td>{{ officer.joined_date ? new Date(officer.joined_date).toLocaleDateString() : (officer.date_created ? new Date(officer.date_created).toLocaleDateString() : 'N/A') }}</td>
             <td>
               <v-tooltip text="Edit Officer" location="top">
                 <template v-slot:activator="{ props }">
@@ -182,6 +195,7 @@
       v-model="departmentOfficersDialog" 
       :officerData="departmentOfficersData" 
       :memberOptions="memberOptions"
+      :departmentOptions="departmentOptions"
       @update:model-value="departmentOfficersDialog = $event" 
       @submit="handleSubmit"
     />
@@ -219,6 +233,7 @@ const itemsPerPage = computed({
 })
 const pageSizeOptions = computed(() => departmentOfficersStore.pageSizeOptions)
 const memberOptions = computed(() => departmentOfficersStore.memberOptions)
+const departmentOptions = computed(() => departmentOfficersStore.departmentOptions)
 
 const sortByOptions = [
   'Member ID (A-Z)',
@@ -351,7 +366,7 @@ const handlePrint = () => {
     : userInfo?.account?.email || 'Admin'
   
   ElMessage.success('Print preview opened. Please check your browser tabs.')
-  const tableHeaders = ['Member ID', 'Full Name', 'Joined Date', 'Date Created']
+  const tableHeaders = ['Member ID', 'Full Name', 'Department', 'Role', 'Status', 'Date Created']
   
   let tableRows = ''
   officers.value.forEach((officer) => {
@@ -359,8 +374,10 @@ const handlePrint = () => {
       <tr>
         <td>${officer.member_id || 'N/A'}</td>
         <td>${officer.fullname || 'N/A'}</td>
+        <td>${officer.department_name || 'N/A'}</td>
+        <td>${officer.role || 'N/A'}</td>
+        <td>${officer.status || 'Active'}</td>
         <td>${officer.joined_date || 'N/A'}</td>
-        <td>${officer.date_created || 'N/A'}</td>
       </tr>
     `
   })
@@ -474,6 +491,7 @@ const handlePrint = () => {
 onMounted(async () => {
   await departmentOfficersStore.fetchOfficers()
   await departmentOfficersStore.fetchMemberOptions()
+  await departmentOfficersStore.fetchDepartmentOptions()
 })
 </script>
 

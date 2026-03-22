@@ -387,6 +387,15 @@ async function createChildDedication(dedicationData) {
       }
     }
 
+    // Enforce 12:00 PM (noon) - Child dedications are only available on Sundays at 12:00 PM
+    if (formattedPreferredTime && formattedPreferredTime !== '12:00:00') {
+      console.warn(`Child dedication time ${formattedPreferredTime} is not 12:00. Forcing to 12:00:00`);
+      formattedPreferredTime = '12:00:00';
+    } else if (!formattedPreferredTime && formattedPreferredDate) {
+      // If no time provided but date is provided, set to 12:00
+      formattedPreferredTime = '12:00:00';
+    }
+
     const formattedDateCompleted = date_completed
       ? (moment(date_completed, 'YYYY-MM-DD', true).isValid()
         ? date_completed
@@ -1341,6 +1350,14 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
         }
       }
 
+      // Enforce 12:00 PM - Child dedications are only available at 12:00 PM
+      if (formattedPreferredTime && !formattedPreferredTime.startsWith('12:')) {
+        console.warn(`Child dedication time ${formattedPreferredTime} is not 12:00. Forcing to 12:00`);
+        formattedPreferredTime = '12:00';
+      } else if (!formattedPreferredTime && finalDedicationDate) {
+        formattedPreferredTime = '12:00';
+      }
+
       fields.push('preferred_dedication_time = ?');
       params.push(formattedPreferredTime);
     }
@@ -2218,8 +2235,7 @@ module.exports = {
  */
 async function getAvailableSundayDates(weeksAhead = 12) {
   try {
-    // Get all child dedications that are NOT approved (i.e., pending, rejected, etc.)
-    // These are the ones that need scheduling
+    // Get all child dedications scheduled for 12pm slots
     const sql = `SELECT 
                   child_id, 
                   child_firstname, 
@@ -2229,9 +2245,6 @@ async function getAvailableSundayDates(weeksAhead = 12) {
                   status,
                   date_created
                 FROM tbl_childdedications 
-                WHERE status != 'approved'
-                AND status != 'completed'
-                AND status != 'scheduled'
                 ORDER BY preferred_dedication_date ASC`;
     
     const [rows] = await query(sql);
@@ -2257,59 +2270,52 @@ async function getAvailableSundayDates(weeksAhead = 12) {
           date: sundayDate.format('YYYY-MM-DD'),
           displayDate: sundayDate.format('MMMM DD, YYYY'),
           dayOfWeek: sundayDate.format('dddd'),
-          timeSlots: generateTimeSlots()
+          timeSlots: generateTimeSlots() // Will only return 12:00 PM slot
         });
       }
     }
     
-    // Get all scheduled/approved dedications to mark time slots as taken
+    // Get all 12pm child dedication requests to count requests per Sunday
     const scheduledSql = `SELECT 
-                          preferred_dedication_date, 
-                          preferred_dedication_time,
+                          DATE_FORMAT(preferred_dedication_date, '%Y-%m-%d') as dedication_date,
+                          COUNT(*) as request_count,
                           status
                         FROM tbl_childdedications 
-                        WHERE status = 'approved'
-                        OR status = 'completed'
-                        OR status = 'scheduled'
-                        OR (preferred_dedication_date IS NOT NULL 
-                            AND preferred_dedication_date >= CURDATE())`;
+                        WHERE (status = 'approved'
+                            OR status = 'completed'
+                            OR status = 'scheduled'
+                            OR status = 'pending')
+                        AND (preferred_dedication_time = '12:00:00' OR preferred_dedication_time = '12:00')
+                        AND preferred_dedication_date IS NOT NULL
+                        AND preferred_dedication_date >= CURDATE()
+                        GROUP BY dedication_date
+                        ORDER BY dedication_date ASC`;
     
     const [scheduledRows] = await query(scheduledSql);
     
-    // Mark taken time slots
-    const takenSlots = {};
-    scheduledRows.forEach(row => {
-      if (row.preferred_dedication_date) {
-        const dateKey = moment(row.preferred_dedication_date).format('YYYY-MM-DD');
-        if (!takenSlots[dateKey]) {
-          takenSlots[dateKey] = new Set();
-        }
-        if (row.preferred_dedication_time) {
-          const timeKey = moment(row.preferred_dedication_time, 'HH:mm:ss').format('HH:mm');
-          takenSlots[dateKey].add(timeKey);
-        }
-      }
+    // Map request counts by date
+    const requestCountMap = {};
+    (scheduledRows || []).forEach(row => {
+      requestCountMap[row.dedication_date] = row.request_count || 0;
     });
     
-    // Filter available Sundays and mark taken slots
+    // Enrich available Sundays with request counts
     const result = availableSundays.map(sunday => {
       const dateKey = sunday.date;
-      const taken = takenSlots[dateKey] || new Set();
-      
-      // Filter time slots that are not taken
-      const availableSlots = sunday.timeSlots.filter(slot => !taken.has(slot.time));
+      const requestCount = requestCountMap[dateKey] || 0;
       
       return {
         ...sunday,
-        timeSlots: availableSlots,
-        totalSlots: sunday.timeSlots.length,
-        availableSlots: availableSlots.length,
-        isFullyBooked: availableSlots.length === 0
+        requestCount: requestCount,
+        timeSlots: sunday.timeSlots.map(slot => ({
+          ...slot,
+          requestCount: requestCount
+        }))
       };
-    }).filter(sunday => sunday.availableSlots > 0);
+    });
     
-    // Get pending dedications count
-    const pendingCount = rows.length;
+    // Get all pending dedications count
+    const pendingCount = rows.filter(r => r.status === 'pending').length;
     
     return {
       success: true,
@@ -2327,22 +2333,20 @@ async function getAvailableSundayDates(weeksAhead = 12) {
 }
 
 /**
- * Generate time slots from 8am to 5pm (1 hour each)
- * @returns {Array} Array of time slot objects
+ * Generate time slots for child dedication - ONLY 12:00 PM on Sundays
+ * @returns {Array} Array with single 12:00 PM time slot
  */
 function generateTimeSlots() {
   const slots = [];
-  for (let hour = 8; hour < 17; hour++) {
-    const time24 = `${hour.toString().padStart(2, '0')}:00`;
-    const endTime24 = `${(hour + 1).toString().padStart(2, '0')}:00`;
-    const time12 = moment(time24, 'HH:mm').format('h:mm A');
-    const endTime12 = moment(endTime24, 'HH:mm').format('h:mm A');
-    
-    slots.push({
-      time: time24,
-      displayTime: `${time12} - ${endTime12}`,
-      hour: hour
-    });
-  }
+  // Only 12:00 PM (noon) slot available for child dedication on Sundays
+  const time24 = '12:00';
+  const time12 = moment(time24, 'HH:mm').format('h:mm A');
+  
+  slots.push({
+    time: time24,
+    displayTime: time12,
+    hour: 12
+  });
+  
   return slots;
 }

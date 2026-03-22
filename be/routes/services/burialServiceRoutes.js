@@ -854,7 +854,7 @@ router.get('/available-slots', async (req, res) => {
         AND service_date IS NOT NULL
         AND service_date >= ?
         AND service_date < ?
-        AND status IN ('Approved', 'Scheduled')
+        AND status IN ('Pending', 'Approved', 'Scheduled')
       ORDER BY service_date ASC
     `, [
       start.format('YYYY-MM-DD HH:mm:ss'),
@@ -881,10 +881,7 @@ router.get('/available-slots', async (req, res) => {
       const bookedTimes = bookedMap[dateStr] || [];
 
       // Evening service times: 6:00 PM, 6:30 PM, 7:00 PM, 7:30 PM, 8:00 PM, 8:30 PM, 9:00 PM, 9:30 PM, 10:00 PM
-      const defaultSlots = [
-        '18:00:00', '18:30:00', '19:00:00', '19:30:00', 
-        '20:00:00', '20:30:00', '21:00:00', '21:30:00', '22:00:00'
-      ];
+      const defaultSlots = ['20:00:00']; // Only 8:00 PM for burial service
       
       const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
 

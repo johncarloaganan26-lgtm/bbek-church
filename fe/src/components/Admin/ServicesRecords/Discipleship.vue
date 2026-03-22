@@ -405,7 +405,7 @@
                 
                 <p class="text-caption text-grey-darken-1 mb-4">
                   <v-icon size="14">mdi-information-outline</v-icon>
-                  Bible Study sessions are restricted to <b>Wednesdays and Saturdays</b> only.
+                  Bible Study sessions are available <b>Daily (Mon-Sat)</b>. Wednesday and Saturday evenings are restricted.
                 </p>
 
                 <div v-if="slotsLoading" class="text-center pa-8">
@@ -478,14 +478,20 @@
                   <v-col cols="12" sm="6">
                     <v-text-field 
                       v-model="promotionForm.location" 
-                      label="Meeting Location" 
+                      label="Address" 
                       variant="outlined" 
                       density="comfortable"
                       hide-details="auto"
-                      class="mb-4"
+                      class="mb-1"
                       prepend-inner-icon="mdi-map-marker"
                       placeholder="e.g., Church, Online, or Home Address"
+                      persistent-hint
+                      hint="Defaults to the requester's home address."
                     ></v-text-field>
+                    <div class="text-caption text-grey-darken-1 px-1 mb-4">
+                      <v-icon size="12">mdi-home-city-outline</v-icon>
+                      Registered Address: <b>{{ bibleStudyItem?.address || '' }}</b>
+                    </div>
                   </v-col>
                 </v-row>
 
@@ -944,8 +950,8 @@ const openBibleStudyDialog = (item) => {
   isPromotionScheduling.value = false;
   
   promotionForm.value = {
-    pastor_id: item.pastor_id || null,
-    location: item.location || item.address || '',
+    pastor_id: null,
+    location: item.address || '',
     scheduled_date: '',
     notes: ''
   };
@@ -1060,14 +1066,23 @@ const deleteItem = async (item) => {
 };
 
 const disabledDate = (time) => {
-  const type = selectedRequest.value?.request_type;
   const day = time.getDay();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  if (type === 'Bible Study') {
-    return day !== 3 && day !== 6; // Wed or Sat only
+  // General rule: No same-day scheduling
+  if (time <= today) return true;
+
+  // Specific rule: No Sunday for anyone except potentially Salvation which is managed elsewhere 
+  // but keep it consistent with the user's request "no on sunday" for Bible Study
+  const type = selectedRequest.value?.request_type;
+  if ((type === 'Bible Study' || type === 'Salvation') && day === 0) {
+    // Note: Salvation technically has a Noon slot in scheduling.js, 
+    // but the user's latest request says "no on sunday" contextually for these.
+    // I'll block Sunday for Bible Study here.
+    if (type === 'Bible Study') return true;
   }
 
-  // Salvation (and legacy "Both") can be scheduled any day.
   return false;
 };
 </script>

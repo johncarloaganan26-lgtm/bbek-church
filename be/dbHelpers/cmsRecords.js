@@ -396,7 +396,7 @@ async function getAllCmsImages(pageName) {
     }
 
     const sql = `
-      SELECT image_id, field_name, mime_type, created_at, updated_at
+      SELECT image_id, field_name, mime_type, image_blob, created_at, updated_at
       FROM tbl_cms_images
       WHERE page_name = ?
       ORDER BY field_name
@@ -410,6 +410,7 @@ async function getAllCmsImages(pageName) {
         imageId: row.image_id,
         fieldName: row.field_name,
         mimeType: row.mime_type,
+        imageBuffer: row.image_blob,
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }))

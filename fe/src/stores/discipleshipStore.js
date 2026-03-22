@@ -57,11 +57,24 @@ export const useDiscipleshipStore = defineStore('discipleship', () => {
             return { success: false, data: [] };
         }
     };
+    const fetchRegistrationData = async (id) => {
+        try {
+            const response = await axios.get(`/services/discipleship-requests/registration-data/${id}`);
+            if (response.data.success) {
+                return response.data.data;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error fetching registration data:', error);
+            return null;
+        }
+    };
 
     return {
         loading,
         submitDiscipleshipRequest,
         submitBibleStudyRequest,
-        fetchAvailableSlots
+        fetchAvailableSlots,
+        fetchRegistrationData
     };
 });

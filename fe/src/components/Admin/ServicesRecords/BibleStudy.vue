@@ -54,18 +54,7 @@
             ></v-select>
           </v-col>
           <v-spacer></v-spacer>
-          <v-col cols="12" md="auto" v-if="selectedRows.length > 0">
-            <v-btn
-              color="success"
-              variant="elevated"
-              prepend-icon="mdi-check-all"
-              @click="handleBulkComplete"
-              :loading="loading"
-              class="text-none"
-            >
-              Mark Selected as Completed ({{ selectedRows.length }})
-            </v-btn>
-          </v-col>
+
         </v-row>
       </v-card-text>
     </v-card>
@@ -128,8 +117,8 @@
               <div v-if="item.phone_number" class="text-caption text-grey">{{ item.phone_number }}</div>
             </td>
             <td>
-              <div class="text-caption text-grey-darken-2" style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="item.address || 'N/A'">
-                {{ item.address || 'N/A' }}
+              <div class="text-caption text-grey-darken-2" style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="item.location || item.address || ''">
+                {{ item.location || item.address || '' }}
               </div>
             </td>
             <td>
@@ -155,16 +144,6 @@
                   <v-icon size="18">mdi-pencil</v-icon>
                   <v-tooltip activator="parent" location="top">Edit / Schedule</v-tooltip>
                 </v-btn>
-                  <v-btn
-                    v-if="['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
-                    variant="tonal"
-                    size="small"
-                    color="success"
-                    @click="markIndividualComplete(item)"
-                  >
-                    <v-icon size="18">mdi-check</v-icon>
-                    <v-tooltip activator="parent" location="top">Mark Completed</v-tooltip>
-                  </v-btn>
 
                 <v-btn
                   v-if="item.status === 'Completed'"
@@ -175,6 +154,18 @@
                 >
                   <v-icon size="18">mdi-water</v-icon>
                   <v-tooltip activator="parent" location="top">Promote to Water Baptism</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  v-if="['Pending', 'Scheduled'].includes(item.status)"
+                  variant="tonal"
+                  size="small"
+                  color="error"
+                  @click="rejectItem(item)"
+                  :loading="rejectingId === item.request_id"
+                >
+                  <v-icon size="18">mdi-close-circle</v-icon>
+                  <v-tooltip activator="parent" location="top">Reject / Suggest New Dates</v-tooltip>
                 </v-btn>
               </div>
             </td>
@@ -219,18 +210,23 @@
             <v-col cols="12" md="6">
               <v-text-field 
                 v-model="editItem.location" 
-                label="Location" 
+                label="Address" 
                 variant="outlined" 
                 density="compact"
                 hide-details="auto"
                 class="mb-3"
+                persistent-hint
+                hint="Defaults to the requester's home address."
               ></v-text-field>
+              <div v-if="editItem.address" class="text-caption text-grey px-1 mb-2">
+                Home Address: <b>{{ editItem.address }}</b>
+              </div>
             </v-col>
           </v-row>
 
           <v-select
             v-model="editItem.status"
-            :items="['Pending', 'Scheduled', 'Completed', 'Cancelled', 'Rejected']"
+            :items="statusItemsWithRestriction"
             label="Status"
             variant="outlined"
             density="compact"
@@ -238,7 +234,7 @@
             class="mb-4"
           ></v-select>
 
-          <label class="text-caption font-weight-bold grey--text mb-1 d-block">Select Schedule (Wed/Sat Only)</label>
+          <label class="text-caption font-weight-bold grey--text mb-1 d-block">Select Schedule (Daily, Except Sunday)</label>
           
           <div v-if="slotsLoading" class="text-center pa-4 border rounded mb-4">
             <v-progress-circular indeterminate color="teal" size="24" class="mb-2" />
@@ -384,13 +380,37 @@ import { useAdminBibleStudyStore } from '@/stores/admin/biblestudyStore';
 import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore';
 import WaterBaptismRegistration from '@/components/LandingPage/Services/WaterBaptismRegistration.vue';
 import { storeToRefs } from 'pinia';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from '@/api/axios';
 
 const store = useAdminBibleStudyStore();
 const settingsStore = useSystemSettingsStore();
 const { requests, loading, totalCount, currentPage, pastors } = storeToRefs(store);
 const { settings, loading: settingsLoading } = storeToRefs(settingsStore);
+
+const statusItemsWithRestriction = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const scheduledDate = editItem.value.scheduled_date ? new Date(editItem.value.scheduled_date) : null;
+  if (scheduledDate) scheduledDate.setHours(0, 0, 0, 0);
+
+  const isFuture = scheduledDate && scheduledDate > today;
+  const isUnscheduled = !scheduledDate;
+
+  return [
+    { title: 'Pending', value: 'Pending' },
+    { title: 'Scheduled', value: 'Scheduled' },
+    { 
+      title: 'Completed', 
+      value: 'Completed', 
+      props: { 
+        disabled: (isFuture || isUnscheduled) && !settings.value.allow_complete_without_schedule && editItem.value._originalStatus !== 'Completed'
+      }
+    },
+    { title: 'Cancelled', value: 'Cancelled' },
+    { title: 'Rejected', value: 'Rejected' }
+  ];
+});
 
 const search = ref('');
 const statusFilter = ref('All Status');
@@ -417,6 +437,7 @@ const promotionDialogVisible = ref(false);
 const adminWaterBaptismDialogVisible = ref(false);
 const promotionData = ref(null);
 const loadingPromotion = ref(false);
+const rejectingId = ref(null);
 
 const availableSlots = ref([]);
 const slotsLoading = ref(false);
@@ -498,6 +519,7 @@ const formatDateTime = (date) => {
 
 const openEditDialog = (item) => {
   editItem.value = { ...item };
+  editItem.value._originalStatus = item.status;
   
   // Directly fall back to the address they input if no location was saved yet.
   if (!editItem.value.location && editItem.value.address) {
@@ -561,6 +583,24 @@ const formatSelectedSchedule = (dateTimeStr) => {
 };
 
 const saveEdit = async () => {
+  // Manual Completion Validation
+  if (editItem.value.status === 'Completed' && !settings.value.allow_complete_without_schedule) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (editItem.value._originalStatus === 'Pending' || !editItem.value.scheduled_date) {
+      ElMessage.warning('Completion restricted: This session must be scheduled before it can be marked as completed.');
+      return;
+    }
+
+    const scheduledDate = new Date(editItem.value.scheduled_date);
+    scheduledDate.setHours(0, 0, 0, 0);
+    if (scheduledDate > today) {
+      ElMessage.warning(`Completion restricted: This session is scheduled for a future date (${editItem.value.scheduled_date.split('T')[0]}).`);
+      return;
+    }
+  }
+
   const success = await store.updateRequest(editItem.value.request_id, editItem.value);
   if (success) dialogVisible.value = false;
 };
@@ -570,13 +610,19 @@ const markIndividualComplete = async (item) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (item.scheduled_date && !settings.value.allow_complete_without_schedule) {
-        const scheduledDate = new Date(item.scheduled_date);
-        scheduledDate.setHours(0, 0, 0, 0);
-        if (scheduledDate > today) {
-            ElMessage.warning(`Cannot complete request scheduled for a future date (${item.scheduled_date}) unless Manual Completion is ON.`);
-            return;
-        }
+    // Manual Completion Logic
+    if (!settings.value.allow_complete_without_schedule) {
+      if (item.status === 'Pending' || !item.scheduled_date) {
+        ElMessage.warning('Completion restricted: This session must be scheduled before it can be marked as completed.');
+        return;
+      }
+      
+      const scheduledDate = new Date(item.scheduled_date);
+      scheduledDate.setHours(0, 0, 0, 0);
+      if (scheduledDate > today) {
+        ElMessage.warning(`Completion restricted: This session is scheduled for a future date (${item.scheduled_date.split('T')[0]}).`);
+        return;
+      }
     }
 
     await ElMessageBox.confirm(
@@ -595,15 +641,52 @@ const markIndividualComplete = async (item) => {
   }
 };
 
+const rejectItem = async (item) => {
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      `Please provide a reason for rejecting the Bible Study request for ${item.firstname} ${item.lastname}. This will be sent to their email along with alternative suggested dates.`,
+      'Reject Bible Study',
+      {
+        confirmButtonText: 'Send Rejection',
+        cancelButtonText: 'Cancel',
+        inputPattern: /.+/,
+        inputPlaceholder: 'e.g., The assigned pastor is unavailable on this day. Please pick from the suggested dates below.',
+        inputErrorMessage: 'Rejection reason is required',
+        type: 'warning'
+      }
+    );
+
+    if (reason) {
+      rejectingId.value = item.request_id;
+      await store.rejectRequest(item.request_id, reason);
+      rejectingId.value = null;
+    }
+  } catch {
+    // User cancelled
+    rejectingId.value = null;
+  }
+};
+
 const promoteToBaptism = (item) => {
-  // Pass the non-member details to pre-fill the water baptism form
+  // Pass all the non-member details to pre-fill the water baptism form
+  // Including age, birthdate, gender, civil_status, middle_name, and profession
+  // so the admin does not have to re-enter them in the next step.
   promotionData.value = {
     _activeItem: item,
     firstname: item.firstname,
+    middle_name: item.middle_name || '',
     lastname: item.lastname,
     email: item.email,
     phone_number: item.phone_number,
-    address: item.address
+    address: item.address,
+    age: item.age || null,
+    birthdate: item.birthdate || '',
+    gender: item.gender || '',
+    civil_status: item.civil_status || '',
+    profession: item.profession || '',
+    guardian_name: item.guardian_name || '',
+    guardian_contact: item.guardian_contact || '',
+    guardian_relationship: item.guardian_relationship || ''
   };
   promotionDialogVisible.value = true;
 };
@@ -614,7 +697,8 @@ const handlePromotionAction = async (isDecided) => {
     promotionDialogVisible.value = false;
     adminWaterBaptismDialogVisible.value = true;
   } else {
-    // If undecided, send the invitation form link
+    // If undecided/hesitant, send the invitation form link
+    // This calls /invite-baptism which now only sends the email (no record created yet)
     loadingPromotion.value = true;
     try {
       const activeItem = promotionData.value._activeItem;
@@ -636,7 +720,11 @@ const handlePromotionSubmit = () => {
 
 const disabledDate = (time) => {
   const day = time.getDay();
-  return day === 0; // Sunday not allowed
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Disable Sunday OR if date is today/past
+  return day === 0 || time <= today;
 };
 
 const disabledTime = (date) => {

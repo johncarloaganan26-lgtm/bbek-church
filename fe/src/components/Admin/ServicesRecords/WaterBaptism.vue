@@ -369,6 +369,89 @@
       @update:model-value="baptismDialog = $event"
       @submit="handleSubmit"
     />
+
+    <!-- Bulk Complete Calendar Dialog -->
+    <v-dialog v-model="bulkCompleteDialog" max-width="400px" persistent class="bulk-complete-dialog" style="overflow: visible;">
+      <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
+        <div class="pa-4 text-center">
+          <v-avatar color="success-lighten-5" size="80" class="mb-4">
+            <v-icon color="success" size="40">mdi-calendar-check</v-icon>
+          </v-avatar>
+          <h2 class="text-h5 font-weight-bold mb-1">Set Completion Date</h2>
+          <p class="text-body-2 text-grey-darken-1">
+            Selected {{ selectedBaptismsToComplete?.length }} records to mark as completed.
+          </p>
+        </div>
+
+        <v-card-text class="pt-0" style="overflow: visible;">  
+          <v-divider class="mb-6"></v-divider>
+          
+          <div class="mb-5">
+            <div class="d-flex align-center mb-2">
+              <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Date (Sundays Only)</span>
+            </div>
+            <el-date-picker
+              v-model="completionDate"
+              type="date"
+              placeholder="Select Sunday"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled-date="disableNonSundays"
+              class="w-100 custom-date-picker"
+              size="large"
+              popper-class="bulk-complete-date-picker-popper"
+              teleport="body"
+              :popper-options="{ strategy: 'fixed' }"
+            />
+          </div>
+
+          <div class="mb-2">
+            <div class="d-flex align-center mb-2">
+              <v-icon size="18" color="primary" class="mr-2">mdi-clock-outline</v-icon>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Time (1:00 PM onwards)</span>
+            </div>
+            <v-select
+              v-model="completionTime"
+              :items="timeOptions"
+              label="Select Time"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              style="border-radius: 8px;"
+            ></v-select>
+            <div class="text-caption text-grey mt-2 d-flex align-center">
+              <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
+              Water baptism is held every Sunday at 1:00 PM.
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-4">
+          <v-btn
+            variant="text"
+            block
+            class="mb-2 font-weight-bold text-grey-darken-1"
+            style="border-radius: 12px; height: 48px;"
+            @click="bulkCompleteDialog = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="success"
+            variant="flat"
+            block
+            class="font-weight-bold"
+            style="border-radius: 12px; height: 52px; font-size: 1rem;"
+            :disabled="!completionDate || !completionTime"
+            @click="confirmBulkComplete"
+          >
+            Mark as Completed
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </div>
 </template>
 
@@ -393,13 +476,13 @@ const baptisms = computed(() => waterBaptismStore.baptisms)
 
 // Sort baptisms with Pending status first, followed by other statuses in specified order
 const sortedBaptisms = computed(() => {
-  const statusOrder = {
-    'pending': 1,
-    'approved': 2,
-    'disapproved': 3,
-    'completed': 4,
-    'cancelled': 5
-  }
+const statusOrder = {
+  'pending': 1,
+  'approved': 2,
+  'disapproved': 3,
+  'completed': 4,
+  'cancelled': 5
+}
   
   return [...baptisms.value].sort((a, b) => {
     const aOrder = statusOrder[a.status] || 999
@@ -479,6 +562,29 @@ const baptismData = ref(null)
 const certificateDialog = ref(false)
 const certificateType = ref('')
 const certificateData = ref(null)
+
+// Bulk Complete Dialog State
+const bulkCompleteDialog = ref(false)
+const completionDate = ref('')
+const completionTime = ref('13:00:00')
+const selectedBaptismsToComplete = ref([])
+
+const disableNonSundays = (date) => {
+  // getDay() returns 0 for Sunday
+  return date.getDay() !== 0
+}
+
+const timeOptions = [
+  { title: '1:00 PM', value: '13:00:00' },
+  { title: '1:30 PM', value: '13:30:00' },
+  { title: '2:00 PM', value: '14:00:00' },
+  { title: '2:30 PM', value: '14:30:00' },
+  { title: '3:00 PM', value: '15:00:00' },
+  { title: '3:30 PM', value: '15:30:00' },
+  { title: '4:00 PM', value: '16:00:00' },
+  { title: '4:30 PM', value: '16:30:00' },
+  { title: '5:00 PM', value: '17:00:00' }
+]
 
 
 // Handlers
@@ -578,22 +684,21 @@ const clearSelection = () => {
 }
 
 const bulkCompleteBaptisms = async () => {
-  // Filter for approved/pending baptisms based on settings
+  // Filter for eligible baptisms based on settings
   const targetBaptisms = selectedBaptisms.value.filter(b => {
     if (settings.value.allow_complete_without_schedule) {
-      return b.status === 'approved' || b.status === 'pending';
+      return ['approved', 'pending', 'scheduled'].includes(b.status);
     }
-    return b.status === 'approved';
+    return ['approved', 'scheduled'].includes(b.status);
   });
   
   if (targetBaptisms.length === 0) {
     ElMessage.warning(settings.value.allow_complete_without_schedule 
-      ? 'No pending or approved baptisms selected.' 
-      : 'No approved baptisms selected.');
+      ? 'No pending, approved or scheduled baptisms selected.' 
+      : 'No approved or scheduled baptisms selected.');
     return;
   }
 
-  // Check dates: cannot complete future baptisms
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -608,56 +713,54 @@ const bulkCompleteBaptisms = async () => {
   const skippedCount = targetBaptisms.length - validBaptisms.length;
 
   if (validBaptisms.length === 0) {
-    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date or turn off Completion Restriction.');
+    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date or turn off Manual Completion restriction.');
     return;
   }
   
+  // Set the baptisms to be completed and open the calendar dialog
+  selectedBaptismsToComplete.value = validBaptisms;
+  
+  // Set default completion date to today if it's Sunday, or next Sunday
+  const now = new Date();
+  if (now.getDay() === 0) {
+    completionDate.value = now.toISOString().split('T')[0];
+  } else {
+    // Just keep it empty for user to select
+    completionDate.value = '';
+  }
+  completionTime.value = '13:00:00';
+  bulkCompleteDialog.value = true;
+};
+
+const confirmBulkComplete = async () => {
   try {
-    let confirmMessage = `Are you sure you want to mark ${validBaptisms.length} approved water baptism record(s) as completed?`;
-    if (skippedCount > 0) {
-      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
-    }
-
-    await ElMessageBox.confirm(
-      confirmMessage,
-      'Confirm Bulk Complete',
-      {
-        confirmButtonText: 'Yes, Mark as Completed',
-        cancelButtonText: 'Cancel',
-        type: 'info',
-      }
-    )
-
-    // Extract baptism IDs for valid baptisms
-    const baptismIds = validBaptisms.map(b => b.baptism_id)
-
-    // Use the bulk complete endpoint
-    const result = await waterBaptismStore.bulkCompleteWaterBaptisms(baptismIds)
+    const baptismIds = selectedBaptismsToComplete.value.map(b => b.baptism_id);
+    
+    const result = await waterBaptismStore.bulkCompleteWaterBaptisms(
+      baptismIds, 
+      completionDate.value, 
+      completionTime.value
+    );
 
     if (result.success) {
-      const { completed, failed, message } = result.data || {}
+      const { completed, failed } = result.data || {};
       
       if (completed > 0) {
-        ElMessage.success(`Successfully marked ${completed} water baptism record(s) as completed`)
+        ElMessage.success(`Successfully marked ${completed} water baptism record(s) as completed`);
       }
       
       if (failed > 0) {
-        ElMessage.warning(`Failed to mark ${failed} water baptism record(s) as completed`)
+        ElMessage.warning(`Failed to mark ${failed} water baptism record(s) as completed`);
       }
       
-      if (message) {
-        ElMessage.info(message)
-      }
+      bulkCompleteDialog.value = false;
+      clearSelection();
     }
-
-    clearSelection()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Error completing baptisms:', error)
-      ElMessage.error('Failed to complete selected water baptism records')
-    }
+    console.error('Error completing baptisms:', error);
+    ElMessage.error('Failed to complete selected water baptism records');
   }
-}
+};
 
 const markIndividualComplete = async (baptism) => {
   try {
@@ -891,6 +994,7 @@ const formatBaptismDateTime = (dateString, timeString, status) => {
 const formatStatus = (status) => {
   const statusMap = {
     'pending': 'Pending',
+    'scheduled': 'Scheduled',
     'approved': 'Approved',
     'disapproved': 'Disapproved',
     'completed': 'Completed',
@@ -1058,18 +1162,18 @@ const handlePrint = () => {
         <table>
           <thead>
             <tr>
-              ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
+              \${tableHeaders.map(header => \`<th>\${header}</th>\`).join('')}
             </tr>
           </thead>
           <tbody>
-            ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
+            \${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
           </tbody>
         </table>
         <div class="footer">
-          <div>Total Records: ${sortedBaptisms.value.length}</div>
+          <div>Total Records: \${sortedBaptisms.value.length}</div>
           <div class="footer-info">
-            <div>Printed on: ${currentDate}</div>
-            <div>Printed by: ${printedBy}</div>
+            <div>Printed on: \${currentDate}</div>
+            <div>Printed by: \${printedBy}</div>
           </div>
         </div>
       </body>
@@ -1141,5 +1245,55 @@ onUnmounted(() => {
   text-rendering: auto;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Ensure date picker calendar appears above dialogs */
+:deep(.el-picker-panel) {
+  z-index: 9999 !important;
+}
+
+:deep(.el-popper) {
+  z-index: 9999 !important;
+}
+
+:deep(.el-picker-popper) {
+  z-index: 9999 !important;
+}
+
+:deep(.bulk-complete-date-picker-popper) {
+  z-index: 9999 !important;
+}
+
+/* Allow popper to overflow the card/dialog */
+:deep(.v-card) {
+  overflow: visible !important;
+  position: relative;
+}
+
+:deep(.v-overlay__content) {
+  overflow: visible !important;
+}
+
+:deep(.v-dialog__content) {
+  overflow: visible !important;
+}
+
+:deep(.el-input__wrapper) {
+  position: relative;
+  z-index: auto !important;
+}
+
+/* Global popper z-index fix */
+:deep(.bulk-complete-date-picker-popper.el-popper) {
+  z-index: 9999 !important;
+}
 </style>
 
+<!-- Non-scoped: targets the teleported popper which lives in <body> outside component scope -->
+<style>
+.bulk-complete-date-picker-popper.el-popper {
+  z-index: 9999 !important;
+}
+.bulk-complete-date-picker-popper .el-picker-panel {
+  z-index: 9999 !important;
+}
+</style>

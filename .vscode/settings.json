@@ -1,7 +1,8 @@
 {
   "tasksync.autopilot": false,
   "tasksync.responseTimeout": "60",
-  "tasksync.maxConsecutiveAutoResponses": 5,
+  "tasksync.maxConsecutiveAutoResponses": 19,
   "tasksync.sessionWarningHours": 0,
-  "tasksync.humanLikeDelayMin": 1
+  "tasksync.humanLikeDelayMin": 1,
+  "tasksync.humanLikeDelayMax": 3
 }

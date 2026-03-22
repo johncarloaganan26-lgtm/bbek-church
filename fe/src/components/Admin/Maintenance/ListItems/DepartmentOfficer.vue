@@ -1,5 +1,15 @@
 <template>
   <div class="department-officer-list">
+    <div class="cms-notice mb-6">
+      <el-alert
+        title="Page Settings"
+        type="info"
+        description="This section manages the header and visual settings for the Department Officers page. Individual officer profiles (names, roles, departments, images) are now managed in the 'Church Records > Department Officers' section."
+        show-icon
+        :closable="false"
+      />
+    </div>
+
     <!-- Hero Image -->
     <div class="list-item">
       <div class="item-label">Hero Image</div>
@@ -26,7 +36,6 @@
             </el-button>
           </template>
         </el-upload>
-        <span v-if="!officersData.heroImage" class="text-grey ml-2">No file chosen</span>
       </div>
     </div>
     <el-divider />
@@ -124,247 +133,6 @@
         ></el-color-picker>
       </div>
     </div>
-    <el-divider />
-
-    <!-- Departments Section -->
-    <div class="departments-section">
-      <div class="section-header">
-        <div class="section-header-left">
-          <h3 class="section-title">Departments</h3>
-          <span class="section-count">{{ officersData.departments?.length || 0 }} departments</span>
-        </div>
-        <el-button type="primary" size="default" @click="showAddDepartmentDialog">
-          <el-icon><Plus /></el-icon>
-          Add Department
-        </el-button>
-      </div>
-
-      <div class="departments-container">
-        <template v-for="(dept, deptIndex) in officersData.departments" :key="`dept-${deptIndex}`">
-          <div class="department-card">
-            <div class="department-header">
-              <div class="department-title-section">
-                <h4 class="department-title">{{ dept.name || 'Unnamed Department' }}</h4>
-                <span class="department-officer-count">{{ dept.officers?.length || 0 }} officers</span>
-              </div>
-              <div class="department-actions">
-                <el-button
-                  type="primary"
-                  size="small"
-                  @click="editDepartment(deptIndex)"
-                >
-                  Edit Department
-                </el-button>
-                <el-button
-                  type="success"
-                  size="small"
-                  @click="showAddOfficerDialog(deptIndex)"
-                >
-                  <el-icon><Plus /></el-icon>
-                  Add Officer
-                </el-button>
-                <el-button
-                  type="danger"
-                  size="small"
-                  @click="deleteDepartment(deptIndex)"
-                >
-                  Delete Department
-                </el-button>
-              </div>
-            </div>
-            
-            <div class="officers-list">
-              <template v-for="(officer, officerIndex) in dept.officers" :key="`officer-${deptIndex}-${officerIndex}`">
-                <div class="list-item">
-                  <div class="item-label">
-                    <div class="officer-info">
-                      <img
-                        v-if="officer.image"
-                        :src="officer.image"
-                        :alt="`${officer.name} profile`"
-                        class="officer-avatar"
-                      />
-                      <div v-else class="officer-avatar-placeholder">
-                        <span class="avatar-text">{{ getInitials(officer.name) }}</span>
-                      </div>
-                      <div class="officer-details">
-                        <div class="officer-name">{{ officer.name || 'Unnamed Officer' }}</div>
-                        <div class="officer-position">{{ officer.role || 'No role set' }}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="item-preview">
-                    <el-upload
-                      :auto-upload="false"
-                      :show-file-list="false"
-                      accept="image/*"
-                      @change="(file) => handleImageChange(file, deptIndex, officerIndex)"
-                    >
-                      <template #trigger>
-                        <el-button size="small" type="primary">
-                          <el-icon><Upload /></el-icon>
-                          Choose File
-                        </el-button>
-                      </template>
-                    </el-upload>
-                    <span v-if="!officer.image" class="text-grey ml-2">No file chosen</span>
-                    <span v-else class="text-grey ml-2">Image selected</span>
-                  </div>
-                  <div class="item-action">
-                    <div class="action-buttons">
-                      <el-button
-                        type="primary"
-                        size="small"
-                        @click="editOfficer(deptIndex, officerIndex)"
-                      >
-                        Edit
-                      </el-button>
-                      <el-button
-                        type="danger"
-                        size="small"
-                        @click="deleteOfficer(deptIndex, officerIndex)"
-                      >
-                        Delete
-                      </el-button>
-                    </div>
-                  </div>
-                </div>
-                <el-divider />
-              </template>
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
-
-    <!-- Add Department Dialog -->
-    <el-dialog
-      v-model="addDepartmentDialogVisible"
-      title="Add New Department"
-      width="500px"
-      @close="closeAddDepartmentDialog"
-    >
-      <div class="edit-dialog-content">
-        <div class="form-group">
-          <label>Department Name:</label>
-          <el-input
-            v-model="newDepartment.name"
-            placeholder="Enter department name"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="closeAddDepartmentDialog">Cancel</el-button>
-          <el-button type="primary" @click="addNewDepartment">Add Department</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- Add Officer Dialog -->
-    <el-dialog
-      v-model="addDialogVisible"
-      title="Add New Department Officer"
-      width="500px"
-      @close="closeAddDialog"
-    >
-      <div class="edit-dialog-content">
-        <div class="form-group">
-          <label>Name:</label>
-          <el-input
-            v-model="newOfficer.name"
-            placeholder="Enter officer name"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Role:</label>
-          <el-input
-            v-model="newOfficer.role"
-            placeholder="Enter role"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Profile Image:</label>
-          <el-upload
-            :auto-upload="false"
-            :show-file-list="false"
-            accept="image/*"
-            @change="handleNewOfficerImageChange"
-            style="margin-top: 8px;"
-          >
-            <template #trigger>
-              <el-button size="small" type="primary">
-                <el-icon><Upload /></el-icon>
-                Choose File
-              </el-button>
-            </template>
-          </el-upload>
-          <span v-if="!newOfficer.image" class="text-grey ml-2">No file chosen</span>
-          <span v-else class="text-grey ml-2">Image selected</span>
-        </div>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="closeAddDialog">Cancel</el-button>
-          <el-button type="primary" @click="addNewOfficer">Add Officer</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- Edit Dialog -->
-    <el-dialog
-      v-model="editDialogVisible"
-      title="Edit Officer"
-      width="500px"
-      @close="closeEditDialog"
-    >
-      <div class="edit-dialog-content">
-        <div class="form-group">
-          <label>Name:</label>
-          <el-input
-            v-model="editingOfficer.name"
-            placeholder="Enter officer name"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Role:</label>
-          <el-input
-            v-model="editingOfficer.role"
-            placeholder="Enter role"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Profile Image:</label>
-          <el-upload
-            :auto-upload="false"
-            :show-file-list="false"
-            accept="image/*"
-            @change="handleEditImageChange"
-            style="margin-top: 8px;"
-          >
-            <template #trigger>
-              <el-button size="small" type="primary">
-                <el-icon><Upload /></el-icon>
-                Choose File
-              </el-button>
-            </template>
-          </el-upload>
-          <span v-if="!editingOfficer.image" class="text-grey ml-2">No file chosen</span>
-          <span v-else class="text-grey ml-2">Image selected</span>
-        </div>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="closeEditDialog">Cancel</el-button>
-          <el-button type="primary" @click="saveOfficerEdit">Save</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 
   <!-- Fixed Actions Bar -->

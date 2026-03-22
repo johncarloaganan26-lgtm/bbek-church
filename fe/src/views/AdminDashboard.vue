@@ -56,21 +56,6 @@
             @click="closeDrawerOnMobile"
           ></v-list-item>
           <v-list-item 
-            prepend-icon="mdi-account-group" 
-            title="Church Leaders"
-            :to="{ name: 'ChurchLeaders' }"
-            :active="$route.name === 'ChurchLeaders'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <!-- Department Officers menu item hidden - functionality integrated into Departments -->
-          <!-- <v-list-item 
-            prepend-icon="mdi-account-multiple" 
-            title="Department Officers"
-            :to="{ name: 'DepartmentOfficers' }"
-            :active="$route.name === 'DepartmentOfficers'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item> -->
-          <v-list-item 
             prepend-icon="mdi-calendar" 
             title="Events Records"
             :to="{ name: 'EventsRecords' }"
@@ -326,7 +311,7 @@ const MIN_ADMIN_RECORD_SEARCH_LENGTH = 2
 const ADMIN_SEARCH_DEBOUNCE_MS = 320
 
 const adminOnlyModules = new Set(['Archive', 'AuditTrail', 'ContentManagement'])
-const excludedAdminSearchModules = new Set(['DepartmentOfficers', 'MarriageServiceAdmin', 'Transactions'])
+const excludedAdminSearchModules = new Set(['MarriageServiceAdmin', 'Transactions'])
 
 const adminRouteMetadata = {
   Dashboard: {
@@ -359,18 +344,7 @@ const adminRouteMetadata = {
     icon: 'mdi-file-import',
     keywords: ['upload', 'bulk', 'excel', 'csv']
   },
-  ChurchLeaders: {
-    title: 'Church Leaders',
-    section: 'Church Records',
-    icon: 'mdi-account-tie',
-    keywords: ['leaders', 'pastors']
-  },
-  DepartmentOfficers: {
-    title: 'Department Officers',
-    section: 'Church Records',
-    icon: 'mdi-account-star',
-    keywords: ['officers']
-  },
+
   EventsRecords: {
     title: 'Events Records',
     section: 'Church Records',

@@ -162,6 +162,40 @@
         </el-select>
       </el-form-item>
 
+      <!-- Department -->
+      <el-form-item v-if="formData.position !== 'none'" label="Department" prop="department_id">
+        <el-select
+          v-model="formData.department_id"
+          placeholder="Select department"
+          size="large"
+          style="width: 100%"
+          clearable
+          filterable
+        >
+          <el-option
+            v-for="dept in departmentsStore.departments"
+            :key="dept.id || dept.department_id"
+            :label="dept.name || dept.department_name"
+            :value="dept.id || dept.department_id"
+          />
+        </el-select>
+      </el-form-item>
+
+      <!-- Profile Image (for officers and pastors) -->
+      <el-form-item v-if="isOfficerPosition || formData.position?.includes('pastor')" label="Profile Image" prop="profile_image">
+        <el-upload
+          class="avatar-uploader"
+          action="#"
+          :show-file-list="false"
+          :auto-upload="false"
+          :on-change="handleImageChange"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+        >
+          <img v-if="formData.profile_image" :src="formData.profile_image" class="avatar" />
+          <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+        </el-upload>
+      </el-form-item>
+
       <!-- Profession -->
       <el-form-item label="Profession" prop="profession">
         <el-input
@@ -351,10 +385,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete } from '@element-plus/icons-vue'
+import { Delete, Plus } from '@element-plus/icons-vue'
 import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
+import { useDepartmentsStore } from '@/stores/ChurchRecords/departmentsStore'
 
 // Props
 const props = defineProps({
@@ -369,10 +404,15 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['update:modelValue', false])
+const emit = defineEmits(['update:modelValue'])
 
 // Pinia Store
 const memberStore = useMemberRecordStore()
+const departmentsStore = useDepartmentsStore()
+
+onMounted(async () => {
+  await departmentsStore.fetchDepartments({ pageSize: 100 })
+})
 
 // Refs
 const formRef = ref(null)
@@ -405,6 +445,15 @@ const labelPosition = computed(() => {
 
 // Check if in edit mode
 const isEditMode = computed(() => !!props.memberData)
+
+const isOfficerPosition = computed(() => {
+  const officerPositions = [
+    'president', 'vice_president', 'secretary', 'assistant_secretary',
+    'treasurer', 'auditor', 'coordinator', 'pio', 'socmed_coordinator',
+    'senior_pastor', 'sending_pastor'
+  ]
+  return officerPositions.includes(formData.position)
+})
 
 // Check if current position is admin/staff (not regular member or none)
 const isAdminOrStaffPosition = computed(() => {
@@ -447,6 +496,8 @@ const formData = reactive({
   phone_number: '',
   civil_status: '',
   position: 'none',
+  department_id: '',
+  profile_image: '',
   profession: '',
   spouse_name: '',
   marriage_date: '',
@@ -695,6 +746,8 @@ watch(() => props.memberData, (newData) => {
     formData.phone_number = newData.phone_number ? newData.phone_number.replace(/^\+63/, '') : ''
     formData.civil_status = newData.civil_status || ''
     formData.position = newData.position || 'none'
+    formData.department_id = newData.department_id || ''
+    formData.profile_image = newData.profile_image || newData.image || ''
     formData.profession = newData.profession || ''
     formData.spouse_name = newData.spouse_name || ''
     formData.marriage_date = newData.marriage_date || ''
@@ -731,6 +784,7 @@ watch(() => props.modelValue, (isOpen) => {
     formData.phone_number = data.phone_number ? data.phone_number.replace(/^\+63/, '') : ''
     formData.civil_status = data.civil_status || ''
     formData.position = data.position || 'none'
+    formData.department_id = data.department_id || ''
     formData.profession = data.profession || ''
     formData.spouse_name = data.spouse_name || ''
     formData.marriage_date = data.marriage_date || ''
@@ -770,6 +824,8 @@ const resetForm = () => {
   formData.phone_number = ''
   formData.civil_status = ''
   formData.position = 'none'
+  formData.department_id = ''
+  formData.profile_image = ''
   formData.profession = ''
   formData.spouse_name = ''
   formData.marriage_date = ''
@@ -789,6 +845,28 @@ const resetForm = () => {
 // Handle close
 const handleClose = () => {
   emit('update:modelValue', false)
+}
+
+// Handle Image Change
+const handleImageChange = (file) => {
+  const isImage = file.raw.type.startsWith('image/')
+  const isLt2M = file.raw.size / 1024 / 1024 < 3
+
+  if (!isImage) {
+    ElMessage.error('Avatar picture must be an image format!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('Avatar picture size can not exceed 3MB!')
+    return false
+  }
+
+  // Convert to base64
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    formData.profile_image = e.target.result
+  }
+  reader.readAsDataURL(file.raw)
 }
 
 // Handle submit
@@ -828,6 +906,8 @@ const handleSubmit = async () => {
       phone_number: `+63${formData.phone_number}`, // Add +63 prefix
       civil_status: formData.civil_status,
       position: formData.position,
+      department_id: formData.position !== 'none' ? (formData.department_id || null) : null,
+      profile_image: formData.position !== 'none' ? formData.profile_image : null,
       profession: formData.profession?.trim() || null,
       spouse_name: formData.spouse_name?.trim() || null,
       marriage_date: formData.marriage_date || null,
@@ -1068,6 +1148,35 @@ defineExpose({
     min-width: auto;
     margin: 0;
   }
+}
+
+/* Avatar Upload Styles */
+.avatar-uploader .el-upload {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+.avatar-uploader .el-upload:hover {
+  border-color: var(--el-color-primary);
+}
+
+.el-icon.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 140px;
+  height: 140px;
+  text-align: center;
+}
+
+.avatar {
+  width: 140px;
+  height: 140px;
+  display: block;
+  object-fit: cover;
 }
 </style>
 

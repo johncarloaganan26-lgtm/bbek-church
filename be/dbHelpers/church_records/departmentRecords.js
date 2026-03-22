@@ -435,27 +435,19 @@ async function getAllDepartments(options = {}) {
     let countSql = 'SELECT COUNT(*) as total FROM tbl_departments d LEFT JOIN tbl_members m ON d.member_id = m.member_id';
     let countParams = [];
 
-    // Build query for fetching records with JOIN to get member fullname
+    // Build query for fetching records with subqueries for the new flow
     let sql = `SELECT 
       d.department_id,
       d.department_name,
       d.status,
       d.date_created,
-      d.member_id,
-      d.joined_members,
-      m.firstname as member_firstname,
-      m.lastname as member_lastname,
-      m.middle_name as member_middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
-      ) as member_fullname,
-      CASE 
-        WHEN d.joined_members IS NULL OR d.joined_members = '' THEN 0
-        ELSE JSON_LENGTH(d.joined_members)
-      END as joined_members_count
+      (SELECT CONCAT(m2.firstname, ' ', m2.lastname) 
+       FROM tbl_members m2 
+       WHERE m2.department_id = d.department_id AND LOWER(m2.position) = 'president' 
+       LIMIT 1) as member_fullname,
+      (SELECT COUNT(*) 
+       FROM tbl_members m3 
+       WHERE m3.department_id = d.department_id) as joined_members_count
     FROM tbl_departments d
     LEFT JOIN tbl_members m ON d.member_id = m.member_id`;
     const params = [];
@@ -518,8 +510,16 @@ async function getAllDepartments(options = {}) {
       sql += whereClause;
     }
 
-    // Add sorting
-    let orderByClause = ' ORDER BY ';
+    // Add department priority (Primary Sort Key)
+    // 1: Men, 2: Ladies, 3: Youth/Young
+    let orderByClause = ` ORDER BY 
+      CASE 
+        WHEN d.department_name LIKE '%Men%' THEN 1
+        WHEN d.department_name LIKE '%Ladies%' THEN 2
+        WHEN d.department_name LIKE '%Youth%' OR d.department_name LIKE '%Young%' THEN 3
+        ELSE 4
+      END ASC, `;
+
     switch (sortByValue) {
       case 'Department Name (A-Z)':
         orderByClause += 'd.department_name ASC';
@@ -561,12 +561,8 @@ async function getAllDepartments(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Get total joined members across all departments (not just current page)
-    let totalJoinedMembersQuery = 'SELECT SUM(CASE WHEN d.joined_members IS NULL OR d.joined_members = "" THEN 0 ELSE JSON_LENGTH(d.joined_members) END) as total FROM tbl_departments d LEFT JOIN tbl_members m ON d.member_id = m.member_id';
-    if (hasWhere) {
-      totalJoinedMembersQuery += ' WHERE ' + whereConditions.join(' AND ');
-    }
-    const [totalJoinedResult] = await query(totalJoinedMembersQuery, countParams);
+    // Get global total of joined members across all departments
+    const [totalJoinedResult] = await query('SELECT COUNT(*) as total FROM tbl_members WHERE department_id IS NOT NULL');
     const totalJoinedMembers = totalJoinedResult[0]?.total || 0;
 
     // Add pagination to main query
@@ -629,23 +625,14 @@ async function getDepartmentById(departmentId) {
       d.department_name,
       d.status,
       d.date_created,
-      d.member_id,
-      d.joined_members,
-      m.firstname as member_firstname,
-      m.lastname as member_lastname,
-      m.middle_name as member_middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
-      ) as member_fullname,
-      CASE 
-        WHEN d.joined_members IS NULL OR d.joined_members = '' THEN 0
-        ELSE JSON_LENGTH(d.joined_members)
-      END as joined_members_count
+      (SELECT CONCAT(m2.firstname, ' ', m2.lastname) 
+       FROM tbl_members m2 
+       WHERE m2.department_id = d.department_id AND LOWER(m2.position) = 'president' 
+       LIMIT 1) as member_fullname,
+      (SELECT COUNT(*) 
+       FROM tbl_members m3 
+       WHERE m3.department_id = d.department_id) as joined_members_count
     FROM tbl_departments d
-    LEFT JOIN tbl_members m ON d.member_id = m.member_id
     WHERE d.department_id = ?`;
     const [rows] = await query(sql, [departmentId]);
 

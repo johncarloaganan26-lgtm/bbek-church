@@ -459,13 +459,13 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
-    async bulkCompleteWaterBaptisms(baptismIds) {
+    async bulkCompleteWaterBaptisms(baptismIds, completionDate = null, completionTime = null) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
         const response = await axios.put('/services/water-baptisms/bulkCompleteWaterBaptisms',
-          { baptismIds },
+          { baptismIds, completionDate, completionTime },
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,

@@ -233,7 +233,7 @@ async function createOnlineDonation(donationData) {
       String(type).trim() || 'donation',
       finalPaymentMethod,
       notes ? String(notes).trim() : null,
-      'pending', // Online donations always start as pending
+      'confirmed', // Online donations are auto-confirmed on submission
       formattedDateCreated,
       formattedDonationDate,
       'online', // source is always online
@@ -244,6 +244,14 @@ async function createOnlineDonation(donationData) {
     ];
 
     const [result] = await query(sql, params);
+
+    // Set verified_date for auto-confirmed donations so dashboard and metrics reflect confirmation
+    try {
+      await query('UPDATE tbl_tithes SET verified_date = ? WHERE tithes_id = ?', [formattedDateCreated, result.insertId]);
+    } catch (updateErr) {
+      console.error('Failed to set verified_date for auto-confirmed donation:', updateErr);
+      // don't throw - donation was created successfully
+    }
 
     return {
       success: true,
@@ -256,7 +264,7 @@ async function createOnlineDonation(donationData) {
         amount: parseFloat(amount) || 0,
         type: String(type).trim() || 'donation',
         donation_method: donation_method,
-        status: 'pending',
+        status: 'confirmed',
         source: 'online',
         donation_date: formattedDonationDate,
         date_created: formattedDateCreated

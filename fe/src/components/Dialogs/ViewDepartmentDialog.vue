@@ -31,8 +31,9 @@
       
       <el-descriptions-item label="Department President">
         <div v-if="presidentInfo" class="member-info">
-          <el-avatar :size="40" class="mr-2">
-            {{ presidentInfo.initials }}
+          <el-avatar :size="48" class="mr-3 officer-avatar">
+            <img v-if="presidentInfo.image" :src="resolveImage(presidentInfo.image, '/img/officers/default.png')" :alt="presidentInfo.name" />
+            <span v-else>{{ presidentInfo.initials }}</span>
           </el-avatar>
           <div class="member-details">
             <div class="member-name">{{ presidentInfo.name }}</div>
@@ -49,8 +50,9 @@
             :key="officer.id"
             class="officer-card"
           >
-            <el-avatar :size="32" class="mr-2">
-              {{ officer.initials }}
+            <el-avatar :size="40" class="mr-3 officer-avatar">
+              <img v-if="officer.image" :src="resolveImage(officer.image, '/img/officers/default.png')" :alt="officer.name" />
+              <span v-else>{{ officer.initials }}</span>
             </el-avatar>
             <div class="officer-details">
               <div class="officer-name">{{ officer.name }}</div>
@@ -114,45 +116,79 @@ const getMemberInfo = (memberId) => {
   }
 }
 
-// Get president info
-const presidentInfo = computed(() => {
-  if (!props.departmentData?.member_id) return null
-  return getMemberInfo(props.departmentData.member_id)
+// Get all members assigned to this department
+const departmentalMembers = computed(() => {
+  if (!props.departmentData?.department_id) return []
+  return memberOptions.value.filter(m => m.department_id === props.departmentData.department_id)
 })
 
-// Parse and resolve officers from joined_members JSON string
-const officersList = computed(() => {
-  if (!props.departmentData?.joined_members) {
-    return []
-  }
+// Get president info
+const presidentInfo = computed(() => {
+  const president = departmentalMembers.value.find(m => m.position?.toLowerCase() === 'president')
+  if (!president) return null
   
-  try {
-    const parsed = typeof props.departmentData.joined_members === 'string'
-      ? JSON.parse(props.departmentData.joined_members)
-      : props.departmentData.joined_members
-    
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed
-        .map(id => {
-          const info = getMemberInfo(id)
-          return info ? info : { id, name: id, position: '-', initials: '?' }
-        })
-    }
-    return []
-  } catch (e) {
-    console.error('Error parsing joined_members:', e)
-    return []
+  return {
+    id: president.member_id || president.id,
+    name: president.name || `${president.firstname} ${president.lastname}`.trim(),
+    position: (president.position || '').replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+    image: president.profile_image || president.profileImage || president.image,
+    initials: getInitials(president.name || `${president.firstname} ${president.lastname}`)
   }
+})
+
+// Get officers list (excluding president and regular members)
+const officersList = computed(() => {
+  const nonOfficerPositions = ['member', 'none', 'president']
+  return departmentalMembers.value
+    .filter(m => !nonOfficerPositions.includes(m.position?.toLowerCase()))
+    .map(m => ({
+      id: m.member_id || m.id,
+      name: m.name || `${m.firstname} ${m.lastname}`.trim(),
+      position: (m.position || '').replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+      image: m.profile_image || m.profileImage || m.image,
+      initials: getInitials(m.name || `${m.firstname} ${m.lastname}`)
+    }))
 })
 
 // Get initials for avatar
 const getInitials = (fullname) => {
   if (!fullname || fullname === '?') return '?'
   const parts = fullname.split(' ')
-  if (parts.length >= 2) {
+  if (parts.length >= 2 && parts[0] && parts[parts.length - 1]) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
   }
-  return fullname.substring(0, 2).toUpperCase()
+  return (fullname[0] || '?').toUpperCase()
+}
+
+// Image helper from other components
+const getImageUrl = (imagePath) => {
+  if (!imagePath || typeof imagePath !== 'string') return ''
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath
+  
+  const parts = imagePath.split('/')
+  const filename = parts.pop()
+  if (!filename) return imagePath
+  const encodedFilename = encodeURIComponent(filename)
+  return (parts.length > 0 ? parts.join('/') + '/' : '') + encodedFilename
+}
+
+// Image resolver
+const resolveImage = (image, fallback) => {
+  if (!image) return getImageUrl(fallback)
+  
+  if (typeof image === 'string') {
+    if (image.startsWith('data:') || image.startsWith('http')) {
+      return image
+    }
+    return getImageUrl(image)
+  }
+  
+  // If it's a buffer object (from backend)
+  if (typeof image === 'object' && image && image.type === 'Buffer' && Array.isArray(image.data)) {
+    return `data:image/jpeg;base64,${btoa(String.fromCharCode.apply(null, image.data))}`
+  }
+  
+  return getImageUrl(fallback)
 }
 </script>
 

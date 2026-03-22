@@ -471,7 +471,8 @@ const ABOUT_SUBMENU_MDI_ICONS = {
   'church-leadership': 'mdi-account-tie',
   'church leadership': 'mdi-account-tie',
   'department-officers': 'mdi-office-building',
-  'department officers': 'mdi-office-building'
+  'department officers': 'mdi-office-building',
+  'departmentofficer': 'mdi-office-building'
 }
 
 const SERVICES_SUBMENU_MDI_ICONS = {
@@ -624,7 +625,7 @@ const defaultHeaderData = {
     {label: 'About', value: 'about',to:'/about' , children:[
         {label: 'Our Story', value: 'our-story',to:'/about/aboutus'},
         {label: 'Church Leadership', value: 'church-leadership',to:'/about/churchleaders'},
-        {label: 'Department Officers', value: 'department-officers',to:'/about/departmentofficer'},
+        {label: 'Department Officers', value: 'departmentofficer',to: '/about/departmentofficer'},
     ]},
     {label: 'Give', value: 'give',to:'/give'},
     {label: 'Events', value: 'events',to:'/events/all-events'},

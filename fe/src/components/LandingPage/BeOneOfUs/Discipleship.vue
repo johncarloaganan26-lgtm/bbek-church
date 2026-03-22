@@ -233,10 +233,12 @@
 
 <script setup>
 import { ref, reactive, watch, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useDiscipleshipStore } from '@/stores/discipleshipStore';
 import { ElMessageBox } from 'element-plus';
 import moment from 'moment';
 
+const route = useRoute();
 const discipleshipStore = useDiscipleshipStore();
 const formRef = ref(null);
 
@@ -287,6 +289,29 @@ const fetchSlots = async () => {
 
 onMounted(async () => {
   await fetchSlots();
+  
+  // Check for reference ID in URL to pre-fill data (from rejection email)
+  const refId = route.query.ref;
+  if (refId) {
+    try {
+      const result = await discipleshipStore.fetchRegistrationData(refId);
+      if (result) {
+        formData.firstname = result.firstname || '';
+        formData.lastname = result.lastname || '';
+        formData.email = result.email || '';
+        formData.phone_number = result.phone_number || '';
+        formData.birthdate = result.birthdate || '';
+        formData.age = result.age || null;
+        formData.gender = result.gender || '';
+        formData.address = result.address || '';
+        
+        // Scroll to the schedule section so they can see the slots
+        scrollToSchedule();
+      }
+    } catch (err) {
+      console.error('Error fetching pre-fill data:', err);
+    }
+  }
 });
 
 const selectSlot = (slotDateTime) => {

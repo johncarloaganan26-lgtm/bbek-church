@@ -13,26 +13,37 @@
               Select one of the upcoming Sunday schedules to automatically fill the form.
             </p>
             
-            <div class="slots-list">
+            <div v-if="loadingSlots" class="text-center py-4">
+              <v-progress-circular indeterminate color="teal" size="24"></v-progress-circular>
+            </div>
+
+            <div v-else class="slots-list">
               <v-hover v-for="slot in availableSlots" :key="slot.date" v-slot="{ isHovering, props }">
                 <v-card
-                  v-bind="props"
-                  :elevation="isHovering ? 4 : 1"
-                  :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
-                  @click="selectSlot(slot)"
-                >
-                  <div class="d-flex justify-space-between align-center">
-                    <div>
-                      <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
-                      <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.time }}</div>
-                    </div>
-                    <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
-                      {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
-                    </v-icon>
-                  </div>
-                </v-card>
-              </v-hover>
-            </div>
+                   v-bind="props"
+                   :elevation="isHovering ? 4 : 1"
+                   :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
+                   @click="selectSlot(slot)"
+                 >
+                   <div class="d-flex justify-space-between align-center">
+                     <div>
+                       <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
+                       <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.timeDisplay }}</div>
+                       <div class="text-caption grey--text mt-1 d-flex align-center">
+                       <v-icon size="14" class="mr-1">mdi-account-group</v-icon>
+                       <span v-if="slot.bookingCount && slot.bookingCount > 0">
+                         {{ slot.bookingCount }} {{ slot.bookingCount === 1 ? 'person' : 'people' }} joined
+                       </span>
+                       <span v-else class="italic">Be the first to join!</span>
+                     </div>
+                     </div>
+                     <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
+                       {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                     </v-icon>
+                   </div>
+                 </v-card>
+               </v-hover>
+             </div>
             
             <v-alert
               type="info"
@@ -156,6 +167,18 @@
               ></v-textarea>
 
               <v-row>
+                <v-col cols="12">
+                  <v-text-field
+                    v-model="formData.profession"
+                    label="Profession"
+                    variant="outlined"
+                    density="comfortable"
+                    placeholder="Enter your profession/occupation"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+
+              <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.email"
@@ -203,13 +226,31 @@
                     :rules="[v => !!v || 'Baptism Time is required']"
                   ></v-text-field>
                 </v-col>
-                <v-col v-if="adminMode" cols="12">
+                <v-col v-if="adminMode" cols="12" md="6">
                   <v-text-field
                     v-model="formData.location"
-                    label="Location (Admin Only)"
+                    label="Address / Location (Admin Only)"
                     variant="outlined"
                     density="comfortable"
+                    prepend-inner-icon="mdi-map-marker"
+                    placeholder="e.g., Church Pool"
                   ></v-text-field>
+                </v-col>
+                <v-col v-if="adminMode" cols="12" md="6">
+                  <v-select
+                    v-model="formData.pastor_name"
+                    :items="churchLeaders"
+                    item-title="name"
+                    item-value="id"
+                    label="Assigned Pastor (Admin Only)"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-account-tie"
+                    placeholder="Select a church leader"
+                    :loading="loadingChurchLeaders"
+                    clearable
+                    searchable
+                  ></v-select>
                 </v-col>
               </v-row>
 
@@ -266,6 +307,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import publicAxios from '@/api/publicAxios';
+import axios from '@/api/axios';
+import moment from 'moment';
 
 const props = defineProps({
   adminMode: {
@@ -297,6 +340,7 @@ const formData = reactive({
   age: null,
   gender: '',
   civil_status: '',
+  profession: '',
   address: '',
   email: '',
   phone_number: '',
@@ -306,39 +350,81 @@ const formData = reactive({
   baptism_date: '',
   baptism_time: '',
   location: '',
+  pastor_name: '',
   is_member: false,
   status: 'pending'
 });
 
 const availableSlots = ref([]);
+const loadingSlots = ref(false);
+const churchLeaders = ref([]);
+const loadingChurchLeaders = ref(false);
 
-const generateSundaySlots = () => {
+const fetchSundaySlots = async () => {
+    loadingSlots.value = true;
+    try {
+        console.log('[WaterBaptism] Fetching available slots...');
+        const response = await publicAxios.get('/services/water-baptisms/available-slots', {
+            params: { days: 45 } // Fetch more days to find enough Sundays
+        });
+        
+        console.log('[WaterBaptism] Available slots response:', response.data);
+        
+        if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
+            const slots = [];
+            
+            response.data.data.forEach(dateGroup => {
+                if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) {
+                    console.warn('[WaterBaptism] Missing or invalid timeSlots for date:', dateGroup.date);
+                    return;
+                }
+                
+                const onePmSlot = dateGroup.timeSlots.find(s => s.time === '13:00:00' || s.time === '13:00');
+                
+                if (onePmSlot) {
+                    const slotData = {
+                        date: dateGroup.date,
+                        displayDate: moment(dateGroup.date).format('MMMM D, YYYY'),
+                        time: '13:00:00',
+                        timeDisplay: '1:00 PM',
+                        bookingCount: typeof onePmSlot.bookingCount === 'number' ? onePmSlot.bookingCount : 0
+                    };
+                    slots.push(slotData);
+                }
+            });
+            
+            availableSlots.value = slots.slice(0, 4); // Keep next 4 Sundays
+        } else {
+            generateFallbackSlots();
+        }
+    } catch (error) {
+        console.error('[WaterBaptism] Error fetching Sunday slots:', error.message, error);
+        ElMessage.warning('Could not fetch available slots. Generating default schedule...');
+        generateFallbackSlots();
+    } finally {
+        loadingSlots.value = false;
+    }
+};
+
+const generateFallbackSlots = () => {
   const slots = [];
   const today = new Date();
   let current = new Date();
-  
-  // Find next Sunday
   const daysUntilSunday = (7 - today.getDay()) % 7;
   current.setDate(today.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
   
-  // Generate next 4 Sundays
   for (let i = 0; i < 4; i++) {
     const slotDate = new Date(current);
     const dateStr = slotDate.toISOString().split('T')[0];
-    const displayDate = slotDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-    
     slots.push({
       date: dateStr,
-      displayDate: displayDate,
-      time: '13:00',
-      timeDisplay: '1:00 PM'
+      displayDate: slotDate.toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      }),
+      time: '13:00:00',
+      timeDisplay: '1:00 PM',
+      bookingCount: 0
     });
-    
     current.setDate(current.getDate() + 7);
   }
   availableSlots.value = slots;
@@ -348,6 +434,21 @@ const selectSlot = (slot) => {
   formData.baptism_date = slot.date;
   formData.baptism_time = slot.time;
   ElMessage.success(`Selected Sunday: ${slot.displayDate}`);
+};
+
+const fetchChurchLeaders = async () => {
+  loadingChurchLeaders.value = true;
+  try {
+    const response = await axios.get('/church-records/church-leaders/getAllChurchLeadersForSelect');
+    if (response.data.success && response.data.data) {
+      churchLeaders.value = response.data.data;
+    }
+  } catch (error) {
+    console.error('Error fetching church leaders:', error);
+    ElMessage.warning('Failed to load church leaders list. You can manually enter the pastor name.');
+  } finally {
+    loadingChurchLeaders.value = false;
+  }
 };
 
 // Auto-calculate age from birthdate
@@ -367,21 +468,23 @@ watch(() => formData.birthdate, (newDate) => {
 });
 
 onMounted(async () => {
-  generateSundaySlots();
+  fetchSundaySlots();
   
-  // If we're in adminMode, pre-hydrate the data passed from parent instead
   if (props.adminMode && props.adminData) {
     requestId.value = props.adminData._activeItem?.request_id || null;
     formData.firstname = props.adminData.firstname || '';
     formData.lastname = props.adminData.lastname || '';
+    formData.middle_name = props.adminData.middle_name || '';
     formData.email = props.adminData.email || '';
     formData.phone_number = props.adminData.phone_number || '';
     formData.address = props.adminData.address || '';
-    formData.status = 'approved'; // Admin setting implies it's ready/scheduled
+    formData.pastor_name = props.adminData.pastor_name || props.adminData.pastor_id || '';
+    formData.location = props.adminData.location || '';
+    formData.status = 'approved';
+    await fetchChurchLeaders();
     return;
   }
 
-  // If reqId is provided (from discipleship invitation), fetch the data
   if (requestId.value) {
     loadingRegistrationData.value = true;
     try {
@@ -390,21 +493,24 @@ onMounted(async () => {
       if (data) {
         formData.firstname = data.firstname || '';
         formData.lastname = data.lastname || '';
+        formData.middle_name = data.middle_name || '';
         formData.email = data.email || '';
         formData.phone_number = data.phone_number || '';
         formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
         formData.age = data.age || null;
-        formData.gender = data.gender || '';
+        formData.gender = data.gender === 'M' ? 'Male' : (data.gender === 'F' ? 'Female' : (data.gender || ''));
         formData.address = data.address || '';
+        if (data.civil_status) {
+          formData.civil_status = data.civil_status.charAt(0).toUpperCase() + data.civil_status.slice(1).toLowerCase();
+        }
+        formData.profession = data.profession || '';
       }
     } catch (error) {
       console.error('Error fetching registration data:', error);
-      // Don't show error to user - form will be empty and they can fill it in
     } finally {
       loadingRegistrationData.value = false;
     }
   }
-  // If no reqId, the form is empty and ready for public registration
 });
 
 const handleSubmit = async () => {
@@ -413,15 +519,22 @@ const handleSubmit = async () => {
 
   submitting.value = true;
   try {
-    // Include requestId if coming from discipleship invitation
     const submissionData = {
       ...formData,
       ...(requestId.value && { request_id: requestId.value })
     };
-    
-    console.log('Submitting water baptism registration with request_id:', requestId.value);
-    const result = await waterBaptismStore.createPublicBaptism(submissionData);
-    console.log('Water baptism registration result:', result);
+
+    let result;
+    if (props.adminMode) {
+      result = await waterBaptismStore.createBaptism({
+        ...submissionData,
+        is_member: false,
+        member_id: null,
+        status: 'approved'
+      });
+    } else {
+      result = await waterBaptismStore.createPublicBaptism(submissionData);
+    }
 
     if (result.success) {
       if (props.adminMode) {

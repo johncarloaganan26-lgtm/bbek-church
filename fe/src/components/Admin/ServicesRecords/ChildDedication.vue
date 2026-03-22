@@ -379,6 +379,82 @@
       @update:model-value="childDedicationDialog = $event"
       @submit="handleSubmit"
     />
+
+    <!-- Bulk Complete Calendar Dialog -->
+    <v-dialog v-model="bulkCompleteDialog" max-width="450px" persistent class="bulk-complete-dialog" style="overflow: visible;">
+      <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
+        <div class="pa-4 text-center">
+          <v-avatar color="success-lighten-5" size="80" class="mb-4">
+            <v-icon color="success" size="40">mdi-calendar-check</v-icon>
+          </v-avatar>
+          <h2 class="text-h5 font-weight-bold mb-1">Set Dedication Completion Date</h2>
+          <p class="text-body-2 text-grey-darken-1">
+            Selected {{ selectedDedications?.length }} child dedication{{ selectedDedications?.length > 1 ? 's' : '' }} to mark as completed.
+          </p>
+        </div>
+
+        <v-card-text class="pt-0" style="overflow: visible;">  
+          <v-divider class="mb-6"></v-divider>
+          
+          <div class="mb-5">
+            <div class="d-flex align-center mb-2">
+              <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Date (Sundays Only)</span>
+            </div>
+            <el-date-picker
+              v-model="completionDate"
+              type="date"
+              placeholder="Select Sunday"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :disabled-date="disableNonSundays"
+              class="w-100 custom-date-picker"
+              size="large"
+              popper-class="bulk-complete-date-picker-popper"
+              teleport="body"
+              :popper-options="{ strategy: 'fixed' }"
+            />
+          </div>
+
+          <div class="mb-5">
+            <div class="d-flex align-center mb-2">
+              <v-icon size="18" color="primary" class="mr-2">mdi-clock-outline</v-icon>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Time</span>
+            </div>
+            <v-select
+              v-model="completionTime"
+              :items="timeOptions"
+              label="Select Time"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+            ></v-select>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-4 pt-0 gap-2">
+          <v-btn
+            variant="outlined"
+            color="grey"
+            @click="closeBulkCompleteDialog"
+            :disabled="isCompletingBulk"
+          >
+            Cancel
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="success"
+            variant="flat"
+            @click="confirmBulkComplete"
+            :loading="isCompletingBulk"
+            :disabled="!completionDate || !completionTime"
+          >
+            <v-icon left>mdi-check</v-icon>
+            Mark as Completed
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -488,6 +564,26 @@ const dedicationData = ref(null)
 const certificateDialog = ref(false)
 const certificateType = ref('')
 const certificateData = ref(null)
+
+// Bulk complete dialog state
+const bulkCompleteDialog = ref(false)
+const completionDate = ref('')
+const completionTime = ref('')
+const isCompletingBulk = ref(false)
+const selectedDedicationsToComplete = ref([])
+
+// Time options for dedication
+const timeOptions = [
+  '9:00 AM',
+  '10:00 AM',
+  '11:00 AM',
+  '12:00 PM',
+  '1:00 PM',
+  '2:00 PM',
+  '3:00 PM',
+  '4:00 PM',
+  '5:00 PM'
+]
 
 // Handlers
 const handleDedicationDialog = () => {
@@ -604,7 +700,7 @@ const bulkCompleteDedications = async () => {
     return;
   }
 
-  // Check dates: cannot complete future dedications
+  // Check dates: cannot complete future dedications (if restriction is enabled)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -623,52 +719,64 @@ const bulkCompleteDedications = async () => {
     return;
   }
   
+  // Show calendar dialog for selecting completion date and time
+  selectedDedicationsToComplete.value = validDedications;
+  completionDate.value = '';
+  completionTime.value = '';
+  bulkCompleteDialog.value = true;
+}
+
+// Bulk complete dialog functions
+const closeBulkCompleteDialog = () => {
+  bulkCompleteDialog.value = false;
+  completionDate.value = '';
+  completionTime.value = '';
+  selectedDedicationsToComplete.value = [];
+};
+
+const confirmBulkComplete = async () => {
+  if (!completionDate.value || !completionTime.value) {
+    ElMessage.warning('Please select both date and time');
+    return;
+  }
+
   try {
-    let confirmMessage = `Are you sure you want to mark ${validDedications.length} approved child dedication(s) as completed?`;
-    if (skippedCount > 0) {
-      confirmMessage += `\n\n(${skippedCount} record(s) were skipped because their scheduled date is in the future.)`;
-    }
+    isCompletingBulk.value = true;
 
-    await ElMessageBox.confirm(
-      confirmMessage,
-      'Confirm Bulk Complete',
-      {
-        confirmButtonText: 'Yes, Mark as Completed',
-        cancelButtonText: 'Cancel',
-        type: 'info',
-      }
-    )
-
-    // Extract child IDs for only approved dedications with past dates
-    const childIds = validDedications.map(d => d.child_id)
-
-    // Use the bulk complete endpoint
-    const result = await childDedicationStore.bulkCompleteChildDedications(childIds)
+    const childIds = selectedDedicationsToComplete.value.map(d => d.child_id);
+    const result = await childDedicationStore.bulkCompleteChildDedications(childIds, {
+      completion_date: completionDate.value,
+      completion_time: completionTime.value
+    });
 
     if (result.success) {
-      const { completed, failed, message } = result.data || {}
-      
+      const { completed, failed, message } = result.data || {};
       if (completed > 0) {
-        ElMessage.success(`Successfully marked ${completed} child dedication(s) as completed`)
+        ElMessage.success(`Successfully marked ${completed} child dedication(s) as completed`);
       }
-      
       if (failed > 0) {
-        ElMessage.warning(`Failed to mark ${failed} child dedication(s) as completed`)
+        ElMessage.warning(`Failed to mark ${failed} child dedication(s) as completed`);
       }
-      
       if (message) {
-        ElMessage.info(message)
+        ElMessage.info(message);
       }
+      clearSelection();
+      closeBulkCompleteDialog();
     }
-
-    clearSelection()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Error completing dedications:', error)
-      ElMessage.error('Failed to complete selected child dedications')
-    }
+    console.error('Error completing child dedications:', error);
+    ElMessage.error('Failed to complete child dedications');
+  } finally {
+    isCompletingBulk.value = false;
   }
-}
+};
+
+// Disable non-Sunday dates
+const disableNonSundays = (time) => {
+  const date = new Date(time);
+  const dayOfWeek = date.getDay();
+  return dayOfWeek !== 0; // 0 = Sunday
+};
 
 const markIndividualComplete = async (dedication) => {
   try {

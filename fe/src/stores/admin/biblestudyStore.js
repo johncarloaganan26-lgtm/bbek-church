@@ -70,19 +70,38 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         }
     };
 
+    const promoteToBaptism = async (id) => {
+        loading.value = true;
+        try {
+            const response = await axios.post(`/services/biblestudy-requests/promote/${id}`);
+            if (response.data.success) {
+                ElMessage.success('Candidate successfully promoted to Water Baptism (Pending status).');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error promoting to baptism:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to promote candidate');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
     const inviteToBaptism = async (id) => {
         loading.value = true;
         try {
             const response = await axios.post(`/services/biblestudy-requests/invite-baptism/${id}`);
             if (response.data.success) {
-                ElMessage.success('Baptism invitation email sent successfully to candidate!');
+                ElMessage.success('Baptism invitation email sent successfully (no record created yet).');
                 await fetchRequests();
                 return true;
             }
             return false;
         } catch (error) {
             console.error('Error sending invitation:', error);
-            ElMessage.error(error.response?.data?.message || 'Failed to send invitation email');
+            ElMessage.error(error.response?.data?.message || 'Failed to send invitation');
             return false;
         } finally {
             loading.value = false;
@@ -119,6 +138,25 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         }
     };
 
+    const rejectRequest = async (id, reason) => {
+        loading.value = true;
+        try {
+            const response = await axios.post(`/services/biblestudy-requests/reject/${id}`, { reason });
+            if (response.data.success) {
+                ElMessage.success('Bible Study request rejected and suggestions sent.');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error rejecting Bible Study:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to reject request');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -131,7 +169,9 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         fetchRequests,
         updateRequest,
         bulkCompleteRequests,
+        promoteToBaptism,
         inviteToBaptism,
+        rejectRequest,
         setPage,
         setFilters
     };

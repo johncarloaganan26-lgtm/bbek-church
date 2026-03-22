@@ -36,7 +36,7 @@
                 <v-card-text>
                   <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                     <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
-                    Weekdays: available any time. Wednesday/Saturday evenings are not available. Sunday: no schedule.
+                    Available Daily (Mon-Sat). Wednesday/Saturday evenings are not available. Sunday: no schedule.
                   </p>
 
                   <div v-if="slotsLoading" class="text-center pa-8">
@@ -184,13 +184,14 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import moment from 'moment'
 import axios from '@/api/axios'
 import { ElMessageBox } from 'element-plus'
 import { useDiscipleshipStore } from '@/stores/discipleshipStore'
 
 const route = useRoute()
+const router = useRouter()
 const discipleshipStore = useDiscipleshipStore()
 const formRef = ref(null)
 
@@ -243,14 +244,21 @@ const hydrateFromReference = async () => {
 
   try {
     const response = await axios.get(`/services/discipleship-requests/registration-data/${referenceId.value}`)
+
     if (response.data?.success) {
       const d = response.data.data || {}
-      formData.salvation_id = referenceId.value
+      formData.salvation_id = d.salvation_id || referenceId.value
       formData.firstname = d.firstname || ''
       formData.lastname = d.lastname || ''
       formData.email = d.email || ''
       formData.phone_number = d.phone_number || ''
       formData.address = d.address || ''
+      
+      // Select slot section and scroll
+      setTimeout(() => {
+        const el = document.getElementById('bible-study-form')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 500)
     }
   } catch (e) {
     console.warn('Failed to fetch reference data:', e.message)
@@ -295,8 +303,9 @@ const handleSubmit = async () => {
           confirmButtonText: 'OK',
           type: 'success',
           callback: () => {
+            // Reset form and navigate back to landing page
             formRef.value.resetFields()
-            fetchSlots()
+            router.push('/')
           }
         }
       )

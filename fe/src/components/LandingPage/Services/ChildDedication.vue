@@ -86,7 +86,7 @@
                   <div v-else class="available-dates-list">
                     <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                       <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
-                      Select a Sunday date and time slot for your child dedication
+                      Select a Sunday for your child dedication (12:00 PM service)
                     </p>
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
@@ -108,7 +108,7 @@
                               class="mr-2"
                               style="color: white !important;"
                             >
-                              {{ sunday.availableSlots }} slots
+                              {{ sunday.requestCount }} {{ sunday.requestCount === 1 ? 'person' : 'people' }} requested
                             </v-chip>
                           </div>
                         </v-expansion-panel-title>
@@ -123,7 +123,7 @@
                               class="ma-1 time-slot-chip"
                               @click="selectTimeSlot(sunday.date, slot.time)"
                             >
-                              {{ slot.displayTime }}
+                              {{ slot.displayTime }} ({{ slot.requestCount }} booked)
                             </v-chip>
                           </div>
                         </v-expansion-panel-text>

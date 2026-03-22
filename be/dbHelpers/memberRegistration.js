@@ -191,6 +191,7 @@ async function registerMemberFromBurialService(payload = {}) {
       location: payload.location?.trim() || 'To be determined',
       pastor_id: null, // Default null pastor_id (will be updated by admin)
       service_date: payload.service_date || null, // Default: 7 days after death date or current date + 7
+      preferred_service_time: payload.preferred_service_time || null, // Preferred time for burial (e.g., 8:00 PM)
       status: 'pending',
       deceased_name: payload.deceasedName?.trim(),
       deceased_birthdate: payload.deceasedBirthDate,

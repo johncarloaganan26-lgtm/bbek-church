@@ -1,12 +1,12 @@
 <template>
   <div class="leadership-page">
     <!-- Hero Section -->
-    <section class="hero-section">
-      <div
-        class="hero-background"
-        :style="{ backgroundImage: `url(${leadershipData.heroImage || getImageUrl('/img/d.jpeg')})` }"
-        @error="handleHeroImageError"
-      ></div>
+    <v-parallax
+      :src="resolveImage(leadershipData.heroImage, '/img/d.jpeg')"
+      height="60vh"
+      class="hero-section"
+      @error="handleHeroImageError"
+    >
       <div class="hero-overlay-gradient"></div>
       
       <!-- Floating Elements -->
@@ -19,13 +19,15 @@
         ></div>
       </div>
 
-      <div class="hero-content-wrapper">
-        <h1 class="hero-title fade-in-up">{{ leadershipData.heroTitle || 'Church Leadership' }}</h1>
-        <p class="hero-subtitle fade-in-up-delay">
-          {{ leadershipData.heroSubtitle || 'Dedicated men and women leading our church community with faith, wisdom, and service.' }}
-        </p>
+      <div class="d-flex flex-column fill-height justify-center align-center text-center">
+        <div class="hero-content-wrapper">
+          <h1 class="hero-title fade-in-up">{{ leadershipData.heroTitle || 'Church Leadership' }}</h1>
+          <p class="hero-subtitle fade-in-up-delay">
+            {{ leadershipData.heroSubtitle || 'Dedicated men and women leading our church community with faith, wisdom, and service.' }}
+          </p>
+        </div>
       </div>
-    </section>
+    </v-parallax>
 
     <!-- Leadership Section -->
     <section class="py-20 bg-white">
@@ -43,7 +45,7 @@
             <v-card class="overflow-hidden" elevation="2" hover>
               <div class="aspect-square relative overflow-hidden">
                 <v-img
-                  :src="leader.image"
+                  :src="resolveImage(leader.image, '/img/sir.jpeg')"
                   :alt="leader.name"
                   cover
                   height="100%"
@@ -83,14 +85,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from '@/api/axios'
+import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
+
+const memberStore = useMemberRecordStore()
 
 const getImageUrl = (imagePath) => {
+  if (!imagePath || typeof imagePath !== 'string') return ''
+  // If it's already an absolute or base64 URL, return as is
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath
+  
   const parts = imagePath.split('/')
   const filename = parts.pop()
+  if (!filename) return imagePath
   const encodedFilename = encodeURIComponent(filename)
-  return parts.join('/') + '/' + encodedFilename
+  return (parts.length > 0 ? parts.join('/') + '/' : '') + encodedFilename
 }
 
 const handleHeroImageError = (event) => {
@@ -115,20 +125,7 @@ const floatingElements = ref([
   { style: { bottom: '50%', left: '25%', width: '52px', height: '52px', animationDelay: '0.9s' } }
 ])
 
-const defaultLeaders = [
-  {
-    name: "Rev. Fresco Q. Sulapas",
-    position: "Senior Pastor",
-    bio: "Serving our congregation with passion and commitment to the Word of God and the Great Commission.",
-    image: "/img/sir.jpeg"
-  },
-  {
-    name: "Rev. Rodolfo Mojica",
-    position: "Sending Pastor",
-    bio: "Leading our church with wisdom and dedication, guiding our congregation in spiritual growth.",
-    image: "/img/n.jpg"
-  }
-]
+const defaultLeaders = []
 
 const leadershipData = ref({
   heroTitle: 'Church Leadership',
@@ -139,81 +136,81 @@ const leadershipData = ref({
   backButtonColor: '#14b8a6'
 })
 
-const leadersData = ref(defaultLeaders)
+const leadersData = computed(() => {
+  const members = memberStore.members || []
+  return members
+    .filter(member => {
+      const pos = (member.position || '').toLowerCase()
+      return pos.includes('pastor')
+    })
+    .map(member => {
+      // Format the position (e.g., 'senior_pastor' -> 'Senior Pastor')
+      let position = member.position || 'Church Leader'
+      let formattedPosition = position.replace(/_/g, ' ')
+      formattedPosition = formattedPosition.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
-// Fetch leadership data from CMS
-const fetchLeadershipData = async () => {
+      return {
+        name: member.fullname || `${member.firstname} ${member.lastname}`.trim(),
+        position: formattedPosition,
+        bio: member.testimony || '',
+        image: member.profile_image || member.profileImage || member.image || '/img/sir.jpeg'
+      }
+    })
+})
+
+// Safe image resolver helper
+const resolveImage = (image, fallback) => {
+  if (!image) return getImageUrl(fallback)
+  
+  // If image is a string, check format
+  if (typeof image === 'string') {
+    if (image.startsWith('data:') || image.startsWith('http')) {
+      return image
+    }
+    return getImageUrl(image)
+  }
+  
+  // If it's a buffer object (from backend)
+  if (typeof image === 'object' && image && image.type === 'Buffer' && Array.isArray(image.data)) {
+    // This shouldn't happen with updated typeCast, but as a fallback:
+    return `data:image/jpeg;base64,${btoa(String.fromCharCode.apply(null, image.data))}`
+  }
+  
+  return getImageUrl(fallback)
+}
+
+// Fetch leadership hero data from CMS
+const fetchLeadershipHeroData = async () => {
   try {
-    const response = await axios.get('/cms/churchleader/full')
-    if (response.data.success && response.data.data) {
-      const { page, images: cmsImages } = response.data.data
-      const content = page?.content || {}
-      
-      console.log('CMS Response - Leadership:', { content, cmsImages })
+    // 1. Fetch content (text fields)
+    const pageResponse = await axios.get('/cms/churchleader')
+    if (pageResponse.data.success && pageResponse.data.data) {
+      const content = pageResponse.data.data.content || {}
       
       // Update leadership data from content
       if (content.heroTitle) leadershipData.value.heroTitle = content.heroTitle
       if (content.heroSubtitle) leadershipData.value.heroSubtitle = content.heroSubtitle
       if (content.sectionTitle) leadershipData.value.sectionTitle = content.sectionTitle
       if (content.backButtonText) leadershipData.value.backButtonText = content.backButtonText
-      if (content.backButtonColor) {
-        leadershipData.value.backButtonColor = content.backButtonColor
-        console.log('Back button color from CMS:', content.backButtonColor)
-      }
-      
-      // Handle hero image - images are stored as BLOB, returned as base64 in images object
-      // The image is stored with field_name = 'heroImage' in tbl_cms_images
-      if (cmsImages && typeof cmsImages === 'object' && cmsImages.heroImage) {
-        const heroImageBase64 = cmsImages.heroImage
-        if (heroImageBase64 && typeof heroImageBase64 === 'string' && heroImageBase64.startsWith('data:image/')) {
-          leadershipData.value.heroImage = heroImageBase64
-          console.log('✅ Hero image loaded from CMS (BLOB converted to base64)')
-        } else {
-          console.log('⚠️ Hero image in CMS is not a valid base64 image')
-        }
-      } else {
-        console.log('ℹ️ No hero image found in CMS, using default')
-      }
-      
-      // Handle leaders array
-      if (content.leaders && Array.isArray(content.leaders) && content.leaders.length > 0) {
-        leadersData.value = content.leaders.map((leader, index) => {
-          // Images are stored with keys like: leaders[0].image, leaders[1].image, etc.
-          // The composable merges them back into content, but we should check images object first
-          const imageKey = `leaders[${index}].image`
-          let leaderImage = ''
-          
-          // First check images object (BLOB converted to base64)
-          if (cmsImages && typeof cmsImages === 'object' && cmsImages[imageKey]) {
-            const imageBase64 = cmsImages[imageKey]
-            if (imageBase64 && typeof imageBase64 === 'string' && imageBase64.startsWith('data:image/')) {
-              leaderImage = imageBase64
-              console.log(`✅ Leader ${index} image loaded from CMS (BLOB converted to base64)`)
-            }
-          }
-          
-          // Fallback to leader.image if it's base64 (composable might have merged it)
-          if (!leaderImage && leader.image && typeof leader.image === 'string' && leader.image.startsWith('data:image/')) {
-            leaderImage = leader.image
-            console.log(`✅ Leader ${index} image from merged content`)
-          }
-          
-          return {
-            name: leader.name || '',
-            position: leader.position || '',
-            bio: leader.bio || '',
-            image: leaderImage
-          }
-        })
-        console.log('✅ Leaders loaded from CMS:', leadersData.value.length, 'items')
-      } else {
-        console.log('ℹ️ No leaders found in CMS, using defaults')
-      }
-      
-      console.log('✅ Leadership CMS data loaded successfully')
+      if (content.backButtonColor) leadershipData.value.backButtonColor = content.backButtonColor
+      console.log('✅ Leadership Hero CMS content loaded successfully')
     } else {
-      console.log('⚠️ No CMS data found for Leadership, using defaults')
+      console.log('⚠️ No CMS content found for Leadership Hero, using defaults')
     }
+
+    // 2. Fetch only the hero image specifically
+    try {
+      const imgResponse = await axios.get('/cms/churchleader/image/heroImage')
+      if (imgResponse.data.success && imgResponse.data.data?.imageBase64) {
+        leadershipData.value.heroImage = imgResponse.data.data.imageBase64
+        console.log('✅ Hero image loaded from CMS specifically')
+      } else {
+        console.log('ℹ️ No hero image found in CMS or invalid response, using default')
+      }
+    } catch (imgErr) {
+      console.log('ℹ️ Error fetching hero image specifically, using default:', imgErr.message)
+    }
+
   } catch (error) {
     if (error.response?.status !== 404) {
       console.error('Error fetching leadership data from CMS:', error)
@@ -223,8 +220,13 @@ const fetchLeadershipData = async () => {
   }
 }
 
-onMounted(async () => {
-  await fetchLeadershipData()
+onMounted(() => {
+  // Fetch from CMS and store in parallel
+  // Fetching a large page size of members to catch all potential pastors
+  Promise.all([
+    fetchLeadershipHeroData(),
+    memberStore.fetchMembers({ pageSize: 1000 })
+  ])
 })
 </script>
 

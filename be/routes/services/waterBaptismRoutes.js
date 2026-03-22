@@ -459,6 +459,21 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
       req.body.status &&
       req.body.status.toLowerCase() === 'completed';
 
+    // Auto-transition from pending to scheduled if scheduling info is provided
+    if (req.body && req.body.baptism_date && req.body.pastor_name && req.body.location) {
+      try {
+        const currentBaptismResp = await getWaterBaptismById(id);
+        if (currentBaptismResp.success && currentBaptismResp.data && 
+            currentBaptismResp.data.status && 
+            currentBaptismResp.data.status.toLowerCase() === 'pending') {
+          console.log(`Automatically transitioning baptism ${id} from pending to approved.`);
+          req.body.status = 'approved';
+        }
+      } catch (e) {
+        console.warn('Failed to check current baptism status:', e.message);
+      }
+    }
+
     const result = await updateWaterBaptism(id, req.body);
 
     if (result.success) {
@@ -836,10 +851,13 @@ router.get('/check-time-slot', async (req, res) => {
 
     const params = [baptism_date, baptism_time];
 
-    // Exclude current baptism if editing
-    if (exclude_id) {
-      sql += ' AND baptism_id != ?';
-      params.push(exclude_id);
+    // Exclude 1:00 PM (13:00:00) from being considered "booked" - it has no limit
+    if (baptism_time && (baptism_time === '13:00:00' || baptism_time === '13:00')) {
+      return res.status(200).json({
+        success: true,
+        message: 'Time slot is available (Unlimited slots for 1:00 PM)',
+        data: { isBooked: false }
+      });
     }
 
     const [rows] = await query(sql, params);
@@ -877,11 +895,11 @@ router.get('/check-time-slot', async (req, res) => {
 /**
  * BULK COMPLETE - Mark multiple water baptism records as completed
  * PUT /api/services/water-baptisms/bulkCompleteWaterBaptisms
- * Body: { baptismIds: ["id1", "id2", "id3"] }
+ * Body: { baptismIds: ["id1", "id2", "id3"], completionDate?, completionTime? }
  */
 router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
   try {
-    const { baptismIds } = req.body;
+    const { baptismIds, completionDate, completionTime } = req.body;
 
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
       return res.status(400).json({
@@ -906,15 +924,15 @@ router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
         const errors = [];
 
         for (const id of baptismIds) {
-            const [rows] = await query('SELECT status, baptism_date FROM tbl_waterbaptisms WHERE baptism_id = ?', [id]);
+            const [rows] = await query('SELECT status, baptism_date FROM tbl_waterbaptism WHERE baptism_id = ?', [id]);
             if (rows.length === 0) {
                 errors.push({ id, reason: 'Not found' });
                 continue;
             }
 
             const baptism = rows[0];
-            if (baptism.status !== 'approved') {
-                errors.push({ id, reason: 'Status must be approved' });
+            if (!['approved', 'scheduled', 'pending'].includes((baptism.status || '').toLowerCase())) {
+                errors.push({ id, reason: 'Status must be approved/scheduled/pending' });
                 continue;
             }
 
@@ -937,11 +955,11 @@ router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
             });
         }
 
-        const result = await bulkCompleteWaterBaptismsWithAccount(filteredIds);
+        const result = await bulkCompleteWaterBaptismsWithAccount(filteredIds, completionDate, completionTime);
         return res.json({ ...result, errors });
     }
 
-    const result = await bulkCompleteWaterBaptismsWithAccount(baptismIds);
+    const result = await bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate, completionTime);
 
     if (result.success) {
       res.status(200).json({
@@ -985,7 +1003,7 @@ router.get('/available-slots', async (req, res) => {
     const [bookedRows] = await query(`
       SELECT DATE_FORMAT(baptism_date, '%Y-%m-%d') AS booked_date, preferred_baptism_time as baptism_time
       FROM tbl_waterbaptism
-      WHERE status IN ('Pending', 'Scheduled')
+      WHERE LOWER(status) IN ('pending', 'approved', 'scheduled')
         AND baptism_date IS NOT NULL
         AND baptism_date >= ?
         AND baptism_date < ?
@@ -1016,10 +1034,11 @@ router.get('/available-slots', async (req, res) => {
       const dateStr = date.format('YYYY-MM-DD');
       const bookedTimes = bookedMap[dateStr] || [];
 
-      // Default time slots for water baptism: 10:00 AM, 11:00 AM, 2:00 PM, 3:00 PM, 4:00 PM
-      const defaultSlots = ['10:00:00', '11:00:00', '14:00:00', '15:00:00', '16:00:00'];
+      // Default time slots for water baptism: ONLY 1:00 PM (Unlimited capacity)
+      const defaultSlots = ['13:00:00'];
       
-      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
+      // 1:00 PM (13:00:00) is always available regardless of existing bookings
+      const availableSlots = defaultSlots; // Always 1PM only
 
       if (availableSlots.length > 0) {
         dateGroups.push({
@@ -1027,11 +1046,17 @@ router.get('/available-slots', async (req, res) => {
           dayName: date.format('dddd'),
           availableSlots: availableSlots.length,
           bookedSlots: bookedTimes.length,
-          timeSlots: availableSlots.map(slot => ({
-            time: slot,
-            datetime: `${dateStr} ${slot}`,
-            display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A')
-          }))
+          timeSlots: availableSlots.map(slot => {
+            const count = (bookedRows || []).filter(r => 
+              r.booked_date === dateStr && r.baptism_time === slot
+            ).length;
+            return {
+              time: slot,
+              datetime: `${dateStr} ${slot}`,
+              display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A'),
+              bookingCount: count
+            };
+          })
         });
       }
     }
@@ -1056,4 +1081,3 @@ router.get('/available-slots', async (req, res) => {
 });
 
 module.exports = router;
-

@@ -49,47 +49,6 @@
         </el-select>
       </el-form-item>
 
-      <!-- Department President -->
-      <el-form-item label="Department President" prop="member_id">
-        <el-select
-          v-model="formData.member_id"
-          placeholder="Select department president (optional)"
-          size="large"
-          style="width: 100%"
-          clearable
-          filterable
-        >
-          <el-option
-            v-for="member in departmentLeadOptions"
-            :key="member.id"
-            :label="member.name"
-            :value="member.id"
-          />
-        </el-select>
-      </el-form-item>
-
-      <!-- Department Officers -->
-      <el-form-item label="Department Officers" prop="joined_members">
-        <el-select
-          v-model="formData.joined_members"
-          placeholder="Select department officers (optional)"
-          size="large"
-          style="width: 100%"
-          multiple
-          filterable
-          clearable
-        >
-          <el-option
-            v-for="member in joinedMemberOptions"
-            :key="member.id"
-            :label="member.name"
-            :value="member.id"
-          />
-        </el-select>
-        <div class="text-caption mt-1 text-grey">
-          Select multiple officers who have joined this department
-        </div>
-      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -112,7 +71,6 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 
-// Props
 const props = defineProps({
   modelValue: {
     type: Boolean,
@@ -121,16 +79,6 @@ const props = defineProps({
   departmentData: {
     type: Object,
     default: null
-  },
-  // Members for department president select: [{ id, name, position }] - only President position
-  departmentLeadOptions: {
-    type: Array,
-    default: () => []
-  },
-  // Members for department officers select: [{ id, name, position }] - only Vice President, Secretary, etc.
-  joinedMemberOptions: {
-    type: Array,
-    default: () => []
   }
 })
 
@@ -148,9 +96,7 @@ const isEditMode = computed(() => !!props.departmentData)
 // Form data
 const formData = reactive({
   department_name: '',
-  status: 'active',
-  member_id: null,
-  joined_members: []
+  status: 'active'
 })
 
 // Validation rules
@@ -161,12 +107,6 @@ const rules = {
   ],
   status: [
     { required: true, message: 'Status is required', trigger: 'change' }
-  ],
-  member_id: [
-    // Member is optional (nullable in schema)
-  ],
-  joined_members: [
-    // Joined members is optional
   ]
 }
 
@@ -174,8 +114,6 @@ const rules = {
 const resetForm = () => {
   formData.department_name = ''
   formData.status = 'active'
-  formData.member_id = null
-  formData.joined_members = []
 
   if (formRef.value) {
     formRef.value.clearValidate()
@@ -203,21 +141,6 @@ watch(
       const data = props.departmentData
       formData.department_name = data.department_name || ''
       formData.status = data.status || 'active'
-      formData.member_id = data.member_id || null
-      
-      // Parse joined_members if it's a JSON string
-      if (data.joined_members) {
-        try {
-          const parsed = typeof data.joined_members === 'string' 
-            ? JSON.parse(data.joined_members) 
-            : data.joined_members
-          formData.joined_members = Array.isArray(parsed) ? parsed : []
-        } catch (e) {
-          formData.joined_members = []
-        }
-      } else {
-        formData.joined_members = []
-      }
     } else {
       resetForm()
     }
@@ -259,11 +182,7 @@ const handleSubmit = async () => {
 
     const submitData = {
       department_name: formData.department_name.trim(),
-      status: formData.status,
-      member_id: formData.member_id || null,
-      joined_members: formData.joined_members && formData.joined_members.length > 0 
-        ? formData.joined_members 
-        : null
+      status: formData.status
     }
 
     emit('submit', submitData)

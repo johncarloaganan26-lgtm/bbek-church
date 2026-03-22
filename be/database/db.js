@@ -60,36 +60,8 @@ const dbConfig = {
   // SSL configuration (many cloud databases require SSL)
   ssl: process.env.DB_SSL === 'true' ? {} : false,
 
-  // Images are now stored as base64 strings in LONGTEXT columns
-  // This avoids BLOB corruption issues with typeCast
-  typeCast: function (field, next) {
-    // Handle TEXT fields by converting to string
-    if (field.type === 'TEXT' || field.type === 'LONGTEXT' ||
-      field.type === 'MEDIUMTEXT' || field.type === 'TINYTEXT') {
-      const value = field.string();
-      if (Buffer.isBuffer(value)) {
-        return value.toString('utf8');
-      }
-      return value;
-    }
-
-    // For VARCHAR and other string fields, ensure proper string conversion
-    if (field.type === 'VAR_STRING' || field.type === 'STRING' || field.type === 'VARCHAR') {
-      const value = field.string();
-      if (Buffer.isBuffer(value)) {
-        return value.toString('utf8');
-      }
-      return value;
-    }
-
-    // Handle DATETIME and TIMESTAMP fields
-    if (field.type === 'DATETIME' || field.type === 'TIMESTAMP' ||
-      field.type === 'DATE' || field.type === 'TIME') {
-      return field.string();
-    }
-
-    return next();
-  }
+  // Set dates to return as strings to match previous custom typeCast behavior
+  dateStrings: true
 };
 
 // Create a shared connection pool

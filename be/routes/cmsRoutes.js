@@ -564,33 +564,21 @@ router.get('/:pageName/full', async (req, res) => {
         imagesResult.data.map(img => img.fieldName));
       
       for (const imgInfo of imagesResult.data) {
-        const imgResult = await getCmsImage(pageName, imgInfo.fieldName);
-        if (imgResult.success && imgResult.data && imgResult.data.imageBuffer && imgResult.data.imageBuffer.length > 0) {
-          const base64Data = bufferToBase64(
-            imgResult.data.imageBuffer,
-            imgResult.data.mimeType
-          );
-          imagesData[imgInfo.fieldName] = base64Data;
-          
-          // Log size for debugging
-          if (imgInfo.fieldName === 'homeVideo') {
-            console.log(`Retrieved ${imgInfo.fieldName} from database:`, {
-              blobSize: imgResult.data.blobSize,
-              bufferLength: imgResult.data.imageBuffer ? imgResult.data.imageBuffer.length : 0,
-              base64Length: base64Data ? base64Data.length : 0,
-              mimeType: imgResult.data.mimeType,
-              updatedAt: imgResult.data.updatedAt
-            });
+        if (imgInfo.imageBuffer && imgInfo.imageBuffer.length > 0) {
+          try {
+            const base64Data = bufferToBase64(
+              imgInfo.imageBuffer,
+              imgInfo.mimeType
+            );
+            imagesData[imgInfo.fieldName] = base64Data;
+            
+            // Log size for debugging
+            if (imgInfo.fieldName === 'homeVideo' || imgInfo.imageBuffer.length > 1000000) {
+              console.log(`Processed ${imgInfo.fieldName} (${imgInfo.imageBuffer.length} bytes)`);
+            }
+          } catch (convError) {
+            console.error(`Error converting ${imgInfo.fieldName} to base64:`, convError.message);
           }
-        } else {
-          // Image was deleted or doesn't exist - explicitly exclude it
-          console.log(`Image ${imgInfo.fieldName} not found, deleted, or empty for page ${pageName}`, {
-            success: imgResult.success,
-            hasData: !!imgResult.data,
-            hasBuffer: !!(imgResult.data && imgResult.data.imageBuffer),
-            bufferLength: imgResult.data && imgResult.data.imageBuffer ? imgResult.data.imageBuffer.length : 0
-          });
-          // DO NOT add to imagesData - this ensures deleted images are not returned
         }
       }
     } else {
@@ -601,7 +589,8 @@ router.get('/:pageName/full', async (req, res) => {
     }
     
     // Log final images that will be returned
-    console.log(`Returning ${Object.keys(imagesData).length} image(s) for page ${pageName}:`, Object.keys(imagesData));
+    const finalKeys = Object.keys(imagesData);
+    console.log(`Returning ${finalKeys.length} image(s) for page ${pageName}:`, finalKeys);
 
     res.status(200).json({
       success: true,

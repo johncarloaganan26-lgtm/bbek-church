@@ -1,6 +1,6 @@
 const { query } = require('../../database/db');
 const moment = require('moment-timezone');
-const { sendBibleStudyDetails } = require('../emailHelper');
+const { sendBibleStudyDetails, sendWaterBaptismInvitation } = require('../emailHelper');
 const { validateSelectedSlot } = require('../../utils/scheduling');
 
 moment.tz.setDefault('Asia/Manila');
@@ -38,14 +38,29 @@ async function createBibleStudyRequest(data) {
             salvation_id = null,
             firstname,
             lastname,
+            middle_name = null,
             email,
             phone_number,
+            birthdate = null,
+            age = null,
+            gender = null,
             address = null,
+            civil_status = null,
+            profession = null,
+            spouse_name = null,
+            marriage_date = null,
+            children = null,
             scheduled_date,
             pastor_id,
-            location,
-            notes
+            location: inputLocation,
+            notes,
+            guardian_name = null,
+            guardian_contact = null,
+            guardian_relationship = null
         } = data;
+
+        // Ensure location defaults to the home address for Bible Study if not provided
+        const location = inputLocation || address || null;
 
         if (!firstname || !lastname || !email || !phone_number) {
             throw new Error('Missing required fields: firstname, lastname, email, phone_number');
@@ -94,46 +109,39 @@ async function createBibleStudyRequest(data) {
 
         const formattedDate = scheduled_date ? moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss') : null;
 
-        // Backward compatibility: some DBs may not yet have an "address" column.
-        let hasAddressColumn = false;
-        try {
-            const [columns] = await query("SHOW COLUMNS FROM tbl_biblestudy_requests LIKE 'address'");
-            hasAddressColumn = Array.isArray(columns) && columns.length > 0;
-        } catch (e) {
-            hasAddressColumn = false;
-        }
+        const sql = `
+            INSERT INTO tbl_biblestudy_requests (
+                request_id, salvation_id, firstname, lastname, middle_name,
+                email, phone_number, birthdate, age, gender,
+                address, civil_status, profession, spouse_name, marriage_date,
+                children, scheduled_date, pastor_id, location, notes, status,
+                guardian_name, guardian_contact, guardian_relationship
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-        let sql = '';
-        let params = [];
-        if (hasAddressColumn) {
-            sql = `
-                INSERT INTO tbl_biblestudy_requests (
-                    request_id, salvation_id, firstname, lastname, email, phone_number,
-                    address, scheduled_date, pastor_id, location, notes, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            params = [
-                request_id, salvation_id, firstname, lastname, normalizedEmail, phone_number,
-                address, formattedDate, pastor_id, location, notes, status
-            ];
-        } else {
-            const notesWithAddress = address
-                ? JSON.stringify({ address, notes: notes || null })
-                : (notes || null);
+        const formattedBirth = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
+        const formattedMarriage = marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null;
+        const childrenStr = (children && typeof children === 'object') ? JSON.stringify(children) : (children || null);
 
-            sql = `
-                INSERT INTO tbl_biblestudy_requests (
-                    request_id, salvation_id, firstname, lastname, email, phone_number,
-                    scheduled_date, pastor_id, location, notes, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            params = [
-                request_id, salvation_id, firstname, lastname, normalizedEmail, phone_number,
-                formattedDate, pastor_id, location, notesWithAddress, status
-            ];
-        }
+        const params = [
+            request_id, salvation_id, firstname, lastname, middle_name,
+            normalizedEmail, phone_number, formattedBirth, age, gender,
+            address, civil_status, profession, spouse_name, formattedMarriage,
+            childrenStr, formattedDate, pastor_id, location, notes, status,
+            guardian_name, guardian_contact, guardian_relationship
+        ];
 
         await query(sql, params);
+
+        // If this Bible Study request was created from a Salvation Talk (Phase 1),
+        // mark that previous stage as "Promoted" to show it has moved to the next phase.
+        if (salvation_id) {
+            console.log('Marking salvation request as PROMOTED:', salvation_id);
+            await query(
+                'UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ? AND request_type = "Salvation"',
+                [salvation_id]
+            );
+        }
 
         return {
             success: true,
@@ -219,7 +227,10 @@ async function getAllBibleStudyRequests(params = {}) {
  */
 async function updateBibleStudyRequest(id, data) {
     try {
-        const { status, scheduled_date, pastor_id, location, notes } = data;
+        const { status, scheduled_date, pastor_id, location, notes,
+                middle_name, birthdate, age, gender, address, civil_status,
+                profession, spouse_name, marriage_date, children,
+                guardian_name, guardian_contact, guardian_relationship } = data;
         
         const updates = [];
         const params = [];
@@ -232,6 +243,19 @@ async function updateBibleStudyRequest(id, data) {
         if (pastor_id !== undefined) { updates.push('pastor_id = ?'); params.push(pastor_id); }
         if (location !== undefined) { updates.push('location = ?'); params.push(location); }
         if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
+        if (middle_name !== undefined) { updates.push('middle_name = ?'); params.push(middle_name); }
+        if (birthdate !== undefined) { updates.push('birthdate = ?'); params.push(birthdate ? moment(birthdate).format('YYYY-MM-DD') : null); }
+        if (age !== undefined) { updates.push('age = ?'); params.push(age); }
+        if (gender !== undefined) { updates.push('gender = ?'); params.push(gender); }
+        if (address !== undefined) { updates.push('address = ?'); params.push(address); }
+        if (civil_status !== undefined) { updates.push('civil_status = ?'); params.push(civil_status); }
+        if (profession !== undefined) { updates.push('profession = ?'); params.push(profession); }
+        if (spouse_name !== undefined) { updates.push('spouse_name = ?'); params.push(spouse_name); }
+        if (marriage_date !== undefined) { updates.push('marriage_date = ?'); params.push(marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null); }
+        if (children !== undefined) { updates.push('children = ?'); params.push(typeof children === 'object' ? JSON.stringify(children) : children); }
+        if (guardian_name !== undefined) { updates.push('guardian_name = ?'); params.push(guardian_name); }
+        if (guardian_contact !== undefined) { updates.push('guardian_contact = ?'); params.push(guardian_contact); }
+        if (guardian_relationship !== undefined) { updates.push('guardian_relationship = ?'); params.push(guardian_relationship); }
 
         if (updates.length === 0) return { success: true, message: 'No changes made' };
 
@@ -289,6 +313,9 @@ async function bulkCompleteBibleStudies(requestIds) {
                         ...request,
                         status: 'Completed'
                     });
+                    
+                    // Bible Study completion message is enough
+
                 } catch (emailError) {
                     console.warn(`Email notification failed for Bible Study completion (${id}):`, emailError.message);
                 }
@@ -311,9 +338,56 @@ async function bulkCompleteBibleStudies(requestIds) {
     }
 }
 
+/**
+ * Promote Bible Study Candidate to Water Baptism
+ */
+async function promoteBibleStudyToBaptism(id, isDecided = false) {
+    try {
+        const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+        if (rows.length === 0) throw new Error('Bible study request not found');
+        const req = rows[0];
+
+        const { createWaterBaptism } = require('./waterBaptismRecords');
+        const baptismData = {
+            request_id: id,
+            firstname: req.firstname,
+            lastname: req.lastname,
+            middle_name: req.middle_name,
+            email: req.email,
+            phone_number: req.phone_number,
+            birthdate: req.birthdate,
+            age: req.age,
+            gender: req.gender,
+            address: req.address,
+            civil_status: req.civil_status,
+            profession: req.profession,
+            spouse_name: req.spouse_name,
+            marriage_date: req.marriage_date,
+            children: req.children,
+            is_member: false,
+            status: isDecided ? 'approved' : 'pending',
+            pastor_name: req.pastor_id || null,
+            location: req.location || null,
+            guardian_name: req.guardian_name,
+            guardian_contact: req.guardian_contact,
+            guardian_relationship: req.guardian_relationship
+        };
+
+        const result = await createWaterBaptism(baptismData);
+        if (result.success) {
+            await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+        }
+        return result;
+    } catch (error) {
+        console.error('Error promoting BS to Baptism:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createBibleStudyRequest,
     getAllBibleStudyRequests,
     updateBibleStudyRequest,
-    bulkCompleteBibleStudies
+    bulkCompleteBibleStudies,
+    promoteBibleStudyToBaptism
 };

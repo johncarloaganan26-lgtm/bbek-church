@@ -364,7 +364,7 @@
             :key="option.value"
             :label="option.name"
             :value="option.value"
-            :disabled="option.value === 'completed' && isFutureDate"
+            :disabled="option.value === 'completed' && isFutureDate && !settings.allow_complete_without_schedule"
           />
         </el-select>
       </el-form-item>
@@ -444,9 +444,13 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore'
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
+import { storeToRefs } from 'pinia'
 import axios from '@/api/axios'
 
 const waterBaptismStore = useWaterBaptismStore()
+const settingsStore = useSystemSettingsStore()
+const { settings } = storeToRefs(settingsStore)
 
 // Props
 const props = defineProps({
@@ -804,7 +808,7 @@ const rules = {
     }
   ],
   location: [
-    { required: false, message: 'Location is optional', trigger: 'blur' }
+    { required: true, message: 'Location is required', trigger: 'blur' }
   ],
   pastor_name: [
     { required: true, message: 'Pastor is required', trigger: 'change' }

@@ -1,5 +1,15 @@
 <template>
   <div class="church-leader-list">
+    <div class="cms-notice mb-6">
+      <el-alert
+        title="Page Settings"
+        type="info"
+        description="This section manages the header and visual settings for the Church Leadership page. Individual leader profiles (names, bios, images) are now managed in the 'Church Records > Church Leaders' section."
+        show-icon
+        :closable="false"
+      />
+    </div>
+
     <!-- Hero Image -->
     <div class="list-item">
       <div class="item-label">Hero Image</div>
@@ -26,7 +36,6 @@
             </el-button>
           </template>
         </el-upload>
-        <span v-if="!leaderData.heroImage" class="text-grey ml-2">No file chosen</span>
       </div>
     </div>
     <el-divider />
@@ -102,163 +111,6 @@
     </div>
     <el-divider />
 
-    <!-- Leaders Section -->
-    <div class="leaders-section">
-      <div class="section-header">
-        <div class="section-header-left">
-          <h3 class="section-title">Leaders</h3>
-          <span class="section-count">{{ leaderData.leaders?.length || 0 }} items</span>
-        </div>
-        <el-button type="primary" size="default" @click="showAddLeaderDialog">
-          <el-icon><Plus /></el-icon>
-          Add Leader
-        </el-button>
-      </div>
-
-      <div class="leaders-container">
-        <template v-for="(leader, index) in leaderData.leaders" :key="`leader-${index}`">
-          <div class="leader-card">
-            <div class="leader-header">
-              <div class="leader-main">
-                <div class="leader-number-badge">{{ index + 1 }}</div>
-                <div class="leader-content">
-                  <div class="leader-fields">
-                    <div class="leader-field">
-                      <label class="leader-field-label">Image</label>
-                      <div class="leader-image-preview">
-                        <el-image
-                          v-if="leader.image"
-                          :src="leader.image"
-                          fit="cover"
-                          class="leader-preview-image"
-                        />
-                        <span v-else class="text-grey">No image selected</span>
-                      </div>
-                      <el-upload
-                        :auto-upload="false"
-                        :show-file-list="false"
-                        accept="image/*"
-                        @change="(file) => handleLeaderImageChange(file, index)"
-                      >
-                        <template #trigger>
-                          <el-button size="small" type="primary">
-                            <el-icon><Upload /></el-icon>
-                            Choose File
-                          </el-button>
-                        </template>
-                      </el-upload>
-                    </div>
-                    <div class="leader-field">
-                      <label class="leader-field-label">Name</label>
-                      <el-input
-                        v-model="leader.name"
-                        size="default"
-                        placeholder="Leader name"
-                        class="leader-input"
-                      />
-                      <div class="leader-meta">
-                        <span class="leader-value">{{ leader.name }}</span>
-                      </div>
-                    </div>
-                    <div class="leader-field">
-                      <label class="leader-field-label">Position</label>
-                      <el-input
-                        v-model="leader.position"
-                        size="default"
-                        placeholder="Leader position"
-                        class="leader-input"
-                      />
-                      <div class="leader-meta">
-                        <span class="leader-value leader-position">{{ leader.position }}</span>
-                      </div>
-                    </div>
-                    <div class="leader-field">
-                      <label class="leader-field-label">Bio</label>
-                      <el-input
-                        v-model="leader.bio"
-                        type="textarea"
-                        :rows="3"
-                        size="small"
-                        placeholder="Leader bio"
-                        class="leader-textarea"
-                      />
-                      <div class="leader-meta">
-                        <span class="leader-value">{{ leader.bio }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="leader-actions">
-                <el-button
-                  type="danger"
-                  size="small"
-                  @click="deleteLeader(index)"
-                >
-                  Delete
-                </el-button>
-              </div>
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
-    <el-divider />
-
-    <!-- Join Section Background Color -->
-    <div class="list-item">
-      <div class="item-label">Join Section Background Color</div>
-      <div class="item-preview">
-        <div
-          class="color-preview"
-          :style="{ backgroundColor: leaderData.joinSectionBackgroundColor }"
-        ></div>
-      </div>
-      <div class="item-action">
-        <el-color-picker
-          v-model="leaderData.joinSectionBackgroundColor"
-          size="small"
-        ></el-color-picker>
-      </div>
-    </div>
-    <el-divider />
-
-    <!-- Join Section Title -->
-    <div class="list-item">
-      <div class="item-label">Join Section Title</div>
-      <div class="item-preview">
-        <span class="text-bold">{{ leaderData.joinSectionTitle }}</span>
-      </div>
-      <div class="item-action">
-        <el-input
-          v-model="leaderData.joinSectionTitle"
-          size="small"
-          placeholder="Enter join section title"
-          style="max-width: 400px;"
-        ></el-input>
-      </div>
-    </div>
-    <el-divider />
-
-    <!-- Join Section Text -->
-    <div class="list-item">
-      <div class="item-label">Join Section Text</div>
-      <div class="item-preview">
-        <span class="text-grey">{{ leaderData.joinSectionText }}</span>
-      </div>
-      <div class="item-action">
-        <el-input
-          v-model="leaderData.joinSectionText"
-          type="textarea"
-          :rows="3"
-          size="small"
-          placeholder="Enter join section text"
-          style="max-width: 400px;"
-        ></el-input>
-      </div>
-    </div>
-    <el-divider />
-
     <!-- Back Button Text -->
     <div class="list-item">
       <div class="item-label">Back Button Text</div>
@@ -298,68 +150,6 @@
         ></el-color-picker>
       </div>
     </div>
-
-    <!-- Add Leader Dialog -->
-    <el-dialog
-      v-model="addDialogVisible"
-      title="Add New Leader"
-      width="500px"
-      @close="closeAddDialog"
-    >
-      <div class="edit-dialog-content">
-        <div class="form-group">
-          <label>Name:</label>
-          <el-input
-            v-model="newLeader.name"
-            placeholder="Enter leader name"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Position:</label>
-          <el-input
-            v-model="newLeader.position"
-            placeholder="Enter position"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Bio:</label>
-          <el-input
-            v-model="newLeader.bio"
-            type="textarea"
-            :rows="3"
-            placeholder="Enter leader bio"
-            style="margin-top: 8px;"
-          ></el-input>
-        </div>
-        <div class="form-group" style="margin-top: 16px;">
-          <label>Profile Image:</label>
-          <el-upload
-            :auto-upload="false"
-            :show-file-list="false"
-            accept="image/*"
-            @change="handleNewLeaderImageChange"
-            style="margin-top: 8px;"
-          >
-            <template #trigger>
-              <el-button size="small" type="primary">
-                <el-icon><Upload /></el-icon>
-                Choose File
-              </el-button>
-            </template>
-          </el-upload>
-          <span v-if="!newLeader.image" class="text-grey ml-2">No file chosen</span>
-          <span v-else class="text-grey ml-2">Image selected</span>
-        </div>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="closeAddDialog">Cancel</el-button>
-          <el-button type="primary" @click="addNewLeader">Add Leader</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 
   <!-- Fixed Actions Bar -->

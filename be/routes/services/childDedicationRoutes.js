@@ -625,9 +625,9 @@ router.get('/getAvailableSundayDates', async (req, res) => {
 });
 
 /**
- * AVAILABLE SLOTS - Get available child dedication slots for admin
+ * AVAILABLE SLOTS - Get available child dedication slots (12pm only on Sundays)
  * GET /api/services/child-dedications/available-slots?days=14
- * Returns available Sunday dates with time slots (same as water baptism: 10 AM, 11 AM, 2 PM, 3 PM, 4 PM)
+ * Returns available Sundays with request count for 12pm slot
  */
 router.get('/available-slots', async (req, res) => {
   try {
@@ -640,33 +640,29 @@ router.get('/available-slots', async (req, res) => {
     const start = momentTz().tz(timezone).startOf('day');
     const endExclusive = start.clone().add(days, 'days');
 
-    // Get all booked dedication slots within the date range
+    // Get all 12pm child dedication requests within the date range
     const [bookedRows] = await query(`
-      SELECT DATE_FORMAT(preferred_dedication_date, '%Y-%m-%d') AS booked_date, preferred_dedication_time as dedication_time
+      SELECT DATE_FORMAT(preferred_dedication_date, '%Y-%m-%d') AS booked_date, 
+             COUNT(*) as request_count
       FROM tbl_childdedications
-      WHERE status IN ('Approved', 'Pending', 'Scheduled')
+      WHERE status IN ('Approved', 'Pending', 'Scheduled', 'Completed')
         AND preferred_dedication_date IS NOT NULL
         AND preferred_dedication_date >= ?
         AND preferred_dedication_date < ?
-        AND preferred_dedication_time IS NOT NULL
-      ORDER BY preferred_dedication_date ASC, preferred_dedication_time ASC
+        AND (preferred_dedication_time = '12:00:00' OR preferred_dedication_time = '12:00')
+      GROUP BY booked_date
+      ORDER BY booked_date ASC
     `, [
       start.format('YYYY-MM-DD HH:mm:ss'),
       endExclusive.format('YYYY-MM-DD HH:mm:ss')
     ]);
 
-    const bookedMap = {};
+    const requestCounts = {};
     (bookedRows || []).forEach(row => {
-      const dateKey = row.booked_date;
-      if (!bookedMap[dateKey]) {
-        bookedMap[dateKey] = [];
-      }
-      if (row.dedication_time) {
-        bookedMap[dateKey].push(row.dedication_time);
-      }
+      requestCounts[row.booked_date] = row.request_count || 0;
     });
 
-    // Generate available Sundays with time slots
+    // Generate available Sundays with 12pm slot only
     const dateGroups = [];
     for (let i = 0; i < days; i++) {
       const date = start.clone().add(i, 'days');
@@ -674,26 +670,22 @@ router.get('/available-slots', async (req, res) => {
       if (date.day() !== 0) continue;
 
       const dateStr = date.format('YYYY-MM-DD');
-      const bookedTimes = bookedMap[dateStr] || [];
+      const slotRequestCount = requestCounts[dateStr] || 0;
 
-      // Default time slots for child dedication (same as water baptism): 10:00 AM, 11:00 AM, 2:00 PM, 3:00 PM, 4:00 PM
-      const defaultSlots = ['10:00:00', '11:00:00', '14:00:00', '15:00:00', '16:00:00'];
+      // Only 12:00 PM slot for child dedication
+      const slot = '12:00:00';
       
-      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
-
-      if (availableSlots.length > 0) {
-        dateGroups.push({
-          date: dateStr,
-          dayName: date.format('dddd'),
-          availableSlots: availableSlots.length,
-          bookedSlots: bookedTimes.length,
-          timeSlots: availableSlots.map(slot => ({
-            time: slot,
-            datetime: `${dateStr} ${slot}`,
-            display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A')
-          }))
-        });
-      }
+      dateGroups.push({
+        date: dateStr,
+        dayName: date.format('dddd'),
+        requestCount: slotRequestCount,
+        timeSlots: [{
+          time: slot,
+          datetime: `${dateStr} ${slot}`,
+          display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A'),
+          requestCount: slotRequestCount
+        }]
+      });
     }
 
     return res.json({
@@ -702,6 +694,7 @@ router.get('/available-slots', async (req, res) => {
       meta: {
         timezone,
         days,
+        slot: '12:00 PM',
         startDate: start.format('YYYY-MM-DD'),
         endDate: endExclusive.format('YYYY-MM-DD')
       }

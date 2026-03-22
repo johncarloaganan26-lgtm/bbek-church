@@ -92,22 +92,34 @@
                         :key="dateGroup.date"
                         variant="flat"
                         class="mb-2 sunday-panel"
+                        style="border-left: 4px solid #0d9488"
                       >
                         <v-expansion-panel-title>
                           <div class="d-flex align-center justify-space-between w-100 pr-2">
-                            <div>
-                              <v-icon color="teal-darken-2" class="mr-2">mdi-calendar</v-icon>
-                              <span class="font-weight-medium text-teal-darken-3">{{ formatDate(dateGroup.date) }}</span>
+                            <div class="d-flex align-center">
+                              <v-icon 
+                                :color="dateGroup.isFullyBooked ? 'grey' : 'teal-darken-2'" 
+                                class="mr-2"
+                              >
+                                {{ dateGroup.isFullyBooked ? 'mdi-lock' : 'mdi-calendar' }}
+                              </v-icon>
+                              <span 
+                                class="font-weight-medium"
+                                :style="{ color: dateGroup.isFullyBooked ? '#999999' : '#115e59' }"
+                              >
+                                {{ formatDate(dateGroup.date) }}
+                              </span>
                             </div>
-                            <v-chip 
-                              size="small" 
-                              color="teal" 
-                              variant="flat"
-                              class="mr-2"
-                              style="color: white !important;"
-                            >
-                              {{ dateGroup.availableSlotsCount || dateGroup.availableSlots }} slots
-                            </v-chip>
+                            <div class="d-flex gap-2 align-center">
+                              <v-chip 
+                                size="small" 
+                                color="teal" 
+                                variant="flat"
+                                style="color: white !important;"
+                              >
+                                {{ dateGroup.bookedByCount }}/1 booked
+                              </v-chip>
+                            </div>
                           </div>
                         </v-expansion-panel-title>
                         <v-expansion-panel-text>
@@ -119,6 +131,7 @@
                               variant="outlined"
                               color="teal-darken-2"
                               class="ma-1 time-slot-chip"
+                              style="cursor: pointer;"
                               @click="selectBurialTimeSlot(dateGroup.date, slot.time || slot.displayTime)"
                             >
                               {{ slot.displayTime || slot.time }}
@@ -445,19 +458,33 @@
                     <!-- Preferred Service Date & Time (Night Service Default) -->
                     <div class="form-group">
                       <label for="preferred-service-date">
-                        Preferred Service Date & Time
+                        Preferred Service Date & Time <span class="required-text">Required</span>
                       </label>
-                      <p class="field-note">When would you like the pastor to conduct the burial service? (Night service: 6:00 PM - 10:00 PM)</p>
-                      <el-date-picker
+                      <p class="field-note">Select a time slot from the available dates on the left</p>
+                      <v-text-field
+                        v-if="preferredServiceDate"
                         v-model="preferredServiceDate"
-                        type="datetime"
-                        placeholder="Select date and time"
-                        format="MM/DD/YYYY hh:mm A"
-                        value-format="YYYY-MM-DD HH:mm:ss"
+                        type="text"
+                        placeholder="Select a time slot from the list on the left"
+                        variant="outlined"
+                        density="compact"
+                        readonly
+                        required
+                        hide-details
                         :disabled="burialServiceStore.loading"
                         style="width: 100%"
-                        :disabled-hours="disabledNightHours"
-                        :default-value="defaultNightTimeDate"
+                        prepend-inner-icon="mdi-calendar-clock"
+                      />
+                      <v-text-field
+                        v-else
+                        placeholder="Select a time slot from the list on the left"
+                        variant="outlined"
+                        density="compact"
+                        readonly
+                        disabled
+                        hide-details
+                        style="width: 100%"
+                        prepend-inner-icon="mdi-calendar-clock"
                       />
                     </div>
 
@@ -545,20 +572,17 @@
                     <!-- Preferred Service Date & Time (Night Service Default) -->
                     <el-form-item>
                       <template #label>
-                        <span>Preferred Service Date & Time</span>
+                        <span>Preferred Service Date & Time <span class="required-text">Required</span></span>
                       </template>
-                      <el-date-picker
-                        v-model="memberFormData.preferred_service_date"
-                        type="datetime"
-                        placeholder="Select date and time"
-                        format="MM/DD/YYYY hh:mm A"
-                        value-format="YYYY-MM-DD HH:mm:ss"
-                        style="width: 100%"
-                        :disabled-hours="disabledNightHours"
-                        :default-value="defaultNightTimeDate"
+                      <el-input
+                        :model-value="preferredServiceDate"
+                        placeholder="Select a time slot from the list on the left"
+                        disabled
+                        readonly
+                        prepend-icon="el-icon-date"
                       />
                       <div class="form-hint">
-                        <span>When would you like the pastor to conduct the burial service? (Night service: 6:00 PM - 10:00 PM)</span>
+                        <span>Select a time slot from the available dates on the left panel</span>
                       </div>
                     </el-form-item>
 
@@ -679,7 +703,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
@@ -715,6 +739,7 @@ const isLoggedIn = computed(() => {
 // Available burial dates (for logged-in members)
 const availableBurialDates = ref([])
 const loadingAvailableDates = ref(false)
+const autoRefreshIntervalId = ref(null)
 
 // Fetch available burial dates (for all users - logged in or not)
 const fetchAvailableBurialDates = async () => {
@@ -867,6 +892,18 @@ onMounted(async () => {
   
   // Fetch available burial dates for all users (logged in or not)
   fetchAvailableBurialDates()
+  
+  // Auto-refresh available dates every 30 seconds to show real-time booking updates
+  autoRefreshIntervalId.value = setInterval(() => {
+    fetchAvailableBurialDates()
+  }, 30000) // 30 seconds
+})
+
+// Cleanup interval on component unmount
+onUnmounted(() => {
+  if (autoRefreshIntervalId.value) {
+    clearInterval(autoRefreshIntervalId.value)
+  }
 })
 
 // Watch birthdate to calculate age
@@ -944,6 +981,13 @@ const handleSubmit = async (e) => {
     return
   }
 
+  // Age validation - Burial service requires 18+ years old
+  if (age.value < 18) {
+    submitError.value = 'You must be at least 18 years old to request burial service.'
+    ElMessage.error('You must be at least 18 years old to request burial service.')
+    return
+  }
+
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email.value.trim())) {
@@ -999,6 +1043,9 @@ const handleSubmit = async (e) => {
 
       showSuccessDialog('Success!', successMessage)
 
+      // Refresh available dates to show the newly booked date as unavailable
+      await fetchAvailableBurialDates()
+
       // Clear form after successful submission
       resetForm()
     } else {
@@ -1047,9 +1094,9 @@ const handleMemberSubmit = async () => {
   // Basic validation
   if (!memberFormData.deceased_name.trim() || !memberFormData.deceased_birthdate || 
       !memberFormData.date_death || !memberFormData.relationship || !memberFormData.burial_location.trim() ||
-      !memberFormData.reason_of_death.trim()) {
-    submitError.value = 'Please fill in all required fields.'
-    ElMessage.error('Please fill in all required fields.')
+      !memberFormData.reason_of_death.trim() || !preferredServiceDate.value) {
+    submitError.value = 'Please fill in all required fields, including selecting a service time from the left panel.'
+    ElMessage.error('Please select a burial service time slot from the available dates on the left.')
     return
   }
 
@@ -1064,7 +1111,7 @@ const handleMemberSubmit = async () => {
       location: memberFormData.burial_location.trim(),
       pastor_name: null,
       service_date: null,
-      preferred_service_time: memberFormData.preferred_service_date ? new Date(memberFormData.preferred_service_date).toISOString() : null,
+      preferred_service_time: preferredServiceDate.value,
       status: 'pending',
       deceased_name: memberFormData.deceased_name.trim(),
       deceased_birthdate: memberFormData.deceased_birthdate ? new Date(memberFormData.deceased_birthdate).toISOString().split('T')[0] : '',
@@ -1072,11 +1119,17 @@ const handleMemberSubmit = async () => {
       reason_of_death: memberFormData.reason_of_death.trim() || null,
       member_id: userInfo.value.member?.member_id || null
     }
+    
+    console.log('Member burial service payload:', JSON.stringify(payload, null, 2))
+    console.log('preferred_service_time value:', payload.preferred_service_time)
 
     const result = await burialServiceStore.createService(payload)
     
     if (result.success) {
       showSuccessDialog('Success!', 'Burial service request submitted successfully! Our pastoral team will support you during this time.')
+      
+      // Refresh available dates to show the newly booked date as unavailable
+      await fetchAvailableBurialDates()
       
       // Clear form after successful submission
       memberFormData.deceased_name = ''
@@ -1087,6 +1140,7 @@ const handleMemberSubmit = async () => {
       memberFormData.reason_of_death = ''
       memberFormData.reason_of_death = ''
       memberFormData.preferred_service_date = null
+      preferredServiceDate.value = getDefaultNightTimeDate()
     } else {
       submitError.value = result.error || 'An error occurred while submitting the request. Please try again.'
       ElMessage.error(submitError.value)
@@ -1117,8 +1171,20 @@ const handleBurialDialogSubmit = async (payload) => {
   }
 }
 const selectBurialTimeSlot = (date, time) => {
-  const dateTime = `${date} ${time}:00`
+  // Ensure time format is HH:mm:ss
+  let formattedTime = time
+  if (time && !time.includes(':')) {
+    // If time is just hour like "20", convert to "20:00:00"
+    formattedTime = `${time}:00:00`
+  } else if (time && time.split(':').length === 2) {
+    // If time is "HH:mm", add seconds
+    formattedTime = `${time}:00`
+  }
+  
+  // Format: YYYY-MM-DD HH:mm:ss for the el-date-picker value-format
+  const dateTime = `${date} ${formattedTime}`
   preferredServiceDate.value = dateTime
+  memberFormData.preferred_service_date = dateTime
   ElMessage.success(`Selected: ${date} at ${time}`)
   const registerSection = document.getElementById('register')
   if (registerSection) {

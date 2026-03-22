@@ -2,16 +2,20 @@
   <div class="marriage-record">
     <div class="d-flex justify-space-between align-center mb-6">
       <h1 class="text-h4 font-weight-bold">Marriage Records</h1>
-      <v-btn 
-        color="success" 
-        prepend-icon="mdi-plus" 
-        size="small" 
-        :disabled="loading"
-        :loading="loading"
-        @click="handleMarriageServiceDialog"
-      >
-        New Marriage
-      </v-btn>
+      <div class="d-flex align-center gap-4">
+        <v-btn 
+          color="success" 
+          prepend-icon="mdi-plus" 
+          size="small" 
+          :disabled="loading"
+          :loading="loading"
+          @click="handleMarriageServiceDialog"
+          class="h-100"
+          style="min-height: 48px;"
+        >
+          New Marriage
+        </v-btn>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -154,19 +158,18 @@
                     color="error"
                     variant="flat"
                     size="small"
+                    prepend-icon="mdi-delete"
                     :disabled="loading"
                     @click="bulkDeleteMarriages"
                   >
-                    <v-icon left>mdi-delete</v-icon>
                     Delete Selected
                   </v-btn>
                   <v-btn
-                    variant="outlined"
+                    variant="text"
                     size="small"
                     @click="clearSelection"
                   >
-                    <v-icon left>mdi-close</v-icon>
-                    Clear Selection
+                    Cancel
                   </v-btn>
                 </div>
               </div>
@@ -400,16 +403,8 @@ const handleMarriageServiceDialog = () => {
 
 const editMarriage = (marriage) => {
   marriageServiceData.value = {
-    marriage_id: marriage.marriage_id,
-    groom_member_id: marriage.groom_member_id,
-    groom_name: marriage.groom_name,
-    bride_member_id: marriage.bride_member_id,
-    bride_name: marriage.bride_name,
-    guardians: Array.isArray(marriage.guardians) ? marriage.guardians : [],
-    pastor_id: marriage.pastor_id,
-    location: marriage.location,
-    marriage_date: marriage.marriage_date,
-    status: marriage.status
+    ...marriage,
+    guardians: Array.isArray(marriage.guardians) ? marriage.guardians : []
   }
   marriageServiceDialog.value = true
 }

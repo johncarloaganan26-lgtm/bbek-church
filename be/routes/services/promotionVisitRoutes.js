@@ -57,10 +57,13 @@ router.post('/:id', authenticateToken, async (req, res) => {
             
             // If undecided, also send the Bible Study form link
             if (req.body.isUndecided) {
-                await emailHelper.sendBibleStudyFormLinkEmail({
+                const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5174';
+                const formLink = `${frontendUrl}/bible-study?ref=${id}`;
+                await emailHelper.sendBibleStudyFormLink({
                     email: rows[0].email,
                     firstname: rows[0].firstname,
                     lastname: rows[0].lastname,
+                    formLink,
                     request_id: id
                 });
             }

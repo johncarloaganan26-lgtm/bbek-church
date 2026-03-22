@@ -720,8 +720,11 @@ async function getAllWaterBaptisms(options = {}) {
 
     // Map status counts
     allStatusCountsResult.forEach(row => {
-      if (summaryStats.hasOwnProperty(row.status)) {
-        summaryStats[row.status] = row.count;
+      const status = row.status ? row.status.toLowerCase() : '';
+      if (status === 'approved' || status === 'scheduled') {
+        summaryStats.approved += row.count;
+      } else if (summaryStats.hasOwnProperty(status)) {
+        summaryStats[status] = row.count;
       }
     });
 
@@ -1520,21 +1523,6 @@ async function getSpecificWaterBaptismDataByMemberIdIfBaptized(memberId) {
   }
 }
 
-module.exports = {
-  createWaterBaptism,
-  getAllWaterBaptisms,
-  getWaterBaptismById,
-  getWaterBaptismByMemberId,
-  updateWaterBaptism,
-  deleteWaterBaptism,
-  bulkDeleteWaterBaptisms,
-  bulkCompleteWaterBaptisms,
-  bulkCompleteWaterBaptismsWithAccount,
-  processBaptismCompletion,
-  exportWaterBaptismsToExcel,
-  getSpecificWaterBaptismDataByMemberIdIfBaptized,
-  checkTimeSlotAvailability
-};
 
 // New comprehensive bulk complete function with member/account creation
 async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
@@ -1859,7 +1847,8 @@ async function bulkCompleteWaterBaptisms(baptismIds) {
           continue;
         }
 
-        if (baptism.status !== 'approved') {
+        const status = (baptism.status || '').toLowerCase();
+        if (status !== 'approved' && status !== 'scheduled') {
           skipped++;
           continue;
         }
@@ -1921,3 +1910,19 @@ async function bulkCompleteWaterBaptisms(baptismIds) {
     throw error;
   }
 }
+
+module.exports = {
+  createWaterBaptism,
+  getAllWaterBaptisms,
+  getWaterBaptismById,
+  getWaterBaptismByMemberId,
+  updateWaterBaptism,
+  deleteWaterBaptism,
+  bulkDeleteWaterBaptisms,
+  bulkCompleteWaterBaptisms,
+  bulkCompleteWaterBaptismsWithAccount,
+  processBaptismCompletion,
+  exportWaterBaptismsToExcel,
+  getSpecificWaterBaptismDataByMemberIdIfBaptized,
+  checkTimeSlotAvailability
+};

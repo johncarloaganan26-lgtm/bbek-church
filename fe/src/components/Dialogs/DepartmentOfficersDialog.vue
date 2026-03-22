@@ -45,8 +45,61 @@
         </el-select>
       </el-form-item>
 
-      <!-- Joined Date -->
-      <el-form-item label="Joined Date" prop="joined_date">
+      <!-- Department -->
+      <el-form-item label="Department" prop="department_id">
+        <el-select
+          v-model="formData.department_id"
+          placeholder="Select department"
+          size="large"
+          style="width: 100%"
+          clearable
+          filterable
+        >
+          <el-option
+            v-for="dept in departmentOptions"
+            :key="dept.id"
+            :label="dept.name"
+            :value="dept.id"
+          />
+        </el-select>
+      </el-form-item>
+
+      <!-- Role -->
+      <el-form-item label="Role" prop="role">
+        <el-select
+          v-model="formData.role"
+          placeholder="Select role"
+          size="large"
+          style="width: 100%"
+          clearable
+        >
+          <el-option label="President" value="President" />
+          <el-option label="Vice President" value="Vice President" />
+          <el-option label="Secretary" value="Secretary" />
+          <el-option label="Assistant Secretary" value="Assistant Secretary" />
+          <el-option label="Treasurer" value="Treasurer" />
+          <el-option label="Auditor" value="Auditor" />
+          <el-option label="Coordinator" value="Coordinator" />
+          <el-option label="PIO" value="PIO" />
+          <el-option label="Social Media Coordinator" value="Social Media Coordinator" />
+        </el-select>
+      </el-form-item>
+
+      <!-- Status -->
+      <el-form-item label="Status" prop="status">
+        <el-select
+          v-model="formData.status"
+          placeholder="Select status"
+          size="large"
+          style="width: 100%"
+        >
+          <el-option label="Active" value="Active" />
+          <el-option label="Inactive" value="Inactive" />
+        </el-select>
+      </el-form-item>
+
+      <!-- Date Created -->
+      <el-form-item label="Date Created" prop="joined_date">
         <el-date-picker
           v-model="formData.joined_date"
           type="datetime"
@@ -56,6 +109,37 @@
           value-format="YYYY-MM-DD HH:mm:ss"
           style="width: 100%"
         />
+      </el-form-item>
+
+      <!-- Bio -->
+      <el-form-item label="Bio" prop="bio">
+        <el-input
+          v-model="formData.bio"
+          type="textarea"
+          :rows="4"
+          placeholder="Enter officer biography"
+          size="large"
+          style="width: 100%"
+        />
+      </el-form-item>
+
+      <!-- Image -->
+      <el-form-item label="Profile Image" prop="image">
+        <div class="image-upload-container">
+          <el-upload
+            class="avatar-uploader"
+            :show-file-list="false"
+            :auto-upload="false"
+            accept="image/*"
+            @change="handleImageChange"
+          >
+            <img v-if="formData.image" :src="formData.image" class="avatar" />
+            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+          </el-upload>
+          <div v-if="formData.image" class="image-actions">
+            <el-button type="danger" size="small" @click="formData.image = null">Remove Image</el-button>
+          </div>
+        </div>
       </el-form-item>
     </el-form>
 
@@ -79,6 +163,7 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -92,6 +177,11 @@ const props = defineProps({
   },
   // Members for selection: [{ id, name }]
   memberOptions: {
+    type: Array,
+    default: () => []
+  },
+  // Departments for selection: [{ id, name }]
+  departmentOptions: {
     type: Array,
     default: () => []
   }
@@ -110,13 +200,24 @@ const isEditMode = computed(() => !!props.officerData)
 // Form data
 const formData = reactive({
   member_id: null,
-  joined_date: ''
+  department_id: null,
+  role: '',
+  status: 'Active',
+  joined_date: '',
+  bio: '',
+  image: null
 })
 
 // Validation rules
 const rules = {
   member_id: [
     { required: true, message: 'Member is required', trigger: 'change' }
+  ],
+  department_id: [
+    { required: true, message: 'Department is required', trigger: 'change' }
+  ],
+  role: [
+    { required: true, message: 'Role is required', trigger: 'blur' }
   ],
   joined_date: [
     { required: true, message: 'Joined date is required', trigger: 'change' },
@@ -147,7 +248,12 @@ const rules = {
 watch(() => props.officerData, (newData) => {
   if (newData && props.modelValue) {
     formData.member_id = newData.member_id ?? null
+    formData.department_id = newData.department_id ?? null
+    formData.role = newData.role || ''
+    formData.status = newData.status || 'Active'
     formData.joined_date = newData.joined_date || ''
+    formData.bio = newData.bio || ''
+    formData.image = newData.image || null
   }
 }, { immediate: true })
 
@@ -160,7 +266,11 @@ watch(() => props.modelValue, (isOpen) => {
     // Populate form when dialog opens in edit mode
     const data = props.officerData
     formData.member_id = data.member_id ?? null
+    formData.department_id = data.department_id ?? null
+    formData.role = data.role || ''
     formData.joined_date = data.joined_date || ''
+    formData.bio = data.bio || ''
+    formData.image = data.image || null
   } else {
     // Reset form for add mode
     resetForm()
@@ -170,7 +280,12 @@ watch(() => props.modelValue, (isOpen) => {
 // Reset form
 const resetForm = () => {
   formData.member_id = null
+  formData.department_id = null
+  formData.role = ''
+  formData.status = 'Active'
   formData.joined_date = ''
+  formData.bio = ''
+  formData.image = null
 
   // Clear validation
   if (formRef.value) {
@@ -212,7 +327,12 @@ const handleSubmit = async () => {
       // Prepare data for submission
       const submitData = {
         member_id: formData.member_id,
-        joined_date: formData.joined_date
+        department_id: formData.department_id,
+        role: formData.role,
+        status: formData.status,
+        joined_date: formData.joined_date,
+        bio: formData.bio,
+        image: formData.image
       }
 
       // Emit submit event with data
@@ -244,6 +364,29 @@ const handleSubmit = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Handle image change
+const handleImageChange = (file) => {
+  if (!file || !file.raw) return
+  
+  const isImage = file.raw.type.startsWith('image/')
+  const isLt2M = file.raw.size / 1024 / 1024 < 2
+
+  if (!isImage) {
+    ElMessage.error('Avatar picture must be image format!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('Avatar picture size can not exceed 2MB!')
+    return false
+  }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    formData.image = e.target.result
+  }
+  reader.readAsDataURL(file.raw)
 }
 
 // Expose method to reset loading (can be called by parent component on API error)
@@ -374,6 +517,45 @@ defineExpose({
 
 .department-officers-dialog :deep(.el-dialog__body) {
   position: relative;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.avatar-uploader :deep(.el-upload:hover) {
+  border-color: #14b8a6;
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 120px;
+  height: 120px;
+  text-align: center;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+  display: block;
+  object-fit: cover;
+}
+
+.image-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 </style>
 

@@ -38,8 +38,6 @@
     <ImNew v-if="activeSection === 'imNew'" :activeSection="activeSection" />
     <About v-if="activeSection === 'about'" :activeSection="activeSection" />
     <OurStory v-if="activeSection === 'ourStory'" :activeSection="activeSection" />
-    <ChurchLeader v-if="activeSection === 'churchLeaders'" :activeSection="activeSection" />
-    <DepartmentOfficer v-if="activeSection === 'departmentOfficer'" :activeSection="activeSection" />
     <Belief v-if="activeSection === 'beliefs'" :activeSection="activeSection" />
     <Give v-if="activeSection === 'give'" :activeSection="activeSection" />
     <Events v-if="activeSection === 'events'" :activeSection="activeSection" />
@@ -59,6 +57,8 @@
     <LearnMoreEvents v-if="activeSection === 'learnMoreEvents'" :activeSection="activeSection" />
     <LearnMoreMinistry v-if="activeSection === 'learnMoreMinistry'" :activeSection="activeSection" />
     <AcceptJesus v-if="activeSection === 'acceptJesus'" :activeSection="activeSection" />
+    <ChurchLeader v-if="activeSection === 'churchLeaders'" :activeSection="activeSection" />
+    <DepartmentOfficer v-if="activeSection === 'departmentOfficer'" :activeSection="activeSection" />
     <Info v-if="activeSection === 'info'" :activeSection="activeSection" />
   </div>
 </template>
@@ -71,8 +71,6 @@ import Home from './ListItems/Home.vue'
 import ImNew from './ListItems/ImNew.vue'
 import About from './ListItems/About.vue'
 import OurStory from './ListItems/OurStory.vue'
-import ChurchLeader from './ListItems/ChurchLeader.vue'
-import DepartmentOfficer from './ListItems/DepartmentOfficer.vue'
 import Belief from './ListItems/Belief.vue'
 import Give from './ListItems/Give.vue'
 import Events from './ListItems/Events.vue'
@@ -93,6 +91,8 @@ import AcceptJesus from './ListItems/AcceptJesus.vue'
 import Ministries from './ListItems/Ministries.vue'
 import DepartmentCategories from './ListItems/DepartmentCategories.vue'
 import Info from './ListItems/Info.vue'
+import ChurchLeader from './ListItems/ChurchLeader.vue'
+import DepartmentOfficer from './ListItems/DepartmentOfficer.vue'
 const activeSection = ref('header')
 const sortDirection = ref('asc') // 'asc' for A-Z, 'desc' for Z-A
 
@@ -138,20 +138,6 @@ const contentSections = ref([
     label: 'Our Story',
     action: () => {
       activeSection.value = 'ourStory'
-    }
-  },
-  {
-    id: 'churchLeaders',
-    label: 'Church Leaders',
-    action: () => {
-      activeSection.value = 'churchLeaders'
-    }
-  },
-    {
-    id: 'departmentOfficer',
-    label: 'Department Officer',
-    action: () => {
-      activeSection.value = 'departmentOfficer'
     }
   },
   {
@@ -278,6 +264,20 @@ const contentSections = ref([
     label: 'Accept Jesus Christ',
     action: () => {
       activeSection.value = 'acceptJesus'
+    }
+  },
+  {
+    id: 'churchLeaders',
+    label: 'Church Leaders (Page Settings)',
+    action: () => {
+      activeSection.value = 'churchLeaders'
+    }
+  },
+  {
+    id: 'departmentOfficer',
+    label: 'Department Officers (Page Settings)',
+    action: () => {
+      activeSection.value = 'departmentOfficer'
     }
   },
   {

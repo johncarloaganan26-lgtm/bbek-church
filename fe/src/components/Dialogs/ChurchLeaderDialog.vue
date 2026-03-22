@@ -70,6 +70,37 @@
           <el-option label="Inactive" value="inactive" />
         </el-select>
       </el-form-item>
+
+      <!-- Bio -->
+      <el-form-item label="Bio" prop="bio">
+        <el-input
+          v-model="formData.bio"
+          type="textarea"
+          :rows="4"
+          placeholder="Enter leader biography"
+          size="large"
+          style="width: 100%"
+        />
+      </el-form-item>
+
+      <!-- Image -->
+      <el-form-item label="Profile Image" prop="image">
+        <div class="image-upload-container">
+          <el-upload
+            class="avatar-uploader"
+            :show-file-list="false"
+            :auto-upload="false"
+            accept="image/*"
+            @change="handleImageChange"
+          >
+            <img v-if="formData.image" :src="formData.image" class="avatar" />
+            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+          </el-upload>
+          <div v-if="formData.image" class="image-actions">
+            <el-button type="danger" size="small" @click="formData.image = null">Remove Image</el-button>
+          </div>
+        </div>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -92,6 +123,7 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -124,7 +156,9 @@ const isEditMode = computed(() => !!props.leaderData)
 const formData = reactive({
   member_id: null,
   joined_date: '',
-  status: 'active'
+  status: 'active',
+  bio: '',
+  image: null
 })
 
 // Validation rules
@@ -168,6 +202,8 @@ watch(() => props.leaderData, (newData) => {
     formData.member_id = newData.member_id ?? null
     formData.joined_date = newData.joined_date || ''
     formData.status = newData.status || 'active'
+    formData.bio = newData.bio || ''
+    formData.image = newData.image || null
   }
 }, { immediate: true })
 
@@ -182,6 +218,8 @@ watch(() => props.modelValue, (isOpen) => {
     formData.member_id = data.member_id ?? null
     formData.joined_date = data.joined_date || ''
     formData.status = data.status || 'active'
+    formData.bio = data.bio || ''
+    formData.image = data.image || null
   } else {
     // Reset form for add mode
     resetForm()
@@ -193,6 +231,8 @@ const resetForm = () => {
   formData.member_id = null
   formData.joined_date = ''
   formData.status = 'active'
+  formData.bio = ''
+  formData.image = null
   
   // Clear validation
   if (formRef.value) {
@@ -235,7 +275,9 @@ const handleSubmit = async () => {
       const submitData = {
         member_id: formData.member_id,
         joined_date: formData.joined_date,
-        status: formData.status
+        status: formData.status,
+        bio: formData.bio,
+        image: formData.image
       }
 
       // Emit submit event with data
@@ -267,6 +309,29 @@ const handleSubmit = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Handle image change
+const handleImageChange = (file) => {
+  if (!file || !file.raw) return
+  
+  const isImage = file.raw.type.startsWith('image/')
+  const isLt2M = file.raw.size / 1024 / 1024 < 2
+
+  if (!isImage) {
+    ElMessage.error('Avatar picture must be image format!')
+    return false
+  }
+  if (!isLt2M) {
+    ElMessage.error('Avatar picture size can not exceed 2MB!')
+    return false
+  }
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    formData.image = e.target.result
+  }
+  reader.readAsDataURL(file.raw)
 }
 
 // Expose method to reset loading (can be called by parent component on API error)
@@ -397,6 +462,45 @@ defineExpose({
 
 .church-leader-dialog :deep(.el-dialog__body) {
   position: relative;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.avatar-uploader :deep(.el-upload:hover) {
+  border-color: #14b8a6;
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 120px;
+  height: 120px;
+  text-align: center;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+  display: block;
+  object-fit: cover;
+}
+
+.image-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 </style>
 

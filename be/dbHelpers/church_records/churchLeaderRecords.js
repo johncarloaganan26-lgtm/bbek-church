@@ -2,6 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
+const { processImage } = require('../../utils/imageHandler');
 
 /**
  * Church Leader Records CRUD Operations
@@ -51,6 +52,8 @@ async function createChurchLeader(leaderData) {
       member_id,
       joined_date,
       status = 'active',
+      bio = null,
+      image = null,
       date_created = new Date()
     } = leaderData;
 
@@ -91,14 +94,16 @@ async function createChurchLeader(leaderData) {
 
     const sql = `
       INSERT INTO tbl_churchleaders 
-        (member_id, joined_date, status, date_created)
-      VALUES (?, ?, ?, ?)
+        (member_id, joined_date, status, bio, image, date_created)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
       member_id.trim(),
       formattedJoinedDate,
       status,
+      bio,
+      image,
       formattedDateCreated
     ];
 
@@ -110,7 +115,10 @@ async function createChurchLeader(leaderData) {
     return {
       success: true,
       message: 'Church leader created successfully',
-      data: createdLeader.data
+      data: {
+        ...createdLeader.data,
+        image: processImage(createdLeader.data.image)
+      }
     };
   } catch (error) {
     console.error('Error creating church leader:', error);
@@ -154,6 +162,8 @@ async function getAllChurchLeaders(options = {}) {
       cl.member_id,
       cl.joined_date,
       cl.status,
+      cl.bio,
+      cl.image,
       cl.date_created,
       m.firstname,
       m.lastname,
@@ -294,7 +304,10 @@ async function getAllChurchLeaders(options = {}) {
     return {
       success: true,
       message: 'Church leaders retrieved successfully',
-      data: rows,
+      data: rows.map(row => ({
+        ...row,
+        image: processImage(row.image)
+      })),
       count: rows.length,
       totalCount: totalCount,
       pagination: {
@@ -404,6 +417,8 @@ async function updateChurchLeader(leaderId, leaderData) {
       member_id,
       joined_date,
       status,
+      bio,
+      image,
       date_created
     } = leaderData;
 
@@ -452,6 +467,16 @@ async function updateChurchLeader(leaderId, leaderData) {
       params.push(status);
     }
 
+    if (bio !== undefined) {
+      fields.push('bio = ?');
+      params.push(bio);
+    }
+
+    if (image !== undefined) {
+      fields.push('image = ?');
+      params.push(image);
+    }
+
     if (date_created !== undefined) {
       const formattedDateCreated = moment(date_created).format('YYYY-MM-DD HH:mm:ss');
       fields.push('date_created = ?');
@@ -490,7 +515,10 @@ async function updateChurchLeader(leaderId, leaderData) {
     return {
       success: true,
       message: 'Church leader updated successfully',
-      data: updatedLeader.data
+      data: {
+        ...updatedLeader.data,
+        image: processImage(updatedLeader.data.image)
+      }
     };
   } catch (error) {
     console.error('Error updating church leader:', error);

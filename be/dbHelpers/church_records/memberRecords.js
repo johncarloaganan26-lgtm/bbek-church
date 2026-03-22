@@ -199,6 +199,8 @@ async function createMember(memberData) {
       marriage_date = null,
       children = null,
       desire_ministry = null,
+      department_id = null,
+      profile_image = null,
       date_created = new Date()
     } = memberData;
 
@@ -277,8 +279,8 @@ async function createMember(memberData) {
 
     const sql = `
       INSERT INTO tbl_members
-        (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, profession, spouse_name, marriage_date, children, desire_ministry, date_created)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, profession, spouse_name, marriage_date, children, desire_ministry, department_id, profile_image, date_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -302,6 +304,8 @@ async function createMember(memberData) {
       marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null,
       children ? JSON.stringify(children) : null,
       desire_ministry,
+      department_id,
+      profile_image,
       date_created
     ];
 
@@ -327,6 +331,8 @@ async function createMember(memberData) {
         marriage_date: marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null,
         children,
         desire_ministry,
+        department_id,
+        profile_image,
         date_created
       }
     };
@@ -363,6 +369,8 @@ async function createMemberWithConnection(memberData, connection) {
       marriage_date = null,
       children = null,
       desire_ministry = null,
+      department_id = null,
+      profile_image = null,
       date_created = new Date()
     } = memberData;
 
@@ -400,8 +408,8 @@ async function createMemberWithConnection(memberData, connection) {
 
     const sql = `
       INSERT INTO tbl_members
-        (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, profession, spouse_name, marriage_date, children, desire_ministry, date_created)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (member_id, firstname, lastname, middle_name, birthdate, age, gender, address, email, phone_number, civil_status, position, guardian_name, guardian_contact, guardian_relationship, profession, spouse_name, marriage_date, children, desire_ministry, department_id, profile_image, date_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
@@ -425,6 +433,8 @@ async function createMemberWithConnection(memberData, connection) {
       marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null,
       children ? JSON.stringify(children) : null,
       desire_ministry,
+      department_id,
+      profile_image,
       date_created
     ];
 
@@ -450,6 +460,8 @@ async function createMemberWithConnection(memberData, connection) {
         marriage_date: marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null,
         children,
         desire_ministry,
+        department_id,
+        profile_image,
         date_created
       }
     };
@@ -500,7 +512,9 @@ async function updateMember(memberId, memberData) {
       spouse_name,
       marriage_date,
       children,
-      desire_ministry
+      desire_ministry,
+      department_id,
+      profile_image
     } = memberData;
 
     // Check for duplicate member before updating (exclude current member)
@@ -605,6 +619,14 @@ async function updateMember(memberId, memberData) {
     if (desire_ministry !== undefined) {
       fields.push('desire_ministry = ?');
       params.push(desire_ministry);
+    }
+    if (department_id !== undefined) {
+      fields.push('department_id = ?');
+      params.push(department_id);
+    }
+    if (profile_image !== undefined) {
+      fields.push('profile_image = ?');
+      params.push(profile_image);
     }
 
     if (fields.length === 0) {
@@ -840,9 +862,17 @@ async function getAllMembers(options = {}) {
       sql += whereClause;
     }
 
-    // Add sorting
-    // Handle sortBy parameter (e.g., "Name (A-Z)", "Name (Z-A)", "Join Date (Newest)", etc.)
-    let orderByClause = ' ORDER BY ';
+    // Add position-based sorting priority (Primary Sort Key)
+    // 1: Pastors, 2: Officers, 3: Members
+    // Then group by Department ID to keep ministry teams together
+    let orderByClause = ` ORDER BY 
+      CASE 
+        WHEN position LIKE '%pastor%' THEN 1
+        WHEN position IN ('president', 'vice_president', 'secretary', 'assistant_secretary', 'treasurer', 'auditor', 'coordinator', 'pio', 'socmed_coordinator') THEN 2
+        ELSE 3
+      END ASC,
+      department_id ASC, `;
+
     const sortByValue = sortBy && sortBy.trim() !== '' ? sortBy.trim() : null;
     switch (sortByValue) {
       case 'Name (A-Z)':
@@ -856,6 +886,12 @@ async function getAllMembers(options = {}) {
         break;
       case 'Join Date (Oldest)':
         orderByClause += 'date_created ASC';
+        break;
+      case 'Join Month (Jan-Dec)':
+        orderByClause += 'MONTH(date_created) ASC, DAY(date_created) ASC';
+        break;
+      case 'Join Month (Dec-Jan)':
+        orderByClause += 'MONTH(date_created) DESC, DAY(date_created) DESC';
         break;
       case 'Age (Low to High)':
         // Cast age to number for proper numeric sorting (age is stored as VARCHAR)

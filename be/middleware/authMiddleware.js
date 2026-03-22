@@ -146,15 +146,21 @@ const publicRoutes = [
   '/api/church-records/tithes/submitOnlineDonation',
   // Discipleship routes (public for form submission)
   '/api/services/discipleship-requests/submit',
-  '/api/services/discipleship-requests/registration-data',
+  '/api/services/discipleship-requests/registration-data/**',
   '/api/services/discipleship-requests/available-slots',
   '/api/services/biblestudy-requests/submit',
+  '/api/services/biblestudy-requests/registration-data/**',
   '/api/services/salvation-availability',
   // Water baptism public registration (no auth required)
   '/api/public/water-baptism/register',
   // Give page recommendation/routes (public)
   '/api/cms/give/recommendations',
   '/api/cms/give/recommendations/create',
+  // Church leaders and department officers (publicly viewable)
+  '/api/church-records/church-leaders/getAllChurchLeaders',
+  '/api/church-records/department-officers/getAllDepartmentOfficers',
+  '/api/church-records/departments/getAllDepartments',
+  '/api/church-records/members/getAllMembers',
 ];
 
 /**

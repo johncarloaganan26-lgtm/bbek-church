@@ -1,6 +1,5 @@
 <template>
   <div class="about-wrapper">
-    <AboutGrid />
     <router-view />
   </div>
 </template>

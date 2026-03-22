@@ -629,7 +629,7 @@
             :key="opt.value"
             :label="opt.label"
             :value="opt.value"
-            :disabled="opt.value === 'completed' && isFutureDate"
+            :disabled="opt.value === 'completed' && isFutureDate && !settings.allow_complete_without_schedule && formData._originalStatus !== 'completed'"
           />
         </el-select>
       </el-form-item>
@@ -670,7 +670,12 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
+import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
+import { storeToRefs } from 'pinia'
 import axios from '@/api/axios'
+
+const settingsStore = useSystemSettingsStore()
+const { settings } = storeToRefs(settingsStore)
 
 const userInfo = ref(null)
 const selectedMemberData = ref(null) // Store selected member data for admin/staff users
@@ -1072,7 +1077,8 @@ const formData = reactive({
   pastor: '',
   location: '',
   status: 'pending',
-  rejection_reason: ''
+  rejection_reason: '',
+  _originalStatus: ''
 })
 
 // Status options
@@ -1508,6 +1514,7 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.location = data.location || ''
       formData.status = data.status || 'pending'
       formData.rejection_reason = data.rejection_reason || ''
+      formData._originalStatus = data.status || ''
 
       // For edit mode, if admin/staff user, fetch the selected member's data
       if (!isMemberUser.value && data.requested_by) {
@@ -1593,6 +1600,7 @@ const resetForm = () => {
   formData.location = ''
   formData.status = 'pending'
   formData.rejection_reason = ''
+  formData._originalStatus = ''
   
   // Clear selected member data
   selectedMemberData.value = null

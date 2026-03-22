@@ -145,6 +145,25 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         fetchRequests();
     };
 
+    const rejectRequest = async (id, reason) => {
+        loading.value = true;
+        try {
+            const response = await axios.post(`/services/discipleship-requests/reject/${id}`, { reason });
+            if (response.data.success) {
+                ElMessage.success('Request rejected and email with suggestions sent');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error rejecting request:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to reject request');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
     const deleteRequest = async (id, reason = '') => {
         loading.value = true;
         try {
@@ -308,6 +327,7 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         promoteToBaptism,
         promoteToBibleStudy,
         inviteToBaptism,
+        rejectRequest,
         fetchRegistrationData,
         deleteRequest,
         bulkArchiveRequests,

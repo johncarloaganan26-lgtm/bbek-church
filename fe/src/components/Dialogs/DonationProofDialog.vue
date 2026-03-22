@@ -27,10 +27,10 @@
           <path d="M7 12.5L10 15.5L17 8.5" stroke="#14b8a6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <h3 class="success-title">Donation Submitted Successfully!</h3>
+      <h3 class="success-title">Donation Confirmed!</h3>
       <p class="success-message">
-        Thank you for your generous donation. Your proof of payment has been received 
-        and will be reviewed by our church admin. You will be notified once it's confirmed.
+        Thank you for your generous donation. Your donation has been received and confirmed.
+        A confirmation email has been sent. The admin may publish a transparency proof later.
       </p>
       <el-button type="primary" size="large" @click="handleClose" class="success-btn">
         Close

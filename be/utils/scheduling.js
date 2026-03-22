@@ -5,7 +5,8 @@ const SLOT_INTERVAL_MINUTES = 30;
 
 const TIME_RANGES = {
   ALL_DAY: { start: '08:00', end: '20:00' }, // Mon-Fri any time
-  MORNING_NOON: { start: '08:00', end: '17:00' }, // No evening (starts at 5 PM or 6 PM)
+  MORNING_NOON: { start: '08:00', end: '12:00' }, // Custom 8AM-12PM Range
+  SALVATION_TALK: { start: '08:00', end: '12:00' },
   NOON_ONLY: { times: ['12:00'] },
 };
 
@@ -40,16 +41,14 @@ function parseDateTime(dateTimeStr, timezone = DEFAULT_TIMEZONE) {
 function getAllowedTimeRanges(serviceType, dayOfWeek) {
   // dayOfWeek: 0=Sun .. 6=Sat (moment().day())
   if (serviceType === 'salvation') {
-    if (dayOfWeek === 0) return [TIME_RANGES.NOON_ONLY]; // Sunday: Noon only
-    if (dayOfWeek === 3) return [TIME_RANGES.MORNING_NOON]; // Wednesday: No evening
-    if (dayOfWeek === 6) return [TIME_RANGES.MORNING_NOON]; // Saturday: Morning and Noon, No evening
-    return [TIME_RANGES.ALL_DAY]; // Mon, Tue, Thu, Fri: Any time
+    // Salvation Talk is available daily 08:00 AM - 12:00 PM
+    return [TIME_RANGES.SALVATION_TALK];
   }
 
   if (serviceType === 'bible_study') {
-    if (dayOfWeek === 3) return [TIME_RANGES.MORNING_NOON]; // Wednesday: No evening
-    if (dayOfWeek === 6) return [TIME_RANGES.MORNING_NOON]; // Saturday: No evening
-    return []; // Bible Study is ONLY Wed/Sat
+    if (dayOfWeek === 0) return []; // Sunday: No schedule
+    if (dayOfWeek === 3 || dayOfWeek === 6) return [TIME_RANGES.MORNING_NOON]; // Wednesday/Saturday: No evening
+    return [TIME_RANGES.ALL_DAY]; // All other days (Mon, Tue, Thu, Fri): Daily
   }
 
   return [];
@@ -65,6 +64,15 @@ function isWithinRange(slotMoment, range) {
 
   // Compare using minutes precision. We treat slot as a start time that must be within [start, end].
   return slotMoment.isSameOrAfter(start, 'minute') && slotMoment.isSameOrBefore(end, 'minute');
+}
+
+function getSlotIntervalMinutes(serviceType) {
+  // Bible Study requires 90-minute (1.5 hour) gaps between sessions
+  // Salvation Talk uses standard 30-minute intervals
+  if (serviceType === 'bible_study') {
+    return 90;
+  }
+  return SLOT_INTERVAL_MINUTES; // Default 30 minutes for salvation
 }
 
 function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAULT_TIMEZONE, now = null }) {
@@ -83,6 +91,7 @@ function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAUL
   const ranges = getAllowedTimeRanges(normalizedService, day);
 
   const slots = [];
+  const intervalMinutes = getSlotIntervalMinutes(normalizedService);
 
   for (const range of ranges) {
     if (range.times) {
@@ -100,7 +109,7 @@ function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAUL
     const cursor = start.clone();
     while (cursor.isSameOrBefore(end)) {
       slots.push(cursor.clone());
-      cursor.add(SLOT_INTERVAL_MINUTES, 'minutes');
+      cursor.add(intervalMinutes, 'minutes');
     }
   }
 
@@ -112,8 +121,8 @@ function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAUL
 
   const sorted = Array.from(unique.values()).sort((a, b) => a.valueOf() - b.valueOf());
 
-  // Filter out past slots if same day.
-  const filtered = sorted.filter((slot) => slot.isSameOrAfter(effectiveNow, 'minute'));
+  // Filter out slots for today and the past. Only allow from tomorrow onwards for preparation.
+  const filtered = sorted.filter((slot) => slot.isAfter(effectiveNow, 'day'));
 
   return {
     success: true,
@@ -125,7 +134,7 @@ function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAUL
       timezone,
       serviceType: normalizedService,
       date: date.format('YYYY-MM-DD'),
-      intervalMinutes: SLOT_INTERVAL_MINUTES,
+      intervalMinutes: intervalMinutes,
     },
   };
 }
@@ -142,17 +151,32 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
   }
 
   const effectiveNow = now || moment().tz(timezone);
-  if (slot.isBefore(effectiveNow, 'minute')) {
-    return { valid: false, message: 'Cannot schedule in the past. Please select a future time slot.' };
+  if (slot.isSameOrBefore(effectiveNow, 'day')) {
+    return { valid: false, message: 'Same-day scheduling is not allowed. Please select a date starting from tomorrow to allow for preparation.' };
   }
 
   if (slot.seconds() !== 0) {
     return { valid: false, message: 'Invalid time slot. Please select an exact time slot.' };
   }
 
-  if (slot.minutes() % SLOT_INTERVAL_MINUTES !== 0) {
-    return { valid: false, message: `Invalid time slot. Please select a ${SLOT_INTERVAL_MINUTES}-minute interval time.` };
+  const intervalMinutes = getSlotIntervalMinutes(normalizedService);
+  
+  // For intervals > 60 minutes (like Bible Study 90min), simple modulo on slot.minutes() fails.
+  // Instead, generate candidate slots for the date and check if the selected slot is one of them.
+  const candidates = generateCandidateSlotsForDate({ 
+    serviceType: normalizedService, 
+    dateStr: slot.format('YYYY-MM-DD'), 
+    timezone,
+    now: effectiveNow.clone().subtract(1, 'year') // Allow checking older slots if needed for validation
+  });
+
+  const slotStr = slot.format('YYYY-MM-DD HH:mm:ss');
+  const isValidCandidate = candidates.data.some(c => c.datetime === slotStr);
+
+  if (!isValidCandidate) {
+    return { valid: false, message: `Invalid time slot. Please select a valid ${intervalMinutes}-minute interval slot starting from the available range.` };
   }
+
 
   const ranges = getAllowedTimeRanges(normalizedService, slot.day());
   if (ranges.length === 0) {

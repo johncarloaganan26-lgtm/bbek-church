@@ -40,12 +40,13 @@ e<template>
                   v-for="timeSlot in dateGroup.timeSlots"
                   :key="timeSlot.datetime"
                   size="small"
-                  :type="isSlotSelected(timeSlot.datetime) ? 'primary' : 'default'"
+                  :type="isSlotSelected(timeSlot.datetime) ? 'primary' : (timeSlot.isBooked ? 'danger' : 'default')"
                   :plain="!isSlotSelected(timeSlot.datetime)"
+                  :disabled="timeSlot.isBooked"
                   @click="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display)"
                   class="time-slot-button"
                 >
-                  {{ timeSlot.display }}
+                  {{ timeSlot.display }} {{ timeSlot.isBooked ? '(Booked)' : '' }}
                 </el-button>
               </div>
             </el-collapse-item>

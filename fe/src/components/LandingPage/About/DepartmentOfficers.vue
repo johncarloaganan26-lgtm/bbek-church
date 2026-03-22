@@ -1,10 +1,10 @@
 <template>
   <div class="department-officers-page">
     <!-- Hero Section -->
-    <section class="hero-section">
+    <header class="hero-section">
       <div
         class="hero-background"
-        :style="{ backgroundImage: `url(${deptOfficersData.heroImage || getImageUrl('/img/churchdepartments.webp')})` }"
+        :style="{ backgroundImage: `url(${resolveImage(deptOfficersData.heroImage, '/img/officers/default.png')})` }"
         @error="handleHeroImageError"
       ></div>
       <div class="hero-overlay-gradient"></div>
@@ -25,7 +25,7 @@
           {{ deptOfficersData.heroSubtitle || 'Dedicated leaders serving and growing together in Christ.' }}
         </p>
       </div>
-    </section>
+    </header>
 
     <!-- Department Officers Section -->
     <section class="py-20" :style="{ backgroundColor: deptOfficersData.backgroundColor || '#ffffff' }">
@@ -51,7 +51,7 @@
               <v-card class="officer-card" elevation="2" hover>
                 <div class="officer-image-wrapper">
                   <v-img
-                    :src="officer.image && officer.image.startsWith('data:') ? officer.image : getImageUrl(officer.image)"
+                    :src="resolveImage(officer.image, '/img/officers/default.png')"
                     :alt="officer.name"
                     cover
                     @error="(event) => handleImageError(event, officer)"
@@ -95,30 +95,41 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from '@/api/axios'
+import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
+import { useDepartmentsStore } from '@/stores/ChurchRecords/departmentsStore'
 
-const getImageUrl = (imagePath) => {
-  // Properly encode the URL, handling spaces and special characters
-  const parts = imagePath.split('/')
-  const filename = parts.pop()
-  const encodedFilename = encodeURIComponent(filename)
-  return parts.join('/') + '/' + encodedFilename
-}
+const memberStore = useMemberRecordStore()
+const departmentsStore = useDepartmentsStore()
 
 const imageErrors = ref(new Map())
+
+const getImageUrl = (imagePath) => {
+  if (!imagePath || typeof imagePath !== 'string') return ''
+  // If it's already an absolute or base64 URL, return as is
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath
+  
+  const parts = imagePath.split('/')
+  const filename = parts.pop()
+  if (!filename) return imagePath
+  const encodedFilename = encodeURIComponent(filename)
+  return (parts.length > 0 ? parts.join('/') + '/' : '') + encodedFilename
+}
 
 const handleImageError = (event, officer) => {
   // Track errors to prevent infinite loops
   const errorKey = officer.image
-  if (imageErrors.value.has(errorKey)) return
+  if (!errorKey || imageErrors.value.has(errorKey)) return
   imageErrors.value.set(errorKey, true)
   
-  // Use a placeholder gradient
-  const imgElement = event.target.closest('.v-avatar')?.querySelector('img')
-  if (imgElement) {
-    imgElement.style.background = 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)'
-    imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTRiOGE2Ii8+PC9zdmc+'
+  // Use a placeholder gradient if possible
+  if (event && event.target && typeof event.target.closest === 'function') {
+    const imgElement = event.target.closest('.v-avatar')?.querySelector('img')
+    if (imgElement) {
+      imgElement.style.background = 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)'
+      imgElement.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMTRiOGE2Ii8+PC9zdmc+'
+    }
   }
 }
 
@@ -145,39 +156,7 @@ const floatingElements = ref([
   { style: { bottom: '50%', left: '25%', width: '52px', height: '52px', animationDelay: '0.9s' } }
 ])
 
-const defaultDepartments = [
-  {
-    name: "Adult Ladies Department",
-    officers: [
-      { name: "Sis. Danica Aldousari", role: "President/Coordinator", image: "/img/officers/adult_ladies_president.png" },
-      { name: "Sis. Melody Bilog", role: "Vice President", image: "/img/officers/adult_ladies_vice_president.png" },
-      { name: "Sis. Espie Apelado", role: "Secretary", image: "/img/officers/adult_ladies_secretary.png" },
-      { name: "Sis. Nancy Belleza", role: "Treasurer", image: "/img/officers/adult_ladies_treasurer.png" },
-      { name: "Ma'am Gina Sulapas", role: "Auditor", image: "/img/officers/adult_ladies_auditor.jpg" }
-    ]
-  },
-  {
-    name: "Adult Men Department",
-    officers: [
-      { name: "Bro. Danny Delos Santos", role: "President", image: "/img/officers/adult_men_president.jpg" },
-      { name: "Bro. Roland Santos", role: "Vice President", image: "/img/officers/adult_men_vice_president.jpg" },
-      { name: "Bro. Robert Apelado", role: "Secretary", image: "/img/officers/adult_men_secretary.jpg" },
-      { name: "Bro. Rowel Bucayan", role: "Treasurer", image: "/img/officers/adult_men_treasurer.png" }
-    ]
-  },
-  {
-    name: "Young People Department",
-    officers: [
-      { name: "Sis. Jessica Las", role: "President", image: "/img/officers/yp_president.jpg" },
-      { name: "Bro. Jessie Timuat", role: "Vice President", image: "/img/officers/yp_vice_president.jpg" },
-      { name: "Sis. Erica Villegas", role: "Secretary", image: "/img/officers/yp_secretary.jpg" },
-      { name: "Sis. Selah Acojedo", role: "Assistant Secretary", image: "/img/officers/yp_assistant_secretary.jpg" },
-      { name: "Sis. Frena May Sulapas", role: "Treasurer", image: "/img/officers/yp_treasurer.jpg" },
-      { name: "Sis. Camille Bucayan", role: "PIO", image: "/img/officers/yp_pio.jpg" },
-      { name: "Sis. Donita Sibugan", role: "Social Media Coordinator", image: "/img/officers/yp_socmed.jpg" }
-    ]
-  }
-]
+const defaultDepartments = []
 
 const deptOfficersData = ref({
   heroTitle: 'Department Officers',
@@ -188,105 +167,165 @@ const deptOfficersData = ref({
   backButtonColor: '#14b8a6'
 })
 
-const departmentsData = ref(defaultDepartments)
+const departmentsData = computed(() => {
+  const grouped = {}
 
-// Fetch department officers data from CMS
-const fetchDeptOfficersData = async () => {
+  // Sorting priority for positions
+  const positionPriority = {
+    'president': 1,
+    'vice_president': 2,
+    'secretary': 3,
+    'assistant_secretary': 4,
+    'treasurer': 5,
+    'auditor': 6,
+    'coordinator': 7,
+    'pio': 8,
+    'socmed_coordinator': 9,
+    'member': 10
+  }
+  
+  // Map ALL existing departments exactly as they appear in the admin records
+  departmentsStore.departments.forEach(dept => {
+    const deptName = dept.name || dept.department_name
+    if (deptName) {
+      grouped[deptName] = {
+        name: deptName,
+        officers: []
+      }
+    }
+  })
+  
+  // Only show these specific officer positions
+  const officerPositions = [
+    'president', 'vice_president', 'secretary', 'assistant_secretary',
+    'treasurer', 'auditor', 'coordinator', 'pio', 'socmed_coordinator'
+  ]
+
+  // Get active members who have a designated leadership position AND a department explicitly matched
+  const activeMembersWithPosition = (memberStore.members || []).filter(m => 
+    m.position && 
+    m.position !== 'none' && 
+    m.position !== 'member' && 
+    officerPositions.includes(m.position.toLowerCase()) &&
+    m.department_id // Must have a mapped department
+  )
+  
+  activeMembersWithPosition.forEach(member => {
+    // Resolve department name and drop unmapped/lost references
+    const dept = departmentsStore.departments.find(d => (d.id || d.department_id) === member.department_id)
+    if (!dept) return
+    
+    const deptName = dept.name || dept.department_name
+    
+    if (grouped[deptName]) {
+      // Format the role for display (e.g., 'vice_president' -> 'Vice President')
+      let position = member.position || 'member'
+      let formattedRole = position.replace(/_/g, ' ')
+      formattedRole = formattedRole.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  
+      grouped[deptName].officers.push({
+        name: `${member.firstname} ${member.lastname}`.trim(),
+        role: formattedRole,
+        priority: positionPriority[member.position] || 99,
+        image: member.profileImage || member.profile_image || member.image || '/img/officers/default.png',
+        bio: member.testimony || ''
+      })
+    }
+  })
+  
+  // Convert map to array and sort officers in each department
+  const result = Object.values(grouped).map(dept => {
+    dept.officers.sort((a, b) => {
+      return (a.priority || 99) - (b.priority || 99)
+    })
+    return dept
+  })
+
+  // Group priority map for departments
+  const departmentPriorityMap = {
+    'Adult Men': 1,
+    'Men': 1,
+    'Adult Ladies': 2,
+    'Ladies': 2,
+    'Young People': 3,
+    'Youth': 3
+  }
+
+  // Sort departments by priority map, then alphabetically
+  return result.sort((a, b) => {
+    const priorityA = departmentPriorityMap[a.name] || (a.name.includes('Men') ? 1 : a.name.includes('Ladies') ? 2 : a.name.includes('Youth') || a.name.includes('Young') ? 3 : 99)
+    const priorityB = departmentPriorityMap[b.name] || (b.name.includes('Men') ? 1 : b.name.includes('Ladies') ? 2 : b.name.includes('Youth') || b.name.includes('Young') ? 3 : 99)
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB
+    }
+    return a.name.localeCompare(b.name)
+  })
+})
+
+// Safe image resolver helper
+const resolveImage = (image, fallback) => {
+  if (!image) return getImageUrl(fallback)
+  
+  // If image is a string, check format
+  if (typeof image === 'string') {
+    if (image.startsWith('data:') || image.startsWith('http')) {
+      return image
+    }
+    return getImageUrl(image)
+  }
+  
+  // If it's a buffer object (from backend)
+  if (typeof image === 'object' && image && image.type === 'Buffer' && Array.isArray(image.data)) {
+    // This shouldn't happen with updated typeCast, but as a fallback:
+    return `data:image/jpeg;base64,${btoa(String.fromCharCode.apply(null, image.data))}`
+  }
+  
+  return getImageUrl(fallback)
+}
+
+// Fetch department officers hero data from CMS
+const fetchDeptOfficersHeroData = async () => {
   try {
-    const response = await axios.get('/cms/departmentofficer/full')
-    if (response.data.success && response.data.data) {
-      const { page, images: cmsImages } = response.data.data
-      const content = page?.content || {}
+    // 1. Fetch content (text fields)
+    const pageResponse = await axios.get('/cms/departmentofficer')
+    if (pageResponse.data.success && pageResponse.data.data) {
+      const content = pageResponse.data.data.content || {}
       
-      console.log('CMS Response - Department Officers:', { content, cmsImages })
-      
-      // Update department officers data from content
+      // Update data from content
       if (content.heroTitle) deptOfficersData.value.heroTitle = content.heroTitle
       if (content.heroSubtitle) deptOfficersData.value.heroSubtitle = content.heroSubtitle
-      if (content.backgroundColor) {
-        deptOfficersData.value.backgroundColor = content.backgroundColor
-        console.log('Background color from CMS:', content.backgroundColor)
-      }
+      if (content.backgroundColor) deptOfficersData.value.backgroundColor = content.backgroundColor
       if (content.backButtonText) deptOfficersData.value.backButtonText = content.backButtonText
-      if (content.backButtonColor) {
-        deptOfficersData.value.backButtonColor = content.backButtonColor
-        console.log('Back button color from CMS:', content.backButtonColor)
-      }
+      if (content.backButtonColor) deptOfficersData.value.backButtonColor = content.backButtonColor
       
-      // Handle hero image - images are stored as BLOB, returned as base64 in images object
-      // The image is stored with field_name = 'heroImage' in tbl_cms_images
-      if (cmsImages && typeof cmsImages === 'object' && cmsImages.heroImage) {
-        const heroImageBase64 = cmsImages.heroImage
-        if (heroImageBase64 && typeof heroImageBase64 === 'string' && heroImageBase64.startsWith('data:image/')) {
-          deptOfficersData.value.heroImage = heroImageBase64
-          console.log('✅ Hero image loaded from CMS (BLOB converted to base64)')
-        } else {
-          console.log('⚠️ Hero image in CMS is not a valid base64 image')
-        }
-      } else {
-        console.log('ℹ️ No hero image found in CMS, using default')
+      console.log('✅ Dept Officers Hero CMS content loaded successfully')
+    }
+
+    // 2. Fetch only the hero image specifically (avoiding the 17+ slow CMS images)
+    try {
+      const imgResponse = await axios.get('/cms/departmentofficer/image/heroImage')
+      if (imgResponse.data.success && imgResponse.data.data?.imageBase64) {
+        deptOfficersData.value.heroImage = imgResponse.data.data.imageBase64
+        console.log('✅ Dept Officers Hero image loaded from CMS specifically')
       }
-      
-      // Handle departments array
-      if (content.departments && Array.isArray(content.departments) && content.departments.length > 0) {
-        departmentsData.value = content.departments.map((dept, deptIndex) => {
-          const department = {
-            name: dept.name || '',
-            officers: []
-          }
-          
-          // Process officers for this department
-          if (dept.officers && Array.isArray(dept.officers)) {
-            department.officers = dept.officers.map((officer, officerIndex) => {
-              // Images are stored with keys like: departments[0].officers[0].image, etc.
-              const imageKey = `departments[${deptIndex}].officers[${officerIndex}].image`
-              let officerImage = ''
-              
-              // First check images object (BLOB converted to base64)
-              if (cmsImages && typeof cmsImages === 'object' && cmsImages[imageKey]) {
-                const imageBase64 = cmsImages[imageKey]
-                if (imageBase64 && typeof imageBase64 === 'string' && imageBase64.startsWith('data:image/')) {
-                  officerImage = imageBase64
-                  console.log(`✅ Officer ${deptIndex}-${officerIndex} image loaded from CMS (BLOB converted to base64)`)
-                }
-              }
-              
-              // Fallback to officer.image if it's base64 (composable might have merged it)
-              if (!officerImage && officer.image && typeof officer.image === 'string' && officer.image.startsWith('data:image/')) {
-                officerImage = officer.image
-                console.log(`✅ Officer ${deptIndex}-${officerIndex} image from merged content`)
-              }
-              
-              return {
-                name: officer.name || '',
-                role: officer.role || '',
-                image: officerImage
-              }
-            })
-          }
-          
-          return department
-        })
-        console.log('✅ Departments loaded from CMS:', departmentsData.value.length, 'departments')
-      } else {
-        console.log('ℹ️ No departments found in CMS, using defaults')
-      }
-      
-      console.log('✅ Department Officers CMS data loaded successfully')
-    } else {
-      console.log('⚠️ No CMS data found for Department Officers, using defaults')
+    } catch (imgErr) {
+      console.log('ℹ️ No Dept Officers hero image found in CMS, using default')
     }
   } catch (error) {
     if (error.response?.status !== 404) {
-      console.error('Error fetching department officers data from CMS:', error)
-    } else {
-      console.log('CMS page not found (404), using default values')
+      console.error('Error fetching dept officers hero data from CMS:', error)
     }
   }
 }
 
-onMounted(async () => {
-  await fetchDeptOfficersData()
+onMounted(() => {
+  // Fetch both in parallel to avoid blocking
+  Promise.all([
+    fetchDeptOfficersHeroData(),
+    memberStore.fetchMembers({ pageSize: 1000 }),
+    departmentsStore.fetchDepartments({ pageSize: 1000 })
+  ])
 })
 </script>
 
@@ -443,6 +482,7 @@ onMounted(async () => {
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -457,6 +497,7 @@ onMounted(async () => {
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

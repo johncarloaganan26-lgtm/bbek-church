@@ -6,7 +6,6 @@ import DashboardView from '../components/Admin/DashboardView.vue'
 import MemberRecord from '../components/Admin/ChurchRecords/MemberRecord.vue'
 import ImportMembers from '../components/Admin/ChurchRecords/ImportMembers.vue'
 import ChurchLeaders from '../components/Admin/ChurchRecords/ChurchLeaders.vue'
-import DepartmentOfficersAdmin from '../components/Admin/ChurchRecords/DepartmentOfficers.vue'
 import EventsRecords from '../components/Admin/ChurchRecords/EventsRecords.vue'
 import TithesOfferings from '../components/Admin/ChurchRecords/TithesOfferings.vue'
 import Ministries from '../components/Admin/ChurchRecords/Ministries.vue'
@@ -291,11 +290,6 @@ const routes = [
         path: 'leaders',
         name: 'ChurchLeaders',
         component: ChurchLeaders
-      },
-      {
-        path: 'officers',
-        name: 'DepartmentOfficers',
-        component: DepartmentOfficersAdmin
       },
       {
         path: 'events',

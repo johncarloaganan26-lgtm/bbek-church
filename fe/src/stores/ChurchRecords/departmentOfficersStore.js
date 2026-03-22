@@ -16,6 +16,7 @@ export const useDepartmentOfficersStore = defineStore('departmentOfficers', {
     itemsPerPage: 10,
     pageSizeOptions: [5, 10, 15],
     memberOptions: [],
+    departmentOptions: [],
     searchTimeout: null
   }),
 
@@ -224,6 +225,20 @@ export const useDepartmentOfficersStore = defineStore('departmentOfficers', {
         }
       } catch (error) {
         console.error('Error fetching department member options:', error)
+      }
+    },
+
+    async fetchDepartmentOptions() {
+      try {
+        const response = await axios.get('/church-records/departments/getAllDepartments?limit=1000')
+        if (response.data.success && response.data.data) {
+          this.departmentOptions = response.data.data.map(dept => ({
+            id: dept.department_id,
+            name: dept.department_name
+          }))
+        }
+      } catch (error) {
+        console.error('Error fetching department options:', error)
       }
     },
 

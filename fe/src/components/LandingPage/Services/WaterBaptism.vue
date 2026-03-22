@@ -257,7 +257,7 @@ const churchLeadersStore = useChurchLeadersStore()
 
 const user = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
 const pastors = ref([])
-const churchLeaders = ref([])
+
 const isMember = ref(false)
 const memberBaptismData = ref(null)
 const loadingCertificate = ref(false)
@@ -314,8 +314,8 @@ const fetchWaterBaptismData = async () => {
 // Check if user is member and fetch data
 onMounted(async () => {
   await fetchWaterBaptismData()
-  await churchLeadersStore.fetchLeaders()
-  churchLeaders.value = churchLeadersStore.leaders
+
+
   await churchLeadersStore.fetchMemberOptions()
   pastors.value = churchLeadersStore.memberOptions
   await fetchMemberBaptismData()

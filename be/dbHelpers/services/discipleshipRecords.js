@@ -54,7 +54,6 @@ async function createDiscipleshipRequest(data) {
     try {
         const request_id = await getNextRequestId();
 
-        // Extract fields
         const {
             firstname, lastname, middle_name, email, phone_number,
             birthdate, age, gender, address, civil_status, profession,
@@ -63,7 +62,10 @@ async function createDiscipleshipRequest(data) {
             notes,
             pastor_id = null,
             location = null,
-            scheduled_date: scheduledDateTime = null
+            scheduled_date: scheduledDateTime = null,
+            guardian_name = null,
+            guardian_contact = null,
+            guardian_relationship = null
         } = data;
 
         // Validation
@@ -129,8 +131,8 @@ async function createDiscipleshipRequest(data) {
         request_id, firstname, lastname, middle_name, email, phone_number,
         birthdate, age, gender, address, civil_status, profession,
         spouse_name, marriage_date, children, request_type, notes, pastor_id, location,
-        scheduled_date, scheduled_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        scheduled_date, scheduled_time, status, guardian_name, guardian_contact, guardian_relationship
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
         const formattedBirth = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
@@ -138,11 +140,20 @@ async function createDiscipleshipRequest(data) {
         const childrenStr = (children && typeof children === 'object') ? JSON.stringify(children) : (children || null);
         const notesStr = (notes && typeof notes === 'object') ? JSON.stringify(notes) : (notes || null);
 
+        // If this is a Bible Study request coming from a completed Salvation Talk,
+        // mark the original Salvation record as "Promoted".
+        if (serviceType === 'bible_study' && data.salvation_id) {
+            await query(
+                'UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ? AND request_type = "Salvation"',
+                [data.salvation_id]
+            );
+        }
+
         const params = [
             request_id, firstname, lastname, middle_name || null, normalizedEmail, phone_number || null,
             formattedBirth, age || null, gender || null, address || null, civil_status || null, profession || null,
             spouse_name || null, formattedMarriage, childrenStr, request_type, notesStr, pastor_id, location,
-            scheduled_date, scheduled_time, initialStatus
+            scheduled_date, scheduled_time, initialStatus, guardian_name, guardian_contact, guardian_relationship
         ];
 
         await query(sql, params);
@@ -248,7 +259,10 @@ async function getAllDiscipleshipRequests(options = {}) {
  */
 async function updateDiscipleshipRequest(request_id, updateData) {
     try {
-        const { status, scheduled_date, scheduled_time, notes, pastor_id, location } = updateData;
+        const { status, scheduled_date, scheduled_time, notes, pastor_id, location,
+                middle_name, birthdate, age, gender, address, civil_status,
+                profession, spouse_name, marriage_date, children,
+                guardian_name, guardian_contact, guardian_relationship } = updateData;
 
         let sql = 'UPDATE tbl_discipleship_requests SET ';
         const updates = [];
@@ -270,6 +284,19 @@ async function updateDiscipleshipRequest(request_id, updateData) {
         }
         if (pastor_id !== undefined) { updates.push('pastor_id = ?'); params.push(pastor_id || null); }
         if (location !== undefined) { updates.push('location = ?'); params.push(location || null); }
+        if (middle_name !== undefined) { updates.push('middle_name = ?'); params.push(middle_name); }
+        if (birthdate !== undefined) { updates.push('birthdate = ?'); params.push(birthdate ? moment(birthdate).format('YYYY-MM-DD') : null); }
+        if (age !== undefined) { updates.push('age = ?'); params.push(age || null); }
+        if (gender !== undefined) { updates.push('gender = ?'); params.push(gender || null); }
+        if (address !== undefined) { updates.push('address = ?'); params.push(address || null); }
+        if (civil_status !== undefined) { updates.push('civil_status = ?'); params.push(civil_status || null); }
+        if (profession !== undefined) { updates.push('profession = ?'); params.push(profession || null); }
+        if (spouse_name !== undefined) { updates.push('spouse_name = ?'); params.push(spouse_name || null); }
+        if (marriage_date !== undefined) { updates.push('marriage_date = ?'); params.push(marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null); }
+        if (children !== undefined) { updates.push('children = ?'); params.push(typeof children === 'object' ? JSON.stringify(children) : (children || null)); }
+        if (guardian_name !== undefined) { updates.push('guardian_name = ?'); params.push(guardian_name || null); }
+        if (guardian_contact !== undefined) { updates.push('guardian_contact = ?'); params.push(guardian_contact || null); }
+        if (guardian_relationship !== undefined) { updates.push('guardian_relationship = ?'); params.push(guardian_relationship || null); }
 
         if (updates.length === 0) return { success: true, message: 'No changes' };
 
@@ -334,19 +361,22 @@ async function promoteToBaptism(request_id, isDecided = false) {
             pastor_name: req.pastor_id || null, // Use the pastor from Phase 1
             location: req.location || null,    // Use the location from Phase 1
             baptism_date: isDecided ? moment().format('YYYY-MM-DD') : null, // Set date to now if decided
-            baptism_time: isDecided ? moment().format('HH:mm:ss') : null    // Set time to now if decided
+            baptism_time: isDecided ? moment().format('HH:mm:ss') : null,    // Set time to now if decided
+            guardian_name: req.guardian_name,
+            guardian_contact: req.guardian_contact,
+            guardian_relationship: req.guardian_relationship
         };
 
         // 3. Create Water Baptism record
         const result = await createWaterBaptism(baptismData);
 
         if (result.success) {
-            // 4. Update request status to Promoted
-            await query('UPDATE tbl_discipleship_requests SET status = "Promoted" WHERE request_id = ?', [request_id]);
+            // NOTE: We don't update status to "Promoted" here anymore.
+            // It will be updated when they actually schedule/submit the next stage form.
 
             return {
                 success: true,
-                message: 'Promoted to Baptism successfully',
+                message: 'Promoted to Baptism successfully (Record created but status pending follow-up)',
                 data: result.data
             };
         } else {
@@ -368,40 +398,28 @@ async function inviteToBaptism(request_id, isDecided = false) {
 
         const req = rows[0];
 
-        // If candidate is decided, promote directly without sending invitation email
+        // If candidate is already decided (Promote), create a scheduled record
         if (isDecided) {
             console.log(`Candidate ${request_id} is decided. Promoting directly to Water Baptism...`);
             return await promoteToBaptism(request_id, true);
         }
 
-        // If undecided, send the invitation email
-        console.log(`Candidate ${request_id} is undecided. Sending Water Baptism invitation email...`);
-
-        try {
-            const result = await sendWaterBaptismInvitation({
+        // If undecided/hesitant, just send the invitation email with registration link
+        // A record in tbl_waterbaptism is NOT created until they submit the form.
+        if (req.email) {
+            await emailHelper.sendWaterBaptismInvitation({
                 request_id: req.request_id,
                 email: req.email,
                 firstname: req.firstname,
-                isDecided: isDecided
+                lastname: req.lastname,
+                isDecided: false
             });
-
-            if (result.success) {
-                return {
-                    success: true,
-                    message: 'Baptism invitation sent successfully'
-                };
-            } else {
-                throw new Error('Failed to send invitation');
-            }
-        } catch (emailError) {
-            // Log email error but still allow the operation to succeed
-            console.error('Email sending failed (continuing with success):', emailError.message);
-            return {
-                success: true,
-                message: 'Baptism invitation sent (email may have failed)',
-                warning: 'Email notification failed but invitation was processed'
-            };
         }
+
+        return { 
+            success: true, 
+            message: 'Water baptism invitation email sent successfully' 
+        };
     } catch (error) {
         console.error('Error inviting to baptism:', error);
         throw error;

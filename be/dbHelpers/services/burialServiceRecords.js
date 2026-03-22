@@ -223,6 +223,21 @@ async function createBurialService(burialData) {
       throw new Error('Missing required field: reason_of_death');
     }
 
+    // Age validation - Burial service requires requester to be 18+ years old
+    if (member_id) {
+      // Get member age from database
+      const [memberData] = await query('SELECT age FROM tbl_members WHERE member_id = ? LIMIT 1', [member_id]);
+      if (memberData && memberData.length > 0) {
+        const memberAge = memberData[0].age;
+        if (memberAge < 18) {
+          return {
+            success: false,
+            message: 'Burial service is only available for members who are 18 years old or older.'
+          };
+        }
+      }
+    }
+
     // For non-member requests, check by requester_email instead of member_id
     const duplicateCheckSql = `
       SELECT burial_id
@@ -257,6 +272,26 @@ async function createBurialService(burialData) {
       };
     }
 
+    // Check if the preferred service time slot is already booked (only 1 per date/time allowed)
+    if (preferred_service_time) {
+      const timeSlotDate = moment(preferred_service_time).format('YYYY-MM-DD');
+      const [existingSlotBooking] = await query(
+        `SELECT burial_id FROM tbl_burialservice 
+         WHERE DATE_FORMAT(preferred_service_time, '%Y-%m-%d') = ? 
+         AND (status = 'pending' OR status = 'Approved' OR status = 'Scheduled' OR status = 'completed')
+         AND HOUR(preferred_service_time) = 20
+         LIMIT 1`,
+        [timeSlotDate]
+      );
+      
+      if (existingSlotBooking && existingSlotBooking.length > 0) {
+        return {
+          success: false,
+          message: `This burial service time slot for ${timeSlotDate} at 8:00 PM is already booked. Please select another date.`
+        };
+      }
+    }
+
     // Validate that service date/time is within night hours (6 PM - 10 PM)
     if (finalServiceDate) {
       const nightHourValidation = validateNightHours(finalServiceDate);
@@ -276,6 +311,25 @@ async function createBurialService(burialData) {
           success: false,
           message: preferredNightValidation.message
         };
+      }
+    }
+
+    // Enforce 8:00 PM (20:00) - Burial service is only available at 8:00 PM
+    let preferred_service_time_enforcement = preferred_service_time;
+    if (preferred_service_time_enforcement) {
+      let timeMoment = moment(preferred_service_time_enforcement);
+      
+      if (timeMoment.isValid()) {
+        const extractedHour = timeMoment.format('HH');
+        const extractedDate = timeMoment.format('YYYY-MM-DD');
+        if (extractedHour !== '20') {
+          console.warn(`Burial service time ${preferred_service_time_enforcement} is not 8:00 PM. Forcing to 20:00`);
+        }
+        // Reconstruct with forced hour but keep the date
+        preferred_service_time_enforcement = `${extractedDate} 20:00:00`;
+      } else {
+        console.error(`Could not parse preferred_service_time: ${preferred_service_time_enforcement}`);
+        preferred_service_time_enforcement = null;
       }
     }
 
@@ -302,9 +356,9 @@ async function createBurialService(burialData) {
     const formattedServiceDate = (finalServiceDate === null || finalServiceDate === '' || !finalServiceDate)
       ? null
       : moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
-    const formattedPreferredServiceTime = (preferred_service_time === null || preferred_service_time === '' || !preferred_service_time)
+    const formattedPreferredServiceTime = (preferred_service_time_enforcement === null || preferred_service_time_enforcement === '' || !preferred_service_time_enforcement)
       ? null
-      : moment(preferred_service_time).format('YYYY-MM-DD HH:mm:ss');
+      : moment(preferred_service_time_enforcement).format('YYYY-MM-DD HH:mm:ss');
     const formattedDateCreated = moment.utc(date_created).format('YYYY-MM-DD HH:mm:ss');
     const formattedBirthdate = deceased_birthdate ? (moment(deceased_birthdate, 'YYYY-MM-DD', true).isValid()
       ? deceased_birthdate
@@ -823,6 +877,24 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
           success: false,
           message: preferredNightValidation.message
         };
+      }
+      
+      // Enforce 8:00 PM (20:00) - Burial service is only available at 8:00 PM
+      if (preferred_service_time && preferred_service_time !== null && preferred_service_time !== '') {
+        let timeMoment = moment(preferred_service_time, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+        if (!timeMoment.isValid()) {
+          timeMoment = moment(preferred_service_time, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+        }
+        
+        if (timeMoment.isValid()) {
+          const extractedHour = timeMoment.format('HH');
+          if (extractedHour !== '20') {
+            console.warn(`Burial service time ${preferred_service_time} is not 8:00 PM. Forcing to 20:00`);
+          }
+          preferred_service_time = '20:00';
+        } else {
+          preferred_service_time = '20:00';
+        }
       }
     }
 
@@ -1494,7 +1566,7 @@ async function bulkCompleteBurialServices(burialIds) {
  * @param {Number} daysAhead - Number of days to look ahead (default: 30)
  * @returns {Promise<Object>} Available daily dates with night shift time slots
  */
-async function getAvailableBurialDates(daysAhead = 30) {
+async function getAvailableBurialDates(daysAhead = 60) {
   try {
     // Get all burial services that are NOT approved (i.e., pending, rejected, etc.)
     const sql = `SELECT 
@@ -1510,66 +1582,62 @@ async function getAvailableBurialDates(daysAhead = 30) {
     
     const [rows] = await query(sql);
     
-    // Generate all upcoming days for the next N days
+    // Generate all upcoming days for the next N days (starting from tomorrow)
     const availableDays = [];
     const today = moment().startOf('day');
     
-    for (let i = 0; i < daysAhead; i++) {
+    for (let i = 1; i <= daysAhead; i++) {
       const currentDay = today.clone().add(i, 'days');
       
-      // Only add future days
-      if (currentDay.isAfter(today) || currentDay.isSame(today, 'day')) {
-        availableDays.push({
-          date: currentDay.format('YYYY-MM-DD'),
-          displayDate: currentDay.format('MMMM DD, YYYY'),
-          dayOfWeek: currentDay.format('dddd'),
-          timeSlots: generateBurialTimeSlots()
-        });
-      }
+      // Only add future days (starting tomorrow)
+      availableDays.push({
+        date: currentDay.format('YYYY-MM-DD'),
+        displayDate: currentDay.format('MMMM DD, YYYY'),
+        dayOfWeek: currentDay.format('dddd'),
+        timeSlots: generateBurialTimeSlots()
+      });
     }
     
-    // Get all scheduled/approved burial services to mark time slots as taken
-    const scheduledSql = `SELECT 
-                          service_date, 
-                          status
+    // Get counts of 8pm slot requests per date - count pending, approved, scheduled only
+    const requestCountsql = `SELECT 
+                          DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d') as serviceDate,
+                          COUNT(*) as count
                         FROM tbl_burialservice 
-                        WHERE status = 'Approved'
-                        OR status = 'completed'
-                        OR status = 'Scheduled'
-                        OR (service_date IS NOT NULL 
-                            AND service_date >= NOW())`;
+                        WHERE status IN ('pending', 'Approved', 'Scheduled', 'approved', 'scheduled')
+                        AND (HOUR(preferred_service_time) = 20 OR HOUR(service_date) = 20)
+                        GROUP BY DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d')`;
     
-    const [scheduledRows] = await query(scheduledSql);
+    const [requestCountRows] = await query(requestCountsql);
     
-    // Mark taken time slots
-    const takenSlots = {};
-    scheduledRows.forEach(row => {
-      if (row.service_date) {
-        const dateKey = moment(row.service_date).format('YYYY-MM-DD');
-        if (!takenSlots[dateKey]) {
-          takenSlots[dateKey] = new Set();
-        }
-        const timeKey = moment(row.service_date).format('HH:mm');
-        takenSlots[dateKey].add(timeKey);
-      }
+    // Create a map of request counts by date
+    const requestCounts = {};
+    requestCountRows.forEach(row => {
+      requestCounts[row.serviceDate] = row.count;
     });
     
-    // Filter available days and mark taken slots
-    const result = availableDays.map(day => {
+    // Filter available days and add request counts
+    const filteredResult = availableDays.map(day => {
       const dateKey = day.date;
-      const taken = takenSlots[dateKey] || new Set();
+      const requestCount = requestCounts[dateKey] || 0;
+      const isFullyBooked = requestCount >= 1; // Only 1 request per date allowed
       
-      // Filter time slots that are not taken
-      const availableSlots = day.timeSlots.filter(slot => !taken.has(slot.time));
+      // Update time slots with booking count
+      const updatedTimeSlots = day.timeSlots.map(slot => ({
+        ...slot,
+        bookingCount: requestCount,
+        isBooked: isFullyBooked
+      }));
       
       return {
         ...day,
-        timeSlots: availableSlots,
-        totalSlots: day.timeSlots.length,
-        availableSlotsCount: availableSlots.length,
-        isFullyBooked: availableSlots.length === 0
+        timeSlots: updatedTimeSlots,
+        totalSlots: 1, 
+        availableSlotsCount: isFullyBooked ? 0 : 1,
+        requestCount: requestCount,
+        isFullyBooked: isFullyBooked,
+        bookedByCount: requestCount
       };
-    }).filter(day => day.availableSlotsCount > 0);
+    }).filter(day => !day.isFullyBooked); // ONLY return available dates to "close" booked ones
     
     // Get pending burial services count
     const pendingCount = rows.length;
@@ -1577,7 +1645,7 @@ async function getAvailableBurialDates(daysAhead = 30) {
     return {
       success: true,
       data: {
-        availableDates: result,
+        availableDates: filteredResult,
         pendingBurialServices: rows,
         pendingCount: pendingCount,
         generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
@@ -1590,23 +1658,22 @@ async function getAvailableBurialDates(daysAhead = 30) {
 }
 
 /**
- * Generate time slots from 5pm to 10pm (night shift, 1 hour each)
- * @returns {Array} Array of time slot objects
+ * Generate time slots - only 8pm (20:00) for burial service
+ * @returns {Array} Array of time slot objects (only 8:00 PM)
  */
 function generateBurialTimeSlots() {
   const slots = [];
-  for (let hour = 17; hour < 22; hour++) {
-    const time24 = `${hour.toString().padStart(2, '0')}:00`;
-    const endTime24 = `${(hour + 1).toString().padStart(2, '0')}:00`;
-    const time12 = moment(time24, 'HH:mm').format('h:mm A');
-    const endTime12 = moment(endTime24, 'HH:mm').format('h:mm A');
-    
-    slots.push({
-      time: time24,
-      displayTime: `${time12} - ${endTime12}`,
-      hour: hour
-    });
-  }
+  const time24 = '20:00';
+  const endTime24 = '21:00';
+  const time12 = moment(time24, 'HH:mm').format('h:mm A');
+  const endTime12 = moment(endTime24, 'HH:mm').format('h:mm A');
+  
+  slots.push({
+    time: time24,
+    displayTime: `${time12}`,
+    hour: 20
+  });
+  
   return slots;
 }
 

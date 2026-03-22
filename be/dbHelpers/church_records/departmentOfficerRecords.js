@@ -2,6 +2,7 @@ const { query } = require('../../database/db');
 const moment = require('moment');
 const XLSX = require('xlsx');
 const { archiveBeforeDelete } = require('../archiveHelper');
+const { processImage } = require('../../utils/imageHandler');
 
 /**
  * Department Officer Records CRUD Operations
@@ -18,10 +19,10 @@ const { archiveBeforeDelete } = require('../archiveHelper');
  * @param {Number} excludeOfficerId - Optional officer_id to exclude from check (for updates)
  * @returns {Promise<Object>} Object with isDuplicate flag
  */
-async function checkDuplicateDepartmentOfficer(memberId, excludeOfficerId = null) {
+async function checkDuplicateDepartmentOfficer(memberId, departmentId, role, excludeOfficerId = null) {
   try {
-    let sql = 'SELECT officer_id, member_id FROM tbl_departmentofficers WHERE member_id = ?';
-    const params = [memberId];
+    let sql = 'SELECT officer_id, member_id, department_id, role FROM tbl_departmentofficers WHERE member_id = ? AND department_id = ? AND role = ?';
+    const params = [memberId, departmentId, role];
 
     if (excludeOfficerId) {
       sql += ' AND officer_id != ?';
@@ -49,7 +50,12 @@ async function createDepartmentOfficer(officerData) {
   try {
     const {
       member_id,
+      department_id,
+      role = '',
       joined_date,
+      bio = null,
+      image = null,
+      status = 'Active',
       date_created = new Date()
     } = officerData;
 
@@ -58,8 +64,8 @@ async function createDepartmentOfficer(officerData) {
       throw new Error('Missing required field: member_id');
     }
 
-    // Check for duplicate member_id
-    const duplicateCheck = await checkDuplicateDepartmentOfficer(member_id);
+    // Check for duplicate member_id + department + role
+    const duplicateCheck = await checkDuplicateDepartmentOfficer(member_id, department_id, role);
     if (duplicateCheck.isDuplicate) {
       return {
         success: false,
@@ -80,13 +86,18 @@ async function createDepartmentOfficer(officerData) {
 
     const sql = `
       INSERT INTO tbl_departmentofficers 
-        (member_id, joined_date, date_created)
-      VALUES (?, ?, ?)
+        (member_id, department_id, role, status, joined_date, bio, image, date_created)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const params = [
       member_id.trim(),
+      department_id,
+      role,
+      status || 'Active',
       formattedJoinedDate,
+      bio,
+      image,
       formattedDateCreated
     ];
 
@@ -129,7 +140,13 @@ async function getAllDepartmentOfficers(options = {}) {
     let sql = `SELECT 
       do.officer_id,
       do.member_id,
+      do.department_id,
+      d.department_name,
+      do.role,
       do.joined_date,
+      do.bio,
+      do.image,
+      do.status,
       do.date_created,
       m.firstname,
       m.lastname,
@@ -141,7 +158,8 @@ async function getAllDepartmentOfficers(options = {}) {
         m.lastname
       ) as fullname
     FROM tbl_departmentofficers do
-    INNER JOIN tbl_members m ON do.member_id = m.member_id`;
+    INNER JOIN tbl_members m ON do.member_id = m.member_id
+    LEFT JOIN tbl_departments d ON do.department_id = d.department_id`;
     const params = [];
 
     // Build WHERE conditions array
@@ -151,12 +169,12 @@ async function getAllDepartmentOfficers(options = {}) {
     // Add search functionality (search by member_id or member name)
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
-      const searchCondition = `(do.member_id LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ?)`;
+      const searchCondition = `(do.member_id LIKE ? OR m.firstname LIKE ? OR m.lastname LIKE ? OR m.middle_name LIKE ? OR CONCAT(m.firstname, ' ', IFNULL(m.middle_name, ''), ' ', m.lastname) LIKE ? OR d.department_name LIKE ? OR do.role LIKE ? OR do.status LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
 
       whereConditions.push(searchCondition);
-      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 
@@ -237,7 +255,10 @@ async function getAllDepartmentOfficers(options = {}) {
     return {
       success: true,
       message: 'Department officers retrieved successfully',
-      data: rows,
+      data: rows.map(row => ({
+        ...row,
+        image: processImage(row.image)
+      })),
       count: rows.length,
       totalCount: totalCount,
       pagination: {
@@ -280,7 +301,10 @@ async function getDepartmentOfficerById(officerId) {
     return {
       success: true,
       message: 'Department officer retrieved successfully',
-      data: rows[0]
+      data: {
+        ...rows[0],
+        image: processImage(rows[0].image)
+      }
     };
   } catch (error) {
     console.error('Error fetching department officer:', error);
@@ -313,7 +337,10 @@ async function getDepartmentOfficerByMemberId(memberId) {
     return {
       success: true,
       message: 'Department officer retrieved successfully',
-      data: rows[0]
+      data: {
+        ...rows[0],
+        image: processImage(rows[0].image)
+      }
     };
   } catch (error) {
     console.error('Error fetching department officer by member ID:', error);
@@ -345,7 +372,12 @@ async function updateDepartmentOfficer(officerId, officerData) {
 
     const {
       member_id,
+      department_id,
+      role,
       joined_date,
+      bio,
+      image,
+      status,
       date_created
     } = officerData;
 
@@ -353,25 +385,56 @@ async function updateDepartmentOfficer(officerId, officerData) {
     const fields = [];
     const params = [];
 
-    if (member_id !== undefined) {
-      // Check for duplicate member_id (excluding current officer)
-      const duplicateCheck = await checkDuplicateDepartmentOfficer(member_id.trim(), officerId);
+    if (member_id !== undefined || department_id !== undefined || role !== undefined) {
+      const checkMemberId = member_id !== undefined ? member_id : officerCheck.data.member_id;
+      const checkDeptId = department_id !== undefined ? department_id : officerCheck.data.department_id;
+      const checkRole = role !== undefined ? role : officerCheck.data.role;
+
+      // Check for duplicate (excluding current officer)
+      const duplicateCheck = await checkDuplicateDepartmentOfficer(checkMemberId, checkDeptId, checkRole, officerId);
       if (duplicateCheck.isDuplicate) {
         return {
           success: false,
-          message: 'A department officer with this member ID already exists',
-          error: 'Duplicate member_id'
+          message: 'An officer with this same member, department, and role already exists',
+          error: 'Duplicate officer role'
         };
       }
+    }
 
+    if (member_id !== undefined) {
       fields.push('member_id = ?');
       params.push(member_id.trim());
+    }
+
+    if (department_id !== undefined) {
+      fields.push('department_id = ?');
+      params.push(department_id);
+    }
+
+    if (role !== undefined) {
+      fields.push('role = ?');
+      params.push(role);
     }
 
     if (joined_date !== undefined) {
       const formattedJoinedDate = moment(joined_date).format('YYYY-MM-DD HH:mm:ss');
       fields.push('joined_date = ?');
       params.push(formattedJoinedDate);
+    }
+
+    if (bio !== undefined) {
+      fields.push('bio = ?');
+      params.push(bio);
+    }
+
+    if (image !== undefined) {
+      fields.push('image = ?');
+      params.push(image);
+    }
+
+    if (status !== undefined) {
+      fields.push('status = ?');
+      params.push(status);
     }
 
     if (date_created !== undefined) {
@@ -412,7 +475,10 @@ async function updateDepartmentOfficer(officerId, officerData) {
     return {
       success: true,
       message: 'Department officer updated successfully',
-      data: updatedOfficer.data
+      data: {
+        ...updatedOfficer.data,
+        image: processImage(updatedOfficer.data.image)
+      }
     };
   } catch (error) {
     console.error('Error updating department officer:', error);
@@ -507,6 +573,7 @@ async function exportDepartmentOfficersToExcel(options = {}) {
         'Last Name': officer.lastname || '',
         'Middle Name': officer.middle_name || '',
         'Joined Date': officer.joined_date ? moment(officer.joined_date).format('YYYY-MM-DD HH:mm:ss') : '',
+        'Status': officer.status || '',
         'Date Created': officer.date_created ? moment(officer.date_created).format('YYYY-MM-DD HH:mm:ss') : '',
         'Created Date': officer.date_created ? moment(officer.date_created).format('YYYY-MM-DD') : ''
       };

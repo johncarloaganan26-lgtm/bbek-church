@@ -153,6 +153,7 @@
             <th class="text-left font-weight-bold">Civil Status</th>
             <th class="text-left font-weight-bold">Join Date</th>
             <th class="text-left font-weight-bold">Position</th>
+            <th class="text-left font-weight-bold">Department</th>
             <th class="text-left font-weight-bold">Actions</th>
           </tr>
         </thead>
@@ -180,6 +181,7 @@
             <td>{{ formatCivilStatus(member.civil_status) }}</td>
             <td>{{ formatDate(member.date_created) }}</td>
             <td>{{ member.position }}</td>
+            <td>{{ getDepartmentName(member) }}</td>
             <td>
               <v-tooltip text="Edit Member" location="top">
                 <template v-slot:activator="{ props }">
@@ -251,6 +253,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMemberRecordStore } from '@/stores/ChurchRecords/memberRecordStore'
+import { useDepartmentsStore } from '@/stores/ChurchRecords/departmentsStore'
 import MemberDialog from '../../Dialogs/MemberDialog.vue'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -259,6 +262,7 @@ const router = useRouter()
 
 // Pinia Store
 const memberStore = useMemberRecordStore()
+const departmentsStore = useDepartmentsStore()
 
 // Component state
 const memberDialog = ref(false)
@@ -288,6 +292,13 @@ const sortByOptions = [
 // Initialize local search query
 localSearchQuery.value = memberStore.searchQuery
 
+
+// Ensure department store is loaded so we can resolve names
+onMounted(() => {
+  if (departmentsStore.departments.length === 0) {
+    departmentsStore.fetchDepartments({ limit: 100 })
+  }
+})
 
 const currentPage = computed({
   get: () => memberStore.currentPage,
@@ -429,6 +440,15 @@ const getMemberName = (member) => {
   if (member.middle_name) parts.push(member.middle_name)
   if (member.lastname) parts.push(member.lastname)
   return parts.join(' ') || 'N/A'
+}
+
+const getDepartmentName = (member) => {
+  if (member.department_name) return member.department_name
+  if (member.department_id) {
+    const dept = departmentsStore.departments.find(d => (d.id || d.department_id) === member.department_id)
+    if (dept) return dept.name || dept.department_name
+  }
+  return 'None'
 }
 
 const formatCivilStatus = (civilStatus) => {
