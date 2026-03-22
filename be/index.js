@@ -319,7 +319,7 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
       baptism_date: baptism_date || null, baptism_time: baptism_time || null,
       location: location || '', pastor_name: pastor_name || '',
       is_member: false, member_id: null, 
-      status: (baptism_date && baptism_time) ? 'approved' : 'pending',
+      status: 'pending',
       ...(request_id && { request_id })
     };
 

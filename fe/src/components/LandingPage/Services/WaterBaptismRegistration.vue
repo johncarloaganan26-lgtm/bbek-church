@@ -478,6 +478,16 @@ onMounted(async () => {
     formData.email = props.adminData.email || '';
     formData.phone_number = props.adminData.phone_number || '';
     formData.address = props.adminData.address || '';
+    formData.birthdate = props.adminData.birthdate ? moment(props.adminData.birthdate).format('YYYY-MM-DD') : '';
+    formData.age = props.adminData.age || null;
+    formData.gender = props.adminData.gender === 'M' ? 'Male' : (props.adminData.gender === 'F' ? 'Female' : (props.adminData.gender || ''));
+    if (props.adminData.civil_status) {
+      formData.civil_status = props.adminData.civil_status.charAt(0).toUpperCase() + props.adminData.civil_status.slice(1).toLowerCase();
+    }
+    formData.profession = props.adminData.profession || '';
+    formData.guardian_name = props.adminData.guardian_name || '';
+    formData.guardian_contact = props.adminData.guardian_contact || '';
+    formData.guardian_relationship = props.adminData.guardian_relationship || '';
     formData.pastor_name = props.adminData.pastor_name || props.adminData.pastor_id || '';
     formData.location = props.adminData.location || '';
     formData.status = 'approved';
@@ -496,7 +506,7 @@ onMounted(async () => {
         formData.middle_name = data.middle_name || '';
         formData.email = data.email || '';
         formData.phone_number = data.phone_number || '';
-        formData.birthdate = data.birthdate ? data.birthdate.split('T')[0] : '';
+        formData.birthdate = data.birthdate ? moment(data.birthdate).format('YYYY-MM-DD') : '';
         formData.age = data.age || null;
         formData.gender = data.gender === 'M' ? 'Male' : (data.gender === 'F' ? 'Female' : (data.gender || ''));
         formData.address = data.address || '';

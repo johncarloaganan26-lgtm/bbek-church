@@ -387,31 +387,6 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
     const result = await createWaterBaptism(baptismData);
 
     if (result.success) {
-      // If request_id is provided (from discipleship invitation), update the discipleship request
-      if (request_id) {
-        await query('UPDATE tbl_discipleship_requests SET water_baptism_registered = 1 WHERE request_id = ?', [request_id]);
-      }
-
-      // Send confirmation email
-      const recipientName = `${firstname} ${lastname}`;
-      await sendWaterBaptismDetails({
-        email: email,
-        status: 'pending',
-        recipientName: recipientName,
-        firstname: firstname,
-        lastname: lastname,
-        middleName: middle_name || '',
-        birthdate: birthdate || '',
-        age: age || null,
-        gender: gender || '',
-        address: address || '',
-        phoneNumber: phone_number || '',
-        civilStatus: civil_status || '',
-        guardianName: guardian_name || '',
-        guardianContact: guardian_contact || '',
-        guardianRelationship: guardian_relationship || ''
-      });
-
       res.status(201).json({
         success: true,
         message: 'Water baptism registration submitted successfully! Check your email for confirmation.',
