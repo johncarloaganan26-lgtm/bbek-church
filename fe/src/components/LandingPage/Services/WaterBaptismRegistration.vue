@@ -522,6 +522,21 @@ onMounted(async () => {
     }
   }
 });
+// Auto-calculate age from birthdate
+watch(() => formData.birthdate, (newDate) => {
+  if (newDate) {
+    const today = new Date();
+    const birthDate = new Date(newDate);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    formData.age = age;
+  } else {
+    formData.age = null;
+  }
+});
 
 const handleSubmit = async () => {
   const { valid } = await formRef.value.validate();

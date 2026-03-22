@@ -324,32 +324,9 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
     };
 
     const result = await createWaterBaptism(baptismData);
-
+    
     if (result.success) {
-      // Calculate total enrollees for the 1 PM slot to show in email if it's a promoted/approved request
-      let baptismCount = 0;
-      if (baptism_date && (baptism_time === '13:00' || baptism_time === '13:00:00') && (request_id || baptismData.status === 'approved')) {
-          const [countRows] = await query(
-              "SELECT COUNT(*) as total FROM tbl_waterbaptism WHERE DATE(baptism_date) = ? AND preferred_baptism_time = '13:00:00' AND status = 'approved'",
-              [baptism_date]
-          );
-          baptismCount = countRows[0].total; 
-      }
-
-      const recipientName = `${firstname} ${lastname}`;
-      await sendWaterBaptismDetails({
-        email, status: 'pending', recipientName,
-        firstname, lastname, middleName: middle_name || '', birthdate: birthdate || '',
-        age: age || null, gender: gender || '', address: address || '',
-        phoneNumber: phone_number || '', civilStatus: civil_status || '',
-        guardianName: guardian_name || '', guardianContact: guardian_contact || '',
-        guardianRelationship: guardian_relationship || '',
-        baptismDate: baptism_date, baptismTime: baptism_time,
-        location: location, pastorName: pastor_name,
-        baptismCount: baptismCount // Pass the count to show in email
-      });
-
-      res.status(201).json({ success: true, message: 'Water baptism registration submitted successfully!', data: result.data });
+      res.status(201).json({ success: true, message: 'Water baptism registration submitted successfully! Check your email for confirmation.', data: result.data });
     } else {
       res.status(400).json({ success: false, message: result.message });
     }

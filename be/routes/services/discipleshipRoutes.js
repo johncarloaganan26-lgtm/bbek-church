@@ -549,8 +549,13 @@ router.get('/registration-data/:id', async (req, res) => {
                         COALESCE(b.guardian_relationship, s.guardian_relationship) as guardian_relationship,
                         COALESCE(b.address, s.address) as salvation_address
                  FROM tbl_biblestudy_requests b
-                 LEFT JOIN tbl_discipleship_requests s ON b.salvation_id = s.request_id
-                 WHERE b.request_id = ? LIMIT 1`,
+                 LEFT JOIN tbl_discipleship_requests s ON (
+                    (b.salvation_id IS NOT NULL AND b.salvation_id = s.request_id) OR
+                    (b.salvation_id IS NULL AND b.email = s.email)
+                 )
+                 WHERE b.request_id = ? 
+                 ORDER BY s.date_created DESC
+                 LIMIT 1`,
                 [id]
             );
             if (rows.length > 0) {

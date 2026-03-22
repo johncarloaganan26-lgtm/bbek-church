@@ -162,21 +162,41 @@ async function getAllBibleStudyRequests(params = {}) {
         const { page = 1, pageSize = 10, search = '', status = '' } = params;
         const offset = (page - 1) * pageSize;
 
-        let sql = 'SELECT * FROM tbl_biblestudy_requests WHERE 1=1';
+        let sql = `
+            SELECT b.*, 
+                   COALESCE(b.middle_name, s.middle_name) as middle_name,
+                   COALESCE(b.birthdate, s.birthdate) as birthdate,
+                   COALESCE(b.age, s.age) as age,
+                   COALESCE(b.gender, s.gender) as gender,
+                   COALESCE(b.civil_status, s.civil_status) as civil_status,
+                   COALESCE(b.profession, s.profession) as profession,
+                   COALESCE(b.spouse_name, s.spouse_name) as spouse_name,
+                   COALESCE(b.marriage_date, s.marriage_date) as marriage_date,
+                   COALESCE(b.children, s.children) as children,
+                   COALESCE(b.guardian_name, s.guardian_name) as guardian_name,
+                   COALESCE(b.guardian_contact, s.guardian_contact) as guardian_contact,
+                   COALESCE(b.guardian_relationship, s.guardian_relationship) as guardian_relationship,
+                   COALESCE(b.address, s.address) as address
+            FROM tbl_biblestudy_requests b
+            LEFT JOIN tbl_discipleship_requests s ON (
+                (b.salvation_id IS NOT NULL AND b.salvation_id = s.request_id) OR
+                (b.salvation_id IS NULL AND LOWER(b.email) = LOWER(s.email))
+            )
+            WHERE 1=1`;
         const queryParams = [];
 
         if (search) {
-            sql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
+            sql += ' AND (b.firstname LIKE ? OR b.lastname LIKE ? OR b.email LIKE ? OR b.request_id LIKE ?)';
             const searchPattern = `%${search}%`;
             queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
         if (status) {
-            sql += ' AND status = ?';
+            sql += ' AND b.status = ?';
             queryParams.push(status);
         }
 
-        sql += ' ORDER BY date_created DESC LIMIT ? OFFSET ?';
+        sql += ' ORDER BY b.date_created DESC LIMIT ? OFFSET ?';
         queryParams.push(parseInt(pageSize), parseInt(offset));
 
         const [rows] = await query(sql, queryParams);

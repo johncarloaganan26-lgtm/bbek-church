@@ -22,7 +22,19 @@ router.post('/submit', async (req, res) => {
             email,
             phone_number,
             address,
-            scheduled_date
+            scheduled_date,
+            middle_name,
+            birthdate,
+            age,
+            gender,
+            civil_status,
+            profession,
+            spouse_name,
+            marriage_date,
+            children,
+            guardian_name,
+            guardian_contact,
+            guardian_relationship
         } = req.body || {};
 
         if (!firstname || !lastname || !email || !phone_number || !address || !scheduled_date) {
@@ -96,7 +108,19 @@ router.post('/submit', async (req, res) => {
                 phone_number,
                 address,
                 scheduled_date,
-                status: 'Pending'
+                status: 'Pending',
+                middle_name,
+                birthdate,
+                age,
+                gender,
+                civil_status,
+                profession,
+                spouse_name,
+                marriage_date,
+                children,
+                guardian_name,
+                guardian_contact,
+                guardian_relationship
             });
         }
 

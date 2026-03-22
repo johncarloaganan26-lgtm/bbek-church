@@ -207,7 +207,19 @@ const formData = reactive({
   email: '',
   phone_number: '',
   address: '',
-  scheduled_date: null
+  scheduled_date: null,
+  middle_name: '',
+  birthdate: '',
+  age: null,
+  gender: '',
+  civil_status: '',
+  profession: '',
+  spouse_name: '',
+  marriage_date: '',
+  children: '',
+  guardian_name: '',
+  guardian_contact: '',
+  guardian_relationship: ''
 })
 
 const rules = {
@@ -253,6 +265,18 @@ const hydrateFromReference = async () => {
       formData.email = d.email || ''
       formData.phone_number = d.phone_number || ''
       formData.address = d.address || ''
+      formData.middle_name = d.middle_name || ''
+      formData.birthdate = d.birthdate ? moment(d.birthdate).format('YYYY-MM-DD') : ''
+      formData.age = d.age || null
+      formData.gender = d.gender || ''
+      formData.civil_status = d.civil_status || ''
+      formData.profession = d.profession || ''
+      formData.spouse_name = d.spouse_name || ''
+      formData.marriage_date = d.marriage_date ? moment(d.marriage_date).format('YYYY-MM-DD') : ''
+      formData.children = d.children || ''
+      formData.guardian_name = d.guardian_name || ''
+      formData.guardian_contact = d.guardian_contact || ''
+      formData.guardian_relationship = d.guardian_relationship || ''
       
       // Select slot section and scroll
       setTimeout(() => {
@@ -291,7 +315,19 @@ const handleSubmit = async () => {
       email: formData.email,
       phone_number: formData.phone_number,
       address: formData.address,
-      scheduled_date: formData.scheduled_date
+      scheduled_date: formData.scheduled_date,
+      middle_name: formData.middle_name,
+      birthdate: formData.birthdate,
+      age: formData.age,
+      gender: formData.gender,
+      civil_status: formData.civil_status,
+      profession: formData.profession,
+      spouse_name: formData.spouse_name,
+      marriage_date: formData.marriage_date,
+      children: formData.children,
+      guardian_name: formData.guardian_name,
+      guardian_contact: formData.guardian_contact,
+      guardian_relationship: formData.guardian_relationship
     }
 
     const success = await discipleshipStore.submitBibleStudyRequest(payload)

@@ -315,7 +315,8 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
   try {
     const { createWaterBaptism } = require('../dbHelpers/services/waterBaptismRecords');
     const { sendWaterBaptismDetails } = require('../dbHelpers/emailHelper');
-    const { checkDuplicateAccount, getSpecificMemberByEmailAndStatus } = require('../dbHelpers/church_records/accountRecords');
+    const { checkDuplicateAccount } = require('../dbHelpers/church_records/accountRecords');
+    const { getSpecificMemberByEmailAndStatus } = require('../dbHelpers/church_records/memberRecords');
     const { query } = require('../database/db');
 
     // Extract all fields including optional request_id
