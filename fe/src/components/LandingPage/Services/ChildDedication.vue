@@ -919,8 +919,12 @@ const resetInlineForm = () => {
 
 // Disable dates that are not Sundays (0 = Sunday in JavaScript)
 const disabledSundayDates = (date) => {
-  // Only allow Sundays (day 0)
-  return date.getDay() !== 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  // Only allow future Sundays (day 0)
+  const isPastOrToday = date <= today
+  const isNotSunday = date.getDay() !== 0
+  return isPastOrToday || isNotSunday
 }
 
 // Handle inline form submission
@@ -1039,6 +1043,8 @@ const handleInlineFormSubmit = async () => {
     if (success) {
       showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
       resetInlineForm()
+      // Refresh available Sunday dates to show the newly booked date as possibly now having more requests
+      await fetchAvailableSundayDates()
     } else {
       ElMessage.error(error || 'Failed to submit child dedication request.')
     }

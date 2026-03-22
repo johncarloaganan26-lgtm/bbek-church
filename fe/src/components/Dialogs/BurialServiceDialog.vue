@@ -1,4 +1,4 @@
-e<template>
+<template>
   <el-dialog
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
@@ -350,7 +350,7 @@ e<template>
           />
           <div class="form-hint" v-if="userInfo?.account?.position !== 'admin' && userInfo?.account?.position !== 'staff'">
             <el-icon><InfoFilled /></el-icon>
-            <span>Burial services are typically conducted in the evening. Default time is 6:00 PM.</span>
+            <span>Burial services are typically conducted in the evening. Default time is 8:00 PM.</span>
           </div>
           <div class="form-hint" v-else>
             <el-icon><InfoFilled /></el-icon>
@@ -585,7 +585,7 @@ const unavailableTimeSlots = ref([])
 const getDefaultNightTime = () => {
   const date = new Date()
   date.setDate(date.getDate() + 1) // Tomorrow
-  date.setHours(18, 0, 0, 0) // 6:00 PM
+  date.setHours(20, 0, 0, 0) // 8:00 PM
   return date
 }
 
@@ -593,8 +593,10 @@ const defaultNightTime = computed(() => getDefaultNightTime())
 
 // Disable future dates (allow selecting today and future dates)
 const disabledFutureDate = (date) => {
-  // Allow all dates including past dates for scheduling
-  return false
+  if (isEditMode.value) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date <= today
 }
 
 // Disable hours - only allow night hours (6 PM - 10 PM)
@@ -942,14 +944,16 @@ const handleSubmit = async () => {
       requester_name: formData.requester_name,
       requester_email: formData.requester_email,
       deceased_name: formData.deceased_name,
-      deceased_birthdate: formData.deceased_birthdate ? new Date(formData.deceased_birthdate).toISOString().split('T')[0] : null,
-      date_death: formData.date_death ? new Date(formData.date_death).toISOString() : null,
+      deceased_birthdate: toISODate(formData.deceased_birthdate) ? toISODate(formData.deceased_birthdate).split('T')[0] : null,
+      date_death: toISODate(formData.date_death),
       reason_of_death: formData.reason_of_death,
       relationship: formData.relationship,
       location: formData.location,
       pastor_name: formData.pastor_name,
       service_date: toISODate(formData.service_date),
-      preferred_service_time: toISODate(formData.preferred_service_date),
+      preferred_service_time: formData.service_date && formData.preferred_service_time 
+        ? `${formData.service_date} ${formData.preferred_service_time}`
+        : toISODate(formData.preferred_service_time),
       status: formData.status,
       rejection_reason: formData.rejection_reason || null,
       rejected_by: (() => {
@@ -979,8 +983,11 @@ const handleSubmit = async () => {
     console.error('Error submitting burial service:', error)
     if (error.response?.data?.message) {
       ElMessage.error(error.response.data.message)
-    } else if (error.message !== 'Validation failed') {
-      ElMessage.error('Failed to submit burial service request. Please try again.')
+    } else if (error === 'cancel') {
+        // do nothing
+    } else {
+      const errorDetail = error.message || (typeof error === 'object' ? 'Validation failed' : String(error))
+      ElMessage.error(`Failed to submit burial service request: ${errorDetail}`)
     }
   } finally {
     loading.value = false

@@ -408,10 +408,11 @@ const fetchSundaySlots = async () => {
 
 const generateFallbackSlots = () => {
   const slots = [];
-  const today = new Date();
-  let current = new Date();
-  const daysUntilSunday = (7 - today.getDay()) % 7;
-  current.setDate(today.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  let current = new Date(tomorrow);
+  const daysUntilSunday = (7 - tomorrow.getDay()) % 7;
+  current.setDate(tomorrow.getDate() + daysUntilSunday);
   
   for (let i = 0; i < 4; i++) {
     const slotDate = new Date(current);

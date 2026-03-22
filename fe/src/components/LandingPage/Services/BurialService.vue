@@ -813,7 +813,7 @@ const memberFormData = reactive({
 const getDefaultNightTimeDate = () => {
   const date = new Date()
   date.setDate(date.getDate() + 1) // Tomorrow
-  date.setHours(18, 0, 0, 0) // 6:00 PM
+  date.setHours(20, 0, 0, 0) // 8:00 PM
   return date
 }
 
@@ -1161,6 +1161,8 @@ const handleBurialDialogSubmit = async (payload) => {
     if (success) {
       showSuccessDialog('Success!', 'Burial service request submitted successfully! Our pastoral team will support you during this time.')
       showBurialDialog.value = false
+      // Refresh available dates to show the newly booked date as unavailable
+      await fetchAvailableBurialDates()
     } else {
       ElMessage.error(error || 'Failed to submit burial service request.')
     }

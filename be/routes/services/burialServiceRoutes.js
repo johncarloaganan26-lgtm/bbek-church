@@ -569,7 +569,7 @@ router.put('/bulkCompleteBurialServices', async (req, res) => {
         const errors = [];
 
         for (const id of burialIds) {
-            const [rows] = await query('SELECT status, service_date FROM tbl_burial_services WHERE burial_id = ?', [id]);
+            const [rows] = await query('SELECT status, service_date FROM tbl_burialservice WHERE burial_id = ?', [id]);
             if (rows.length === 0) {
                 errors.push({ id, reason: 'Not found' });
                 continue;
@@ -874,7 +874,7 @@ router.get('/available-slots', async (req, res) => {
 
     // Generate available dates with time slots (evening only: 6 PM - 10 PM, 30-min intervals)
     const dateGroups = [];
-    for (let i = 0; i < days; i++) {
+    for (let i = 1; i <= days; i++) {
       const date = start.clone().add(i, 'days');
       const dateStr = date.format('YYYY-MM-DD');
       const dayName = date.format('dddd');

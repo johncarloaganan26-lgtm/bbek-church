@@ -799,7 +799,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       };
     }
 
-    const {
+    let {
       member_id,
       requester_name,
       requester_email,
@@ -807,7 +807,7 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       location,
       pastor_name,
       service_date,
-      preferred_service_time,
+      preferred_service_time: prefServiceTime,
       status,
       date_created,
       deceased_name,
@@ -870,8 +870,8 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
     }
 
     // Validate preferred_service_time if being updated
-    if (preferred_service_time !== undefined) {
-      const preferredNightValidation = validateNightHours(preferred_service_time);
+    if (prefServiceTime !== undefined) {
+      const preferredNightValidation = validateNightHours(prefServiceTime);
       if (!preferredNightValidation.isValid) {
         return {
           success: false,
@@ -880,20 +880,20 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
       }
       
       // Enforce 8:00 PM (20:00) - Burial service is only available at 8:00 PM
-      if (preferred_service_time && preferred_service_time !== null && preferred_service_time !== '') {
-        let timeMoment = moment(preferred_service_time, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+      if (prefServiceTime && prefServiceTime !== null && prefServiceTime !== '') {
+        let timeMoment = moment(prefServiceTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
         if (!timeMoment.isValid()) {
-          timeMoment = moment(preferred_service_time, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+          timeMoment = moment(prefServiceTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
         }
         
         if (timeMoment.isValid()) {
           const extractedHour = timeMoment.format('HH');
           if (extractedHour !== '20') {
-            console.warn(`Burial service time ${preferred_service_time} is not 8:00 PM. Forcing to 20:00`);
+            console.warn(`Burial service time ${prefServiceTime} is not 8:00 PM. Forcing to 20:00`);
           }
-          preferred_service_time = '20:00';
+          prefServiceTime = '20:00';
         } else {
-          preferred_service_time = '20:00';
+          prefServiceTime = '20:00';
         }
       }
     }
@@ -949,20 +949,37 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
         fields.push('service_date = ?');
         params.push(null);
       } else {
-        const formattedServiceDate = moment(finalServiceDate).format('YYYY-MM-DD HH:mm:ss');
-        fields.push('service_date = ?');
-        params.push(formattedServiceDate);
+        const sDateMoment = moment(finalServiceDate);
+        if (sDateMoment.isValid()) {
+          const formattedServiceDate = sDateMoment.format('YYYY-MM-DD HH:mm:ss');
+          fields.push('service_date = ?');
+          params.push(formattedServiceDate);
+        } else {
+          console.warn(`Invalid finalServiceDate: ${finalServiceDate}`);
+          // Optionally push null or handle as error
+        }
       }
     }
 
-    if (preferred_service_time !== undefined) {
-      if (preferred_service_time === null || preferred_service_time === '' || !preferred_service_time) {
+    if (prefServiceTime !== undefined) {
+      if (prefServiceTime === null || prefServiceTime === '' || !prefServiceTime) {
         fields.push('preferred_service_time = ?');
         params.push(null);
       } else {
-        const formattedPreferredServiceTime = moment(preferred_service_time).format('YYYY-MM-DD HH:mm:ss');
-        fields.push('preferred_service_time = ?');
-        params.push(formattedPreferredServiceTime);
+        const pTimeMoment = moment(prefServiceTime);
+        if (pTimeMoment.isValid()) {
+          const formattedPreferredServiceTime = pTimeMoment.format('YYYY-MM-DD HH:mm:ss');
+          fields.push('preferred_service_time = ?');
+          params.push(formattedPreferredServiceTime);
+        } else if (typeof prefServiceTime === 'string' && /^\d{2}:\d{2}/.test(prefServiceTime)) {
+             // If it's just a time like "20:00", we should probably combine it with current date or service date
+             // or if the column is TIME, just use it. But here we format as DATETIME.
+             // Let's assume we want HH:mm:ss if it's just time
+             fields.push('preferred_service_time = ?');
+             params.push(prefServiceTime); 
+        } else {
+          console.warn(`Invalid prefServiceTime: ${prefServiceTime}`);
+        }
       }
     }
 
@@ -1598,13 +1615,13 @@ async function getAvailableBurialDates(daysAhead = 60) {
       });
     }
     
-    // Get counts of 8pm slot requests per date - count pending, approved, scheduled only
+    // Get counts of burial service requests per date - count pending, approved, scheduled only
     const requestCountsql = `SELECT 
                           DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d') as serviceDate,
                           COUNT(*) as count
                         FROM tbl_burialservice 
                         WHERE status IN ('pending', 'Approved', 'Scheduled', 'approved', 'scheduled')
-                        AND (HOUR(preferred_service_time) = 20 OR HOUR(service_date) = 20)
+                        AND DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d') >= CURDATE()
                         GROUP BY DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d')`;
     
     const [requestCountRows] = await query(requestCountsql);

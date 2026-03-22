@@ -31,7 +31,7 @@
             <el-collapse-item
               v-for="dateGroup in availableSlots"
               :key="dateGroup.date"
-              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} (${dateGroup.availableSlots} available)`"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} - Booked: ${dateGroup.bookedSlots || 0}`"
               :name="dateGroup.date"
               class="slot-date-group"
             >
@@ -297,9 +297,11 @@
             style="width: 100%"
             :disabled="loading"
             :disabled-date="(date) => {
-              const isPast = date < new Date().setHours(0,0,0,0);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const isPastOrToday = date <= today;
               const isNotSunday = date.getDay() !== 0;
-              return isEditMode ? isNotSunday : (isPast || isNotSunday);
+              return isEditMode ? isNotSunday : (isPastOrToday || isNotSunday);
             }"
             @change="onDateTimeChange"
           />

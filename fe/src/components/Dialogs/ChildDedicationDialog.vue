@@ -14,20 +14,20 @@
   >
     <div class="dialog-content-wrapper">
       <!-- Left Panel: Available Slots -->
-      <div class="available-slots-panel" v-if="!isEditMode">
+      <!-- Left Panel: Available Slots -->
+      <div v-if="showAvailableSlots" class="available-slots-panel">
         <div class="slots-header">
           <span>Available Sundays</span>
           <el-button 
             link 
             size="small"
-            @click="showAvailableSlots = !showAvailableSlots"
+            @click="showAvailableSlots = false"
           >
-            {{ showAvailableSlots ? 'Hide' : 'Show' }}
+            Hide
           </el-button>
         </div>
         
-        <div v-if="showAvailableSlots" class="slots-content"
-          :class="{ 'slots-loading': slotsLoading }">
+        <div class="slots-content" :class="{ 'slots-loading': slotsLoading }">
           <div v-if="slotsLoading" class="loading-message">
             <el-progress :percentage="100" :indeterminate="true"></el-progress>
             Loading time slots...
@@ -39,12 +39,11 @@
             <el-collapse-item
               v-for="dateGroup in availableSlots"
               :key="dateGroup.date"
-              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)}`"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} - Booked: ${dateGroup.requestCount || dateGroup.bookedSlots || 0}`"
               :name="dateGroup.date"
             >
               <div class="slots-info">
-                <span>Available: <el-tag type="success">{{ dateGroup.availableSlots }}</el-tag></span>
-                <span>Booked: <el-tag type="info">{{ dateGroup.bookedSlots }}</el-tag></span>
+                <span>Booked: <el-tag type="info">{{ dateGroup.requestCount || dateGroup.bookedSlots || 0 }}</el-tag></span>
               </div>
               <div class="time-slots-grid">
                 <button
@@ -65,8 +64,15 @@
         </div>
       </div>
 
+      <!-- Show/Hide Slots Button (when slots are hidden) -->
+      <div v-if="!showAvailableSlots" class="show-slots-button">
+        <el-button text @click="showAvailableSlots = true" class="toggle-slots-btn">
+          <i class="el-icon-arrow-right"></i> View Available Slots
+        </el-button>
+      </div>
+
       <!-- Right Panel: Form -->
-      <div class="form-panel">
+      <div :class="['form-panel', !showAvailableSlots ? 'form-panel-full' : '']">
         <el-form
           ref="formRef"
           :model="formData"
@@ -721,7 +727,7 @@ const dialogWidth = computed(() => {
   } else if (window.innerWidth <= 960) {
     return '90%'
   }
-  return '900px'
+  return showAvailableSlots.value ? '1000px' : '800px'
 })
 
 // Responsive label width
@@ -864,12 +870,18 @@ const validateTimeSlot = async (date, time, excludeId = null) => {
 
 // Date analyzer function - only allows Sundays (child dedication services are on Sundays)
 const isDateDisabled = (date) => {
-  // Only check: date cannot be in the past
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // Disable if date is in the past OR not a Sunday
-  return date < today || date.getDay() !== 0
+  // In edit mode, allow the current value even if it's today/past
+  if (isEditMode.value && formData.preferred_dedication_date) {
+    const currentValue = new Date(formData.preferred_dedication_date)
+    currentValue.setHours(0, 0, 0, 0)
+    if (date.getTime() === currentValue.getTime()) return false
+  }
+
+  // Disable if date is in the past, today, OR not a Sunday
+  return date <= today || date.getDay() !== 0
 }
 
 // Get disabled hours for time picker based on selected date
@@ -1177,8 +1189,17 @@ const rules = {
           today.setHours(0, 0, 0, 0)
           preferredDate.setHours(0, 0, 0, 0)
           
-          if (preferredDate < today) {
-            callback(new Error('Preferred dedication date cannot be in the past'))
+          if (preferredDate <= today) {
+            // In edit mode, allow if it matches current value
+            if (isEditMode.value && formData.preferred_dedication_date) {
+              const currentVal = new Date(formData.preferred_dedication_date)
+              currentVal.setHours(0,0,0,0)
+              if (preferredDate.getTime() === currentVal.getTime()) {
+                callback()
+                return
+              }
+            }
+            callback(new Error('Preferred dedication date must be tomorrow or later'))
             return
           }
           
@@ -1781,41 +1802,41 @@ const handleSubmit = async () => {
       background: 'rgba(255, 255, 255, 0.8)',
     })
 
-    // Prepare data for submission
+    // Prepare data for submission safely
     const submitData = {
-      requested_by: formData.requested_by.trim(),
+      requested_by: String(formData.requested_by || '').trim(),
       requester_relationship: formData.requester_relationship,
-      child_firstname: formData.child_firstname.trim(),
-      child_lastname: formData.child_lastname.trim(),
-      child_middle_name: formData.child_middle_name ? formData.child_middle_name.trim() : null,
+      child_firstname: String(formData.child_firstname || '').trim(),
+      child_lastname: String(formData.child_lastname || '').trim(),
+      child_middle_name: formData.child_middle_name ? String(formData.child_middle_name).trim() : null,
       date_of_birth: formData.date_of_birth,
-      place_of_birth: formData.place_of_birth.trim(),
+      place_of_birth: String(formData.place_of_birth || '').trim(),
       gender: formData.gender,
       preferred_dedication_date: formData.preferred_dedication_date || null,
       preferred_dedication_time: formData.preferred_dedication_time || null,
-      contact_phone_number: formData.contact_phone_number.trim(),
-      contact_email: formData.contact_email ? formData.contact_email.trim() : null,
-      contact_address: formData.contact_address.trim(),
-      father_firstname: formData.father_firstname ? formData.father_firstname.trim() : null,
-      father_lastname: formData.father_lastname ? formData.father_lastname.trim() : null,
-      father_middle_name: formData.father_middle_name ? formData.father_middle_name.trim() : null,
-      father_phone_number: formData.father_phone_number ? formData.father_phone_number.trim() : null,
-      father_email: formData.father_email ? formData.father_email.trim() : null,
-      father_address: formData.father_address ? formData.father_address.trim() : null,
-      mother_firstname: formData.mother_firstname ? formData.mother_firstname.trim() : null,
-      mother_lastname: formData.mother_lastname ? formData.mother_lastname.trim() : null,
-      mother_middle_name: formData.mother_middle_name ? formData.mother_middle_name.trim() : null,
-      mother_phone_number: formData.mother_phone_number ? formData.mother_phone_number.trim() : null,
-      mother_email: formData.mother_email ? formData.mother_email.trim() : null,
-      mother_address: formData.mother_address ? formData.mother_address.trim() : null,
+      contact_phone_number: String(formData.contact_phone_number || '').trim(),
+      contact_email: formData.contact_email ? String(formData.contact_email).trim() : null,
+      contact_address: String(formData.contact_address || '').trim(),
+      father_firstname: formData.father_firstname ? String(formData.father_firstname).trim() : null,
+      father_lastname: formData.father_lastname ? String(formData.father_lastname).trim() : null,
+      father_middle_name: formData.father_middle_name ? String(formData.father_middle_name).trim() : null,
+      father_phone_number: formData.father_phone_number ? String(formData.father_phone_number).trim() : null,
+      father_email: formData.father_email ? String(formData.father_email).trim() : null,
+      father_address: formData.father_address ? String(formData.father_address).trim() : null,
+      mother_firstname: formData.mother_firstname ? String(formData.mother_firstname).trim() : null,
+      mother_lastname: formData.mother_lastname ? String(formData.mother_lastname).trim() : null,
+      mother_middle_name: formData.mother_middle_name ? String(formData.mother_middle_name).trim() : null,
+      mother_phone_number: formData.mother_phone_number ? String(formData.mother_phone_number).trim() : null,
+      mother_email: formData.mother_email ? String(formData.mother_email).trim() : null,
+      mother_address: formData.mother_address ? String(formData.mother_address).trim() : null,
       sponsors: formData.sponsors && formData.sponsors.length > 0
         ? formData.sponsors.map(s => ({
-            firstname: s.firstname ? s.firstname.trim() : '',
-            lastname: s.lastname ? s.lastname.trim() : '',
-            middle_name: s.middle_name ? s.middle_name.trim() : '',
-            phone_number: s.phone_number ? s.phone_number.trim() : '',
-            address: s.address ? s.address.trim() : ''
-          })).filter(s => s.firstname && s.lastname && s.phone_number && s.address) // Only include complete sponsors
+            firstname: String(s.firstname || '').trim(),
+            lastname: String(s.lastname || '').trim(),
+            middle_name: String(s.middle_name || '').trim(),
+            phone_number: String(s.phone_number || '').trim(),
+            address: String(s.address || '').trim()
+          })).filter(s => s.firstname && s.lastname && s.phone_number && s.address)
         : [],
       status: formData.status,
       rejection_reason: formData.rejection_reason || null,
@@ -1827,8 +1848,8 @@ const handleSubmit = async () => {
 
     // Only include pastor and location for admin/staff users
     if (!isMemberUser.value) {
-      submitData.pastor = formData.pastor ? formData.pastor.trim() : null
-      submitData.location = formData.location ? formData.location.trim() : null
+      submitData.pastor = formData.pastor ? String(formData.pastor).trim() : null
+      submitData.location = formData.location ? String(formData.location).trim() : null
     }
 
     // Emit submit event with data
@@ -1846,8 +1867,9 @@ const handleSubmit = async () => {
 
     if (error !== 'cancel') {
       console.error('Process STOPPED due to error:', error)
+      const errorMsg = typeof error === 'object' ? 'Validation failed or connection error' : String(error)
       ElMessage.error({
-        message: 'Submission failed: Please check all required fields and try again. Process stopped.',
+        message: `Submission failed: ${errorMsg}. Please check all required fields and try again.`,
         duration: 6000,
         showClose: true
       })

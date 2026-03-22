@@ -664,7 +664,7 @@ router.get('/available-slots', async (req, res) => {
 
     // Generate available Sundays with 12pm slot only
     const dateGroups = [];
-    for (let i = 0; i < days; i++) {
+    for (let i = 1; i <= days; i++) {
       const date = start.clone().add(i, 'days');
       // Child Dedication only on Sundays (day 0)
       if (date.day() !== 0) continue;
