@@ -2,10 +2,10 @@
   <v-app>
     <!-- Loading Screen -->
     <transition name="fade">
-      <div v-if="isLoading" class="loading-screen">
-        <div class="loading-content">
-          <img src="/logo-watermark.png" alt="BBEK Logo" class="loading-logo" />
-          <div class="loading-spinner"></div>
+      <div v-if="isLoading" class="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; display: flex; align-items: center; justify-content: center; z-index: 99999;">
+        <div class="loading-content" style="display: flex; flex-direction: column; align-items: center; gap: 32px;">
+          <img src="/logo-watermark.png" alt="BBEK Logo" class="loading-logo" style="width: 200px; height: 200px; object-fit: contain;" />
+          <div class="loading-spinner" style="width: 50px; height: 50px; border: 4px solid #e0e0e0; border-top-color: #0cbdaa; border-radius: 50%;"></div>
         </div>
       </div>
     </transition>
