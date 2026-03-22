@@ -168,8 +168,8 @@
           style="width: 100%"
           :disabled="loading"
         >
-          <el-option label="Male" value="M" />
-          <el-option label="Female" value="F" />
+          <el-option label="Male" value="Male" />
+          <el-option label="Female" value="Female" />
         </el-select>
       </el-form-item>
 
@@ -381,8 +381,8 @@
         />
       </el-form-item>
 
-      <!-- Guardian Name (shown only if single) -->
-      <el-form-item v-if="formData.civil_status === 'single'" label="Guardian Name">
+      <!-- Guardian Name -->
+      <el-form-item label="Guardian Name">
         <el-input
           v-model="formData.guardian_name"
           placeholder="Enter guardian's full name"
@@ -391,8 +391,8 @@
         />
       </el-form-item>
 
-      <!-- Guardian Contact (shown only if single) -->
-      <el-form-item v-if="formData.civil_status === 'single'" label="Guardian Contact">
+      <!-- Guardian Contact -->
+      <el-form-item label="Guardian Contact">
         <el-input
           v-model="formData.guardian_contact"
           placeholder="Enter guardian's contact number"
@@ -403,8 +403,8 @@
         </el-input>
       </el-form-item>
 
-      <!-- Guardian Relationship (shown only if single) -->
-      <el-form-item v-if="formData.civil_status === 'single'" label="Guardian Relationship">
+      <!-- Guardian Relationship -->
+      <el-form-item label="Guardian Relationship">
         <el-select
           v-model="formData.guardian_relationship"
           placeholder="Select relationship"
@@ -671,15 +671,6 @@ const statusOptions = [
   { name: 'Cancelled', value: 'cancelled' }
 ]
 
-const isFutureDate = computed(() => {
-  if (!formData.baptism_date) return true
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const scheduledDate = new Date(formData.baptism_date)
-  scheduledDate.setHours(0, 0, 0, 0)
-  return scheduledDate > today
-})
-
 // Form data
 const formData = reactive({
   baptism_id: '',
@@ -709,6 +700,29 @@ const formData = reactive({
   guardian_name: '',
   guardian_contact: '',
   guardian_relationship: ''
+})
+
+// Auto-calculate age from birthdate
+watch(() => formData.birthdate, (newDate) => {
+  if (newDate) {
+    const today = new Date();
+    const birthDate = new Date(newDate);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    formData.age = age;
+  }
+});
+
+const isFutureDate = computed(() => {
+  if (!formData.baptism_date) return true
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const scheduledDate = new Date(formData.baptism_date)
+  scheduledDate.setHours(0, 0, 0, 0)
+  return scheduledDate > today
 })
 
 // Validation rules

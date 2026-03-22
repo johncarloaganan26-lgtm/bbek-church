@@ -453,8 +453,9 @@ async function createWaterBaptism(baptismData) {
           recipientName: recipientName,
           memberName: recipientName,
           baptismDate: createdBaptism.data.baptism_date
-            ? moment(createdBaptism.data.baptism_date).format('YYYY-MM-DD HH:mm')
+            ? moment(createdBaptism.data.baptism_date).format('YYYY-MM-DD')
             : 'To be determined',
+          baptismTime: createdBaptism.data.baptism_time || '',
           location: createdBaptism.data.location || '',
           pastorName: createdBaptism.data.pastor_name,
           isMember: is_member && !!member_id,

@@ -379,6 +379,8 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
       guardian_name: guardian_name || '',
       guardian_contact: guardian_contact || '',
       guardian_relationship: guardian_relationship || '',
+      baptism_date: req.body.baptism_date || null,
+      baptism_time: req.body.baptism_time || null,
       is_member: false,
       member_id: null,
       status: 'pending',
