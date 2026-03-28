@@ -216,7 +216,7 @@ g<template>
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Transaction" location="top">
+              <v-tooltip text="Archive Transaction" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn
                     icon="mdi-delete"
@@ -456,10 +456,10 @@ const viewCertificate = async (transaction) => {
 const deleteTransaction = async (transaction) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete transaction "${transaction.transaction_id}"?`,
-      'Confirm Delete',
+      `Are you sure you want to archive transaction "${transaction.transaction_id}"?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -467,16 +467,16 @@ const deleteTransaction = async (transaction) => {
 
     const result = await transactionsStore.deleteTransaction(transaction.transaction_id)
     if (result.success) {
-      ElMessage.success('Transaction deleted successfully')
-      // Refresh totals after deleting transaction
+      ElMessage.success('Transaction archived successfully')
+      // Refresh totals after archiving transaction
       await transactionsStore.fetchTotalsByServiceType()
     } else {
-      ElMessage.error(result.error || 'Failed to delete transaction')
+      ElMessage.error(result.error || 'Failed to archive transaction')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting transaction:', error)
-      ElMessage.error('An error occurred while deleting the transaction')
+      console.error('Error archiving transaction:', error)
+      ElMessage.error('An error occurred while archiving the transaction')
     }
   }
 }

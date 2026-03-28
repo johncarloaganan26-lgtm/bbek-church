@@ -2,8 +2,14 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { query } = require('../database/db');
+const NodeCache = require('node-cache');
 
 const router = express.Router();
+
+// Initialize cache for login attempts (15-minute lockout)
+const loginAttemptsCache = new NodeCache({ stdTTL: 900, checkperiod: 60 });
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_TIME_MINS = 15;
 
 // Login route
 router.post('/login', async (req, res) => {
@@ -17,13 +23,31 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // BRUTE FORCE PROTECTION: Check if email is currently locked out
+    const attemptKey = `login_attempts_${email.toLowerCase().trim()}`;
+    const attempts = loginAttemptsCache.get(attemptKey) || 0;
+
+    if (attempts >= MAX_LOGIN_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed login attempts. Please try again after ${LOCKOUT_TIME_MINS} minutes.`,
+        error: 'Account locked temporarily'
+      });
+    }
+
     // Find user by email
     const [users] = await query('SELECT * FROM tbl_accounts WHERE email = ?', [email]);
 
     if (users.length === 0) {
+      // Increment failed attempts
+      const newAttempts = attempts + 1;
+      loginAttemptsCache.set(attemptKey, newAttempts);
+
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: newAttempts >= MAX_LOGIN_ATTEMPTS 
+          ? `Too many failed attempts. Account locked for ${LOCKOUT_TIME_MINS} minutes.`
+          : `Invalid credentials. ${MAX_LOGIN_ATTEMPTS - newAttempts} attempts remaining.`
       });
     }
 
@@ -33,11 +57,20 @@ router.post('/login', async (req, res) => {
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
+      // Increment failed attempts
+      const newAttempts = attempts + 1;
+      loginAttemptsCache.set(attemptKey, newAttempts);
+
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: newAttempts >= MAX_LOGIN_ATTEMPTS 
+          ? `Too many failed attempts. Account locked for ${LOCKOUT_TIME_MINS} minutes.`
+          : `Invalid credentials. ${MAX_LOGIN_ATTEMPTS - newAttempts} attempts remaining.`
       });
     }
+
+    // Success! Clear failed attempts
+    loginAttemptsCache.del(attemptKey);
 
     // Get member info
     const [members] = await query('SELECT * FROM tbl_members WHERE member_id = ?', [user.member_id]);

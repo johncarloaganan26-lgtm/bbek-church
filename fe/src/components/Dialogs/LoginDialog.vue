@@ -379,7 +379,7 @@ const handleBecomeMember = () => {
 .form-options {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 16px;
 }
 

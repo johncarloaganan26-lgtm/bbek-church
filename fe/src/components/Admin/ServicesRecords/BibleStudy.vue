@@ -56,22 +56,37 @@
           <v-spacer></v-spacer>
 
         </v-row>
+
+        <!-- Bulk Action Summary (Tonal Alert Style) -->
+        <v-row v-if="selectedRows.length > 0" class="mt-4">
+          <v-col cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-0"
+              density="compact"
+            >
+              <div class="d-flex align-center justify-space-between">
+                <div class="text-body-2">
+                  <strong>{{ selectedRows.length }}</strong> record{{ selectedRows.length > 1 ? 's' : '' }} selected
+                </div>
+                <div class="d-flex gap-2">
+                  <v-btn color="success" variant="flat" size="small" prepend-icon="mdi-check" @click="handleBulkComplete">
+                    Mark Completed
+                  </v-btn>
+                  <v-btn color="error" variant="flat" size="small" prepend-icon="mdi-archive" @click="handleBulkArchive">
+                    Archive Selected
+                  </v-btn>
+                  <v-btn variant="outlined" size="small" prepend-icon="mdi-close" @click="selectedRows = []">
+                    Clear Selection
+                  </v-btn>
+                </div>
+              </div>
+            </v-alert>
+          </v-col>
+        </v-row>
       </v-card-text>
     </v-card>
-    
-    <!-- Bulk Action Summary (Floating) -->
-    <v-fade-transition>
-      <div v-if="selectedRows.length > 0" class="bulk-selection-bar d-flex align-center justify-space-between pa-4 bg-primary text-white elevation-4">
-        <div class="d-flex align-center">
-          <v-icon class="mr-3">mdi-checkbox-multiple-marked</v-icon>
-          <span class="text-subtitle-1 font-weight-bold">{{ selectedRows.length }} records selected</span>
-        </div>
-        <div class="d-flex gap-4">
-          <v-btn variant="text" color="white" @click="selectedRows = []">Clear</v-btn>
-          <v-btn color="success" variant="flat" prepend-icon="mdi-check" @click="handleBulkComplete">Mark Completed</v-btn>
-        </div>
-      </div>
-    </v-fade-transition>
 
     <!-- Table -->
     <v-card elevation="2">
@@ -297,7 +312,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="grey" variant="text" @click="dialogVisible = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" @click="saveEdit" :loading="loading">Save</v-btn>
+          <v-btn color="primary" variant="flat" @click="saveEdit" :loading="loading">Save Changes</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -474,6 +489,34 @@ const handleBulkComplete = async () => {
   const result = await store.bulkCompleteRequests(eligibleIds);
   if (result) {
     selectedRows.value = [];
+  }
+};
+
+const handleBulkArchive = async () => {
+  if (selectedRows.value.length === 0) return;
+
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      `You are about to archive ${selectedRows.value.length} selected record(s). Please provide a reason for this action.`,
+      'Bulk Archive Bible Study',
+      {
+        confirmButtonText: 'Archive Records',
+        cancelButtonText: 'Cancel',
+        inputPattern: /.+/,
+        inputPlaceholder: 'e.g., Records are outdated or duplicate',
+        inputErrorMessage: 'Archive reason is required',
+        type: 'warning'
+      }
+    );
+
+    if (reason) {
+      const success = await store.bulkArchiveRequests(selectedRows.value, reason);
+      if (success) {
+        selectedRows.value = [];
+      }
+    }
+  } catch {
+    // User cancelled
   }
 };
 

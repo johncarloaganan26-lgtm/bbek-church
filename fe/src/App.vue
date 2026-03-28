@@ -1,14 +1,7 @@
 <template>
   <v-app>
-    <!-- Loading Screen -->
-    <transition name="fade">
-      <div v-if="isLoading" class="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; display: flex; align-items: center; justify-content: center; z-index: 99999;">
-        <div class="loading-content" style="display: flex; flex-direction: column; align-items: center; gap: 32px;">
-          <img src="/logo-watermark.png" alt="BBEK Logo" class="loading-logo" style="width: 200px; height: 200px; object-fit: contain;" />
-          <div class="loading-spinner" style="width: 50px; height: 50px; border: 4px solid #e0e0e0; border-top-color: #0cbdaa; border-radius: 50%;"></div>
-        </div>
-      </div>
-    </transition>
+    <!-- Unified Loading Screen -->
+    <PageLoader v-model="isLoading" viewport />
 
     <!-- Navigation should only display for Landing Page if page is in AdminDashboard and its children dont display it -->
     <Navigation v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
@@ -34,6 +27,7 @@ import { useAnnouncementStore } from '@/stores/announcementStore'
 import AnnouncementDisplayDialog from '@/components/Dialogs/AnnouncementDisplayDialog.vue'
 import { checkAccessTokenValidity } from '@/utils/tokenValidation'
 import Navigation from './components/LandingPage/Navigation.vue'
+import PageLoader from './components/Common/PageLoader.vue'
 import Footer from './components/LandingPage/Footer.vue'
 import SocialMediaIcons from './components/LandingPage/SocialMediaIcons.vue'
 import MembershipJourneyBanner from './components/LandingPage/MembershipJourneyBanner.vue'
@@ -101,109 +95,7 @@ onMounted(async () => {
 })
 </script>
 
-<style>
-/* Loading Screen Styles */
-.loading-screen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-}
-
-.loading-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-}
-
-.loading-logo {
-  width: 200px;
-  height: 200px;
-  object-fit: contain;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-/* Responsive sizes for different devices */
-@media (max-width: 768px) {
-  .loading-logo {
-    width: 150px;
-    height: 150px;
-  }
-}
-
-@media (max-width: 480px) {
-  .loading-logo {
-    width: 120px;
-    height: 120px;
-  }
-}
-
-/* Larger screens */
-@media (min-width: 1200px) {
-  .loading-logo {
-    width: 250px;
-    height: 250px;
-  }
-}
-
-/* Extra large screens */
-@media (min-width: 1600px) {
-  .loading-logo {
-    width: 300px;
-    height: 300px;
-  }
-}
-
-.loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid #e0e0e0;
-  border-top-color: #0cbdaa;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@media (max-width: 480px) {
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border-width: 3px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .loading-spinner {
-    width: 60px;
-    height: 60px;
-    border-width: 5px;
-  }
-}
-
-/* Animations */
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+<style scoped>
 /* Fade transition */
 .fade-enter-active,
 .fade-leave-active {

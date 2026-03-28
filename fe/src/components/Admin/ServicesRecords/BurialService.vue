@@ -224,7 +224,7 @@
                     @click="bulkDeleteServices"
                   >
                     <v-icon left>mdi-delete</v-icon>
-                    Delete Selected
+                    Archive Selected
                   </v-btn>
                   <v-btn
                     variant="outlined"
@@ -328,7 +328,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Burial Service" location="top">
+              <v-tooltip text="Archive Burial Service" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn
                     icon="mdi-delete"
@@ -516,10 +516,10 @@ const editService = async (service) => {
 const deleteService = async (id) => {
   try {
     const { value: reason } = await ElMessageBox.prompt(
-      'Enter the reason for deleting this burial service:',
-      'Confirm Delete',
+      'Enter the reason for archiving this burial service:',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         inputType: 'textarea',
         inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
@@ -533,14 +533,14 @@ const deleteService = async (id) => {
 
     const result = await burialServiceStore.deleteService(id, reason)
     if (result.success) {
-      ElMessage.success('Burial service deleted successfully')
+      ElMessage.success('Burial service archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete burial service')
+      ElMessage.error(result.error || 'Failed to archive burial service')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting burial service:', error)
-      ElMessage.error('Failed to delete burial service')
+      console.error('Error archiving burial service:', error)
+      ElMessage.error('Failed to archive burial service')
     }
   }
 }
@@ -694,10 +694,10 @@ const markIndividualComplete = async (service) => {
 const bulkDeleteServices = async () => {
   try {
     const { value: reason } = await ElMessageBox.prompt(
-      'Enter the reason for deleting these burial services:',
-      'Confirm Bulk Delete',
+      'Enter the reason for archiving these burial services:',
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         inputType: 'textarea',
         inputPlaceholder: 'e.g., Duplicate entries, Wrong data, etc.',
@@ -719,19 +719,19 @@ const bulkDeleteServices = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} burial service${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} burial service${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} burial service${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} burial service${failed > 1 ? 's' : ''}`)
       }
     }
 
     clearSelection()
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error bulk deleting services:', error)
-      ElMessage.error('Failed to delete selected burial services')
+      console.error('Error bulk archiving services:', error)
+      ElMessage.error('Failed to archive selected burial services')
     }
   }
 }

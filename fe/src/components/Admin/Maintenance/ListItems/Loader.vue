@@ -1,26 +1,15 @@
 <template>
-  <el-dialog
+  <PageLoader
     :model-value="loading"
-    :close-on-click-modal="false"
-    :close-on-press-escape="false"
-    :show-close="false"
-    :width="300"
-    :lock-scroll="false"
-    center
-    class="loader-dialog"
-  >
-    <div class="loader-content">
-      <el-icon class="is-loading loader-icon">
-        <Loading />
-      </el-icon>
-      <p class="loader-text">Loading...</p>
-    </div>
-  </el-dialog>
+    viewport
+    message="Processing Data..."
+    subtitle="Please wait while we update church records"
+  />
 </template>
 
 <script setup>
-import { Loading } from '@element-plus/icons-vue'
 import { watch, nextTick, onBeforeUnmount } from 'vue'
+import PageLoader from '@/components/Common/PageLoader.vue'
 
 const props = defineProps({
   loading: {

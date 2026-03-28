@@ -215,7 +215,7 @@
                     @click="bulkDeleteBaptisms"
                   >
                     <v-icon left>mdi-delete</v-icon>
-                    Delete Selected
+                    Archive Selected
                   </v-btn>
                   <v-btn
                     variant="outlined"
@@ -330,7 +330,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Baptism Record" location="top">
+              <v-tooltip text="Archive Baptism Record" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -373,6 +373,14 @@
     <!-- Bulk Complete Calendar Dialog -->
     <v-dialog v-model="bulkCompleteDialog" max-width="400px" persistent class="bulk-complete-dialog" style="overflow: visible;">
       <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          color="grey-darken-2"
+          class="position-absolute"
+          style="top: 10px; right: 10px; z-index: 10;"
+          @click="closeBulkCompleteDialog"
+        ></v-btn>
         <div class="pa-4 text-center">
           <v-avatar color="success-lighten-5" size="80" class="mb-4">
             <v-icon color="success" size="40">mdi-calendar-check</v-icon>
@@ -433,7 +441,7 @@
             block
             class="mb-2 font-weight-bold text-grey-darken-1"
             style="border-radius: 12px; height: 48px;"
-            @click="bulkCompleteDialog = false"
+            @click="closeBulkCompleteDialog"
           >
             Cancel
           </v-btn>
@@ -628,10 +636,10 @@ const editBaptism = (baptism) => {
 const deleteBaptism = async (id) => {
   try {
     const { value: reason } = await ElMessageBox.prompt(
-      'Enter the reason for deleting this water baptism record:',
-      'Confirm Delete',
+      'Enter the reason for archiving this water baptism record:',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         inputType: 'textarea',
         inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
@@ -645,14 +653,14 @@ const deleteBaptism = async (id) => {
 
     const result = await waterBaptismStore.deleteBaptism(id, reason);
     if (result.success) {
-      ElMessage.success('Water baptism record deleted successfully');
+      ElMessage.success('Water baptism record archived successfully');
     } else {
-      ElMessage.error(result.error || 'Failed to delete water baptism record');
+      ElMessage.error(result.error || 'Failed to archive water baptism record');
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting water baptism:', error);
-      ElMessage.error('Failed to delete water baptism record');
+      console.error('Error archiving water baptism:', error);
+      ElMessage.error('Failed to archive water baptism record');
     }
   }
 }
@@ -730,6 +738,13 @@ const bulkCompleteBaptisms = async () => {
   }
   completionTime.value = '13:00:00';
   bulkCompleteDialog.value = true;
+};
+
+const closeBulkCompleteDialog = () => {
+  bulkCompleteDialog.value = false;
+  completionDate.value = '';
+  completionTime.value = '13:00:00';
+  selectedBaptismsToComplete.value = [];
 };
 
 const confirmBulkComplete = async () => {

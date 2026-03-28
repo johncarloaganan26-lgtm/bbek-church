@@ -142,7 +142,7 @@
                 @click="bulkDeleteForms"
               >
                 <v-icon left>mdi-delete</v-icon>
-                Delete Selected
+                Archive Selected
               </v-btn>
               <v-btn
                 variant="outlined"
@@ -751,10 +751,10 @@ const bulkApproveForms = async () => {
 const bulkDeleteForms = async () => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedForms.value.length} selected message${selectedForms.value.length > 1 ? 's' : ''}?`,
-      'Confirm Bulk Delete',
+      `Are you sure you want to archive ${selectedForms.value.length} selected message${selectedForms.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -770,11 +770,11 @@ const bulkDeleteForms = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} message${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} message${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} message${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} message${failed > 1 ? 's' : ''}`)
       }
     }
 

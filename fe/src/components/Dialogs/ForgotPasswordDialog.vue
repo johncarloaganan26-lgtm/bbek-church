@@ -99,7 +99,13 @@
         <p class="text-body-2">{{ successDialog.message }}</p>
       </div>
       <template #footer>
-        <el-button :type="successDialog.isError ? 'danger' : 'success'" @click="closeSuccessDialog">OK</el-button>
+        <el-button 
+          :type="successDialog.isError ? 'danger' : 'primary'" 
+          @click="closeSuccessDialog"
+          :style="!successDialog.isError ? 'background-color: #14b8a6; border-color: #14b8a6; color: white;' : ''"
+        >
+          OK
+        </el-button>
       </template>
     </el-dialog>
   </el-dialog>
@@ -316,8 +322,19 @@ const handleBackToLogin = () => {
 
 .submit-btn {
   width: 100%;
+  height: 40px;
   font-weight: 600;
   letter-spacing: 0.5px;
+  background-color: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  color: white !important;
+  transition: all 0.2s;
+}
+
+.submit-btn:hover {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+  transform: translateY(-1px);
 }
 
 .form-footer {

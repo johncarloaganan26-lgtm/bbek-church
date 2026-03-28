@@ -1,23 +1,12 @@
 <template>
   <div class="landing-page">
-    <!-- Loading overlay for sequential CMS data loading -->
-    <v-overlay :model-value="isLoadingCmsData" contained class="align-center justify-center" style="z-index: 10000;">
-      <div class="text-center">
-        <v-progress-circular 
-          :model-value="loadingProgress.total > 0 ? (loadingProgress.current / loadingProgress.total) * 100 : 0"
-          color="primary" 
-          size="64" 
-          width="6"
-          class="mb-4"
-        >
-          <span class="text-caption">{{ loadingProgress.current }}/{{ loadingProgress.total }}</span>
-        </v-progress-circular>
-        <p class="text-white text-h6">{{ loadingMessage }}</p>
-        <p class="text-white text-caption mt-2">
-          Loading CMS data sequentially to reduce server load...
-        </p>
-      </div>
-    </v-overlay>
+    <!-- Unified Loading Screen for sequential CMS data loading -->
+    <PageLoader 
+      v-model="isLoadingCmsData" 
+      :progress="(loadingProgress.current / loadingProgress.total) * 100"
+      :message="loadingMessage"
+      subtitle="Synchronizing church content..."
+    />
     <v-main>
       <HeroSection />
       <BeliefsSection />
@@ -43,6 +32,7 @@ import EventsSection from '../components/LandingPage/EventsSection.vue'
 import PastEventsSection from '../components/LandingPage/PastEventsSection.vue'
 import InfoSection from '../components/LandingPage/InfoSection.vue'
 import Footer from '../components/LandingPage/Footer.vue'
+import PageLoader from '../components/Common/PageLoader.vue'
 import SocialMediaIcons from '../components/LandingPage/SocialMediaIcons.vue'
 import { fetchCmsPagesSequentially, CORE_CMS_PAGES } from '@/utils/cmsSequentialLoader'
 

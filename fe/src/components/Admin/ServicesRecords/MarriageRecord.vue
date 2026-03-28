@@ -158,11 +158,11 @@
                     color="error"
                     variant="flat"
                     size="small"
-                    prepend-icon="mdi-delete"
+                    prepend-icon="mdi-archive"
                     :disabled="loading"
                     @click="bulkDeleteMarriages"
                   >
-                    Delete Selected
+                    Archive Selected
                   </v-btn>
                   <v-btn
                     variant="text"
@@ -258,7 +258,7 @@
               ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Marriage Record" location="top">
+              <v-tooltip text="Archive Marriage Record" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-delete" 
@@ -412,10 +412,10 @@ const editMarriage = (marriage) => {
 const deleteMarriage = async (id) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this marriage record?',
-      'Confirm Delete',
+      'Are you sure you want to archive this marriage record?',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -423,14 +423,14 @@ const deleteMarriage = async (id) => {
 
     const result = await marriageServiceStore.deleteMarriage(id)
     if (result.success) {
-      ElMessage.success('Marriage record deleted successfully')
+      ElMessage.success('Marriage record archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete marriage record')
+      ElMessage.error(result.error || 'Failed to archive marriage record')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting marriage:', error)
-      ElMessage.error('Failed to delete marriage record')
+      console.error('Error archiving marriage:', error)
+      ElMessage.error('Failed to archive marriage record')
     }
   }
 }
@@ -464,10 +464,10 @@ const clearSelection = () => {
 const bulkDeleteMarriages = async () => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedMarriages.value.length} selected marriage record${selectedMarriages.value.length > 1 ? 's' : ''}?`,
-      'Confirm Bulk Delete',
+      `Are you sure you want to archive ${selectedMarriages.value.length} selected marriage record${selectedMarriages.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -482,19 +482,19 @@ const bulkDeleteMarriages = async () => {
     const failed = results.length - successful
 
     if (successful > 0) {
-      ElMessage.success(`Successfully deleted ${successful} marriage record${successful > 1 ? 's' : ''}`)
+      ElMessage.success(`Successfully archived ${successful} marriage record${successful > 1 ? 's' : ''}`)
     }
 
     if (failed > 0) {
-      ElMessage.warning(`Failed to delete ${failed} marriage record${failed > 1 ? 's' : ''}`)
+      ElMessage.warning(`Failed to archive ${failed} marriage record${failed > 1 ? 's' : ''}`)
     }
 
     clearSelection()
     await marriageServiceStore.fetchMarriages()
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error bulk deleting marriages:', error)
-      ElMessage.error('Failed to delete selected marriage records')
+      console.error('Error bulk archiving marriages:', error)
+      ElMessage.error('Failed to archive selected marriage records')
     }
   }
 }

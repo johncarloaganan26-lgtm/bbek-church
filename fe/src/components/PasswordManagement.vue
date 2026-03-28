@@ -83,7 +83,7 @@
                 required
               ></v-text-field>
 
-              <v-btn color="primary" size="large" block type="submit" :loading="submitting">
+              <v-btn style="background-color: #14b8a6; color: white;" size="large" block type="submit" :loading="submitting">
                 Change Password
               </v-btn>
 

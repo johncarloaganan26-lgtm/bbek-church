@@ -1,4 +1,8 @@
 const { query } = require('../database/db');
+const NodeCache = require('node-cache');
+
+// Initialize cache with 5-minute TTL (300 seconds)
+const dashboardCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 /**
  * Get dashboard statistics - OPTIMIZED with fewer queries
@@ -7,6 +11,24 @@ const { query } = require('../database/db');
  */
 async function getDashboardStats() {
   try {
+    // Check if stats are in cache
+    const cacheKey = 'dashboard_stats';
+    const cachedData = dashboardCache.get(cacheKey);
+    
+    if (cachedData) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📊 Serving dashboard stats from CACHE');
+      }
+      return {
+        ...cachedData,
+        fromCache: true
+      };
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('📊 Fetching FRESH dashboard stats from Database');
+    }
+
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -95,7 +117,7 @@ async function getDashboardStats() {
     const unreadMessages = messageCounts[0]?.unread_messages || 0;
     
     // =========================================================================
-    // QUERY 5: Church services this month (water baptism, child dedication, burial) - COMBINED
+    // QUERY 5: Church services this month COMBINED
     // =========================================================================
     const [serviceCounts] = await query(`
       SELECT 
@@ -107,14 +129,22 @@ async function getDashboardStats() {
          AND (DATE_FORMAT(preferred_dedication_date, "%Y-%m") = ? OR preferred_dedication_date IS NULL)) as child_dedication,
         (SELECT COUNT(*) FROM tbl_burialservice 
          WHERE status IN ('approved', 'ongoing') 
-         AND (DATE_FORMAT(service_date, "%Y-%m") = ? OR service_date IS NULL)) as burial_service
-    `, [currentMonthStr, currentMonthStr, currentMonthStr]);
+         AND (DATE_FORMAT(service_date, "%Y-%m") = ? OR service_date IS NULL)) as burial_service,
+        (SELECT COUNT(*) FROM tbl_biblestudy_requests 
+         WHERE status IN ('Pending', 'Scheduled') 
+         AND (DATE_FORMAT(scheduled_date, "%Y-%m") = ? OR scheduled_date IS NULL)) as bible_study,
+        (SELECT COUNT(*) FROM tbl_discipleship_requests 
+         WHERE request_type = 'Salvation' AND status IN ('Pending', 'Scheduled') 
+         AND (DATE_FORMAT(scheduled_date, "%Y-%m") = ? OR scheduled_date IS NULL)) as salvation_talk
+    `, [currentMonthStr, currentMonthStr, currentMonthStr, currentMonthStr, currentMonthStr]);
     
     const waterBaptismThisMonth = serviceCounts[0]?.water_baptism || 0;
     const childDedicationThisMonth = serviceCounts[0]?.child_dedication || 0;
     const burialServiceThisMonth = serviceCounts[0]?.burial_service || 0;
+    const bibleStudyThisMonth = serviceCounts[0]?.bible_study || 0;
+    const salvationTalkThisMonth = serviceCounts[0]?.salvation_talk || 0;
     
-    return {
+    const result = {
       success: true,
       message: 'Dashboard statistics retrieved successfully',
       data: {
@@ -142,16 +172,31 @@ async function getDashboardStats() {
         churchServices: {
           waterBaptism: waterBaptismThisMonth,
           childDedication: childDedicationThisMonth,
-          burialService: burialServiceThisMonth
+          burialService: burialServiceThisMonth,
+          bibleStudy: bibleStudyThisMonth,
+          salvationTalk: salvationTalkThisMonth
         }
       }
     };
+
+    // Store results in cache before returning
+    dashboardCache.set(cacheKey, result);
+    
+    return result;
+
   } catch (error) {
     console.error('Error getting dashboard stats:', error);
     throw error;
   }
 }
+/**
+ * Function to clear dashboard cache manually (e.g., when a donation or record is added)
+ */
+function clearDashboardCache() {
+  dashboardCache.del('dashboard_stats');
+}
 
 module.exports = {
-  getDashboardStats
+  getDashboardStats,
+  clearDashboardCache
 };

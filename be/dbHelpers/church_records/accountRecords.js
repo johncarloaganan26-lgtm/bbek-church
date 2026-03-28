@@ -856,7 +856,7 @@ async function forgotPasswordByEmail(email) {
         type: 'password_reset'
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+      { expiresIn: '1h' }
     );
     console.log('🔐 JWT token generated');
 

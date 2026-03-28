@@ -194,7 +194,7 @@
                     @click="bulkDeleteApprovals"
                   >
                     <v-icon left>mdi-delete</v-icon>
-                    Delete Selected
+                    Archive Selected
                   </v-btn>
                   <v-btn
                     variant="outlined"
@@ -304,7 +304,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Approval" location="top">
+              <v-tooltip text="Archive Approval" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -584,10 +584,10 @@ const rejectRequest = async (approval) => {
 const deleteApproval = async (id) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this approval?',
-      'Confirm Delete',
+      'Are you sure you want to archive this approval?',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -595,14 +595,14 @@ const deleteApproval = async (id) => {
 
     const result = await approvalsStore.deleteApproval(id)
     if (result.success) {
-      ElMessage.success('Approval deleted successfully')
+      ElMessage.success('Approval archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete approval')
+      ElMessage.error(result.error || 'Failed to archive approval')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting approval:', error)
-      ElMessage.error('Failed to delete approval')
+      console.error('Error archiving approval:', error)
+      ElMessage.error('Failed to archive approval')
     }
   }
 }
@@ -689,10 +689,10 @@ const bulkApproveApprovals = async () => {
 const bulkDeleteApprovals = async () => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedApprovals.value.length} selected approval${selectedApprovals.value.length > 1 ? 's' : ''}?`,
-      'Confirm Bulk Delete',
+      `Are you sure you want to archive ${selectedApprovals.value.length} selected approval${selectedApprovals.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -708,11 +708,11 @@ const bulkDeleteApprovals = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} approval${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} approval${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} approval${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} approval${failed > 1 ? 's' : ''}`)
       }
     }
 

@@ -10,7 +10,7 @@
           :disabled="loading"
           @click="handleBulkDelete"
         >
-          Delete Selected ({{ selectedAccounts.length }})
+          Archive Selected ({{ selectedAccounts.length }})
         </v-btn>
         <v-btn
           variant="text"
@@ -208,7 +208,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Account" location="top">
+              <v-tooltip text="Archive Account" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -365,10 +365,10 @@ const editAccount = (account) => {
 const deleteAccount = async (account) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete the account for ${account.email}?`,
-      'Confirm Delete',
+      `Are you sure you want to archive the account for ${account.email}?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -376,14 +376,14 @@ const deleteAccount = async (account) => {
 
     const result = await accountsStore.deleteAccount(account.acc_id || account.id)
     if (result.success) {
-      ElMessage.success('Account deleted successfully')
+      ElMessage.success('Account archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete account')
+      ElMessage.error(result.error || 'Failed to archive account')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting account:', error)
-      ElMessage.error('Failed to delete account')
+      console.error('Error archiving account:', error)
+      ElMessage.error('Failed to archive account')
     }
   }
 }
@@ -660,10 +660,10 @@ const handleBulkDelete = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedAccounts.value.length} selected account(s)? This action cannot be undone.`,
-      'Confirm Bulk Delete',
+      `Are you sure you want to archive ${selectedAccounts.value.length} selected account(s)? This action cannot be undone.`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete All',
+        confirmButtonText: 'Archive All',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -679,11 +679,11 @@ const handleBulkDelete = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} account${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} account${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} account${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} account${failed > 1 ? 's' : ''}`)
       }
     }
 

@@ -197,7 +197,7 @@
               @click="bulkDeleteAnnouncements"
             >
               <el-icon><Delete /></el-icon>
-              Delete Selected
+              Archive Selected
             </el-button>
             <el-button
               size="small"
@@ -551,22 +551,22 @@ const handleSubmit = async () => {
 const handleDelete = async (announcement) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete the announcement "${announcement.title}"?`,
-      'Delete Announcement',
+      `Are you sure you want to archive the announcement "${announcement.title}"?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning'
       }
     )
 
     await announcementStore.deleteAnnouncement(announcement.announcement_id)
-    ElMessage.success('Announcement deleted successfully')
+    ElMessage.success('Announcement archived successfully')
     await fetchAnnouncements()
     await fetchSummaryStats()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error(error.message || 'Failed to delete announcement')
+      ElMessage.error(error.message || 'Failed to archive announcement')
     }
   }
 }
@@ -583,10 +583,10 @@ const clearSelection = () => {
 const bulkDeleteAnnouncements = async () => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedAnnouncements.value.length} selected announcement${selectedAnnouncements.value.length > 1 ? 's' : ''}?`,
-      'Bulk Delete Announcements',
+      `Are you sure you want to archive ${selectedAnnouncements.value.length} selected announcement${selectedAnnouncements.value.length > 1 ? 's' : ''}?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -602,11 +602,11 @@ const bulkDeleteAnnouncements = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} announcement${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} announcement${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} announcement${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} announcement${failed > 1 ? 's' : ''}`)
       }
     }
 

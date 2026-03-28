@@ -165,7 +165,7 @@
                 :disabled="loading"
                 @click="handleBulkDelete"
               >
-                Delete Selected ({{ selectedMinistries.length }})
+                Archive Selected ({{ selectedMinistries.length }})
               </v-btn>
               <v-btn
                 variant="text"
@@ -264,7 +264,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Ministry" location="top">
+              <v-tooltip text="Archive Ministry" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -448,10 +448,10 @@ const handleBulkDelete = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedMinistries.value.length} selected ministry/ministries?`,
-      'Bulk Delete Ministries',
+      `Are you sure you want to archive ${selectedMinistries.value.length} selected ministry/ministries?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -467,11 +467,11 @@ const handleBulkDelete = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} ministry${deleted > 1 ? 'ies' : 'y'}`)
+        ElMessage.success(`Successfully archived ${deleted} ministry${deleted > 1 ? 'ies' : 'y'}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} ministry${failed > 1 ? 'ies' : 'y'}`)
+        ElMessage.warning(`Failed to archive ${failed} ministry${failed > 1 ? 'ies' : 'y'}`)
       }
     }
 
@@ -512,10 +512,10 @@ const editMinistry = (ministry) => {
 const deleteMinistry = async (id) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this ministry?',
-      'Confirm Delete',
+      'Are you sure you want to archive this ministry?',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -523,14 +523,14 @@ const deleteMinistry = async (id) => {
 
     const result = await ministriesStore.deleteMinistry(id)
     if (result.success) {
-      ElMessage.success('Ministry deleted successfully')
+      ElMessage.success('Ministry archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete ministry')
+      ElMessage.error(result.error || 'Failed to archive ministry')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting ministry:', error)
-      ElMessage.error('Failed to delete ministry')
+      console.error('Error archiving ministry:', error)
+      ElMessage.error('Failed to archive ministry')
     }
   }
 }

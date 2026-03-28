@@ -212,6 +212,26 @@
               <v-btn variant="outlined" color="purple" block @click="$router.push('/admin/burial-service')">Manage</v-btn>
             </v-card>
           </v-col>
+          <v-col cols="12" md="6">
+            <v-card class="pa-4" elevation="2" :style="{ backgroundColor: '#FFF3E0' }">
+              <div class="d-flex align-center mb-3">
+                <v-icon icon="mdi-book-open-variant" size="32" color="orange-darken-2" class="mr-3"></v-icon>
+                <h3 class="text-h6 font-weight-bold">Bible Study</h3>
+              </div>
+              <p class="text-body-2 mb-4">{{ bibleStudyCount }} active/scheduled requests this month</p>
+              <v-btn variant="outlined" color="orange-darken-2" block @click="$router.push('/admin/bible-study')">Manage</v-btn>
+            </v-card>
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-card class="pa-4" elevation="2" :style="{ backgroundColor: '#FCE4EC' }">
+              <div class="d-flex align-center mb-3">
+                <v-icon icon="mdi-account-heart" size="32" color="pink" class="mr-3"></v-icon>
+                <h3 class="text-h6 font-weight-bold">Salvation Talk</h3>
+              </div>
+              <p class="text-body-2 mb-4">{{ salvationTalkCount }} requests this month</p>
+              <v-btn variant="outlined" color="pink" block @click="$router.push('/admin/discipleship')">Manage</v-btn>
+            </v-card>
+          </v-col>
         </v-row>
       </v-col>
     </v-row>
@@ -259,6 +279,8 @@ const unreadMessages = ref(0)
 const waterBaptismCount = ref(0)
 const childDedicationCount = ref(0)
 const burialServiceCount = ref(0)
+const bibleStudyCount = ref(0)
+const salvationTalkCount = ref(0)
 const loadingStats = ref(false)
 
 /**
@@ -491,6 +513,8 @@ const fetchDashboardStats = async () => {
       waterBaptismCount.value = stats.churchServices?.waterBaptism || 0
       childDedicationCount.value = stats.churchServices?.childDedication || 0
       burialServiceCount.value = stats.churchServices?.burialService || 0
+      bibleStudyCount.value = stats.churchServices?.bibleStudy || 0
+      salvationTalkCount.value = stats.churchServices?.salvationTalk || 0
     }
   } catch (error) {
     console.error('Error fetching dashboard stats:', error)
@@ -507,6 +531,8 @@ const fetchDashboardStats = async () => {
     waterBaptismCount.value = 0
     childDedicationCount.value = 0
     burialServiceCount.value = 0
+    bibleStudyCount.value = 0
+    salvationTalkCount.value = 0
   } finally {
     loadingStats.value = false
   }

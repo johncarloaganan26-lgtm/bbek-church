@@ -12,7 +12,7 @@
             :disabled="loading"
             @click="handleBulkDelete"
           >
-            Delete Selected ({{ selectedDepartments.length }})
+            Archive Selected ({{ selectedDepartments.length }})
           </v-btn>
           <v-btn
             variant="text"
@@ -258,7 +258,7 @@
               ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Department" location="top">
+              <v-tooltip text="Archive Department" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn
                 icon="mdi-delete"
@@ -548,10 +548,10 @@ const handleSubmit = async (submitData) => {
 const deleteDepartment = async (department) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete "${department.department_name}"?`,
-      'Confirm Delete',
+      `Are you sure you want to archive "${department.department_name}"?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -559,14 +559,14 @@ const deleteDepartment = async (department) => {
 
     const result = await departmentsStore.deleteDepartment(department.department_id)
     if (result.success) {
-      ElMessage.success('Department deleted successfully')
+      ElMessage.success('Department archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete department')
+      ElMessage.error(result.error || 'Failed to archive department')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting department:', error)
-      ElMessage.error('An error occurred while deleting the department')
+      console.error('Error archiving department:', error)
+      ElMessage.error('An error occurred while archiving the department')
     }
   }
 }
@@ -819,10 +819,10 @@ const handleBulkDelete = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedDepartments.value.length} selected department(s)? This action cannot be undone.`,
-      'Confirm Bulk Delete',
+      `Are you sure you want to archive ${selectedDepartments.value.length} selected department(s)? This action cannot be undone.`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete All',
+        confirmButtonText: 'Archive All',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -838,11 +838,11 @@ const handleBulkDelete = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} department${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} department${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} department${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} department${failed > 1 ? 's' : ''}`)
       }
     }
 

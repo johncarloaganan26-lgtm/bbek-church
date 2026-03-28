@@ -11,7 +11,7 @@
             :disabled="memberStore.loading"
             @click="handleBulkDelete"
           >
-            Delete Selected ({{ selectedMembers.length }})
+            Archive Selected ({{ selectedMembers.length }})
           </v-btn>
           <v-btn
             variant="text"
@@ -195,7 +195,7 @@
               ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Member" location="top">
+              <v-tooltip text="Archive Member" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-delete" 
@@ -390,10 +390,10 @@ const editMember = (member) => {
 const deleteMember = async (member) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${getMemberName(member)}?`,
-      'Delete Member',
+      `Are you sure you want to archive ${getMemberName(member)}?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -401,13 +401,13 @@ const deleteMember = async (member) => {
     
     const result = await memberStore.deleteMember(member.member_id)
     if (result.success) {
-      ElMessage.success('Member deleted successfully')
+      ElMessage.success('Member archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete member')
+      ElMessage.error(result.error || 'Failed to archive member')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Delete error:', error)
+      console.error('Archive error:', error)
     }
   }
 }

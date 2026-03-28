@@ -35,6 +35,128 @@ const createTransporter = () => {
 };
 
 /**
+ * Universal email template wrapper for Bible Baptist Ekklesia of Kawit
+ * @param {Object} options - Template options
+ * @param {string} options.title - Main heading of the email
+ * @param {string} [options.preheader] - Small uppercase text above the title
+ * @param {string} options.body - HTML content of the email body
+ * @param {Object} [options.action] - Optional button link { url, label }
+ * @param {string} [options.statusColor] - Primary accent color (default: blue)
+ */
+const renderEmailLayout = ({ title, preheader, body, action, statusColor = '#2563eb' }) => {
+  const logoUrl = 'https://biblebaptistekklesiaofkawit.xyz/logo.png';
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td, p, a { font-family: Arial, sans-serif !important; }
+    </style>
+    <![endif]-->
+    <style>
+        body { margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+        .wrapper { width: 100%; border-collapse: collapse; background-color: #f8fafc; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; margin-top: 40px; margin-bottom: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .header { padding: 48px 40px 32px; text-align: center; background: linear-gradient(to bottom, #ffffff, #f1f5f9); }
+        .logo { height: 72px; width: auto; margin-bottom: 24px; }
+        .content { padding: 0 48px 48px; color: #334155; line-height: 1.7; font-size: 16px; }
+        .content h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 24px; letter-spacing: -0.02em; }
+        .content p { margin-bottom: 20px; }
+        .button-container { padding: 32px 0; text-align: center; }
+        .button { background-color: ${statusColor}; color: #ffffff !important; padding: 16px 40px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 16px; display: inline-block; transition: transform 0.2s; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
+        .button:hover { opacity: 0.9; }
+        .footer { padding: 40px; text-align: center; background-color: #f1f5f9; color: #64748b; font-size: 14px; }
+        .footer-logo { height: 32px; width: auto; opacity: 0.5; margin-bottom: 16px; }
+        .social-links { margin: 24px 0; }
+        .social-link { margin: 0 8px; color: #94a3b8; text-decoration: none; font-weight: 500; }
+        @media only screen and (max-width: 600px) {
+            .container { border-radius: 0; margin-top: 0; margin-bottom: 0; }
+            .content { padding: 0 32px 40px; }
+        }
+    </style>
+</head>
+<body>
+    <table class="wrapper">
+        <tr>
+            <td>
+                <div class="container">
+                    <div class="header">
+                        <img src="${logoUrl}" alt="BBEK Logo" class="logo">
+                    </div>
+                    <div class="content">
+                        ${preheader ? `<p style="font-weight: 600; text-transform: uppercase; color: ${statusColor}; font-size: 12px; letter-spacing: 0.1em; margin-bottom: 8px;">${preheader}</p>` : ''}
+                        <h1>${title}</h1>
+                        ${body}
+                        ${action ? `
+                        <div class="button-container">
+                            <a href="${action.url}" class="button">${action.label}</a>
+                        </div>` : ''}
+                    </div>
+                    <div class="footer">
+                        <img src="${logoUrl}" alt="BBEK Logo" class="footer-logo">
+                        <p>&copy; ${new Date().getFullYear()} Bible Baptist Ekklesia of Kawit. All rights reserved.</p>
+                        <p>Philippine Sangley Road, Kawit, Cavite</p>
+                        <div class="social-links">
+                            <a href="https://biblebaptistekklesiaofkawit.xyz" class="social-link">Website</a>
+                        </div>
+                        <p style="font-size: 11px; opacity: 0.7; max-width: 400px; margin: 0 auto; line-height: 1.4;">This is an automated notification. Please do not reply to this email. For assistance, please contact our support team.</p>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+  `;
+};
+
+/**
+ * Send a support inquiry confirmation email
+ * @param {Object} supportDetails - Support inquiry details
+ */
+const sendSupportEmail = async (supportDetails) => {
+  try {
+    const { email, name, subject: inquirySubject, message, ticketId } = supportDetails;
+    const transporter = createTransporter();
+
+    const body = `
+      <p>Dear ${name || 'Valued Member'},</p>
+      <p>We have received your support inquiry regarding <strong>"${inquirySubject}"</strong>. Our team has been notified and we are currently reviewing your request.</p>
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b;"><strong>Ticket ID:</strong> ${ticketId || 'N/A'}</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px; color: #1e293b;"><strong>Your Message:</strong></p>
+        <p style="margin: 4px 0 0 0; font-style: italic; color: #475569;">"${message}"</p>
+      </div>
+      <p>A church representative will contact you via this email address as soon as possible. Thank you for your patience.</p>
+    `;
+
+    const html = renderEmailLayout({
+      title: 'Support Inquiry Received',
+      preheader: 'Help & Support',
+      body,
+      statusColor: '#059669' // Green for support
+    });
+
+    const mailOptions = {
+      from: `"BBEK Support" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: `[Support #${ticketId || 'NEW'}] Inquiry Received: ${inquirySubject}`,
+      html
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Error sending support email:', error);
+    return buildErrorResult('Failed to send support email', error);
+  }
+};
+
+/**
  * Send account details email for password change
  * Supports two scenarios: new account creation and forgot password
  * @param {Object} accountDetails - Account details object
@@ -113,61 +235,40 @@ const sendAccountDetails = async (accountDetails) => {
       importantNotes = `
         <p><strong>Important:</strong></p>
         <ul>
-          <li>This link will expire after 7 days for security reasons.</li>
+          <li>This link will expire after 1 hour for security reasons.</li>
           <li>If you did not request this password reset, please ignore this email and contact the church administration immediately.</li>
           <li>For security, do not share this link with anyone.</li>
         </ul>
       `;
     }
 
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${mainMessage}</p>
+      <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6; margin: 24px 0;">
+        ${importantNotes}
+      </div>
+      <p>If you have any questions or concerns, please contact the church administration.</p>
+      <p style="color: #64748b; font-size: 12px; margin-top: 24px;">
+        Or copy and paste this link into your browser:<br>
+        <a href="${resetUrl}" style="color: #3b82f6; word-break: break-all;">${resetUrl}</a>
+      </p>
+    `;
+
     const mailOptions = {
-      from: `"Bible Baptist Ekklesia of Kawit Administrator" <${CHURCH_EMAIL}>`,
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: accountDetails.email,
       subject: subject,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${title}</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">${title}</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${mainMessage}</p>
-            
-            <p>Please click on the link below to ${emailType === 'new_account' ? 'set' : 'reset'} your password:</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" 
-                 style="background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-                ${buttonText}
-              </a>
-            </div>
-            
-            <p style="color: #7f8c8d; font-size: 12px;">
-              Or copy and paste this link into your browser:<br>
-              <a href="${resetUrl}" style="color: #3498db; word-break: break-all;">${resetUrl}</a>
-            </p>
-            
-            ${importantNotes}
-            
-            <p>If you have any questions or concerns, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      html: renderEmailLayout({
+        title,
+        preheader: emailType === 'new_account' ? 'Welcome' : 'Account Security',
+        body,
+        action: {
+          url: resetUrl,
+          label: buttonText
+        },
+        statusColor: '#3b82f6'
+      })
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -223,68 +324,59 @@ const sendMarriageDetails = async (marriageDetails) => {
     const marriageDate = marriageDetails.marriageDate || 'To be determined';
     const location = marriageDetails.location || 'To be determined';
 
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${statusMessages[status] || 'Your marriage service status has been updated.'}</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Current Status</p>
+        <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
+      </div>
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${statusMessages[status] || 'Your marriage service status has been updated.'}</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Current Status</p>
+        <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
+      </div>
+      
+      <div style="background-color: #ffffff; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin: 24px 0;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Marriage Service Details</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px; width: 40%;"><strong>Groom</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-size: 14px;">${groomName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px;"><strong>Bride</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-size: 14px;">${brideName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px;"><strong>Marriage Date</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-size: 14px;">${marriageDate}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b; font-size: 14px;"><strong>Location</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b; font-size: 14px;">${location}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <p>If you have any questions or need to make changes, please contact the church administration.</p>
+    `;
+
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: marriageDetails.email,
       subject: `Marriage Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Marriage Service Update</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">Marriage Service Update</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${statusMessages[status] || 'Your marriage service status has been updated.'}</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
-              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
-                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
-                  ${status}
-                </span>
-              </p>
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Marriage Service Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Groom:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${groomName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Bride:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${brideName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Marriage Date:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${marriageDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Location:</strong></td>
-                  <td style="padding: 8px 0;">${location}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <p>If you have any questions or need to make changes, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      html: renderEmailLayout({
+        title: 'Marriage Service Update',
+        preheader: 'Church Services',
+        body,
+        statusColor: statusColors[status] || '#3b82f6'
+      })
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -422,183 +514,73 @@ const sendWaterBaptismDetails = async (baptismDetails) => {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: baptismDetails.email,
       subject: `Water Baptism Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Water Baptism Service Update</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">Water Baptism Service Update</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${statusMessages[status] || 'Your water baptism service status has been updated.'}</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
-              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
-                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
-                  ${status}
-                </span>
-              </p>
-            </div>
-            
-            ${status === 'pending' ? `
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0;"><strong>Next Steps:</strong></p>
-              <p style="margin: 10px 0 0 0;">Our team is reviewing your registration. You may be contacted for a brief pastoral interview to discuss your faith journey. Please wait for the official approval notification.</p>
-            </div>
-            ` : ''}
-
-            ${status === 'approved' ? `
-            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
-              <p style="margin: 0;"><strong>Preparation for Baptism:</strong></p>
-              <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Attend the pre-baptism orientation as scheduled</li>
-                <li>Please prepare a change of clothes and a towel</li>
-                <li>Arrive at the baptism venue at least 30 minutes before the ceremony</li>
-              </ul>
-            </div>
-            ` : ''}
-
-            ${(status === 'disapproved' || status === 'cancelled') ? `
-            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
-              <p style="margin: 0;"><strong>Reason:</strong></p>
-              <p style="margin: 10px 0 0 0;">${baptismDetails.rejectionReason || 'No reason provided.'}</p>
-            </div>
-            ` : ''}
-
-            ${status === 'completed' ? `
-            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
-              <p style="margin: 0;"><strong>Welcome to the Family!</strong></p>
-              <p style="margin: 10px 0 0 0;">You can now log in to the portal to view your <strong>digital Baptism Certificate</strong>. We also invite you to explore other modules and ministries as you grow in your faith journey.</p>
-            </div>
-            ` : ''}
-            
-            ${status === 'pending' || status !== 'pending' ? `
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Baptism Service Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>${status === 'completed' ? 'Date Got Saved:' : 'Baptism Date:'}</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${baptismDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
-                </tr>
-                ${baptismDetails.location && baptismDetails.location.trim() !== '' ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Location:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${baptismDetails.location}</td>
-                </tr>
-                ` : ''}
-                ${baptismDetails.baptismCount > 0 ? `
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Total Enrollees for this date:</strong></td>
-                  <td style="padding: 8px 0;">${baptismDetails.baptismCount} ${baptismDetails.baptismCount === 1 ? 'Person' : 'People'}</td>
-                </tr>
-                ` : ''}
-              </table>
-            </div>
-            ` : ''}
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Registration Information</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Full Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${fullName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Birthdate:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${birthdate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Age:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${age} years old</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Gender:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${gender}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Address:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${address}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Email:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${email}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${phoneNumber}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Civil Status:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${civilStatus}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Profession:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${profession}</td>
-                </tr>
-                ${spouseName ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Spouse Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${spouseName}</td>
-                </tr>
-                ` : ''}
-                ${childrenInfo ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Children:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${childrenInfo}</td>
-                </tr>
-                ` : ''}
-                ${guardianName ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Guardian Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${guardianName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Guardian Contact:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${guardianContact}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Guardian Relationship:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${guardianRelationship}</td>
-                </tr>
-                ` : ''}
-                ${testimony ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Testimony:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${testimony}</td>
-                </tr>
-                ` : ''}
-              </table>
-            </div>
-            
-            ${baptismDetails.desireMinistry ? `
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Ministry Interest</h3>
-              <p style="margin: 0;">${baptismDetails.desireMinistry}</p>
-            </div>
-            ` : ''}
-            
-            <p>If you have any questions or need to make changes to your water baptism registration, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
+      html: renderEmailLayout({
+        title: 'Water Baptism Update',
+        preheader: 'Baptism Records',
+        body: `
+          <p>Dear <strong>${recipientName}</strong>,</p>
+          <p>${statusMessages[status] || 'Your water baptism service status has been updated.'}</p>
+          
+          <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Current Status</p>
+            <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
           </div>
-        </body>
-        </html>
-      `,
+          
+          ${status === 'pending' ? `
+          <div style="background-color: #fffbeb; padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b; margin-bottom: 24px;">
+            <p style="margin: 0; font-weight: 700; color: #92400e;">Next Steps:</p>
+            <p style="margin: 8px 0 0 0; color: #b45309;">Our team is reviewing your registration. You may be contacted for a brief pastoral interview. Please wait for official approval.</p>
+          </div>
+          ` : ''}
+
+          ${status === 'approved' ? `
+          <div style="background-color: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 4px solid #0ea5e9; margin-bottom: 24px;">
+            <p style="margin: 0; font-weight: 700; color: #075985;">Preparation for Baptism:</p>
+            <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #0369a1;">
+              <li>Attend the pre-baptism orientation as scheduled</li>
+              <li>Please prepare a change of clothes and a towel</li>
+              <li>Arrive at the venue least 30 minutes before the ceremony</li>
+            </ul>
+          </div>
+          ` : ''}
+
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+            <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+              <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Service Details</h3>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr>
+                <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>${status === 'completed' ? 'Date Got Saved:' : 'Baptism Date:'}</strong></td>
+                <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${baptismDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Pastor:</strong></td>
+                <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${pastorName}</td>
+              </tr>
+              ${baptismDetails.location && baptismDetails.location.trim() !== '' ? `
+              <tr>
+                <td style="padding: 12px 20px; color: #64748b;"><strong>Location:</strong></td>
+                <td style="padding: 12px 20px; color: #1e293b;">${baptismDetails.location}</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
+          
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+              <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Registration Information</h3>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+              <tr><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Full Name:</strong></td><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${fullName}</td></tr>
+              <tr><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Email:</strong></td><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${email}</td></tr>
+              <tr><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Phone:</strong></td><td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${phoneNumber}</td></tr>
+            </table>
+          </div>
+
+          <p style="margin-top: 24px;">If you have any questions, please contact the church administration.</p>
+        `,
+        statusColor: statusColors[status] || '#3b82f6'
+      })
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -688,151 +670,85 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
 
     const location = dedicationDetails.location || 'To be determined';
 
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${statusMessages[status] || 'Your child dedication service status has been updated.'}</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Current Status</p>
+        <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
+      </div>
+
+      ${status === 'pending' ? `
+      <div style="background-color: #fffbeb; padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b; margin-bottom: 24px;">
+        <p style="margin: 0; font-weight: 700; color: #92400e;">Next Steps:</p>
+        <p style="margin: 8px 0 0 0; color: #b45309;">Our team is coordinating with our Officiating Pastors to confirm their availability. We will notify you once the schedule is confirmed.</p>
+      </div>
+      ` : ''}
+
+      ${status === 'approved' ? `
+      <div style="background-color: #f0f9ff; padding: 20px; border-radius: 12px; border-left: 4px solid #0ea5e9; margin-bottom: 24px;">
+        <p style="margin: 0; font-weight: 700; color: #075985;">Preparation:</p>
+        <p style="margin: 8px 0 0 0; color: #0369a1;">Schedule confirmed! Please coordinate with the church office to finalize the names of godparents and invite your loved ones.</p>
+      </div>
+      ` : ''}
+
+      ${status === 'completed' ? `
+      <div style="background-color: #f0fdf4; padding: 20px; border-radius: 12px; border-left: 4px solid #22c55e; margin-bottom: 24px;">
+        <p style="margin: 0; font-weight: 700; color: #166534;">Congratulations!</p>
+        <p style="margin: 8px 0 0 0; color: #15803d;">Your child's dedication is now officially recorded. You may now log in to download the official Digital Certificate.</p>
+      </div>
+      ` : ''}
+
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Dedication Details</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;"><strong>Date & Time</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${fullDedicationDateTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Officiating Pastor</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${pastorName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b;"><strong>Location</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b;">${location}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Child Information</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Full Name</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${childName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b;"><strong>Gender</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b;">${dedicationDetails.childGender || 'N/A'}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin-top: 24px;">If you have any questions, please contact the church administration.</p>
+    `;
+
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: dedicationDetails.email,
       subject: `Child Dedication Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Child Dedication Service Update</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">Child Dedication Service Update</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${statusMessages[status] || 'Your child dedication service status has been updated.'}</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
-              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
-                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
-                  ${status}
-                </span>
-              </p>
-            </div>
-            
-            ${status === 'pending' ? `
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0;"><strong>Next Steps:</strong></p>
-              <p style="margin: 10px 0 0 0;">Our team is currently coordinating with our Officiating Pastors to confirm their availability for your requested date. We will notify you once the schedule is confirmed.</p>
-            </div>
-            ` : ''}
-
-            ${status === 'approved' ? `
-            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
-              <p style="margin: 0;"><strong>Preparation:</strong></p>
-              <p style="margin: 10px 0 0 0;">Schedule confirmed! Please coordinate with the church office to finalize the names of godparents for the certificate and invite your loved ones to join this special occasion.</p>
-            </div>
-            ` : ''}
-
-            ${(status === 'disapproved' || status === 'cancelled') ? `
-            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
-              <p style="margin: 0;"><strong>Reason:</strong></p>
-              <p style="margin: 10px 0 0 0;">${dedicationDetails.rejectionReason || 'No reason provided.'}</p>
-            </div>
-            ` : ''}
-
-            ${status === 'completed' ? `
-            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
-              <p style="margin: 0;"><strong>Congratulations!</strong></p>
-              <p style="margin: 10px 0 0 0;">Your child's dedication is now officially recorded. You may now log in to the portal to download the official <strong>Digital Certificate</strong> from your 'My Account' page.</p>
-            </div>
-            ` : ''}
-            
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Child Dedication Service Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Dedication Date:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${fullDedicationDateTime}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Location:</strong></td>
-                  <td style="padding: 8px 0;">${location}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Child Information</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Child's Full Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${childName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Date of Birth:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.childBirthdate || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Gender:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.childGender || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Place of Birth:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.placeOfBirth || 'N/A'}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Parent/Guardian Information</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Full Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${memberName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Email:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.email || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.phoneNumber || 'N/A'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Address:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${dedicationDetails.address || 'N/A'}</td>
-                </tr>
-                ${dedicationDetails.requesterRelationship ? `
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Relationship to Child:</strong></td>
-                  <td style="padding: 8px 0;">${dedicationDetails.requesterRelationship}</td>
-                </tr>
-                ` : ''}
-              </table>
-            </div>
-            
-            ${dedicationDetails.specialPrayerRequests ? `
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Special Prayer Requests</h3>
-              <p style="margin: 0;">${dedicationDetails.specialPrayerRequests}</p>
-            </div>
-            ` : ''}
-            
-            <p>If you have any questions or need to make changes to your child dedication registration, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      html: renderEmailLayout({
+        title: 'Child Dedication Update',
+        preheader: 'Church Records',
+        body,
+        statusColor: statusColors[status] || '#3b82f6'
+      })
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -849,59 +765,54 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
 };
 
 /**
- * Send burial service details email
- * @param {Object} burialDetails - Burial service details object
- * @param {string} burialDetails.email - Recipient email
- * @param {string} burialDetails.status - Status: 'pending', 'approved', 'disapproved', 'completed', or 'cancelled'
- * @param {string} [burialDetails.memberName] - Member's name (optional)
- * @param {string} [burialDetails.deceasedName] - Deceased person's name (optional)
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Date of Birth:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${deceasedBirthDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Date of Death:</strong></td>
-                  <td style="padding: 8px 0;">${dateOfDeath}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0;"><strong>Next Steps:</strong></p>
-              <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Our team will review your request within 24 hours</li>
-                <li>You will receive a follow-up email with service date and location details</li>
-                <li>If you have any urgent questions, please contact the church administration</li>
-              </ul>
-            </div>
-            
-            <p>Please know that our thoughts and prayers are with you and your family during this time. We are committed to providing compassionate support and ensuring that the burial service honors the memory of your loved one.</p>
-            
-            <p>If you have any questions or need immediate assistance, please do not hesitate to contact us.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email. For inquiries, please contact the church administration.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+ * Send burial service request notification email
+ * @param {Object} burialDetails - Burial service details
+ */
+const sendBurialRequestNotification = async (burialDetails) => {
+  try {
+    const { email, recipientName, deceasedName, deceasedBirthDate, dateOfDeath } = burialDetails;
+    const transporter = createTransporter();
+
+    const body = `
+      <p>Dear <strong>${recipientName || 'Valued Member'}</strong>,</p>
+      <p>We have received your burial service request for <strong>${deceasedName || 'N/A'}</strong>. Our hearts go out to you and your family during this difficult time.</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin: 24px 0;">
+        <h3 style="margin: 0 0 16px 0; font-size: 14px; color: #1e293b;">Deceased Information</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;"><strong>Name</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${deceasedName}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Date of Birth</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${deceasedBirthDate || 'N/A'}</td></tr>
+          <tr><td style="padding: 8px 0; color: #64748b;"><strong>Date of Death</strong></td><td style="padding: 8px 0; color: #1e293b;">${dateOfDeath || 'N/A'}</td></tr>
+        </table>
+      </div>
+
+      <div style="background-color: #fffbeb; padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b; margin-bottom: 24px;">
+        <p style="margin: 0; font-weight: 700; color: #92400e;">Next Steps:</p>
+        <p style="margin: 8px 0 0 0; color: #b45309;">Our pastoral team will review your request within 24 hours. A representative will reach out shortly for coordination and spiritual support.</p>
+      </div>
+      
+      <p>If you have any urgent questions, please contact the church administration.</p>
+    `;
+
+    const html = renderEmailLayout({
+      title: 'Burial Service Request',
+      preheader: 'Bereavement Support',
+      body,
+      statusColor: '#f59e0b'
+    });
+
+    const mailOptions = {
+      from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
+      to: email,
+      subject: 'Burial Service Request Update',
+      html
     };
 
     const info = await transporter.sendMail(mailOptions);
-
-    return {
-      success: true,
-      message: 'Burial service request notification email sent successfully',
-      messageId: info.messageId,
-    };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending burial service request notification email:', error);
-    return buildErrorResult('Failed to send burial service request notification email', error);
+    console.error('Error sending burial notification:', error);
+    return buildErrorResult('Failed to send burial notification', error);
   }
 };
 
@@ -922,21 +833,21 @@ const sendChildDedicationDetails = async (dedicationDetails) => {
 const sendBurialDetails = async (burialDetails) => {
   try {
     if (!burialDetails || !burialDetails.email || !burialDetails.status) {
-      return {
-        success: false,
-        message: 'Email and status are required',
-      };
+      return { success: false, message: 'Email and status are required' };
     }
 
     const transporter = createTransporter();
-    const status = burialDetails.status.toLowerCase();
+    const status = (burialDetails.status || 'pending').toLowerCase();
+    
+    // Status color mapping for premium look
     const statusColors = {
-      pending: '#f39c12',
-      approved: '#27ae60',
-      disapproved: '#e74c3c',
-      completed: '#27ae60',
-      cancelled: '#95a5a6',
+      pending: '#f59e0b',
+      approved: '#059669',
+      completed: '#059669',
+      disapproved: '#dc2626',
+      cancelled: '#4b5563'
     };
+
     const statusMessages = {
       pending: 'Your burial service request is currently pending approval.',
       approved: 'Your burial service request has been approved.',
@@ -947,135 +858,63 @@ const sendBurialDetails = async (burialDetails) => {
 
     const recipientName = burialDetails.recipientName || 'Valued Member';
     const deceasedName = burialDetails.deceasedName || 'N/A';
-    const familyContact = burialDetails.familyContact || 'N/A';
-    const pastorName = burialDetails.pastorName || 'N/A';
-    const isMember = burialDetails.isMember || false;
+    
+    // Format burial date
+    const burialDateMoment = moment(burialDetails.burialDate);
+    const burialDate = burialDateMoment.isValid() 
+      ? burialDateMoment.tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A') 
+      : 'To be determined';
+      
+    const location = burialDetails.location || 'To be determined';
 
-    // Format burial date using moment for accuracy and timezone consistency
-    let burialDate = burialDetails.burialDate || 'To be determined';
-    if (burialDate !== 'To be determined' && (status === 'approved' || status === 'completed')) {
-      const dateMoment = moment(burialDate);
-      if (dateMoment.isValid()) {
-        // Format with AM/PM
-        burialDate = dateMoment.tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A');
-      }
-    }
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${statusMessages[status] || 'Your burial service status has been updated.'}</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Current Status</p>
+        <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
+      </div>
 
-    // Handle location for non-members in pending status
-    let location = burialDetails.location || 'To be determined';
-    if (status === 'pending' && !isMember) {
-      location = '';
-    }
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Service Details</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;"><strong>Deceased Name</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${deceasedName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Burial Date</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${burialDate}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b;"><strong>Location</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b;">${location}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p>If you have any questions or need to make adjustments, please reach out to the church administration. We are here to support you in every way possible.</p>
+    `;
+
+    const html = renderEmailLayout({
+      title: 'Burial Service Update',
+      preheader: 'Bereavement Support',
+      body,
+      statusColor: statusColors[status] || '#3b82f6'
+    });
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: burialDetails.email,
-      subject: `Burial Service Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Burial Service Update</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">Burial Service Update</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${statusMessages[status] || 'Your burial service status has been updated.'}</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
-              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
-                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
-                  ${status}
-                </span>
-              </p>
-            </div>
-            
-            ${status === 'pending' ? `
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0;"><strong>What's Next:</strong></p>
-              <p style="margin: 10px 0 0 0;">Our pastoral team has been notified. A representative will reach out shortly for coordination and spiritual support during this time of mourning.</p>
-            </div>
-            ` : ''}
-
-            ${status === 'approved' ? `
-            <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
-              <p style="margin: 0;"><strong>Service Preparation:</strong></p>
-              <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Please prepare a brief biography of the deceased for the officiating pastor</li>
-                <li>Coordinate any special service requirements (music, tributes) with the assigned pastor</li>
-                <li>Finalize venue arrangements and inform the family accordingly</li>
-              </ul>
-            </div>
-            ` : ''}
-
-            ${(status === 'disapproved' || status === 'cancelled') ? `
-            <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
-              <p style="margin: 0;"><strong>Reason:</strong></p>
-              <p style="margin: 10px 0 0 0;">${burialDetails.rejectionReason || 'No reason provided.'}</p>
-            </div>
-            ` : ''}
-
-            ${status === 'completed' ? `
-            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
-              <p style="margin: 0;"><strong>Continuing Support</strong></p>
-              <p style="margin: 10px 0 0 0;">We continue to join you in prayer. If your family needs follow-up counseling or any church support as you journey through grief, we are here for you.</p>
-            </div>
-            ` : ''}
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Burial Service Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Deceased Name:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${deceasedName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Family Contact:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${familyContact}</td>
-                </tr>
-                ${status === 'approved' ? `
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Pastor:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${pastorName}</td>
-                </tr>
-                ` : ''}
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Burial Date:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${burialDate}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Location:</strong></td>
-                  <td style="padding: 8px 0;">${location}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <p>If you have any questions or need to make changes, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      subject: `Burial Service Update - ${status.toUpperCase()}`,
+      html
     };
 
     const info = await transporter.sendMail(mailOptions);
-
-    return {
-      success: true,
-      message: 'Burial details email sent successfully',
-      messageId: info.messageId,
-    };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending burial details email:', error);
     return buildErrorResult('Failed to send burial details email', error);
@@ -1095,10 +934,7 @@ const sendBurialDetails = async (burialDetails) => {
 const sendApprovalRequestNotification = async (approvalDetails) => {
   try {
     if (!approvalDetails || !approvalDetails.email || !approvalDetails.type) {
-      return {
-        success: false,
-        message: 'Email and type are required',
-      };
+      return { success: false, message: 'Email and type are required' };
     }
 
     const transporter = createTransporter();
@@ -1107,208 +943,137 @@ const sendApprovalRequestNotification = async (approvalDetails) => {
     const approvalId = approvalDetails.approvalId || 'N/A';
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
 
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>We have received your request to join the ${typeLabel.toLowerCase()} <strong>${requestTitle}</strong>. Thank you for your interest!</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid #f59e0b; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Request Status</p>
+        <p style="margin: 4px 0 0 0; color: #f59e0b; font-size: 18px; font-weight: 800; text-transform: uppercase;">Pending Review</p>
+      </div>
+
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Request Details</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;"><strong>Request ID</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${approvalId}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Type</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${typeLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b;"><strong>${typeLabel} Name</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b;">${requestTitle}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p>Our team will review your request within 24-48 hours. You will receive another notification once a decision has been made.</p>
+    `;
+
+    const html = renderEmailLayout({
+      title: `${typeLabel} Join Request`,
+      preheader: 'Notification Received',
+      body,
+      statusColor: '#f59e0b'
+    });
+
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: approvalDetails.email,
-      subject: `${typeLabel} Join Request Received - Bible Baptist Ekklesia of Kawit`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${typeLabel} Join Request Received</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">${typeLabel} Join Request Received</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>We have received your request to join the ${typeLabel.toLowerCase()} <strong>${requestTitle}</strong>. Thank you for your interest in participating!</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f39c12;">
-              <p style="margin: 0 0 10px 0;"><strong>Request Status:</strong> 
-                <span style="color: #f39c12; font-weight: bold; text-transform: uppercase;">
-                  Pending Review
-                </span>
-              </p>
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Request Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Request ID:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${approvalId}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Type:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${typeLabel}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>${typeLabel} Name:</strong></td>
-                  <td style="padding: 8px 0;">${requestTitle}</td>
-                </tr>
-              </table>
-            </div>
-            
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0;"><strong>Next Steps:</strong></p>
-              <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>Our team will review your request within 24-48 hours</li>
-                <li>You will receive a follow-up email once your request has been reviewed</li>
-                <li>If approved, you will be able to participate in the ${typeLabel.toLowerCase()}</li>
-                <li>If you have any questions, please contact the church administration</li>
-              </ul>
-            </div>
-            
-            <p>We appreciate your interest and look forward to having you join us!</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email. For inquiries, please contact the church administration.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      subject: `${typeLabel} Join Request Received`,
+      html
     };
 
     const info = await transporter.sendMail(mailOptions);
-
-    return {
-      success: true,
-      message: 'Approval request notification email sent successfully',
-      messageId: info.messageId,
-    };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending approval request notification email:', error);
-    return buildErrorResult('Failed to send approval request notification email', error);
+    console.error('Error sending approval request notification:', error);
+    return buildErrorResult('Failed to send approval request notification', error);
   }
 };
 
+
 /**
  * Send approval status update email
- * @param {Object} approvalDetails - Approval status update details object
- * @param {string} approvalDetails.email - Recipient email
- * @param {string} approvalDetails.status - Status: 'pending', 'approved', or 'rejected'
- * @param {string} approvalDetails.type - Type: 'event' or 'ministry'
- * @param {string} approvalDetails.requestTitle - Event or ministry name
- * @param {string} [approvalDetails.recipientName] - Recipient name (optional)
- * @param {string} [approvalDetails.approvalId] - Approval ID (optional)
- * @returns {Promise<Object>} - Result object with success status and message
+ * @param {Object} approvalDetails - Approval status details object
  */
 const sendApprovalStatusUpdate = async (approvalDetails) => {
   try {
     if (!approvalDetails || !approvalDetails.email || !approvalDetails.status) {
-      return {
-        success: false,
-        message: 'Email and status are required',
-      };
+      return { success: false, message: 'Email and status are required' };
     }
 
     const transporter = createTransporter();
-    const status = approvalDetails.status.toLowerCase();
+    const status = (approvalDetails.status || 'pending').toLowerCase();
+    
     const statusColors = {
-      pending: '#f39c12',
-      approved: '#27ae60',
-      rejected: '#e74c3c',
+      approved: '#059669',
+      rejected: '#dc2626',
+      pending: '#f59e0b'
     };
+
     const statusMessages = {
-      pending: 'Your request is currently pending review.',
       approved: 'Congratulations! Your request has been approved. You can now participate in this activity.',
-      rejected: 'We regret to inform you that your request has been rejected. If you have any questions, please contact the church administration.',
+      rejected: 'We regret to inform you that your request has been rejected.',
+      pending: 'Your request is currently pending review.'
     };
 
     const recipientName = approvalDetails.recipientName || 'Valued Member';
     const requestTitle = approvalDetails.requestTitle || 'N/A';
-    const approvalId = approvalDetails.approvalId || 'N/A';
     const typeLabel = approvalDetails.type === 'event' ? 'Event' : 'Ministry';
+
+    const body = `
+      <p>Dear <strong>${recipientName}</strong>,</p>
+      <p>${statusMessages[status] || 'Your request status has been updated.'}</p>
+      
+      <div style="background-color: #f8fafc; padding: 24px; border-radius: 12px; border-left: 4px solid ${statusColors[status] || '#3b82f6'}; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Update Information</p>
+        <p style="margin: 4px 0 0 0; color: ${statusColors[status] || '#3b82f6'}; font-size: 18px; font-weight: 800; text-transform: uppercase;">${status}</p>
+      </div>
+
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+        <div style="background-color: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+          <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Request Details</h3>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%;"><strong>Type</strong></td>
+            <td style="padding: 12px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b;">${typeLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 20px; color: #64748b;"><strong>Activity</strong></td>
+            <td style="padding: 12px 20px; color: #1e293b;">${requestTitle}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin-top: 24px;">If you have any questions, please contact the church administration.</p>
+    `;
+
+    const html = renderEmailLayout({
+      title: 'Join Request Update',
+      preheader: 'Notification Update',
+      body,
+      statusColor: statusColors[status] || '#3b82f6'
+    });
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
       to: approvalDetails.email,
-      subject: `${typeLabel} Join Request ${status.charAt(0).toUpperCase() + status.slice(1)} - Bible Baptist Ekklesia of Kawit`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${typeLabel} Join Request ${status.charAt(0).toUpperCase() + status.slice(1)}</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
-            <h2 style="color: #2c3e50; margin-top: 0;">${typeLabel} Join Request Update</h2>
-            
-            <p>Dear ${recipientName},</p>
-            
-            <p>${statusMessages[status] || 'Your request status has been updated.'}</p>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${statusColors[status] || '#3498db'};">
-              <p style="margin: 0 0 10px 0;"><strong>Status:</strong> 
-                <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">
-                  ${status}
-                </span>
-              </p>
-            </div>
-            
-            <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2c3e50; margin-top: 0;">Request Details</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Request ID:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${approvalId}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Type:</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${typeLabel}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>${typeLabel} Name:</strong></td>
-                  <td style="padding: 8px 0;">${requestTitle}</td>
-                </tr>
-              </table>
-            </div>
-            
-            ${status === 'approved' ? `
-            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
-              <p style="margin: 0;"><strong>What's Next:</strong></p>
-              <ul style="margin: 10px 0 0 20px; padding: 0;">
-                <li>You are now a participant in <strong>${requestTitle}</strong></li>
-                <li>You will receive updates and information about this ${typeLabel.toLowerCase()}</li>
-                <li>If you have any questions, please contact the church administration</li>
-              </ul>
-            </div>
-            ` : ''}
-            
-            <p>If you have any questions or need to make changes, please contact the church administration.</p>
-            
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-            
-            <p style="color: #95a5a6; font-size: 12px; margin-bottom: 0;">
-              This is an automated message from the Bible Baptist Ekklesia of Kawit.<br>
-              Please do not reply to this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+      subject: `${typeLabel} Join Request Update`,
+      html
     };
 
     const info = await transporter.sendMail(mailOptions);
-
-    return {
-      success: true,
-      message: 'Approval status update email sent successfully',
-      messageId: info.messageId,
-    };
+    return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error sending approval status update email:', error);
-    return buildErrorResult('Failed to send approval status update email', error);
+    console.error('Error sending approval status update:', error);
+    return buildErrorResult('Failed to send approval status update', error);
   }
 };
 
@@ -2680,6 +2445,7 @@ module.exports = {
   sendBibleStudyInvitation,
   sendBibleStudyDetails,
   sendPromotionVisitDetails,
+  sendSupportEmail,
   generateResetToken,
 };
 

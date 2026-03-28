@@ -5,7 +5,7 @@ const {
     updateBibleStudyRequest,
     createBibleStudyRequest
 } = require('../../dbHelpers/services/biblestudyRecords');
-const { authenticateToken } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const { sendBibleStudyDetails, sendWaterBaptismInvitation, sendSalvationRejectionWithReason } = require('../../dbHelpers/emailHelper');
 const { query } = require('../../database/db');
@@ -503,6 +503,90 @@ router.post('/bulk-complete', authenticateToken, async (req, res) => {
         }
     } catch (error) {
         console.error('Bulk complete error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ADMIN: Bulk Archive Bible Study requests
+router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const { requestIds, reason } = req.body;
+
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No requests selected'
+            });
+        }
+
+        const { archiveBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+        
+        const archived = [];
+        const failed = [];
+
+        for (const requestId of requestIds) {
+            try {
+                // Fetch details for audit log before archiving
+                const [rows] = await query('SELECT firstname, lastname FROM tbl_biblestudy_requests WHERE request_id = ?', [requestId]);
+                if (rows.length === 0) {
+                    failed.push({ requestId, reason: 'Not found' });
+                    continue;
+                }
+                const requestData = rows[0];
+
+                await archiveBibleStudyRequest(requestId, {
+                    archived_by: req.user?.acc_id || 'admin',
+                    archive_reason: reason || 'Archived by admin'
+                });
+
+                // Individual Audit Log
+                await auditTrailRecords.createAuditLog({
+                    action_type: 'BIBLESTUDY_ARCHIVED',
+                    module: 'Bible Study',
+                    description: JSON.stringify({
+                        request_id: requestId,
+                        firstname: requestData.firstname,
+                        lastname: requestData.lastname,
+                        archive_reason: reason || 'Archived by admin'
+                    }),
+                    user_id: req.user?.acc_id || null,
+                    user_email: req.user?.email || null,
+                    user_name: req.user?.firstname || null,
+                    user_position: req.user?.position || null
+                });
+
+                archived.push(requestId);
+            } catch (err) {
+                console.error(`Error archiving Bible Study ${requestId}:`, err);
+                failed.push({ requestId, error: err.message });
+            }
+        }
+
+        // Bulk Audit Log
+        if (archived.length > 0) {
+            await auditTrailRecords.createAuditLog({
+                action_type: 'BIBLESTUDY_BULK_ARCHIVED',
+                module: 'Bible Study',
+                description: JSON.stringify({
+                    archived_count: archived.length,
+                    failed_count: failed.length,
+                    request_ids: archived,
+                    archive_reason: reason
+                }),
+                user_id: req.user?.acc_id || null,
+                user_email: req.user?.email || null,
+                user_name: req.user?.firstname || null,
+                user_position: req.user?.position || null
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully archived ${archived.length} request(s)`,
+            data: { archived, failed }
+        });
+    } catch (error) {
+        console.error('Bulk archive error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

@@ -215,7 +215,7 @@
                     @click="bulkDeleteDedications"
                   >
                     <v-icon left>mdi-delete</v-icon>
-                    Delete Selected
+                    Archive Selected
                   </v-btn>
                   <v-btn
                     variant="outlined"
@@ -340,7 +340,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Delete Child Dedication" location="top">
+              <v-tooltip text="Archive Child Dedication" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -383,6 +383,14 @@
     <!-- Bulk Complete Calendar Dialog -->
     <v-dialog v-model="bulkCompleteDialog" max-width="450px" persistent class="bulk-complete-dialog" style="overflow: visible;">
       <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
+        <v-btn
+          icon="mdi-close"
+          variant="text"
+          color="grey-darken-2"
+          class="position-absolute"
+          style="top: 10px; right: 10px; z-index: 10;"
+          @click="closeBulkCompleteDialog"
+        ></v-btn>
         <div class="pa-4 text-center">
           <v-avatar color="success-lighten-5" size="80" class="mb-4">
             <v-icon color="success" size="40">mdi-calendar-check</v-icon>
@@ -629,10 +637,10 @@ const editDedication = (dedication) => {
 const deleteDedication = async (id) => {
   try {
     const { value: reason } = await ElMessageBox.prompt(
-      'Enter the reason for deleting this child dedication:',
-      'Confirm Delete',
+      'Enter the reason for archiving this child dedication:',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         inputType: 'textarea',
         inputPlaceholder: 'e.g., Duplicate entry, Wrong data, etc.',
@@ -646,14 +654,14 @@ const deleteDedication = async (id) => {
 
     const result = await childDedicationStore.deleteDedication(id, reason);
     if (result.success) {
-      ElMessage.success('Child dedication deleted successfully');
+      ElMessage.success('Child dedication archived successfully');
     } else {
-      ElMessage.error(result.error || 'Failed to delete child dedication');
+      ElMessage.error(result.error || 'Failed to archive child dedication');
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting child dedication:', error);
-      ElMessage.error('Failed to delete child dedication');
+      console.error('Error archiving child dedication:', error);
+      ElMessage.error('Failed to archive child dedication');
     }
   }
 }

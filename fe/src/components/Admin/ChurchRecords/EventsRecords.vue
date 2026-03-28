@@ -117,7 +117,7 @@
                 :disabled="loading"
                 @click="handleBulkDelete"
               >
-                Delete Selected ({{ selectedEvents.length }})
+                Archive Selected ({{ selectedEvents.length }})
               </v-btn>
               <v-btn
                 variant="text"
@@ -392,10 +392,10 @@ const handleBulkDelete = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedEvents.value.length} selected event(s)?`,
-      'Bulk Delete Events',
+      `Are you sure you want to archive ${selectedEvents.value.length} selected event(s)?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -411,11 +411,11 @@ const handleBulkDelete = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} event${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} event${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} event${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} event${failed > 1 ? 's' : ''}`)
       }
     }
 
@@ -500,10 +500,10 @@ const editEvent = (event) => {
 const deleteEvent = async (id) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this event?',
-      'Confirm Delete',
+      'Are you sure you want to archive this event?',
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -511,14 +511,14 @@ const deleteEvent = async (id) => {
 
     const result = await eventsRecordsStore.deleteEvent(id)
     if (result.success) {
-      ElMessage.success('Event deleted successfully')
+      ElMessage.success('Event archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete event')
+      ElMessage.error(result.error || 'Failed to archive event')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting event:', error)
-      ElMessage.error('Failed to delete event')
+      console.error('Error archiving event:', error)
+      ElMessage.error('Failed to archive event')
     }
   }
 }

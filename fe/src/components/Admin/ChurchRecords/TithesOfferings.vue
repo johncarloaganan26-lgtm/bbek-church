@@ -208,7 +208,7 @@
                 @click="handleBulkDelete"
               >
                 <v-icon left>mdi-delete</v-icon>
-                Delete Selected
+                Archive Selected
               </v-btn>
               <v-btn
                 variant="outlined"
@@ -394,7 +394,7 @@
                     ></v-btn>
                   </template>
                 </v-tooltip>
-                <v-tooltip text="Delete Donation" location="top">
+                <v-tooltip text="Archive Donation" location="top">
                   <template v-slot:activator="{ props }">
                     <v-btn 
                       icon="mdi-delete" 
@@ -627,10 +627,10 @@ const handleBulkDelete = async () => {
 
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedTithes.value.length} selected donation(s)?`,
-      'Bulk Delete Donations',
+      `Are you sure you want to archive ${selectedTithes.value.length} selected donation(s)?`,
+      'Confirm Bulk Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -646,11 +646,11 @@ const handleBulkDelete = async () => {
       const { deleted, failed } = result.data
 
       if (deleted > 0) {
-        ElMessage.success(`Successfully deleted ${deleted} donation${deleted > 1 ? 's' : ''}`)
+        ElMessage.success(`Successfully archived ${deleted} donation${deleted > 1 ? 's' : ''}`)
       }
 
       if (failed > 0) {
-        ElMessage.warning(`Failed to delete ${failed} donation${failed > 1 ? 's' : ''}`)
+        ElMessage.warning(`Failed to archive ${failed} donation${failed > 1 ? 's' : ''}`)
       }
     }
 
@@ -683,10 +683,10 @@ const editDonation = (donation) => {
 const deleteDonation = async (donation) => {
   try {
     await ElMessageBox.confirm(
-      `Are you sure you want to delete this donation record?`,
-      'Confirm Delete',
+      `Are you sure you want to archive this donation record?`,
+      'Confirm Archive',
       {
-        confirmButtonText: 'Delete',
+        confirmButtonText: 'Archive',
         cancelButtonText: 'Cancel',
         type: 'warning',
       }
@@ -694,14 +694,14 @@ const deleteDonation = async (donation) => {
 
     const result = await tithesOfferingsStore.deleteDonation(donation.tithes_id)
     if (result.success) {
-      ElMessage.success('Donation deleted successfully')
+      ElMessage.success('Donation archived successfully')
     } else {
-      ElMessage.error(result.error || 'Failed to delete donation')
+      ElMessage.error(result.error || 'Failed to archive donation')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Error deleting donation:', error)
-      ElMessage.error('Failed to delete donation')
+      console.error('Error archiving donation:', error)
+      ElMessage.error('Failed to archive donation')
     }
   }
 }

@@ -404,10 +404,46 @@ async function promoteBibleStudyToBaptism(id, isDecided = false) {
     }
 }
 
+/**
+ * Archive Bible Study request
+ */
+async function archiveBibleStudyRequest(id, archiveData) {
+    try {
+        const { query } = require('../../database/db');
+        const { archiveRecord } = require('../archiveRecords');
+
+        // 1. Get the current record data
+        const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+        if (rows.length === 0) {
+            throw new Error('Bible study request not found');
+        }
+
+        const recordData = rows[0];
+
+        // 2. Archive the record
+        await archiveRecord(
+            'tbl_biblestudy_requests',
+            id,
+            recordData,
+            archiveData.archived_by,
+            archiveData.archive_reason
+        );
+
+        // 3. Delete the original record
+        await query('DELETE FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+
+        return { success: true, message: 'Bible Study request archived successfully' };
+    } catch (error) {
+        console.error('Error archiving Bible Study:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createBibleStudyRequest,
     getAllBibleStudyRequests,
     updateBibleStudyRequest,
     bulkCompleteBibleStudies,
-    promoteBibleStudyToBaptism
+    promoteBibleStudyToBaptism,
+    archiveBibleStudyRequest
 };
