@@ -143,7 +143,7 @@ const routes = [
       },
       {
         path: 'ministry-data',
-        query: { ministryData: decodeURIComponent(event) },
+        query: { ministryData: null },
         name: 'MinistryData',
         component: MinistryData
       },

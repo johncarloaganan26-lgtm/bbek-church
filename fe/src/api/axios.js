@@ -99,19 +99,14 @@ instance.interceptors.response.use(
     // Check if this is truly a public endpoint (no auth required)
     // We only suppress errors for routes that are explicitly public and don't need a token
     const isPublicEndpoint = 
-      originalRequest.url?.includes('/public/') ||
-      originalRequest.url?.endsWith('/submit') ||
-      originalRequest.url?.endsWith('/available-slots') ||
-      originalRequest.url?.includes('/cms/') ||
-      originalRequest.url?.includes('/api/health') ||
-      // Sermon & Live page public endpoints
+      // Sermon, Live, Child Dedication & other listing endpoints (read-only public data)
       originalRequest.url?.includes('/getSermonEvents') ||
       originalRequest.url?.includes('/getCompletedSermonEvents') ||
       originalRequest.url?.includes('/getMinistrySermonEvents') ||
-      // Child dedication & other service listing endpoints (read-only public data)
       originalRequest.url?.includes('/getAvailableSundayDates') ||
-      originalRequest.url?.includes('/church-records/events/') ||
-      originalRequest.url?.includes('/church-records/ministries/')
+      originalRequest.url?.includes('/church-records/') ||
+      originalRequest.url?.includes('/cms/') ||
+      originalRequest.url?.includes('/public/')
     
     // Check if current page is public
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
@@ -133,15 +128,9 @@ instance.interceptors.response.use(
         // Clear invalid tokens
         localStorage.removeItem('accessToken')
         localStorage.removeItem('auth_token')
-        localStorage.removeItem('token')
-        localStorage.removeItem('userInfo')
-        
-        // Show error message
-        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Unauthorized. Please login again.'
-        ElMessage.error(errorMessage)
-        
-        // Only redirect if not already on landing page
-        if (window.location.pathname !== '/') {
+        // Only redirect if not already on landing page AND NOT on a public page
+        // We only want to force redirect if the user was on a protected admin/dashboard page
+        if (window.location.pathname !== '/' && !isPublicPath) {
           window.location.href = '/'
         }
       }
