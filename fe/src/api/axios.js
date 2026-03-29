@@ -103,7 +103,15 @@ instance.interceptors.response.use(
       originalRequest.url?.endsWith('/submit') ||
       originalRequest.url?.endsWith('/available-slots') ||
       originalRequest.url?.includes('/cms/') ||
-      originalRequest.url?.includes('/api/health')
+      originalRequest.url?.includes('/api/health') ||
+      // Sermon & Live page public endpoints
+      originalRequest.url?.includes('/getSermonEvents') ||
+      originalRequest.url?.includes('/getCompletedSermonEvents') ||
+      originalRequest.url?.includes('/getMinistrySermonEvents') ||
+      // Child dedication & other service listing endpoints (read-only public data)
+      originalRequest.url?.includes('/getAvailableSundayDates') ||
+      originalRequest.url?.includes('/church-records/events/') ||
+      originalRequest.url?.includes('/church-records/ministries/')
     
     // Check if current page is public
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''

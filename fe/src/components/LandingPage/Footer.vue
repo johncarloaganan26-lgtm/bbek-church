@@ -14,7 +14,7 @@
       ></v-img>
     </div>
 
-    <v-container>
+    <v-container class="footer-inner-container">
       <v-row class="py-8">
         <!-- Church Identity -->
         <v-col cols="12" md="4" class="text-center text-md-left">
@@ -346,6 +346,13 @@ onMounted(async () => {
   position: relative;
   padding-bottom: 80px !important;
   overflow: hidden;
+}
+
+/* Match footer container padding to navigation header (padding: 8px 24px) */
+.footer-inner-container {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+  max-width: 100% !important;
 }
 
 /* Background Watermark */
