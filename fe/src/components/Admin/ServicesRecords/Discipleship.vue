@@ -851,9 +851,9 @@ const openScheduleDialog = (item) => {
   isEditing.value = true;
   selectedRequest.value = { ...item };
   
-  // Default location to Registered Address if blank, fallback to church address
+  // Default location to church address if blank
   if (!selectedRequest.value.location) {
-    selectedRequest.value.location = selectedRequest.value.address || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
+    selectedRequest.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
   }
   
   // Ensure notes is a string and not [object Object]
