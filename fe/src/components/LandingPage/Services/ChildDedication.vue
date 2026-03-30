@@ -675,7 +675,15 @@ const fetchAvailableSundayDates = async () => {
     })
     
     if (response.data.success) {
-      availableSundayDates.value = response.data.data.availableDates || []
+      const rawDates = response.data.data.availableDates || []
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      availableSundayDates.value = rawDates.filter(sunday => {
+        const d = new Date(sunday.date)
+        d.setHours(0, 0, 0, 0)
+        return d > today
+      })
     }
   } catch (error) {
     console.error('Error fetching available Sunday dates:', error)
@@ -797,805 +805,805 @@ const inlineFormRules = {
 // Requester display name for inline form
 const inlineRequesterDisplayName = computed(() => {
   if (userInfo.value?.member) {
-    const m = userInfo.value.member
-    return `${m.firstname || ''} ${m.middle_name ? m.middle_name + ' ' : ''}${m.lastname || ''}`.trim()
-  }
-  return ''
-})
-
-// Inline form sponsor helpers
-const addInlineSponsor = () => {
-  inlineFormData.sponsors.push({
-    firstname: '',
-    lastname: '',
-    middle_name: '',
-    phone_number: '',
-    address: ''
+      const m = userInfo.value.member
+      return `${m.firstname || ''} ${m.middle_name ? m.middle_name + ' ' : ''}${m.lastname || ''}`.trim()
+    }
+    return ''
   })
-  if (inlineFormRef.value) {
-    inlineFormRef.value.validateField('sponsors')
-  }
-}
 
-const removeInlineSponsor = (index) => {
-  if (inlineFormData.sponsors.length > 0) {
-    inlineFormData.sponsors.splice(index, 1)
+  // Inline form sponsor helpers
+  const addInlineSponsor = () => {
+    inlineFormData.sponsors.push({
+      firstname: '',
+      lastname: '',
+      middle_name: '',
+      phone_number: '',
+      address: ''
+    })
     if (inlineFormRef.value) {
       inlineFormRef.value.validateField('sponsors')
     }
   }
-}
 
-// Handle relationship change for inline form
-const onInlineRelationshipChange = (relationship) => {
-  const memberData = userInfo.value?.member
-  
-  // Clear all parent fields first
-  inlineFormData.father_firstname = ''
-  inlineFormData.father_lastname = ''
-  inlineFormData.father_middle_name = ''
-  inlineFormData.father_phone_number = ''
-  inlineFormData.father_email = ''
-  inlineFormData.father_address = ''
-  
-  inlineFormData.mother_firstname = ''
-  inlineFormData.mother_lastname = ''
-  inlineFormData.mother_middle_name = ''
-  inlineFormData.mother_phone_number = ''
-  inlineFormData.mother_email = ''
-  inlineFormData.mother_address = ''
-  
-  // Clear contact fields if they were auto-populated from member data
-  const memberPhone = memberData?.phone_number
-  const memberEmail = userInfo.value?.account?.email || memberData?.email
-  const memberAddress = memberData?.address
-  
-  if (inlineFormData.contact_phone_number === memberPhone) {
-    inlineFormData.contact_phone_number = ''
-  }
-  if (inlineFormData.contact_email === memberEmail) {
-    inlineFormData.contact_email = ''
-  }
-  if (inlineFormData.contact_address === memberAddress) {
-    inlineFormData.contact_address = ''
-  }
-  
-  // Auto-populate based on relationship
-  if (relationship === 'father' && memberData) {
-    inlineFormData.father_firstname = memberData.firstname || ''
-    inlineFormData.father_lastname = memberData.lastname || ''
-    inlineFormData.father_middle_name = memberData.middle_name || ''
-    inlineFormData.father_phone_number = memberData.phone_number || ''
-    inlineFormData.father_email = memberData.email || userInfo.value?.account?.email || ''
-    inlineFormData.father_address = memberData.address || ''
-  } else if (relationship === 'mother' && memberData) {
-    inlineFormData.mother_firstname = memberData.firstname || ''
-    inlineFormData.mother_lastname = memberData.lastname || ''
-    inlineFormData.mother_middle_name = memberData.middle_name || ''
-    inlineFormData.mother_phone_number = memberData.phone_number || ''
-    inlineFormData.mother_email = memberData.email || userInfo.value?.account?.email || ''
-    inlineFormData.mother_address = memberData.address || ''
-  } else {
-    if (memberData) {
-      inlineFormData.contact_phone_number = memberData.phone_number || ''
-      inlineFormData.contact_email = memberData.email || userInfo.value?.account?.email || ''
-      inlineFormData.contact_address = memberData.address || ''
+  const removeInlineSponsor = (index) => {
+    if (inlineFormData.sponsors.length > 0) {
+      inlineFormData.sponsors.splice(index, 1)
+      if (inlineFormRef.value) {
+        inlineFormRef.value.validateField('sponsors')
+      }
     }
   }
-}
 
-// Reset inline form
-const resetInlineForm = () => {
-  inlineFormData.requested_by = ''
-  inlineFormData.requester_relationship = ''
-  inlineFormData.preferred_dedication_date = null
-  inlineFormData.child_firstname = ''
-  inlineFormData.child_lastname = ''
-  inlineFormData.child_middle_name = ''
-  inlineFormData.date_of_birth = ''
-  inlineFormData.place_of_birth = ''
-  inlineFormData.gender = ''
-  inlineFormData.contact_phone_number = ''
-  inlineFormData.contact_email = ''
-  inlineFormData.contact_address = ''
-  inlineFormData.father_firstname = ''
-  inlineFormData.father_lastname = ''
-  inlineFormData.father_middle_name = ''
-  inlineFormData.father_phone_number = ''
-  inlineFormData.father_email = ''
-  inlineFormData.father_address = ''
-  inlineFormData.mother_firstname = ''
-  inlineFormData.mother_lastname = ''
-  inlineFormData.mother_middle_name = ''
-  inlineFormData.mother_phone_number = ''
-  inlineFormData.mother_email = ''
-  inlineFormData.mother_address = ''
-  inlineFormData.sponsors = []
-  
-  if (inlineFormRef.value) {
-    inlineFormRef.value.clearValidate()
-  }
-}
-
-// Disable dates that are not Sundays (0 = Sunday in JavaScript)
-const disabledSundayDates = (date) => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  // Only allow future Sundays (day 0)
-  const isPastOrToday = date <= today
-  const isNotSunday = date.getDay() !== 0
-  return isPastOrToday || isNotSunday
-}
-
-// Handle inline form submission
-const handleInlineFormSubmit = async () => {
-  // Check if user is logged in
-  if (!userInfo.value?.member?.member_id) {
-    ElMessage.warning('Please log in to submit a child dedication request.')
-    showLoginDialog.value = true
-    return
-  }
-  
-  if (!inlineFormRef.value) return
-  
-  try {
-    console.log('Starting inline child dedication submission...')
+  // Handle relationship change for inline form
+  const onInlineRelationshipChange = (relationship) => {
+    const memberData = userInfo.value?.member
     
-    // Check for duplicates
-    if (inlineFormData.requested_by && inlineFormData.child_firstname && inlineFormData.child_lastname && inlineFormData.date_of_birth) {
-      try {
-        const checkResponse = await axios.get('/church-records/child-dedications/check-duplicate', {
-          params: {
-            requested_by: inlineFormData.requested_by,
-            child_firstname: inlineFormData.child_firstname.trim(),
-            child_lastname: inlineFormData.child_lastname.trim(),
-            date_of_birth: inlineFormData.date_of_birth
-          }
-        })
-        
-        if (checkResponse.data.success && checkResponse.data.data && checkResponse.data.data.exists) {
-          ElMessage.error({
-            message: `Duplicate Found: A child dedication request for "${inlineFormData.child_firstname} ${inlineFormData.child_lastname}" (DOB: ${inlineFormData.date_of_birth}) already exists. Process stopped.`,
-            duration: 8000,
-            showClose: true
+    // Clear all parent fields first
+    inlineFormData.father_firstname = ''
+    inlineFormData.father_lastname = ''
+    inlineFormData.father_middle_name = ''
+    inlineFormData.father_phone_number = ''
+    inlineFormData.father_email = ''
+    inlineFormData.father_address = ''
+    
+    inlineFormData.mother_firstname = ''
+    inlineFormData.mother_lastname = ''
+    inlineFormData.mother_middle_name = ''
+    inlineFormData.mother_phone_number = ''
+    inlineFormData.mother_email = ''
+    inlineFormData.mother_address = ''
+    
+    // Clear contact fields if they were auto-populated from member data
+    const memberPhone = memberData?.phone_number
+    const memberEmail = userInfo.value?.account?.email || memberData?.email
+    const memberAddress = memberData?.address
+    
+    if (inlineFormData.contact_phone_number === memberPhone) {
+      inlineFormData.contact_phone_number = ''
+    }
+    if (inlineFormData.contact_email === memberEmail) {
+      inlineFormData.contact_email = ''
+    }
+    if (inlineFormData.contact_address === memberAddress) {
+      inlineFormData.contact_address = ''
+    }
+    
+    // Auto-populate based on relationship
+    if (relationship === 'father' && memberData) {
+      inlineFormData.father_firstname = memberData.firstname || ''
+      inlineFormData.father_lastname = memberData.lastname || ''
+      inlineFormData.father_middle_name = memberData.middle_name || ''
+      inlineFormData.father_phone_number = memberData.phone_number || ''
+      inlineFormData.father_email = memberData.email || userInfo.value?.account?.email || ''
+      inlineFormData.father_address = memberData.address || ''
+    } else if (relationship === 'mother' && memberData) {
+      inlineFormData.mother_firstname = memberData.firstname || ''
+      inlineFormData.mother_lastname = memberData.lastname || ''
+      inlineFormData.mother_middle_name = memberData.middle_name || ''
+      inlineFormData.mother_phone_number = memberData.phone_number || ''
+      inlineFormData.mother_email = memberData.email || userInfo.value?.account?.email || ''
+      inlineFormData.mother_address = memberData.address || ''
+    } else {
+      if (memberData) {
+        inlineFormData.contact_phone_number = memberData.phone_number || ''
+        inlineFormData.contact_email = memberData.email || userInfo.value?.account?.email || ''
+        inlineFormData.contact_address = memberData.address || ''
+      }
+    }
+  }
+
+  // Reset inline form
+  const resetInlineForm = () => {
+    inlineFormData.requested_by = ''
+    inlineFormData.requester_relationship = ''
+    inlineFormData.preferred_dedication_date = null
+    inlineFormData.child_firstname = ''
+    inlineFormData.child_lastname = ''
+    inlineFormData.child_middle_name = ''
+    inlineFormData.date_of_birth = ''
+    inlineFormData.place_of_birth = ''
+    inlineFormData.gender = ''
+    inlineFormData.contact_phone_number = ''
+    inlineFormData.contact_email = ''
+    inlineFormData.contact_address = ''
+    inlineFormData.father_firstname = ''
+    inlineFormData.father_lastname = ''
+    inlineFormData.father_middle_name = ''
+    inlineFormData.father_phone_number = ''
+    inlineFormData.father_email = ''
+    inlineFormData.father_address = ''
+    inlineFormData.mother_firstname = ''
+    inlineFormData.mother_lastname = ''
+    inlineFormData.mother_middle_name = ''
+    inlineFormData.mother_phone_number = ''
+    inlineFormData.mother_email = ''
+    inlineFormData.mother_address = ''
+    inlineFormData.sponsors = []
+    
+    if (inlineFormRef.value) {
+      inlineFormRef.value.clearValidate()
+    }
+  }
+
+  // Disable dates that are not Sundays (0 = Sunday in JavaScript)
+  const disabledSundayDates = (date) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    // Only allow future Sundays (day 0)
+    const isPastOrToday = date <= today
+    const isNotSunday = date.getDay() !== 0
+    return isPastOrToday || isNotSunday
+  }
+
+  // Handle inline form submission
+  const handleInlineFormSubmit = async () => {
+    // Check if user is logged in
+    if (!userInfo.value?.member?.member_id) {
+      ElMessage.warning('Please log in to submit a child dedication request.')
+      showLoginDialog.value = true
+      return
+    }
+    
+    if (!inlineFormRef.value) return
+    
+    try {
+      console.log('Starting inline child dedication submission...')
+      
+      // Check for duplicates
+      if (inlineFormData.requested_by && inlineFormData.child_firstname && inlineFormData.child_lastname && inlineFormData.date_of_birth) {
+        try {
+          const checkResponse = await axios.get('/church-records/child-dedications/check-duplicate', {
+            params: {
+              requested_by: inlineFormData.requested_by,
+              child_firstname: inlineFormData.child_firstname.trim(),
+              child_lastname: inlineFormData.child_lastname.trim(),
+              date_of_birth: inlineFormData.date_of_birth
+            }
           })
-          return
-        }
-      } catch (checkError) {
-        // Only show error if it's not a 404 or network error
-        if (!checkError.response?.status?.toString().startsWith('4') && checkError.code !== 'ECONNABORTED') {
-          if (checkError.response?.data?.message && checkError.response.data.message.includes('already exists')) {
+          
+          if (checkResponse.data.success && checkResponse.data.data && checkResponse.data.data.exists) {
             ElMessage.error({
-              message: `Duplicate Error: ${checkError.response.data.message}`,
+              message: `Duplicate Found: A child dedication request for "${inlineFormData.child_firstname} ${inlineFormData.child_lastname}" (DOB: ${inlineFormData.date_of_birth}) already exists. Process stopped.`,
               duration: 8000,
               showClose: true
             })
             return
           }
+        } catch (checkError) {
+          // Only show error if it's not a 404 or network error
+          if (!checkError.response?.status?.toString().startsWith('4') && checkError.code !== 'ECONNABORTED') {
+            if (checkError.response?.data?.message && checkError.response.data.message.includes('already exists')) {
+              ElMessage.error({
+                message: `Duplicate Error: ${checkError.response.data.message}`,
+                duration: 8000,
+                showClose: true
+              })
+              return
+            }
+          }
+          // Silently continue if check fails (duplicate check is optional)
+          console.warn('Duplicate check skipped:', checkError.message)
         }
-        // Silently continue if check fails (duplicate check is optional)
-        console.warn('Duplicate check skipped:', checkError.message)
       }
+      
+      // Form validation
+      await inlineFormRef.value.validate()
+      
+      // User confirmation
+      try {
+        await ElMessageBox.confirm(
+          'Are you sure you want to submit this child dedication request?',
+          'Confirm Child Dedication Request',
+          {
+            confirmButtonText: 'Submit',
+            cancelButtonText: 'Cancel',
+            type: 'warning',
+          }
+        )
+      } catch {
+        return
+      }
+      
+      // Submit form
+      inlineFormLoading.value = true
+      
+      const submitData = {
+        requested_by: inlineFormData.requested_by.trim(),
+        requester_relationship: inlineFormData.requester_relationship,
+        preferred_dedication_date: inlineFormData.preferred_dedication_date 
+          ? inlineFormData.preferred_dedication_date.replace('T', ' ').substring(0, 19) 
+          : null,
+        child_firstname: inlineFormData.child_firstname.trim(),
+        child_lastname: inlineFormData.child_lastname.trim(),
+        child_middle_name: inlineFormData.child_middle_name ? inlineFormData.child_middle_name.trim() : null,
+        date_of_birth: inlineFormData.date_of_birth,
+        place_of_birth: inlineFormData.place_of_birth.trim(),
+        gender: inlineFormData.gender,
+        contact_phone_number: inlineFormData.contact_phone_number.trim(),
+        contact_email: inlineFormData.contact_email ? inlineFormData.contact_email.trim() : null,
+        contact_address: inlineFormData.contact_address.trim(),
+        father_firstname: inlineFormData.father_firstname ? inlineFormData.father_firstname.trim() : null,
+        father_lastname: inlineFormData.father_lastname ? inlineFormData.father_lastname.trim() : null,
+        father_middle_name: inlineFormData.father_middle_name ? inlineFormData.father_middle_name.trim() : null,
+        father_phone_number: inlineFormData.father_phone_number ? inlineFormData.father_phone_number.trim() : null,
+        father_email: inlineFormData.father_email ? inlineFormData.father_email.trim() : null,
+        father_address: inlineFormData.father_address ? inlineFormData.father_address.trim() : null,
+        mother_firstname: inlineFormData.mother_firstname ? inlineFormData.mother_firstname.trim() : null,
+        mother_lastname: inlineFormData.mother_lastname ? inlineFormData.mother_lastname.trim() : null,
+        mother_middle_name: inlineFormData.mother_middle_name ? inlineFormData.mother_middle_name.trim() : null,
+        mother_phone_number: inlineFormData.mother_phone_number ? inlineFormData.mother_phone_number.trim() : null,
+        mother_email: inlineFormData.mother_email ? inlineFormData.mother_email.trim() : null,
+        mother_address: inlineFormData.mother_address ? inlineFormData.mother_address.trim() : null,
+        sponsors: inlineFormData.sponsors && inlineFormData.sponsors.length > 0
+          ? inlineFormData.sponsors.map(s => ({
+              firstname: s.firstname ? s.firstname.trim() : '',
+              lastname: s.lastname ? s.lastname.trim() : '',
+              middle_name: s.middle_name ? s.middle_name.trim() : '',
+              phone_number: s.phone_number ? s.phone_number.trim() : '',
+              address: s.address ? s.address.trim() : ''
+            })).filter(s => s.firstname && s.lastname && s.phone_number && s.address)
+          : []
+      }
+      
+      // Submit using store
+      const { success, error } = await childDedicationStore.createDedication(submitData)
+      
+      if (success) {
+        showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
+        resetInlineForm()
+        // Refresh available Sunday dates to show the newly booked date as possibly now having more requests
+        await fetchAvailableSundayDates()
+      } else {
+        ElMessage.error(error || 'Failed to submit child dedication request.')
+      }
+      
+    } catch (error) {
+      console.error('Error submitting inline form:', error)
+      // Only show error if it's not a cancellation or network error
+      if (error !== 'cancel' && !error.message?.includes('network') && !error.message?.includes('timeout')) {
+        ElMessage.error('Submission failed. Please try again.')
+      }
+    } finally {
+      inlineFormLoading.value = false
     }
-    
-    // Form validation
-    await inlineFormRef.value.validate()
-    
-    // User confirmation
+  }
+
+  // Success dialog state
+  const successDialog = ref({
+    show: false,
+    title: '',
+    message: ''
+  })
+
+  // Initialize on mount
+  onMounted(async () => {
     try {
-      await ElMessageBox.confirm(
-        'Are you sure you want to submit this child dedication request?',
-        'Confirm Child Dedication Request',
-        {
-          confirmButtonText: 'Submit',
-          cancelButtonText: 'Cancel',
-          type: 'warning',
-        }
-      )
-    } catch {
-      return
-    }
-    
-    // Submit form
-    inlineFormLoading.value = true
-    
-    const submitData = {
-      requested_by: inlineFormData.requested_by.trim(),
-      requester_relationship: inlineFormData.requester_relationship,
-      preferred_dedication_date: inlineFormData.preferred_dedication_date 
-        ? inlineFormData.preferred_dedication_date.replace('T', ' ').substring(0, 19) 
-        : null,
-      child_firstname: inlineFormData.child_firstname.trim(),
-      child_lastname: inlineFormData.child_lastname.trim(),
-      child_middle_name: inlineFormData.child_middle_name ? inlineFormData.child_middle_name.trim() : null,
-      date_of_birth: inlineFormData.date_of_birth,
-      place_of_birth: inlineFormData.place_of_birth.trim(),
-      gender: inlineFormData.gender,
-      contact_phone_number: inlineFormData.contact_phone_number.trim(),
-      contact_email: inlineFormData.contact_email ? inlineFormData.contact_email.trim() : null,
-      contact_address: inlineFormData.contact_address.trim(),
-      father_firstname: inlineFormData.father_firstname ? inlineFormData.father_firstname.trim() : null,
-      father_lastname: inlineFormData.father_lastname ? inlineFormData.father_lastname.trim() : null,
-      father_middle_name: inlineFormData.father_middle_name ? inlineFormData.father_middle_name.trim() : null,
-      father_phone_number: inlineFormData.father_phone_number ? inlineFormData.father_phone_number.trim() : null,
-      father_email: inlineFormData.father_email ? inlineFormData.father_email.trim() : null,
-      father_address: inlineFormData.father_address ? inlineFormData.father_address.trim() : null,
-      mother_firstname: inlineFormData.mother_firstname ? inlineFormData.mother_firstname.trim() : null,
-      mother_lastname: inlineFormData.mother_lastname ? inlineFormData.mother_lastname.trim() : null,
-      mother_middle_name: inlineFormData.mother_middle_name ? inlineFormData.mother_middle_name.trim() : null,
-      mother_phone_number: inlineFormData.mother_phone_number ? inlineFormData.mother_phone_number.trim() : null,
-      mother_email: inlineFormData.mother_email ? inlineFormData.mother_email.trim() : null,
-      mother_address: inlineFormData.mother_address ? inlineFormData.mother_address.trim() : null,
-      sponsors: inlineFormData.sponsors && inlineFormData.sponsors.length > 0
-        ? inlineFormData.sponsors.map(s => ({
-            firstname: s.firstname ? s.firstname.trim() : '',
-            lastname: s.lastname ? s.lastname.trim() : '',
-            middle_name: s.middle_name ? s.middle_name.trim() : '',
-            phone_number: s.phone_number ? s.phone_number.trim() : '',
-            address: s.address ? s.address.trim() : ''
-          })).filter(s => s.firstname && s.lastname && s.phone_number && s.address)
-        : []
-    }
-    
-    // Submit using store
-    const { success, error } = await childDedicationStore.createDedication(submitData)
-    
-    if (success) {
-      showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
-      resetInlineForm()
-      // Refresh available Sunday dates to show the newly booked date as possibly now having more requests
-      await fetchAvailableSundayDates()
-    } else {
-      ElMessage.error(error || 'Failed to submit child dedication request.')
-    }
-    
-  } catch (error) {
-    console.error('Error submitting inline form:', error)
-    // Only show error if it's not a cancellation or network error
-    if (error !== 'cancel' && !error.message?.includes('network') && !error.message?.includes('timeout')) {
-      ElMessage.error('Submission failed. Please try again.')
-    }
-  } finally {
-    inlineFormLoading.value = false
-  }
-}
-
-// Success dialog state
-const successDialog = ref({
-  show: false,
-  title: '',
-  message: ''
-})
-
-// Initialize on mount
-onMounted(async () => {
-  try {
-    // Load CMS data (includes images as base64 data URLs from /full endpoint)
-    const loadedData = await loadPageData()
-    if (loadedData) {
-      Object.assign(childDedicationData.value, loadedData)
-    }
-  } catch (error) {
-    console.error('Error loading CMS data:', error)
-    // Continue even if CMS loading fails - use default data
-  }
-
-  try {
-    const storedUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    userInfo.value = storedUserInfo
-    
-    // Initialize inline form with logged-in member's ID
-    if (userInfo.value?.member?.member_id) {
-      inlineFormData.requested_by = userInfo.value.member.member_id
-    }
-    
-    // Fetch available Sunday dates for logged-in members
-    if (userInfo.value?.account?.acc_id) {
-      await fetchAvailableSundayDates()
-    }
-  } catch (error) {
-    console.error('Error loading user info:', error)
-    userInfo.value = {}
-  }
-})
-
-const openLoginDialog = () => {
-  showLoginDialog.value = true
-}
-
-// Show success dialog
-const showSuccessDialog = (title, message) => {
-  successDialog.value = {
-    show: true,
-    title,
-    message
-  }
-}
-
-// Close success dialog
-const closeSuccessDialog = () => {
-  successDialog.value.show = false
-}
-
-// Select time slot from available dates and populate form
-const selectTimeSlot = (date, time) => {
-  // Create datetime string in format YYYY-MM-DD HH:mm:ss
-  const dateTime = `${date} ${time}:00`
-  inlineFormData.preferred_dedication_date = dateTime
-  
-  ElMessage.success(`Selected: ${date} at ${time}`)
-  
-  // Scroll to the form
-  const registerSection = document.getElementById('register')
-  if (registerSection) {
-    registerSection.scrollIntoView({ behavior: 'smooth' })
-  }
-}
-
-const handleChildDedicationDialogSubmit = async (payload) => {
-  if (!childDedicationDialogRef.value) return
-  try {
-    const { success, error } = await childDedicationStore.createDedication(payload)
-    if (success) {
-      showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
-      showChildDedicationDialog.value = false
-      selectedDedicationData.value = null // Clear selected data after successful submission
-      // Refresh unavailable time slots in case new slots are now blocked
-      if (childDedicationDialogRef.value) {
-        childDedicationDialogRef.value.fetchUnavailableTimeSlots()
+      // Load CMS data (includes images as base64 data URLs from /full endpoint)
+      const loadedData = await loadPageData()
+      if (loadedData) {
+        Object.assign(childDedicationData.value, loadedData)
       }
-    } else {
-      ElMessage.error(error || 'Failed to submit child dedication request.')
-      showChildDedicationDialog.value = false
+    } catch (error) {
+      console.error('Error loading CMS data:', error)
+      // Continue even if CMS loading fails - use default data
     }
-  } catch (err) {
-    ElMessage.error(err?.message || 'Failed to submit child dedication request.')
-    showChildDedicationDialog.value = false
-  } finally {
-    childDedicationDialogRef.value?.resetLoading()
+
+    try {
+      const storedUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+      userInfo.value = storedUserInfo
+      
+      // Initialize inline form with logged-in member's ID
+      if (userInfo.value?.member?.member_id) {
+        inlineFormData.requested_by = userInfo.value.member.member_id
+      }
+      
+      // Fetch available Sunday dates for logged-in members
+      if (userInfo.value?.account?.acc_id) {
+        await fetchAvailableSundayDates()
+      }
+    } catch (error) {
+      console.error('Error loading user info:', error)
+      userInfo.value = {}
+    }
+  })
+
+  const openLoginDialog = () => {
+    showLoginDialog.value = true
   }
-}
 
-// Handle switch to edit mode
-const handleSwitchToEdit = (dedication) => {
-  selectedDedicationData.value = dedication
-  showChildDedicationDialog.value = true
-}
-</script>
-
-<style scoped>
-.child-dedication-page {
-  width: 100vw;
-  min-height: 100vh;
-  background: white;
-  position: relative;
-}
-
-.main-content {
-  width: 100%;
-  flex: 1;
-}
-
-/* Hero Section */
-.hero-section {
-  position: relative;
-  width: 100%;
-  margin-top: 64px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.hero-background {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-
-.hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
-}
-
-.floating-elements {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.floating-element {
-  position: absolute;
-  background: rgba(63, 211, 194, 0.62);
-  border-radius: 50%;
-  animation: float 3.5s ease-in-out infinite;
-}
-
-.float-1 { top: 80px; left: 80px; width: 48px; height: 48px; animation-delay: 0s; }
-.float-2 { top: 33%; right: 64px; width: 32px; height: 32px; animation-delay: 1.5s; animation-name: floatRotate; }
-.float-3 { bottom: 33%; left: 64px; width: 40px; height: 40px; animation-delay: 2s; }
-.float-4 { bottom: 80px; right: 80px; width: 24px; height: 24px; animation-delay: 0.8s; }
-.float-5 { top: 50%; left: 25%; width: 28px; height: 28px; animation-delay: 1.2s; animation-name: floatRotate12; }
-.float-6 { bottom: 25%; right: 33%; width: 36px; height: 36px; animation-delay: 2.5s; }
-.float-7 { top: 25%; left: 33%; width: 16px; height: 16px; animation-delay: 1.8s; animation-name: floatRotate; }
-.float-8 { top: 75%; right: 25%; width: 44px; height: 44px; animation-delay: 0.3s; }
-.float-9 { bottom: 50%; left: 16%; width: 20px; height: 20px; animation-delay: 2.1s; }
-.float-10 { top: 40px; left: 40px; width: 64px; height: 64px; animation-delay: 0s; }
-.float-11 { top: 80px; right: 80px; width: 48px; height: 48px; animation-delay: 1s; }
-.float-12 { bottom: 80px; left: 80px; width: 56px; height: 56px; animation-delay: 2s; animation-name: floatRotate; }
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
+  // Show success dialog
+  const showSuccessDialog = (title, message) => {
+    successDialog.value = {
+      show: true,
+      title,
+      message
+    }
   }
-  50% {
-    transform: translateY(-20px);
+
+  // Close success dialog
+  const closeSuccessDialog = () => {
+    successDialog.value.show = false
   }
-}
 
-@keyframes floatRotate {
-  0%, 100% {
-    transform: translateY(0) rotate(45deg);
+  // Select time slot from available dates and populate form
+  const selectTimeSlot = (date, time) => {
+    // Create datetime string in format YYYY-MM-DD HH:mm:ss
+    const dateTime = `${date} ${time}:00`
+    inlineFormData.preferred_dedication_date = dateTime
+    
+    ElMessage.success(`Selected: ${date} at ${time}`)
+    
+    // Scroll to the form
+    const registerSection = document.getElementById('register')
+    if (registerSection) {
+      registerSection.scrollIntoView({ behavior: 'smooth' })
+    }
   }
-  50% {
-    transform: translateY(-20px) rotate(225deg);
+
+  const handleChildDedicationDialogSubmit = async (payload) => {
+    if (!childDedicationDialogRef.value) return
+    try {
+      const { success, error } = await childDedicationStore.createDedication(payload)
+      if (success) {
+        showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
+        showChildDedicationDialog.value = false
+        selectedDedicationData.value = null // Clear selected data after successful submission
+        // Refresh unavailable time slots in case new slots are now blocked
+        if (childDedicationDialogRef.value) {
+          childDedicationDialogRef.value.fetchUnavailableTimeSlots()
+        }
+      } else {
+        ElMessage.error(error || 'Failed to submit child dedication request.')
+        showChildDedicationDialog.value = false
+      }
+    } catch (err) {
+      ElMessage.error(err?.message || 'Failed to submit child dedication request.')
+      showChildDedicationDialog.value = false
+    } finally {
+      childDedicationDialogRef.value?.resetLoading()
+    }
   }
-}
 
-@keyframes floatRotate12 {
-  0%, 100% {
-    transform: translateY(0) rotate(12deg);
+  // Handle switch to edit mode
+  const handleSwitchToEdit = (dedication) => {
+    selectedDedicationData.value = dedication
+    showChildDedicationDialog.value = true
   }
-  50% {
-    transform: translateY(-20px) rotate(192deg);
+  </script>
+
+  <style scoped>
+  .child-dedication-page {
+    width: 100vw;
+    min-height: 100vh;
+    background: white;
+    position: relative;
   }
-}
 
-.clip-path-star {
-  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  border-radius: 0;
-}
-
-.clip-path-triangle {
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  border-radius: 0;
-}
-
-.clip-path-diamond {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  border-radius: 0;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 10;
-  text-align: center;
-  padding: 0 16px;
-  max-width: 1280px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.hero-title {
-  font-size: 3rem;
-  font-weight: bold;
-  color: white;
-  margin-bottom: 16px;
-  letter-spacing: -0.025em;
-  font-family: 'Georgia', serif;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.hero-subtitle {
-  font-size: 1.125rem;
-  color: white;
-  font-weight: 300;
-}
-
-.fade-in-up {
-  animation: fadeInUp 0.8s ease-out;
-}
-
-.fade-in-up-delay {
-  animation: fadeInUp 0.8s ease-out 0.2s both;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+  .main-content {
+    width: 100%;
+    flex: 1;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-@media (min-width: 768px) {
-  .hero-title {
-    font-size: 5rem;
-  }
-  .hero-subtitle {
-    font-size: 1.25rem;
-  }
-}
-
-@media (max-width: 640px) {
+  /* Hero Section */
   .hero-section {
-    min-height: 70vh;
+    position: relative;
+    width: 100%;
     margin-top: 64px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
-  .hero-title {
-    font-size: 2rem;
+  .hero-background {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
-  .hero-subtitle {
-    font-size: 1rem;
-    padding: 0 16px;
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3));
   }
 
-  .hero-content {
-    padding: 0 16px;
-  }
-
-  .content-section {
-    padding: 32px 0;
-  }
-
-  .section-title {
-    font-size: 1.5rem;
-    margin-bottom: 24px;
-  }
-
-  .info-cards {
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  .card-title {
-    font-size: 1.25rem;
-  }
-
-  .who-baptized-card {
-    padding: 16px;
-  }
-
-  .who-title {
-    font-size: 1.125rem;
-  }
-
-  .registration-card {
-    margin-top: 24px;
-  }
-
-  .registration-title {
-    font-size: 1.25rem;
-  }
-
-  .registration-subtitle {
-    font-size: 0.8125rem;
+  .floating-elements {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .floating-element {
-    display: none;
+    position: absolute;
+    background: rgba(63, 211, 194, 0.62);
+    border-radius: 50%;
+    animation: float 3.5s ease-in-out infinite;
   }
-}
 
-/* Content Section */
-.content-section {
-  position: relative;
-  padding: 64px 0;
-  background: white;
-  overflow: hidden;
-}
+  .float-1 { top: 80px; left: 80px; width: 48px; height: 48px; animation-delay: 0s; }
+  .float-2 { top: 33%; right: 64px; width: 32px; height: 32px; animation-delay: 1.5s; animation-name: floatRotate; }
+  .float-3 { bottom: 33%; left: 64px; width: 40px; height: 40px; animation-delay: 2s; }
+  .float-4 { bottom: 80px; right: 80px; width: 24px; height: 24px; animation-delay: 0.8s; }
+  .float-5 { top: 50%; left: 25%; width: 28px; height: 28px; animation-delay: 1.2s; animation-name: floatRotate12; }
+  .float-6 { bottom: 25%; right: 33%; width: 36px; height: 36px; animation-delay: 2.5s; }
+  .float-7 { top: 25%; left: 33%; width: 16px; height: 16px; animation-delay: 1.8s; animation-name: floatRotate; }
+  .float-8 { top: 75%; right: 25%; width: 44px; height: 44px; animation-delay: 0.3s; }
+  .float-9 { bottom: 50%; left: 16%; width: 20px; height: 20px; animation-delay: 2.1s; }
+  .float-10 { top: 40px; left: 40px; width: 64px; height: 64px; animation-delay: 0s; }
+  .float-11 { top: 80px; right: 80px; width: 48px; height: 48px; animation-delay: 1s; }
+  .float-12 { bottom: 80px; left: 80px; width: 56px; height: 56px; animation-delay: 2s; animation-name: floatRotate; }
 
-.content-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 48px;
-  position: relative;
-  z-index: 2;
-}
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
 
-@media (min-width: 1024px) {
+  @keyframes floatRotate {
+    0%, 100% {
+      transform: translateY(0) rotate(45deg);
+    }
+    50% {
+      transform: translateY(-20px) rotate(225deg);
+    }
+  }
+
+  @keyframes floatRotate12 {
+    0%, 100% {
+      transform: translateY(0) rotate(12deg);
+    }
+    50% {
+      transform: translateY(-20px) rotate(192deg);
+    }
+  }
+
+  .clip-path-star {
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    border-radius: 0;
+  }
+
+  .clip-path-triangle {
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    border-radius: 0;
+  }
+
+  .clip-path-diamond {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    border-radius: 0;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 0 16px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .hero-title {
+    font-size: 3rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 16px;
+    letter-spacing: -0.025em;
+    font-family: 'Georgia', serif;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .hero-subtitle {
+    font-size: 1.125rem;
+    color: white;
+    font-weight: 300;
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.8s ease-out;
+  }
+
+  .fade-in-up-delay {
+    animation: fadeInUp 0.8s ease-out 0.2s both;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .hero-title {
+      font-size: 5rem;
+    }
+    .hero-subtitle {
+      font-size: 1.25rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-section {
+      min-height: 70vh;
+      margin-top: 64px;
+    }
+
+    .hero-title {
+      font-size: 2rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1rem;
+      padding: 0 16px;
+    }
+
+    .hero-content {
+      padding: 0 16px;
+    }
+
+    .content-section {
+      padding: 32px 0;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      margin-bottom: 24px;
+    }
+
+    .info-cards {
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+    }
+
+    .who-baptized-card {
+      padding: 16px;
+    }
+
+    .who-title {
+      font-size: 1.125rem;
+    }
+
+    .registration-card {
+      margin-top: 24px;
+    }
+
+    .registration-title {
+      font-size: 1.25rem;
+    }
+
+    .registration-subtitle {
+      font-size: 0.8125rem;
+    }
+
+    .floating-element {
+      display: none;
+    }
+  }
+
+  /* Content Section */
+  .content-section {
+    position: relative;
+    padding: 64px 0;
+    background: white;
+    overflow: hidden;
+  }
+
   .content-grid {
-    grid-template-columns: 1fr 1fr;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+    position: relative;
+    z-index: 2;
   }
-  .content-grid > .left-column,
-  .content-grid > .right-column {
+
+  @media (min-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr 1fr;
+      align-items: stretch;
+    }
+    .content-grid > .left-column,
+    .content-grid > .right-column {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .section-title {
+    font-size: 1.875rem;
+    font-weight: bold;
+    margin-bottom: 32px;
+    font-family: 'Georgia', serif;
+    color: #000;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.6s ease-out both;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .info-cards {
+    display: grid;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .info-card {
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #14b8a6;
+    transition: all 0.3s ease;
+  }
+
+  .info-card:hover {
+    transform: translateX(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-left-width: 6px;
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  .who-baptized-card {
+    padding: 24px;
+    border-radius: 8px;
+    border-left: 4px solid #14b8a6;
+    transition: all 0.3s ease;
+  }
+
+  .who-baptized-card:hover {
+    transform: translateX(8px);
+    border-left-width: 6px;
+  }
+
+  .who-title {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 16px;
+    font-family: 'Georgia', serif;
+    color: #000;
+  }
+
+  .baptized-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
+    gap: 12px;
   }
-}
 
-.section-title {
-  font-size: 1.875rem;
-  font-weight: bold;
-  margin-bottom: 32px;
-  font-family: 'Georgia', serif;
-  color: #000;
-}
-
-.fade-in {
-  animation: fadeIn 0.6s ease-out both;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+  /* Available Dates Section Styles */
+  .available-dates-list {
+    max-height: 400px;
+    overflow-y: auto;
   }
-  to {
-    opacity: 1;
+
+  .dates-panel {
+    background: transparent !important;
   }
-}
 
-.info-cards {
-  display: grid;
-  gap: 24px;
-  margin-bottom: 32px;
-}
+  .dates-panel .v-expansion-panel {
+    background: white !important;
+    border: 1px solid #0d9488 !important;
+  }
 
-.info-card {
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  border-left: 4px solid #14b8a6;
-  transition: all 0.3s ease;
-}
+  .time-slots-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 
-.info-card:hover {
-  transform: translateX(8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-left-width: 6px;
-}
+  .time-slot-chip {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
 
-.card-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.025em;
-}
+  .time-slot-chip:hover {
+    background: #14b8a6 !important;
+    color: white !important;
+    border-color: #14b8a6 !important;
+  }
 
-.who-baptized-card {
-  padding: 24px;
-  border-radius: 8px;
-  border-left: 4px solid #14b8a6;
-  transition: all 0.3s ease;
-}
+  .baptized-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    transition: transform 0.5s;
+  }
 
-.who-baptized-card:hover {
-  transform: translateX(8px);
-  border-left-width: 6px;
-}
+  .baptized-item:hover {
+    transform: translateX(8px);
+  }
 
-.who-title {
-  font-size: 1.25rem;
-  font-weight: bold;
-  margin-bottom: 16px;
-  font-family: 'Georgia', serif;
-  color: #000;
-}
+  .check-icon {
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
 
-.baptized-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+  /* Sunday Schedule Card - System Branding */
+  .sunday-schedule-card {
+    border: 2px solid #0d9488;
+    border-top: 4px solid #0d9488;
+    background: #ffffff;
+  }
 
-/* Available Dates Section Styles */
-.available-dates-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
+  .sunday-schedule-card .v-card-title {
+    color: #0d9488;
+    border-bottom: 2px solid #0d9488;
+    padding-bottom: 12px;
+  }
 
-.dates-panel {
-  background: transparent !important;
-}
+  .sunday-panel {
+    background: #f0fdfa !important;
+    margin-bottom: 8px !important;
+    border: 2px solid #0d9488 !important;
+    box-shadow: none !important;
+  }
 
-.dates-panel .v-expansion-panel {
-  background: white !important;
-  border: 1px solid #0d9488 !important;
-}
+  .sunday-panel::before {
+    display: none !important;
+  }
 
-.time-slots-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
+  .sunday-panel .v-expansion-panel-title {
+    background: transparent !important;
+  }
 
-.time-slot-chip {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
+  .sunday-panel:hover {
+    background: #ccfbf1 !important;
+  }
 
-.time-slot-chip:hover {
-  background: #14b8a6 !important;
-  color: white !important;
-  border-color: #14b8a6 !important;
-}
+  .time-slot-chip {
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
 
-.baptized-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  transition: transform 0.5s;
-}
+  .time-slot-chip:hover {
+    background-color: #0d9488 !important;
+    color: white !important;
+    border-color: #0d9488 !important;
+    transform: scale(1.05);
+  }
 
-.baptized-item:hover {
-  transform: translateX(8px);
-}
+  .time-slots-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 
-.check-icon {
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-/* Sunday Schedule Card - System Branding */
-.sunday-schedule-card {
-  border: 2px solid #0d9488;
-  border-top: 4px solid #0d9488;
-  background: #ffffff;
-}
-
-.sunday-schedule-card .v-card-title {
-  color: #0d9488;
-  border-bottom: 2px solid #0d9488;
-  padding-bottom: 12px;
-}
-
-.sunday-panel {
-  background: #f0fdfa !important;
-  margin-bottom: 8px !important;
-  border: 2px solid #0d9488 !important;
-  box-shadow: none !important;
-}
-
-.sunday-panel::before {
-  display: none !important;
-}
-
-.sunday-panel .v-expansion-panel-title {
-  background: transparent !important;
-}
-
-.sunday-panel:hover {
-  background: #ccfbf1 !important;
-}
-
-.time-slot-chip {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.time-slot-chip:hover {
-  background-color: #0d9488 !important;
-  color: white !important;
-  border-color: #0d9488 !important;
-  transform: scale(1.05);
-}
-
-.time-slots-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-/* Login Alert */
-.login-alert {
-  margin-bottom: 24px;
-}
+  /* Login Alert */
+  .login-alert {
+    margin-bottom: 24px;
+  }
 
 .alert-content {
   display: flex;

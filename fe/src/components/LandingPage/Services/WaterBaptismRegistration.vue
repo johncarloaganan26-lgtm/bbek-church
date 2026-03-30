@@ -205,15 +205,16 @@
               <h3 class="text-h6 mt-2 mb-4 teal--text">Baptism Details</h3>
               <v-row>
                 <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model="formData.baptism_date"
-                    label="Preferred Date"
-                    type="date"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[v => !!v || 'Baptism Date is required']"
-                  ></v-text-field>
+                    <v-text-field
+                      v-model="formData.baptism_date"
+                      label="Preferred Date"
+                      type="date"
+                      variant="outlined"
+                      density="comfortable"
+                      required
+                      :rules="[v => !!v || 'Baptism Date is required']"
+                      :min="new Date(Date.now() + 86400000).toISOString().split('T')[0]"
+                    ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -369,11 +370,18 @@ const fetchSundaySlots = async () => {
         });
         
         console.log('[WaterBaptism] Available slots response:', response.data);
-        
         if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
             const slots = [];
-            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
             response.data.data.forEach(dateGroup => {
+                const slotDate = new Date(dateGroup.date);
+                slotDate.setHours(0, 0, 0, 0);
+                
+                // Only include future dates
+                if (slotDate <= today) return;
+
                 if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) {
                     console.warn('[WaterBaptism] Missing or invalid timeSlots for date:', dateGroup.date);
                     return;

@@ -245,7 +245,15 @@ const fetchSlots = async () => {
   })
 
   if (result.success) {
-    availableScheduleDates.value = result.data || []
+    const rawDates = result.data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    availableScheduleDates.value = rawDates.filter(dateGroup => {
+      const slotDate = new Date(dateGroup.date);
+      slotDate.setHours(0, 0, 0, 0);
+      return slotDate > today;
+    });
   }
 
   slotsLoading.value = false

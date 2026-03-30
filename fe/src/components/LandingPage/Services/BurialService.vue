@@ -756,7 +756,17 @@ const fetchAvailableBurialDates = async () => {
     if (response.data && response.data.success) {
       // API returns { success: true, data: { availableDates: [...] } }
       const responseData = response.data.data || response.data
-      availableBurialDates.value = responseData.availableDates || responseData.dates || response.data.dates || []
+      const rawDates = responseData.availableDates || responseData.dates || response.data.dates || []
+      
+      // Filter for future dates only
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      availableBurialDates.value = rawDates.filter(dateGroup => {
+        const slotDate = new Date(dateGroup.date)
+        slotDate.setHours(0, 0, 0, 0)
+        return slotDate > today
+      })
     } else {
       availableBurialDates.value = []
     }
