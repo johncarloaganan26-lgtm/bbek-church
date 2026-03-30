@@ -851,9 +851,9 @@ const openScheduleDialog = (item) => {
   isEditing.value = true;
   selectedRequest.value = { ...item };
   
-  // Default location to church address if blank
+  // Default location to Registered Address if blank, fallback to church address
   if (!selectedRequest.value.location) {
-    selectedRequest.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
+    selectedRequest.value.location = selectedRequest.value.address || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
   }
   
   // Ensure notes is a string and not [object Object]
@@ -976,7 +976,7 @@ const openBibleStudyDialog = (item) => {
   
   promotionForm.value = {
     pastor_id: null,
-    location: item.location || item.address || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
+    location: item.address || item.location || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
     scheduled_date: '',
     notes: ''
   };
