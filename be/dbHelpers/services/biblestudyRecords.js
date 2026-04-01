@@ -1,5 +1,6 @@
 const { query } = require('../../database/db');
 const moment = require('moment-timezone');
+const XLSX = require('xlsx');
 const { sendBibleStudyDetails, sendWaterBaptismInvitation } = require('../emailHelper');
 const { validateSelectedSlot } = require('../../utils/scheduling');
 
@@ -98,12 +99,13 @@ async function createBibleStudyRequest(data) {
         // Prevent double-booking of the selected slot (Pending/Scheduled blocks)
         if (scheduled_date) {
             const formattedSlot = moment.tz(scheduled_date, ['YYYY-MM-DD HH:mm:ss', moment.ISO_8601], 'Asia/Manila').format('YYYY-MM-DD HH:mm:ss');
-            const [conflicts] = await query(
-                "SELECT request_id FROM tbl_biblestudy_requests WHERE status IN ('Pending','Scheduled') AND scheduled_date = ? LIMIT 1",
+            const [rows] = await query(
+                "SELECT COUNT(*) as bookedCount FROM tbl_biblestudy_requests WHERE status IN ('Pending','Scheduled') AND scheduled_date = ?",
                 [formattedSlot]
             );
-            if (conflicts.length > 0) {
-                throw new Error('Selected time slot is no longer available. Please choose a different slot.');
+            const { BIBLE_STUDY_CAPACITY } = require('../../utils/scheduling');
+            if (rows[0].bookedCount >= BIBLE_STUDY_CAPACITY) {
+                throw new Error(`Selected time slot has reached its maximum capacity of ${BIBLE_STUDY_CAPACITY} parties. Please choose a different slot.`);
             }
         }
 
@@ -159,7 +161,7 @@ async function createBibleStudyRequest(data) {
  */
 async function getAllBibleStudyRequests(params = {}) {
     try {
-        const { page = 1, pageSize = 10, search = '', status = '' } = params;
+        const { page = 1, pageSize = 10, search = '', status = '', sortBy, startDate, endDate } = params;
         const offset = (page - 1) * pageSize;
 
         let sql = `
@@ -176,12 +178,19 @@ async function getAllBibleStudyRequests(params = {}) {
                    COALESCE(b.guardian_name, s.guardian_name) as guardian_name,
                    COALESCE(b.guardian_contact, s.guardian_contact) as guardian_contact,
                    COALESCE(b.guardian_relationship, s.guardian_relationship) as guardian_relationship,
-                   COALESCE(b.address, s.address) as address
+                   COALESCE(b.address, s.address) as address,
+                   COALESCE(
+                     CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+                     CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                   ) as pastor_name_joined
             FROM tbl_biblestudy_requests b
             LEFT JOIN tbl_discipleship_requests s ON (
                 (b.salvation_id IS NOT NULL AND b.salvation_id = s.request_id) OR
                 (b.salvation_id IS NULL AND LOWER(b.email) = LOWER(s.email))
             )
+            LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+            LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+            LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
             WHERE 1=1`;
         const queryParams = [];
 
@@ -191,12 +200,75 @@ async function getAllBibleStudyRequests(params = {}) {
             queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
         }
 
-        if (status) {
+        const isAllStatus = !status || status === '' || status.toLowerCase() === 'all' || status.toLowerCase() === 'all status';
+        if (!isAllStatus) {
             sql += ' AND b.status = ?';
             queryParams.push(status);
         }
 
-        sql += ' ORDER BY b.date_created DESC LIMIT ? OFFSET ?';
+        if (startDate && endDate) {
+            sql += ' AND b.scheduled_date BETWEEN ? AND ?';
+            queryParams.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+
+        let orderBy = 'b.date_created DESC';
+        if (sortBy) {
+            switch (sortBy) {
+                case 'date_created_asc': orderBy = 'b.date_created ASC'; break;
+                case 'date_created_desc': orderBy = 'b.date_created DESC'; break;
+                case 'name_asc': orderBy = 'b.firstname ASC, b.lastname ASC'; break;
+                case 'name_desc': orderBy = 'b.firstname DESC, b.lastname DESC'; break;
+                case 'scheduled_asc': orderBy = 'b.scheduled_date ASC'; break;
+                case 'scheduled_desc': orderBy = 'b.scheduled_date DESC'; break;
+            }
+        }
+
+        sql += ` ORDER BY ${orderBy}`;
+
+        // Get total count
+        let countSql = 'SELECT COUNT(*) as total FROM tbl_biblestudy_requests WHERE 1=1';
+        const countParams = [];
+        if (search) {
+            countSql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
+            countParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+        }
+        if (!isAllStatus) {
+            countSql += ' AND status = ?';
+            countParams.push(status);
+        }
+        if (startDate && endDate) {
+            countSql += ' AND scheduled_date BETWEEN ? AND ?';
+            countParams.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+        const [countRows] = await query(countSql, countParams);
+        const totalCount = countRows[0].total;
+
+        const noPagination = params.noPagination === true;
+        if (noPagination) {
+            const [rows] = await query(sql, queryParams);
+            const formattedRows = rows.map(row => {
+                const formatted = { ...row };
+                if (row.address && typeof row.address !== 'string' && Buffer.isBuffer(row.address)) {
+                    formatted.address = row.address.toString('utf8');
+                }
+                if (row.notes && typeof row.notes !== 'string' && Buffer.isBuffer(row.notes)) {
+                    formatted.notes = row.notes.toString('utf8');
+                }
+                return formatted;
+            });
+            return {
+                success: true,
+                data: formattedRows,
+                pagination: {
+                    total: totalCount,
+                    page: 1,
+                    pageSize: totalCount,
+                    totalPages: 1
+                }
+            };
+        }
+
+        sql += ` LIMIT ? OFFSET ?`;
         queryParams.push(parseInt(pageSize), parseInt(offset));
 
         const [rows] = await query(sql, queryParams);
@@ -213,27 +285,14 @@ async function getAllBibleStudyRequests(params = {}) {
             return formatted;
         });
 
-        // Get total count
-        let countSql = 'SELECT COUNT(*) as total FROM tbl_biblestudy_requests WHERE 1=1';
-        const countParams = [];
-        if (search) {
-            countSql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
-            countParams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
-        }
-        if (status) {
-            countSql += ' AND status = ?';
-            countParams.push(status);
-        }
-        const [countRows] = await query(countSql, countParams);
-
         return {
             success: true,
             data: formattedRows,
             pagination: {
-                total: countRows[0].total,
+                total: totalCount,
                 page: parseInt(page),
                 pageSize: parseInt(pageSize),
-                totalPages: Math.ceil(countRows[0].total / pageSize)
+                totalPages: Math.ceil(totalCount / pageSize)
             }
         };
     } catch (error) {
@@ -256,13 +315,13 @@ async function updateBibleStudyRequest(id, data) {
         const params = [];
 
         if (status) { updates.push('status = ?'); params.push(status); }
-        if (scheduled_date !== undefined) { 
+        if (scheduled_date) { 
             updates.push('scheduled_date = ?'); 
-            params.push(scheduled_date ? moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss') : null); 
+            params.push(moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss')); 
         }
-        if (pastor_id !== undefined) { updates.push('pastor_id = ?'); params.push(pastor_id); }
-        if (location !== undefined) { updates.push('location = ?'); params.push(location); }
-        if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
+        if (pastor_id) { updates.push('pastor_id = ?'); params.push(pastor_id); }
+        if (location) { updates.push('location = ?'); params.push(location); }
+        if (notes !== undefined && notes !== null) { updates.push('notes = ?'); params.push(notes); }
         if (middle_name !== undefined) { updates.push('middle_name = ?'); params.push(middle_name); }
         if (birthdate !== undefined) { updates.push('birthdate = ?'); params.push(birthdate ? moment(birthdate).format('YYYY-MM-DD') : null); }
         if (age !== undefined) { updates.push('age = ?'); params.push(age); }
@@ -361,7 +420,7 @@ async function bulkCompleteBibleStudies(requestIds) {
 /**
  * Promote Bible Study Candidate to Water Baptism
  */
-async function promoteBibleStudyToBaptism(id, isDecided = false) {
+async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {}) {
     try {
         const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
         if (rows.length === 0) throw new Error('Bible study request not found');
@@ -385,12 +444,13 @@ async function promoteBibleStudyToBaptism(id, isDecided = false) {
             marriage_date: req.marriage_date,
             children: req.children,
             is_member: false,
-            status: isDecided ? 'approved' : 'pending',
-            pastor_name: req.pastor_id || null,
-            location: req.location || null,
+            status: overrides.status || (isDecided ? 'approved' : 'pending'),
+            pastor_name: overrides.pastor_id || req.pastor_id || null,
+            location: overrides.location || req.location || null,
             guardian_name: req.guardian_name,
             guardian_contact: req.guardian_contact,
-            guardian_relationship: req.guardian_relationship
+            guardian_relationship: req.guardian_relationship,
+            notes: overrides.notes || req.notes || ''
         };
 
         const result = await createWaterBaptism(baptismData);
@@ -439,11 +499,75 @@ async function archiveBibleStudyRequest(id, archiveData) {
     }
 }
 
+async function exportBibleStudyRequestsToExcel(options = {}) {
+    const format = options.format || 'xlsx';
+    try {
+        const exportOptions = { ...options, noPagination: true };
+        // Remove ALL pagination parameters to export the full result set
+        delete exportOptions.page;
+        delete exportOptions.pageSize;
+        delete exportOptions.limit;
+        delete exportOptions.offset;
+        delete exportOptions.format;
+        
+        const result = await getAllBibleStudyRequests(exportOptions);
+        if (!result.success || !result.data || result.data.length === 0) {
+            throw new Error('No records found to export');
+        }
+
+        const excelData = result.data.map((row, index) => ({
+            'No.': index + 1,
+            'Request ID': row.request_id,
+            'First Name': row.firstname,
+            'Last Name': row.lastname,
+            'Email': row.email,
+            'Phone Number': row.phone_number || '-',
+            'Status': row.status,
+            'Scheduled Date': row.scheduled_date ? moment(row.scheduled_date).format('YYYY-MM-DD HH:mm:ss') : 'Not Scheduled',
+            'Location': row.location || '-',
+            'Notes': row.notes || '-',
+            'Date Created': moment(row.date_created).format('YYYY-MM-DD HH:mm:ss')
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+
+        if (format === 'xlsx') {
+            const columnWidths = [
+                { wch: 5 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 25 },
+                { wch: 30 },
+                { wch: 20 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 30 },
+                { wch: 30 },
+                { wch: 25 }
+            ];
+            worksheet['!cols'] = columnWidths;
+        }
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Bible Study Requests');
+        
+        return XLSX.write(workbook, { 
+            type: 'buffer', 
+            bookType: format === 'csv' ? 'csv' : 'xlsx',
+            compression: format === 'xlsx'
+        });
+    } catch (error) {
+        console.error('Export error:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createBibleStudyRequest,
     getAllBibleStudyRequests,
     updateBibleStudyRequest,
     bulkCompleteBibleStudies,
     promoteBibleStudyToBaptism,
-    archiveBibleStudyRequest
+    archiveBibleStudyRequest,
+    exportBibleStudyRequestsToExcel
 };

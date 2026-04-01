@@ -76,6 +76,11 @@ instance.interceptors.request.use(
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     }
+
+    // 5. Update last interaction timestamp (to prevent session expiry from inactivity)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('last_interaction', Date.now().toString())
+    }
     
     return config
   },

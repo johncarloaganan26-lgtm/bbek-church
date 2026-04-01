@@ -208,7 +208,7 @@
              <th class="text-left font-weight-bold">Groom</th>
             <th class="text-left font-weight-bold">Bride</th>
             <th class="text-left font-weight-bold">Guardians</th>
-            <th class="text-left font-weight-bold">Pastor ID</th>
+            <th class="text-left font-weight-bold">Pastor</th>
             <th class="text-left font-weight-bold">Location</th>
             <th class="text-left font-weight-bold">Marriage Date</th>
             <th class="text-left font-weight-bold">Status</th>
@@ -235,7 +235,13 @@
             <td>{{ getGroomDisplayName(marriage) }}</td>
             <td>{{ getBrideDisplayName(marriage) }}</td>
             <td>{{ formatGuardians(marriage.guardians) }}</td>
-            <td>{{ marriage.pastor_id }}</td>
+            <td>
+              <div v-if="marriage.pastor_name_joined" class="text-body-2 font-weight-medium">
+                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
+                {{ marriage.pastor_name_joined }}
+              </div>
+              <div v-else class="text-caption text-grey">{{ marriage.pastor_id || 'Unassigned' }}</div>
+            </td>
             <td>{{ marriage.location }}</td>
             <td>{{ marriage.marriage_date ? formatDateTime(marriage.marriage_date) : 'Not scheduled' }}</td>
             <td>

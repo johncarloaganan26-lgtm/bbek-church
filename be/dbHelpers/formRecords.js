@@ -758,11 +758,15 @@ async function updateServiceDateForScheduleChange(formData) {
     }
 
     const requestedDateFormatted = moment(requestedDate).format('YYYY-MM-DD HH:mm:ss');
+    const requestedTimeOnly = moment(requestedDate).format('HH:mm:ss');
+
+    console.log(`[ScheduleChange] Updating ${serviceType} service ${finalServiceId} to ${requestedDateFormatted}`);
 
     // Update the service date - map date column names to function parameter names
     const updateData = {};
     if (serviceType === 'water-baptism') {
-      updateData.baptism_date = requestedDateFormatted;
+      updateData.baptism_date = moment(requestedDate).format('YYYY-MM-DD');
+      updateData.baptism_time = requestedTimeOnly;
     } else if (serviceType === 'marriage') {
       updateData.marriage_date = requestedDateFormatted;
     } else if (serviceType === 'burial') {
@@ -771,23 +775,31 @@ async function updateServiceDateForScheduleChange(formData) {
       // For child dedication, split date and time
       updateData.preferred_dedication_date = moment(requestedDate).format('YYYY-MM-DD');
       // Only update time if requestedDate contains time information
-      if (moment(requestedDate).format('HH:mm:ss') !== '00:00:00') {
-        updateData.preferred_dedication_time = moment(requestedDate).format('HH:mm:ss');
+      if (requestedTimeOnly !== '00:00:00') {
+        updateData.preferred_dedication_time = requestedTimeOnly;
       }
     }
 
-    const updateResult = await serviceConfig.updateFunction(finalServiceId, updateData);
+    // Call the update function with isAdmin=true where supported to bypass status-based blocks
+    let updateResult;
+    if (serviceType === 'burial' || serviceType === 'child-dedication') {
+      updateResult = await serviceConfig.updateFunction(finalServiceId, updateData, true);
+    } else {
+      updateResult = await serviceConfig.updateFunction(finalServiceId, updateData);
+    }
 
-    if (updateResult.success) {
+    if (updateResult && updateResult.success) {
+      console.log(`[ScheduleChange] Successfully updated ${serviceType} service ${finalServiceId}`);
       return {
         success: true,
         message: `Service date updated successfully for ${serviceType}`,
         serviceId: finalServiceId
       };
     } else {
+      console.warn(`[ScheduleChange] Failed to update ${serviceType} service ${finalServiceId}:`, updateResult?.message);
       return {
         success: false,
-        message: updateResult.message || 'Failed to update service date'
+        message: updateResult?.message || 'Failed to update service date'
       };
     }
   } catch (error) {

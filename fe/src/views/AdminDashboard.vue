@@ -17,7 +17,7 @@
         <div class="text-uppercase text-caption grey--text mb-6">{{ isAdmin ? 'ADMIN PANEL' : 'STAFF PANEL' }}</div>
       </div>
 
-      <v-list nav density="compact" class="pa-0">
+      <v-list nav density="compact" class="pa-0" color="teal">
         <!-- Dashboard -->
         <v-list-item
           prepend-icon="mdi-home"
@@ -224,6 +224,18 @@
       </div>
       <v-spacer></v-spacer>
 
+      <!-- Manage Availability Slots Button -->
+      <v-btn
+        prepend-icon="mdi-calendar-clock"
+        variant="elevated"
+        @click="availabilityManagerVisible = true"
+        class="mr-4 px-4 font-weight-bold"
+        color="teal-darken-1"
+        style="border-radius: 8px; text-transform: none !important;"
+      >
+        Manage Availability Slots
+      </v-btn>
+
       <!-- Notification Icon -->
       <NotificationIcon class="mr-4" />
 
@@ -267,6 +279,9 @@
         <router-view />
       </v-container>
     </v-main>
+
+    <!-- Global Availability Manager -->
+    <AvailabilityManager v-model="availabilityManagerVisible" />
   </div>
 </template>
 
@@ -277,7 +292,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useCmsStore } from '@/stores/cmsStore'
 import { useDisplay } from 'vuetify'
 import NotificationIcon from '@/components/NotificationIcon.vue'
+import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue'
 import axios from '@/api/axios'
+
+const availabilityManagerVisible = ref(false)
 
 const route = useRoute()
 const router = useRouter()
@@ -856,6 +874,24 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Premium Sidebar Active State */
+:deep(.v-list-item--active) {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
+  margin-left: 8px !important;
+  margin-right: 8px !important;
+  border-radius: 5px !important;
+}
+
+:deep(.v-list-item--active .v-list-item__prepend .v-icon) {
+  color: white !important;
+}
+
+:deep(.v-list-item--active .v-list-item-title) {
+  font-weight: 600 !important;
 }
 
 .cursor-pointer {

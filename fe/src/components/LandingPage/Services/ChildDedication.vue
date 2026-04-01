@@ -59,14 +59,14 @@
           <div class="content-grid">
             <!-- Left Column: What is Child Dedication -->
             <div class="left-column">
-              <!-- Available Sunday Dates Section (Only for logged in users) -->
-              <template v-if="userInfo.account && userInfo.account.acc_id">
+              <!-- Available Dates Section -->
+              <div class="availability-section">
                 <h2 class="section-title fade-in" style="animation-delay: 100ms;">
                   Select Available Dates
                 </h2>
                 
                 <v-card 
-                  class="mb-4 fade-in-up sunday-schedule-card" 
+                  class="mb-4 fade-in-up schedule-card" 
                   style="animation-delay: 200ms;" 
                   variant="flat"
                 >
@@ -79,27 +79,27 @@
                     <v-progress-circular indeterminate color="primary" size="24"></v-progress-circular>
                     <p class="mt-2 text-teal-darken-1" style="font-family: 'Georgia', serif;">Loading available dates...</p>
                   </div>
-                  <div v-else-if="availableSundayDates.length === 0" class="text-center py-4">
+                  <div v-else-if="availableDates.length === 0" class="text-center py-4">
                     <v-icon color="grey" size="48">mdi-calendar-remove</v-icon>
                     <p class="mt-2 text-grey-darken-1" style="font-family: 'Georgia', serif;">No available dates at this time</p>
                   </div>
                   <div v-else class="available-dates-list">
                     <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                       <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
-                      Select a Sunday for your child dedication (12:00 PM service)
+                      Select an available date for your child dedication
                     </p>
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
-                        v-for="(sunday, index) in availableSundayDates.slice(0, 4)"
-                        :key="sunday.date"
+                        v-for="(dateSpec, index) in availableDates"
+                        :key="dateSpec.date"
                         variant="flat"
-                        class="mb-2 sunday-panel"
+                        class="mb-2 date-panel"
                       >
                         <v-expansion-panel-title>
                           <div class="d-flex align-center justify-space-between w-100 pr-2">
                             <div>
                               <v-icon color="teal-darken-2" class="mr-2">mdi-calendar</v-icon>
-                              <span class="font-weight-medium text-teal-darken-3">{{ sunday.displayDate }}</span>
+                              <span class="font-weight-medium text-teal-darken-3">{{ dateSpec.displayDate }}</span>
                             </div>
                             <v-chip 
                               size="small" 
@@ -108,38 +108,37 @@
                               class="mr-2"
                               style="color: white !important;"
                             >
-                              {{ sunday.requestCount }} {{ sunday.requestCount === 1 ? 'person' : 'people' }} requested
+                              {{ dateSpec.requestCount }}/{{ dateSpec.timeSlots.reduce((sum, s) => sum + (s.maxCapacity || 0), 0) }} total booked
                             </v-chip>
                           </div>
                         </v-expansion-panel-title>
                         <v-expansion-panel-text>
                           <div class="time-slots-grid">
                             <v-chip
-                              v-for="slot in sunday.timeSlots"
+                              v-for="slot in dateSpec.timeSlots"
                               :key="slot.time"
                               size="small"
                               variant="outlined"
                               color="teal-darken-2"
                               class="ma-1 time-slot-chip"
-                              @click="selectTimeSlot(sunday.date, slot.time)"
+                              @click="selectDedicationTimeSlot(dateSpec.date, slot.time)"
+                              :title="slot.bookedMembers?.length > 0 ? 'Booked by: ' + slot.bookedMembers.join(', ') : 'No bookings yet'"
                             >
-                              {{ slot.displayTime }} ({{ slot.requestCount }} booked)
+                              {{ slot.displayTime }} ({{ slot.requestCount }}/{{ slot.maxCapacity }})
                             </v-chip>
                           </div>
                         </v-expansion-panel-text>
                       </v-expansion-panel>
                     </v-expansion-panels>
-                    <p v-if="availableSundayDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
-                      + {{ availableSundayDates.length - 4 }} more Sundays available
-                    </p>
-                  </div>
+
+                  </div> <!-- available-dates-list -->
                 </v-card-text>
               </v-card>
-              </template>
+            </div> <!-- availability-section -->
 
-              <!-- What is Child Dedication? - ONLY show when NOT logged in -->
-              <div v-if="!userInfo.account || !userInfo.account.acc_id">
-                <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
+            <!-- What is Child Dedication? -->
+            <div class="mt-8">
+              <h2 class="section-title fade-in" style="animation-delay: 200ms; font-family: 'Georgia', serif; font-style: italic;">
                 {{ childDedicationData.sectionTitle }}
               </h2>
               
@@ -221,7 +220,7 @@
                       />
                     </el-form-item>
 
-                    <!-- Preferred Service Date & Time (Sunday only) -->
+                    <!-- Preferred Service Date & Time -->
                     <el-form-item label="Preferred Service Date & Time">
                       <el-date-picker
                         v-model="inlineFormData.preferred_dedication_date"
@@ -231,10 +230,10 @@
                         value-format="YYYY-MM-DD HH:mm:ss"
                         size="large"
                         style="width: 100%"
-                        :disabled-date="disabledSundayDates"
+                        :disabled-date="disabledDates"
                       />
                       <div class="form-hint" style="font-size: 0.85rem; color: #666; margin-top: 4px;">
-                        Please select a Sunday for the dedication ceremony.
+                        Please select an available date for the dedication ceremony.
                       </div>
                     </el-form-item>
 
@@ -653,40 +652,47 @@ import { useCms } from '@/composables/useCms'
 const childDedicationStore = useChildDedicationStore()
 const showLoginDialog = ref(false)
 
-// Available Sunday dates state
-const availableSundayDates = ref([])
+// Available Dates state
+const availableDates = ref([])
 const loadingAvailableDates = ref(false)
 
-// Fetch available Sunday dates for logged-in members
-const fetchAvailableSundayDates = async () => {
-  // Only fetch if user is logged in
-  if (!userInfo.value.account || !userInfo.value.account.acc_id) {
-    return
-  }
-  
-  loadingAvailableDates.value = true
+// Fetch available dates for logged-in members
+const fetchAvailableDates = async () => {
+  loadingAvailableDates.value = true;
   try {
-    const accessToken = localStorage.getItem('accessToken')
-    const response = await axios.get('/church-records/child-dedications/getAvailableSundayDates', {
-      params: { weeksAhead: 8 },
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
+    const response = await axios.get('/services/child-dedications/available-slots', {
+      params: { days: 60 } // Looking ahead 2 months for dedication
     })
     
     if (response.data.success) {
-      const rawDates = response.data.data.availableDates || []
+      const rawDates = response.data.data || []
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
-      availableSundayDates.value = rawDates.filter(sunday => {
-        const d = new Date(sunday.date)
-        d.setHours(0, 0, 0, 0)
-        return d > today
-      })
+      availableDates.value = rawDates
+        .filter(group => {
+          const d = new Date(group.date)
+          d.setHours(0, 0, 0, 0)
+          return d > today
+        })
+        .map(group => ({
+          ...group,
+          displayDate: new Date(group.date).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          requestCount: group.timeSlots.reduce((sum, slot) => sum + (slot.bookedCount || 0), 0),
+          timeSlots: group.timeSlots.map(slot => ({
+            ...slot,
+            displayTime: slot.display || slot.time,
+            requestCount: slot.bookedCount || 0,
+            bookedMembers: slot.bookedMembers || []
+          }))
+        }))
     }
   } catch (error) {
-    console.error('Error fetching available Sunday dates:', error)
+    console.error('Error fetching available dates:', error)
   } finally {
     loadingAvailableDates.value = false
   }
@@ -791,7 +797,7 @@ const inlineFormRules = {
   requester_relationship: [
     {
       validator: (rule, value, callback) => {
-        if (!value || !value.trim()) {
+        if (!value || !String(value).trim()) {
           callback(new Error('Relationship to the child is required'))
           return
         }
@@ -925,14 +931,12 @@ const inlineRequesterDisplayName = computed(() => {
     }
   }
 
-  // Disable dates that are not Sundays (0 = Sunday in JavaScript)
-  const disabledSundayDates = (date) => {
+  // Available dates analyzer - allows any future date
+  const disabledDates = (date) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    // Only allow future Sundays (day 0)
-    const isPastOrToday = date <= today
-    const isNotSunday = date.getDay() !== 0
-    return isPastOrToday || isNotSunday
+    // Only allow future dates
+    return date <= today
   }
 
   // Handle inline form submission
@@ -1051,8 +1055,8 @@ const inlineRequesterDisplayName = computed(() => {
       if (success) {
         showSuccessDialog('Success!', 'Child dedication request submitted successfully. Our pastoral team will contact you soon.')
         resetInlineForm()
-        // Refresh available Sunday dates to show the newly booked date as possibly now having more requests
-        await fetchAvailableSundayDates()
+        // Refresh available dates to show the newly booked date as possibly now having more requests
+        await fetchAvailableDates()
       } else {
         ElMessage.error(error || 'Failed to submit child dedication request.')
       }
@@ -1097,9 +1101,9 @@ const inlineRequesterDisplayName = computed(() => {
         inlineFormData.requested_by = userInfo.value.member.member_id
       }
       
-      // Fetch available Sunday dates for logged-in members
+      // Fetch available dates for logged-in members
       if (userInfo.value?.account?.acc_id) {
-        await fetchAvailableSundayDates()
+        await fetchAvailableDates()
       }
     } catch (error) {
       console.error('Error loading user info:', error)
@@ -1126,7 +1130,7 @@ const inlineRequesterDisplayName = computed(() => {
   }
 
   // Select time slot from available dates and populate form
-  const selectTimeSlot = (date, time) => {
+  const selectDedicationTimeSlot = (date, time) => {
     // Create datetime string in format YYYY-MM-DD HH:mm:ss
     const dateTime = `${date} ${time}:00`
     inlineFormData.preferred_dedication_date = dateTime
@@ -1550,35 +1554,35 @@ const inlineRequesterDisplayName = computed(() => {
     flex-shrink: 0;
   }
 
-  /* Sunday Schedule Card - System Branding */
-  .sunday-schedule-card {
+  /* Schedule Card - System Branding */
+  .schedule-card {
     border: 2px solid #0d9488;
     border-top: 4px solid #0d9488;
     background: #ffffff;
   }
 
-  .sunday-schedule-card .v-card-title {
+  .schedule-card .v-card-title {
     color: #0d9488;
     border-bottom: 2px solid #0d9488;
     padding-bottom: 12px;
   }
 
-  .sunday-panel {
+  .date-panel {
     background: #f0fdfa !important;
     margin-bottom: 8px !important;
     border: 2px solid #0d9488 !important;
     box-shadow: none !important;
   }
 
-  .sunday-panel::before {
+  .date-panel::before {
     display: none !important;
   }
 
-  .sunday-panel .v-expansion-panel-title {
+  .date-panel .v-expansion-panel-title {
     background: transparent !important;
   }
 
-  .sunday-panel:hover {
+  .date-panel:hover {
     background: #ccfbf1 !important;
   }
 

@@ -1,16 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const moment = require('moment-timezone');
 const {
     getAllBibleStudyRequests,
     updateBibleStudyRequest,
-    createBibleStudyRequest
+    createBibleStudyRequest,
+    exportBibleStudyRequestsToExcel
 } = require('../../dbHelpers/services/biblestudyRecords');
 const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const { sendBibleStudyDetails, sendWaterBaptismInvitation, sendSalvationRejectionWithReason } = require('../../dbHelpers/emailHelper');
 const { query } = require('../../database/db');
-const { validateSelectedSlot, generateCandidateSlotsForDate } = require('../../utils/scheduling');
-const moment = require('moment-timezone');
+const { validateSelectedSlot, generateCandidateSlotsForDate, BIBLE_STUDY_CAPACITY } = require('../../utils/scheduling');
 
 // PUBLIC: Submit Bible Study interest (from form link)
 router.post('/submit', async (req, res) => {
@@ -187,14 +188,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 return res.status(400).json({ success: false, message: slotValidation.message });
             }
 
-            // Prevent double-booking on schedule changes.
+            // Support multiple bookings per slot based on capacity.
             const formattedSlot = slotValidation.slot.format('YYYY-MM-DD HH:mm:ss');
-            const [conflicts] = await query(
-                "SELECT request_id FROM tbl_biblestudy_requests WHERE request_id != ? AND status IN ('Pending','Scheduled') AND scheduled_date = ? LIMIT 1",
+            const [rows] = await query(
+                "SELECT COUNT(*) as bookedCount FROM tbl_biblestudy_requests WHERE request_id != ? AND status IN ('Pending','Scheduled') AND scheduled_date = ?",
                 [id, formattedSlot]
             );
-            if (conflicts.length > 0) {
-                return res.status(400).json({ success: false, message: 'Selected time slot is already booked. Please choose another slot.' });
+            if (rows[0].bookedCount >= BIBLE_STUDY_CAPACITY) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Selected time slot has reached its maximum capacity of ${BIBLE_STUDY_CAPACITY} parties. Please choose another slot.` 
+                });
             }
 
             // Normalize to consistent formatting for DB.
@@ -366,19 +370,25 @@ router.post('/reject/:id', authenticateToken, async (req, res) => {
             if (!generated.success) continue;
 
             const [booked] = await query(
-                `SELECT DATE_FORMAT(scheduled_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime 
+                `SELECT scheduled_date, COUNT(*) as count 
                  FROM tbl_biblestudy_requests 
-                 WHERE status IN ('Pending', 'Scheduled') AND DATE(scheduled_date) = ?`,
+                 WHERE status IN ('Pending', 'Scheduled') AND DATE(scheduled_date) = ?
+                 GROUP BY scheduled_date`,
                 [date]
             );
-            const bookedSet = new Set(booked.map(r => r.slot_datetime));
+            const bookedCounts = booked.reduce((acc, r) => {
+                const dt = moment(r.scheduled_date).format('YYYY-MM-DD HH:mm:ss');
+                acc[dt] = r.count;
+                return acc;
+            }, {});
             
             // EXCLUDE the rejected slot so they don't pick it again
             const rejectedSlotStr = moment(request.scheduled_date).format('YYYY-MM-DD HH:mm:ss');
             const available = generated.data.filter(slot => {
-                const isBooked = bookedSet.has(slot.datetime);
+                const count = bookedCounts[slot.datetime] || 0;
+                const isFull = count >= BIBLE_STUDY_CAPACITY;
                 const isRejectedSameSlot = slot.datetime === rejectedSlotStr;
-                return !isBooked && !isRejectedSameSlot;
+                return !isFull && !isRejectedSameSlot;
             });
 
             if (available.length > 0) {
@@ -587,6 +597,148 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
         });
     } catch (error) {
         console.error('Bulk archive error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ADMIN: Export Bible Study Requests to Excel
+router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const format = req.query.format || 'xlsx';
+        const buffer = await exportBibleStudyRequestsToExcel(req.query);
+        const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+        const filename = `biblestudy_export_${timestamp}.${format}`;
+        
+        const contentType = format === 'csv' 
+            ? 'text/csv' 
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const format = req.body.format || 'xlsx';
+        const buffer = await exportBibleStudyRequestsToExcel(req.body);
+        const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+        const filename = `biblestudy_export_${timestamp}.${format}`;
+        
+        const contentType = format === 'csv' 
+            ? 'text/csv' 
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ADMIN: Bulk Update Bible Study requests
+router.post('/bulk-update', authenticateToken, async (req, res) => {
+    try {
+        const { requestIds, status, pastor_id, location, scheduled_date } = req.body;
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'No requests selected' });
+        }
+
+        const { updateBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+        let updatedCount = 0;
+        let failedCount = 0;
+
+        for (const id of requestIds) {
+            try {
+                // If scheduled_date is provided, we use it directly or handle it
+                await updateBibleStudyRequest(id, { status, pastor_id, location, scheduled_date });
+                updatedCount++;
+            } catch (err) {
+                console.error(`Failed to update BS ${id}:`, err.message);
+                failedCount++;
+            }
+        }
+
+        // Audit Log
+        await auditTrailRecords.createAuditLog({
+            action_type: 'BIBLESTUDY_BULK_UPDATED',
+            module: 'Bible Study',
+            description: JSON.stringify({ count: updatedCount, failed: failedCount, ...req.body }),
+            user_id: req.user?.acc_id,
+            user_name: req.user?.firstname,
+            user_position: req.user?.position
+        });
+
+        res.json({ success: true, message: `Updated ${updatedCount} requests. ${failedCount} failed.` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ADMIN: Bulk Promote Bible Study (to Baptism)
+router.post('/bulk-promote', authenticateToken, async (req, res) => {
+    try {
+        const { requestIds, isDecided = false, overrides = {} } = req.body;
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'No requests selected' });
+        }
+
+        const { promoteBibleStudyToBaptism } = require('../../dbHelpers/services/biblestudyRecords');
+        const { sendWaterBaptismInvitation } = require('../../dbHelpers/services/waterBaptismRecords');
+        
+        let processedCount = 0;
+        let failedCount = 0;
+
+        for (const id of requestIds) {
+            try {
+                const [rows] = await query('SELECT status, firstname, lastname, email FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+                if (rows.length === 0) {
+                    failedCount++;
+                    continue;
+                }
+
+                const candidate = rows[0];
+                if (candidate.status !== 'Completed' && candidate.status !== 'Promoted') {
+                    failedCount++;
+                    continue;
+                }
+
+                if (isDecided) {
+                    // READY: Create record directly
+                    await promoteBibleStudyToBaptism(id, true, overrides);
+                } else {
+                    // HESITANT: Just send invitation link
+                    await sendWaterBaptismInvitation({
+                        request_id: id,
+                        email: candidate.email,
+                        firstname: candidate.firstname,
+                        lastname: candidate.lastname,
+                        isDecided: false
+                    });
+                }
+                processedCount++;
+            } catch (err) {
+                console.error(`Failed to process BS promote ${id}:`, err.message);
+                failedCount++;
+            }
+        }
+
+        res.json({ 
+            success: true, 
+            message: isDecided 
+                ? `Successfully promoted ${processedCount} candidates to Water Baptism.` 
+                : `Successfully sent invitation links to ${processedCount} candidates.`,
+            failedCount
+        });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });

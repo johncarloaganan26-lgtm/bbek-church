@@ -71,7 +71,7 @@ document.head.appendChild(styleSheet)
 
 export default {
   install(app) {
-    app.use(ElementPlus)
+    app.use(ElementPlus, { zIndex: 4000 })
     // Register all icons
     for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
       app.component(key, component)

@@ -548,27 +548,36 @@ async function getAllWaterBaptisms(options = {}) {
       m.guardian_relationship as member_guardian_relationship,
       -- For members: use member table data
       -- For non-members: use waterbaptism table's own fields
-      COALESCE(m.firstname, wb.firstname) as firstname,
-      COALESCE(m.lastname, wb.lastname) as lastname,
-      COALESCE(m.middle_name, wb.middle_name) as middle_name,
-      COALESCE(m.birthdate, wb.birthdate) as birthdate,
-      COALESCE(m.age, wb.age) as age,
-      COALESCE(m.gender, wb.gender) as gender,
-      COALESCE(m.address, wb.address) as address,
-      COALESCE(m.email, wb.email) as email,
-      COALESCE(m.phone_number, wb.phone_number) as phone_number,
-      COALESCE(m.civil_status, wb.civil_status) as civil_status,
-      COALESCE(m.guardian_name, wb.guardian_name) as guardian_name,
-      COALESCE(m.guardian_contact, wb.guardian_contact) as guardian_contact,
-      COALESCE(m.guardian_relationship, wb.guardian_relationship) as guardian_relationship,
+      COALESCE(m.firstname, wb.firstname, '') as firstname,
+      COALESCE(m.lastname, wb.lastname, '') as lastname,
+      COALESCE(m.middle_name, wb.middle_name, '') as middle_name,
+      COALESCE(m.birthdate, wb.birthdate, '') as birthdate,
+      COALESCE(m.age, wb.age, '') as age,
+      COALESCE(m.gender, wb.gender, '') as gender,
+      COALESCE(m.address, wb.address, '') as address,
+      COALESCE(m.email, wb.email, '') as email,
+      COALESCE(m.phone_number, wb.phone_number, '') as phone_number,
+      COALESCE(m.civil_status, wb.civil_status, '') as civil_status,
+      COALESCE(m.guardian_name, wb.guardian_name, '') as guardian_name,
+      COALESCE(m.guardian_contact, wb.guardian_contact, '') as guardian_contact,
+      COALESCE(m.guardian_relationship, wb.guardian_relationship, '') as guardian_relationship,
       CONCAT(
-        COALESCE(m.firstname, wb.firstname),
-        IF(COALESCE(m.middle_name, wb.middle_name) IS NOT NULL AND COALESCE(m.middle_name, wb.middle_name) != '', CONCAT(' ', COALESCE(m.middle_name, wb.middle_name)), ''),
+        COALESCE(m.firstname, wb.firstname, ''),
+        IF(COALESCE(m.middle_name, wb.middle_name, '') != '', CONCAT(' ', COALESCE(m.middle_name, wb.middle_name, '')), ''),
         ' ',
-        COALESCE(m.lastname, wb.lastname)
-      ) as fullname
+        COALESCE(m.lastname, wb.lastname, '')
+      ) as fullname,
+      COALESCE(
+        CONCAT(pm_acc.firstname, ' ', pm_acc.lastname),
+        CONCAT(pm_direct.firstname, ' ', pm_direct.lastname)
+      ) as pastor_name_joined,
+      COALESCE(pm_acc.position, pm_direct.position) as pastor_position
     FROM tbl_waterbaptism wb
-    LEFT JOIN tbl_members m ON wb.member_id = m.member_id`;
+    LEFT JOIN tbl_members m ON wb.member_id = m.member_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN tbl_accounts pa ON wb.pastor_name = pa.acc_id
+    LEFT JOIN tbl_members pm_acc ON pa.email = pm_acc.email COLLATE utf8mb4_unicode_ci -- Join to get pastor name from account email
+    LEFT JOIN tbl_members pm_direct ON wb.pastor_name = pm_direct.member_id COLLATE utf8mb4_unicode_ci -- Join directly by member_id
+    `;
     const params = [];
 
     // Build WHERE conditions array
@@ -594,7 +603,7 @@ async function getAllWaterBaptisms(options = {}) {
 
     // Add status filter
     if (status && status !== 'All Status') {
-      whereConditions.push('status = ?');
+      whereConditions.push('wb.status = ?');
       countParams.push(status);
       params.push(status);
       hasWhere = true;
@@ -1526,7 +1535,7 @@ async function getSpecificWaterBaptismDataByMemberIdIfBaptized(memberId) {
 
 
 // New comprehensive bulk complete function with member/account creation
-async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
+async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate = null, completionTime = '13:00') {
   try {
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
       return {
@@ -1552,9 +1561,9 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
         const baptism = baptismResult.data;
         const currentStatus = (baptism.status || '').toLowerCase();
 
-        // Allow 'pending' or 'approved' records for bulk completion
-        if (currentStatus !== 'approved' && currentStatus !== 'pending') {
-          console.log(`Skipping ${baptismId}: Status is '${currentStatus}' (Only 'pending' or 'approved' are allowed)`);
+        // Allow 'pending' or 'approved' or 'scheduled' records for bulk completion
+        if (currentStatus !== 'approved' && currentStatus !== 'pending' && currentStatus !== 'scheduled') {
+          console.log(`Skipping ${baptismId}: Status is '${currentStatus}' (Only 'pending', 'approved', or 'scheduled' are allowed)`);
           skipped++;
           continue;
         }
@@ -1563,8 +1572,16 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds) {
 
         // Mark as completed in DB first if not already
         if (baptism.status !== 'completed') {
-          const completionTimestamp = moment().format('YYYY-MM-DD HH:mm');
-          await query("UPDATE tbl_waterbaptism SET status = 'completed', baptism_date = ? WHERE baptism_id = ?", [completionTimestamp, baptismId]);
+          // Use provided completion date if available, otherwise fallback to existing or current date
+          let finalCompletionDate;
+          if (completionDate) {
+             finalCompletionDate = completionTime ? `${completionDate} ${completionTime}` : completionDate;
+          } else {
+             finalCompletionDate = baptism.baptism_date || moment().format('YYYY-MM-DD HH:mm');
+          }
+
+          console.log(`📅 Marking baptism ${baptismId} as completed with date ${finalCompletionDate}`);
+          await query("UPDATE tbl_waterbaptism SET status = 'completed', baptism_date = ? WHERE baptism_id = ?", [finalCompletionDate, baptismId]);
         }
 
         // Use the common processing function to ensure member/account/email
@@ -1819,7 +1836,7 @@ async function processBaptismCompletion(baptismId) {
   }
 }
 
-async function bulkCompleteWaterBaptisms(baptismIds) {
+async function bulkCompleteWaterBaptisms(baptismIds, completionDate = null, completionTime = '13:00') {
   try {
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
       return {
@@ -1849,18 +1866,24 @@ async function bulkCompleteWaterBaptisms(baptismIds) {
         }
 
         const status = (baptism.status || '').toLowerCase();
-        if (status !== 'approved' && status !== 'scheduled') {
+        if (status !== 'approved' && status !== 'scheduled' && status !== 'pending') {
           skipped++;
           continue;
         }
 
-        // Get the current timestamp - this becomes the baptism date when marking as completed
-        const completionTimestamp = moment().format('YYYY-MM-DD HH:mm');
-        console.log(`📅 Setting baptism_date to completion timestamp: ${completionTimestamp}`);
+        // Determine the baptism date
+        let finalCompletionDate;
+        if (completionDate) {
+           finalCompletionDate = completionTime ? `${completionDate} ${completionTime}` : completionDate;
+        } else {
+           finalCompletionDate = baptism.baptism_date || moment().format('YYYY-MM-DD HH:mm');
+        }
+        
+        console.log(`📅 Setting baptism_date to: ${finalCompletionDate}`);
 
-        // Update status to completed AND set baptism_date to current timestamp
+        // Update status to completed AND set baptism_date
         const updateSql = `UPDATE tbl_waterbaptism SET status = 'completed', baptism_date = ? WHERE baptism_id = ?`;
-        await query(updateSql, [completionTimestamp, baptismId]);
+        await query(updateSql, [finalCompletionDate, baptismId]);
 
         try {
           const email = baptism.email || baptism.member_email;

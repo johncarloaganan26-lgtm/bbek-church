@@ -65,6 +65,17 @@
               @update:model-value="handleFilterChange('gender', $event)"
             ></v-select>
           </v-col>
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="memberStore.filters.position"
+              :items="positionOptions"
+              label="Position"
+              variant="outlined"
+              density="compact"
+              hide-details
+              @update:model-value="handleFilterChange('position', $event)"
+            ></v-select>
+          </v-col>
           <v-col cols="12" md="3">
             <el-date-picker
               v-model="localDateRange"
@@ -276,6 +287,18 @@ const localSearchQuery = ref('')
 // Filter options
 const ageRangeOptions = ['All Ages', '0-18', '19-30', '31-50', '51+']
 const genderOptions = ['All Genders', 'Male', 'Female']
+const positionOptions = [
+  'All Positions',
+  'Pastor',
+  'Officer',
+  'Member',
+  'None',
+  'Secretary',
+  'Treasurer',
+  'Coordinator',
+  'President',
+  'Vice President'
+]
 const sortByOptions = [
   'Name (A-Z)',
   'Name (Z-A)',
@@ -364,6 +387,10 @@ watch(() => memberStore.filters.gender, () => {
 })
 
 watch(() => memberStore.filters.sortBy, () => {
+  selectedMembers.value = []
+})
+
+watch(() => memberStore.filters.position, () => {
   selectedMembers.value = []
 })
 

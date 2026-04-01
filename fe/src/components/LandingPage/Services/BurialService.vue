@@ -88,7 +88,7 @@
                     </p>
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
-                        v-for="(dateGroup, index) in availableBurialDates.slice(0, 4)" 
+                        v-for="(dateGroup, index) in availableBurialDates" 
                         :key="dateGroup.date"
                         variant="flat"
                         class="mb-2 sunday-panel"
@@ -117,7 +117,7 @@
                                 variant="flat"
                                 style="color: white !important;"
                               >
-                                {{ dateGroup.bookedByCount }}/1 booked
+                                {{ dateGroup.bookedByCount }}/{{ dateGroup.timeSlots[0]?.maxCapacity || 1 }} booked
                               </v-chip>
                             </div>
                           </div>
@@ -140,12 +140,9 @@
                           <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
                             No time slots available for this date.
                           </p>
-                        </v-expansion-panel-text>
+                 </v-expansion-panel-text>
                       </v-expansion-panel>
                     </v-expansion-panels>
-                    <p v-if="availableBurialDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
-                      + {{ availableBurialDates.length - 4 }} more dates available
-                    </p>
                   </div>
                   <!-- No dates available -->
                   <div v-else class="text-center py-4">
@@ -436,10 +433,10 @@
                       </div>
                     </div>
 
-                    <!-- Reason of Death -->
+                    <!-- Cause of Death -->
                     <div class="form-group">
                       <label for="reason-of-death">
-                        Reason of Death <span class="required-text">Required</span>
+                        Cause of Death <span class="required-text">Required</span>
                       </label>
                       <p class="field-note">Cause of death (if known)</p>
                       <v-text-field
@@ -455,7 +452,7 @@
                       ></v-text-field>
                     </div>
 
-                    <!-- Preferred Service Date & Time (Night Service Default) -->
+                    <!-- Preferred Service Date & Time -->
                     <div class="form-group">
                       <label for="preferred-service-date">
                         Preferred Service Date & Time <span class="required-text">Required</span>
@@ -569,7 +566,7 @@
                       </el-select>
                     </el-form-item>
 
-                    <!-- Preferred Service Date & Time (Night Service Default) -->
+                    <!-- Preferred Service Date & Time -->
                     <el-form-item>
                       <template #label>
                         <span>Preferred Service Date & Time <span class="required-text">Required</span></span>
@@ -642,7 +639,7 @@
 
                     <el-form-item>
                       <template #label>
-                        <span>Reason of Death <span class="required-text">Required</span></span>
+                        <span>Cause of Death <span class="required-text">Required</span></span>
                       </template>
                       <el-input
                         v-model="memberFormData.reason_of_death"
@@ -745,28 +742,29 @@ const autoRefreshIntervalId = ref(null)
 const fetchAvailableBurialDates = async () => {
   loadingAvailableDates.value = true
   try {
-    const token = localStorage.getItem('token')
-    const headers = token ? { Authorization: `Bearer ${token}` } : {}
-    
-    const response = await axios.get('/church-records/burial-services/getAvailableBurialDates', {
-      params: { daysAhead: 30 },
-      headers
+    const response = await axios.get('/services/burial-services/available-slots', {
+      params: { days: 30 }
     })
     
     if (response.data && response.data.success) {
-      // API returns { success: true, data: { availableDates: [...] } }
-      const responseData = response.data.data || response.data
-      const rawDates = responseData.availableDates || responseData.dates || response.data.dates || []
-      
-      // Filter for future dates only
+      const rawDates = response.data.data || []
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       
-      availableBurialDates.value = rawDates.filter(dateGroup => {
-        const slotDate = new Date(dateGroup.date)
-        slotDate.setHours(0, 0, 0, 0)
-        return slotDate > today
-      })
+      availableBurialDates.value = rawDates
+        .filter(group => {
+          const slotDate = new Date(group.date)
+          slotDate.setHours(0, 0, 0, 0)
+          return slotDate > today
+        })
+        .map(group => ({
+          ...group,
+          bookedByCount: group.timeSlots.reduce((sum, slot) => sum + (slot.bookedCount || 0), 0),
+          timeSlots: group.timeSlots.map(slot => ({
+            ...slot,
+            displayTime: slot.display || slot.time
+          }))
+        }))
     } else {
       availableBurialDates.value = []
     }
@@ -819,20 +817,20 @@ const memberFormData = reactive({
   preferred_service_date: null
 })
 
-// Preferred service date/time (default to tomorrow 6:00 PM)
+// Default service time (tomorrow at 10:00 AM instead of hardcoded 8 PM)
 const getDefaultNightTimeDate = () => {
   const date = new Date()
   date.setDate(date.getDate() + 1) // Tomorrow
-  date.setHours(20, 0, 0, 0) // 8:00 PM
+  date.setHours(10, 0, 0, 0) // Default to 10:00 AM
   return date
 }
 
 const preferredServiceDate = ref(getDefaultNightTimeDate())
 const defaultNightTimeDate = computed(() => getDefaultNightTimeDate())
 
-// Disable hours - only allow night hours (6 PM - 10 PM)
+// Allow all hours now
 const disabledNightHours = () => {
-  return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23]
+  return []
 }
 
 // Relationship options for dropdown

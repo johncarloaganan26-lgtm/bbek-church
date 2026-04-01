@@ -11,7 +11,8 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
     const pageSize = ref(10);
     const filters = ref({
         status: 'All',
-        search: ''
+        search: '',
+        sortBy: 'date_created_desc'
     });
 
     const pastors = ref([]);
@@ -34,7 +35,9 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
                 page: currentPage.value,
                 pageSize: pageSize.value,
                 search: filters.value.search,
-                status: filters.value.status === 'All' ? '' : filters.value.status
+                status: filters.value.status === 'All' ? '' : filters.value.status,
+                startDate: filters.value.startDate,
+                endDate: filters.value.endDate
             };
 
             const response = await axios.get('/services/biblestudy-requests', { params });
@@ -176,6 +179,71 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         }
     };
 
+    const bulkUpdateRequest = async (data) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/biblestudy-requests/bulk-update', data);
+            if (response.data.success) {
+                ElMessage.success(response.data.message || 'Bulk update completed successfully');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error bulk updating Bible Study:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to bulk update requests');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const bulkPromoteToBaptism = async (requestIds, isDecided = false, overrides = {}) => {
+        loading.value = true;
+        try {
+            const response = await axios.post('/services/biblestudy-requests/bulk-promote', { requestIds, isDecided, overrides });
+            if (response.data.success) {
+                ElMessage.success(response.data.message || 'Bulk promotion completed successfully');
+                await fetchRequests();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error bulk promoting Bible Study:', error);
+            ElMessage.error(error.response?.data?.message || 'Failed to bulk promote requests');
+            return false;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const exportToExcel = async (params = {}) => {
+        try {
+            const format = params.format || 'xlsx';
+            const response = await axios.get('/services/biblestudy-requests/exportExcel', {
+                params,
+                responseType: 'blob'
+            });
+            
+            const contentType = format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            const blob = new Blob([response.data], { type: contentType });
+            const url = window.URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `biblestudy_records_${new Date().toISOString().split('T')[0]}.${format}`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            return true;
+        } catch (error) {
+            console.error('Export error:', error);
+            ElMessage.error('Failed to export records');
+            return false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -189,9 +257,12 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         updateRequest,
         bulkCompleteRequests,
         bulkArchiveRequests,
+        bulkUpdateRequest,
+        bulkPromoteToBaptism,
         promoteToBaptism,
         inviteToBaptism,
         rejectRequest,
+        exportToExcel,
         setPage,
         setFilters
     };

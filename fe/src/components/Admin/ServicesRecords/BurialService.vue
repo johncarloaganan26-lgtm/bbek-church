@@ -301,7 +301,16 @@
             <td>{{ formatDateTime(service.date_death) }}</td>
             <td>{{ service.relationship }}</td>
             <td>{{ service.location }}</td>
-            <td>{{ service.pastor_name }}</td>
+            <td>
+              <div v-if="service.pastor_name_joined" class="text-body-2 font-weight-medium">
+                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
+                {{ service.pastor_name_joined }}
+                <div v-if="service.pastor_position" class="text-caption text-grey font-italic ml-6">
+                  {{ service.pastor_position }}
+                </div>
+              </div>
+              <div v-else class="text-caption text-grey">{{ service.pastor_name || 'Unassigned' }}</div>
+            </td>
             <td>
               <div v-if="service.status === 'completed'" class="text-success font-weight-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">DATE GOT COMPLETED:</div>
               <div :class="{'font-weight-medium': service.status === 'completed'}">
@@ -367,6 +376,12 @@
       @update:model-value="burialServiceDialog = $event"
       @submit="handleSubmit"
     />
+
+    <!-- Availability Manager Dialog -->
+    <AvailabilityManager 
+      v-model="availabilityManagerVisible" 
+      initial-service="burial" 
+    />
   </div>
 </template>
 
@@ -377,6 +392,7 @@ import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
+import AvailabilityManager from '@/components/admin/ServicesRecords/AvailabilityManager.vue'
 
 const burialServiceStore = useBurialServiceStore()
 const settingsStore = useSystemSettingsStore()
@@ -384,6 +400,7 @@ const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedServices = ref([])
+const availabilityManagerVisible = ref(false)
 
 // Computed properties from store
 const services = computed(() => burialServiceStore.services)

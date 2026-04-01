@@ -621,7 +621,9 @@ watch(
               address: ''
             }
           ]
-      formData.pastor_id = newData.pastor_id ?? null
+      // Coerce pastor_id to number if numeric, to match el-select option.id type
+      const pastorVal1 = newData.pastor_id
+      formData.pastor_id = pastorVal1 && !isNaN(pastorVal1) ? Number(pastorVal1) : (pastorVal1 ?? null)
       formData.location = newData.location || ''
       formData.marriage_date = newData.marriage_date || ''
       formData.status = newData.status || 'pending'
@@ -721,7 +723,9 @@ watch(
                 address: ''
               }
             ]
-        formData.pastor_id = data.pastor_id ?? null
+        // Coerce pastor_id to number if numeric, to match el-select option.id type
+        const pastorVal2 = data.pastor_id
+        formData.pastor_id = pastorVal2 && !isNaN(pastorVal2) ? Number(pastorVal2) : (pastorVal2 ?? null)
         formData.location = data.location || ''
         formData.marriage_date = data.marriage_date || ''
         formData.status = data.status || 'pending'

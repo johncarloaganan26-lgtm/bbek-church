@@ -36,7 +36,7 @@
                 <v-card-text>
                   <p class="text-body-2 text-teal-darken-2 mb-3" style="font-family: 'Georgia', serif; font-style: italic;">
                     <v-icon size="16" color="teal-darken-2">mdi-information</v-icon>
-                    Available Daily (Mon-Sat). Wednesday/Saturday evenings are not available. Sunday: no schedule.
+                    The availability of slots is subject to the assigned pastor's schedule. Please select an available slot below.
                   </p>
 
                   <div v-if="slotsLoading" class="text-center pa-8">
@@ -47,7 +47,7 @@
                   <div v-else-if="availableScheduleDates && availableScheduleDates.length > 0">
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
-                        v-for="dateGroup in availableScheduleDates.slice(0, 4)"
+                        v-for="dateGroup in availableScheduleDates"
                         :key="dateGroup.date"
                         variant="flat"
                         class="mb-2"
@@ -69,12 +69,15 @@
                               v-for="slot in dateGroup.timeSlots"
                               :key="slot.datetime"
                               size="small"
-                              :variant="formData.scheduled_date === slot.datetime ? 'flat' : 'outlined'"
-                              :color="formData.scheduled_date === slot.datetime ? 'teal' : 'teal-darken-2'"
+                              :variant="formData.scheduled_date === slot.datetime ? 'flat' : (slot.bookedCount > 0 ? 'tonal' : 'outlined')"
+                              :color="formData.scheduled_date === slot.datetime ? 'teal' : (slot.bookedCount > 0 ? 'teal-darken-1' : 'teal-darken-2')"
                               class="ma-1 time-slot-chip"
                               @click="selectSlot(slot.datetime)"
                             >
                               {{ formatTime(slot.time) }}
+                              <span class="ml-1 text-caption font-weight-bold" style="font-size: 0.7rem !important; opacity: 0.8 !important;">
+                                ({{ slot.bookedCount }}/{{ slot.maxCapacity || 1 }})
+                              </span>
                             </v-chip>
                           </div>
                           <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
@@ -84,14 +87,15 @@
                       </v-expansion-panel>
                     </v-expansion-panels>
 
-                    <p v-if="availableScheduleDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
-                      + {{ availableScheduleDates.length - 4 }} more dates available
-                    </p>
+
                   </div>
 
-                  <div v-else class="text-center pa-8">
-                    <v-icon size="48" color="teal-lighten-3">mdi-calendar-blank</v-icon>
-                    <p class="mt-2 grey--text">No slots currently available. Please check back later.</p>
+                  <div v-else class="text-center pa-10 bg-white rounded-xl border-dashed border-2 mt-4" style="border-color: #fca5a5 !important; background-color: #fef2f2 !important;">
+                    <v-icon size="64" color="red-lighten-3" class="mb-4">mdi-calendar-remove</v-icon>
+                    <h3 class="text-h6 font-weight-bold text-red-darken-3 mb-1" style="font-family: 'Georgia', serif;">No Slots Available</h3>
+                    <p class="text-body-2 text-red-darken-2" style="font-family: 'Georgia', serif; font-style: italic;">
+                      We are currently fully booked or no schedules have been set. Please contact the church office or check back soon!
+                    </p>
                   </div>
 
                   <div v-if="formData.scheduled_date" class="mt-4">
@@ -241,7 +245,7 @@ const fetchSlots = async () => {
 
   const result = await discipleshipStore.fetchAvailableSlots({
     service: 'bible_study',
-    days: 14
+    days: 30
   })
 
   if (result.success) {

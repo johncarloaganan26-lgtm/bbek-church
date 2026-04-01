@@ -427,10 +427,18 @@ async function getAllMarriageServices(options = {}) {
         IF(bride.middle_name IS NOT NULL AND bride.middle_name != '', CONCAT(' ', bride.middle_name), ''),
         ' ',
         bride.lastname
-      ) as bride_fullname
+      ) as bride_fullname,
+      COALESCE(
+        CONCAT(pm_acc.firstname, ' ', pm_acc.lastname),
+        CONCAT(pm_direct.firstname, ' ', pm_direct.lastname)
+      ) as pastor_name_joined
     FROM tbl_marriageservice ms
-    LEFT JOIN tbl_members groom ON ms.groom_member_id = groom.member_id
-    LEFT JOIN tbl_members bride ON ms.bride_member_id = bride.member_id`;
+    LEFT JOIN tbl_members groom ON ms.groom_member_id = groom.member_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN tbl_members bride ON ms.bride_member_id = bride.member_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN tbl_accounts pa ON ms.pastor_id = pa.acc_id
+    LEFT JOIN tbl_members pm_acc ON pa.email = pm_acc.email COLLATE utf8mb4_unicode_ci -- Join to get pastor name from account email
+    LEFT JOIN tbl_members pm_direct ON ms.pastor_id = pm_direct.member_id COLLATE utf8mb4_unicode_ci -- Join directly by member_id
+    `;
     const params = [];
 
     // Build WHERE conditions array
@@ -452,7 +460,7 @@ async function getAllMarriageServices(options = {}) {
 
     // Add status filter
     if (status && status !== 'All Status') {
-      whereConditions.push('status = ?');
+      whereConditions.push('ms.status = ?');
       countParams.push(status);
       params.push(status);
       hasWhere = true;

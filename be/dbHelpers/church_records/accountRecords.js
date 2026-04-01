@@ -99,7 +99,7 @@ async function getSpecificMemberByEmailAndPassword(email, password) {
 
     // Password is valid, proceed with authentication
     // Insert access token to the account
-    account.accessToken = jwt.sign({ email: account.email, position: account.position, acc_id: account.acc_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    account.accessToken = jwt.sign({ email: account.email, position: account.position, acc_id: account.acc_id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     if (account.position === 'member') {
       // Find the member by email

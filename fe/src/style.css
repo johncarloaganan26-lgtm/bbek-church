@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+/* Ensure dropdowns are not clipped in containers */
+.el-dialog__body, 
+.el-drawer__body, 
+.v-card-text {
+  overflow: visible !important;
+}
+
 body {
   font-family: "Roboto", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -55,7 +62,6 @@ div.v-alert.v-alert--error .v-alert__icon {
   color: #c62828 !important;
 }
 
-/* Mobile responsive improvements */
 @media (max-width: 640px) {
   body {
     font-size: 14px;
@@ -70,9 +76,52 @@ div.v-alert.v-alert--error .v-alert__icon {
     min-height: 44px;
     min-width: 44px;
   }
-
-  /* Prevent horizontal scroll */
-  * {
-    max-width: 100%;
-  }
 }
+
+/* Global fix for dropdowns and poppers appearing behind dialogs */
+/* This is crucial for mixed-library projects (Vuetify + Element Plus) */
+.el-popper,
+.el-select-dropdown,
+.el-picker-panel,
+.v-overlay-container,
+.v-menu,
+.v-list {
+  z-index: 99999 !important;
+}
+
+/* ---------------------------------------------------------
+   Admin Dashboard - Unified Teal Theme
+   --------------------------------------------------------- */
+
+/* ---------------------------------------------------------
+   Admin Dashboard - Critical Action Highlights
+   --------------------------------------------------------- */
+
+/* KEEP TEAL: Add buttons (typically success/green semantic color) */
+.admin-dashboard .v-btn.bg-success,
+.admin-dashboard .v-btn.text-success,
+.admin-dashboard .v-btn[color="success"],
+.admin-dashboard .v-btn--variant-flat.bg-success,
+.admin-dashboard .v-btn--variant-elevated.bg-success,
+.admin-dashboard .el-button--success {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
+  color: white !important;
+  border: none !important;
+}
+
+/* KEEP TEAL: Active Sidebar Buttons (handled in AdminDashboard.vue, 
+   but ensuring no overrides here) */
+
+/* REVERTED: General buttons will now follow the default Vuetify theme */
+/* (We remove the previous catch-all teal overrides) */
+
+/* Checkboxes to teal */
+.admin-dashboard .v-checkbox .v-selection-control__input .v-icon--checked {
+  color: #14b8a6 !important;
+}
+
+/* Pagination - keeping teal for consistency with active states */
+.admin-dashboard .v-pagination__item--active {
+  background-color: #14b8a6 !important;
+  color: white !important;
+}

@@ -14,10 +14,9 @@
   >
     <div class="dialog-content-wrapper">
       <!-- Left Panel: Available Slots -->
-      <!-- Left Panel: Available Slots -->
       <div v-if="showAvailableSlots" class="available-slots-panel">
         <div class="slots-header">
-          <span>Available Sundays</span>
+          <span>Available Dates</span>
           <el-button 
             link 
             size="small"
@@ -39,11 +38,11 @@
             <el-collapse-item
               v-for="dateGroup in availableSlots"
               :key="dateGroup.date"
-              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} - Booked: ${dateGroup.requestCount || dateGroup.bookedSlots || 0}`"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} - Booked: ${dateGroup.totalBooked}/${dateGroup.totalCapacity}`"
               :name="dateGroup.date"
             >
               <div class="slots-info">
-                <span>Booked: <el-tag type="info">{{ dateGroup.requestCount || dateGroup.bookedSlots || 0 }}</el-tag></span>
+                <span>Booked: <el-tag type="info">{{ dateGroup.totalBooked }}/{{ dateGroup.totalCapacity }}</el-tag></span>
               </div>
               <div class="time-slots-grid">
                 <button
@@ -52,8 +51,9 @@
                   class="slot-button"
                   :class="{ 'selected': isSlotSelected(slot.datetime) }"
                   @click="selectAvailableSlot(dateGroup.date, slot.time, slot.display)"
+                  :title="slot.bookedMembers?.length > 0 ? 'Booked by: ' + slot.bookedMembers.join(', ') : 'No bookings yet'"
                 >
-                  {{ slot.display }}
+                  {{ slot.display }} ({{ slot.bookedCount }}/{{ slot.maxCapacity }})
                 </button>
               </div>
               <div v-if="selectedSlotDisplay" class="selected-display">
@@ -596,12 +596,13 @@
           filterable
           :disabled="loading"
           @change="onPastorChange"
+          teleported
         >
           <el-option
             v-for="option in pastorOptions"
             :key="option.id"
-            :label="option.name"
-            :value="option.name"
+            :label="`${option.name}${option.position ? ' (' + option.position + ')' : ''}`"
+            :value="option.id"
           />
         </el-select>
       </el-form-item>
@@ -629,6 +630,7 @@
           style="width: 100%"
           :disabled="loading"
           @change="handleStatusChange"
+          teleported
         >
           <el-option
             v-for="opt in statusOptions"
@@ -868,7 +870,7 @@ const validateTimeSlot = async (date, time, excludeId = null) => {
   return true
 }
 
-// Date analyzer function - only allows Sundays (child dedication services are on Sundays)
+// Date analyzer function - allows any future date
 const isDateDisabled = (date) => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -880,8 +882,8 @@ const isDateDisabled = (date) => {
     if (date.getTime() === currentValue.getTime()) return false
   }
 
-  // Disable if date is in the past, today, OR not a Sunday
-  return date <= today || date.getDay() !== 0
+  // Disable if date is in the past or today
+  return date <= today
 }
 
 // Get disabled hours for time picker based on selected date
@@ -1120,7 +1122,7 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Only require relationship for new requests, not for updating pending requests
-        if (!isEditMode.value && (!value || !value.trim())) {
+        if (!isEditMode.value && (!value || !String(value).trim())) {
           callback(new Error('Relationship to the child is required'))
           return
         }
@@ -1178,12 +1180,12 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Only required for admin/staff users
-        if (!isMemberUser.value && (!value || !value.trim())) {
+        if (!isMemberUser.value && (!value || !String(value).trim())) {
           callback(new Error('Preferred dedication date is required'))
           return
         }
         // If value is provided, validate it's not in the past
-        if (value && value.trim()) {
+        if (value && String(value).trim()) {
           const preferredDate = new Date(value)
           const today = new Date()
           today.setHours(0, 0, 0, 0)
@@ -1220,12 +1222,12 @@ const rules = {
     {
       validator: async (rule, value, callback) => {
         // Only required for admin/staff users
-        if (!isMemberUser.value && (!value || !value.trim())) {
+        if (!isMemberUser.value && (!value || !String(value).trim())) {
           callback(new Error('Preferred dedication time is required'))
           return
         }
         // If value is provided, validate it's within business hours
-        if (value && value.trim()) {
+        if (value && String(value).trim()) {
           const [hours, minutes] = value.split(':').map(Number)
           const totalMinutes = hours * 60 + minutes
 
@@ -1261,12 +1263,12 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Contact phone is optional
-        if (!value || !value.trim()) {
+        if (!value || !String(value).trim()) {
           callback()
           return
         }
         // Check if exactly 10 digits
-        if (value.length !== 10) {
+        if (String(value).length !== 10) {
           callback(new Error('Contact phone number must be exactly 10 digits (9XXXXXXXXX)'))
           return
         }
@@ -1295,16 +1297,15 @@ const rules = {
           const s = value[i] || {}
           // If any field is filled, require firstname, lastname, phone_number, and address
           if (s.firstname || s.lastname || s.phone_number || s.address) {
-            if (!s.firstname || !s.firstname.trim() || !s.lastname || !s.lastname.trim() || !s.phone_number || !s.phone_number.trim() || !s.address || !s.address.trim()) {
+            if (!s.firstname || !String(s.firstname).trim() || !s.lastname || !String(s.lastname).trim() || !s.phone_number || !String(s.phone_number).trim() || !s.address || !String(s.address).trim()) {
               callback(new Error(`Sponsor ${i + 1}: firstname, lastname, phone number, and address are required if sponsor is added`))
               return
             }
-            // Validate phone number is exactly 11 digits
-            if (s.phone_number && s.phone_number.trim()) {
-              if (s.phone_number.length !== 10) {
-                callback(new Error(`Sponsor ${i + 1}: phone number must be exactly 10 digits (9XXXXXXXXX)`))
-                return
-              }
+            // Validate phone number is exactly 10 digits (as used in other places)
+            const phoneStr = String(s.phone_number).trim()
+            if (phoneStr && phoneStr.length !== 10) {
+              callback(new Error(`Sponsor ${i + 1}: phone number must be exactly 10 digits (9XXXXXXXXX)`))
+              return
             }
           }
         }
@@ -1318,11 +1319,11 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Only require pastor for admin/staff users
-        if (!isMemberUser.value && (!value || !value.trim())) {
+        if (!isMemberUser.value && (!value || !String(value).trim())) {
           callback(new Error('Pastor is required'))
           return
         }
-        if (value && value.length > 255) {
+        if (value && String(value).length > 255) {
           callback(new Error('Pastor name must not exceed 255 characters'))
           return
         }
@@ -1335,11 +1336,11 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Only require location for admin/staff users
-        if (!isMemberUser.value && (!value || !value.trim())) {
+        if (!isMemberUser.value && (!value || !String(value).trim())) {
           callback(new Error('Location is required'))
           return
         }
-        if (value && value.length > 255) {
+        if (value && String(value).length > 255) {
           callback(new Error('Location must not exceed 255 characters'))
           return
         }
@@ -1352,7 +1353,7 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Only require status for admin/staff users
-        if (!isMemberUser.value && (!value || !value.trim())) {
+        if (!isMemberUser.value && (!value || !String(value).trim())) {
           callback(new Error('Status is required'))
           return
         }
@@ -1365,12 +1366,12 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Father phone is optional
-        if (!value || !value.trim()) {
+        if (!value || !String(value).trim()) {
           callback()
           return
         }
         // Check if exactly 10 digits
-        if (value.length !== 10) {
+        if (String(value).length !== 10) {
           callback(new Error("Father's phone number must be exactly 10 digits (9XXXXXXXXX)"))
           return
         }
@@ -1383,31 +1384,13 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         // Mother phone is optional
-        if (!value || !value.trim()) {
+        if (!value || !String(value).trim()) {
           callback()
           return
         }
         // Check if exactly 10 digits
-        if (value.length !== 10) {
+        if (String(value).length !== 10) {
           callback(new Error("Mother's phone number must be exactly 10 digits (9XXXXXXXXX)"))
-          return
-        }
-        callback()
-      },
-      trigger: 'blur'
-    }
-  ],
-  contact_phone_number: [
-    {
-      validator: (rule, value, callback) => {
-        // Contact phone is optional
-        if (!value || !value.trim()) {
-          callback()
-          return
-        }
-        // Check if exactly 10 digits
-        if (value.length !== 10) {
-          callback(new Error('Contact phone number must be exactly 10 digits (9XXXXXXXXX)'))
           return
         }
         callback()
@@ -1461,7 +1444,9 @@ watch(() => props.dedicationData, (newData) => {
           address: s.address || ''
         }))
       : []
-    formData.pastor = newData.pastor || ''
+    // Coerce pastor ID to number if numeric, to match el-select option.id type
+    const pastorVal1 = newData.pastor
+    formData.pastor = pastorVal1 && !isNaN(pastorVal1) ? Number(pastorVal1) : (pastorVal1 || '')
     formData.location = newData.location || ''
     formData.status = newData.status || 'pending'
     formData.rejection_reason = newData.rejection_reason || ''
@@ -1531,7 +1516,9 @@ watch(() => props.modelValue, async (isOpen) => {
             address: s.address || ''
           }))
         : []
-      formData.pastor = data.pastor || ''
+      // Coerce pastor ID to number if numeric, to match el-select option.id type
+      const pastorVal2 = data.pastor
+      formData.pastor = pastorVal2 && !isNaN(pastorVal2) ? Number(pastorVal2) : (pastorVal2 || '')
       formData.location = data.location || ''
       formData.status = data.status || 'pending'
       formData.rejection_reason = data.rejection_reason || ''
@@ -1641,7 +1628,17 @@ const fetchAvailableSlots = async (days = 14) => {
     })
     
     if (response.data.success) {
-      availableSlots.value = response.data.data || []
+      const rawData = response.data.data || []
+      availableSlots.value = rawData.map(group => ({
+        ...group,
+        totalBooked: group.timeSlots.reduce((sum, slot) => sum + (slot.bookedCount || 0), 0),
+        totalCapacity: group.timeSlots.reduce((sum, slot) => sum + (slot.maxCapacity || 0), 0),
+        timeSlots: group.timeSlots.map(slot => ({
+          ...slot,
+          bookedCount: slot.bookedCount || 0,
+          bookedMembers: slot.bookedMembers || []
+        }))
+      }))
     }
   } catch (error) {
     console.error('Error fetching available slots:', error)
@@ -2285,7 +2282,7 @@ defineExpose({
 
   .available-slots-panel {
     width: 100%;
-    max-height: 300px;
+    max-height: 40vh;
   }
 }
 
@@ -2298,7 +2295,7 @@ defineExpose({
   .available-slots-panel {
     width: 100%;
     padding: 12px;
-    max-height: 250px;
+    max-height: 40vh;
   }
 
   .time-slots-grid {

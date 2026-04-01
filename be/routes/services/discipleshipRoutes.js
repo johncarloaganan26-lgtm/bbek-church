@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
+const moment = require('moment-timezone');
 const {
     createDiscipleshipRequest,
     getAllDiscipleshipRequests,
     updateDiscipleshipRequest,
     promoteToBaptism,
     inviteToBaptism,
-    archiveDiscipleshipRequest
+    deleteDiscipleshipRequest,
+    archiveDiscipleshipRequest,
+    exportDiscipleshipRequestsToExcel
 } = require('../../dbHelpers/services/discipleshipRecords');
 const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const archiveRecord = require('../../dbHelpers/archiveRecords').archiveRecord;
 const { query } = require('../../database/db');
 const emailHelper = require('../../dbHelpers/emailHelper');
-const moment = require('moment-timezone');
-const { generateCandidateSlotsForDate, validateSelectedSlot } = require('../../utils/scheduling');
+const { generateCandidateSlotsForDate, validateSelectedSlot, BIBLE_STUDY_CAPACITY } = require('../../utils/scheduling');
 
 // Keep date validation consistent with stored scheduling values.
 moment.tz.setDefault('Asia/Manila');
@@ -79,7 +81,7 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                     AND scheduled_date IS NOT NULL
                     AND DATE(scheduled_date) = ?
                 `;
-            } else {
+            } else if (serviceType === 'bible_study') {
                 bookedSql = `
                   SELECT DATE_FORMAT(scheduled_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
                   FROM tbl_biblestudy_requests
@@ -87,12 +89,35 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                     AND scheduled_date IS NOT NULL
                     AND DATE(scheduled_date) = ?
                 `;
+            } else if (serviceType === 'water_baptism') {
+                bookedSql = `
+                  SELECT DATE_FORMAT(baptism_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
+                  FROM tbl_waterbaptism
+                  WHERE status IN ('pending', 'approved', 'scheduled')
+                    AND baptism_date IS NOT NULL
+                    AND DATE(baptism_date) = ?
+                `;
             }
 
             const [bookedRows] = await query(bookedSql, bookedParams);
-            const bookedSet = new Set((bookedRows || []).map(r => r.slot_datetime).filter(Boolean));
+            
+            // Map booked slots to counts
+            const bookedCounts = (bookedRows || []).reduce((acc, r) => {
+                const dt = r.slot_datetime;
+                if (dt) acc[dt] = (acc[dt] || 0) + 1;
+                return acc;
+            }, {});
 
-            const available = (generated.data || []).filter((slot) => !bookedSet.has(slot.datetime));
+            const processedSlots = (generated.data || []).map(slot => ({
+                ...slot,
+                bookedCount: bookedCounts[slot.datetime] || 0
+            }));
+
+            // For Salvation Talk, allow all generated slots and include booked count.
+            // For Bible Study, show as available unless capacity reached.
+            const available = serviceType === 'salvation' 
+                ? processedSlots 
+                : processedSlots.filter(s => s.bookedCount < BIBLE_STUDY_CAPACITY);
 
             return res.json({
                 success: true,
@@ -101,12 +126,13 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
             });
         }
 
-        // Otherwise, return grouped dates (Burial-like UI): next N days with time slots.
+        // Grouped dates UI: Today onwards.
         const daysRaw = req.query.days;
         const requestedDays = Number.parseInt(String(daysRaw || '7'), 10);
-        const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 30) : 7;
+        const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 7;
 
-        const start = moment().tz(timezone).add(1, 'day').startOf('day');
+        // Start from TODAY to allow manually added slots for today to reflect.
+        const start = moment().tz(timezone).startOf('day');
         const endExclusive = start.clone().add(requestedDays, 'days');
 
         // Determine normalized service type (via generator's meta, reusing its validator).
@@ -144,7 +170,7 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                 AND scheduled_date >= ?
                 AND scheduled_date < ?
             `;
-        } else {
+        } else if (serviceType === 'bible_study') {
             bookedRangeSql = `
               SELECT DATE_FORMAT(scheduled_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
               FROM tbl_biblestudy_requests
@@ -153,28 +179,97 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                 AND scheduled_date >= ?
                 AND scheduled_date < ?
             `;
+        } else if (serviceType === 'water_baptism') {
+            bookedRangeSql = `
+              SELECT DATE_FORMAT(baptism_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
+              FROM tbl_waterbaptism
+              WHERE status IN ('pending', 'approved', 'scheduled')
+                AND baptism_date IS NOT NULL
+                AND baptism_date >= ?
+                AND baptism_date < ?
+            `;
         }
 
         const [bookedRows] = await query(bookedRangeSql, bookedRangeParams);
-        const bookedSet = new Set((bookedRows || []).map(r => r.slot_datetime).filter(Boolean));
+        
+        // Map booked slots to counts
+        const bookedCounts = (bookedRows || []).reduce((acc, r) => {
+            const dt = r.slot_datetime;
+            if (dt) acc[dt] = (acc[dt] || 0) + 1;
+            return acc;
+        }, {});
+
+        let manualSlotsSql = '';
+        let manualSlotsParams = [];
+
+        if (serviceType === 'salvation' || serviceType === 'bible_study' || serviceType === 'water_baptism') {
+            manualSlotsSql = `
+                SELECT DATE_FORMAT(available_date, '%Y-%m-%d') as date, 
+                       DATE_FORMAT(available_time, '%H:%i') as time,
+                       CONCAT(DATE_FORMAT(available_date, '%Y-%m-%d'), ' ', DATE_FORMAT(available_time, '%H:%i:00')) as datetime,
+                       max_slots, status
+                FROM tbl_service_slots
+                WHERE service_type = ? 
+                AND available_date >= ? AND available_date < ?
+                AND status = 'Available'
+            `;
+            manualSlotsParams = [serviceType, start.format('YYYY-MM-DD'), endExclusive.format('YYYY-MM-DD')];
+        }
+
+        const [manualRows] = manualSlotsSql ? await query(manualSlotsSql, manualSlotsParams) : [[]];
+        console.log(`[SlotsDebug] Service: ${serviceType}, Range: ${start.format('YYYY-MM-DD')} to ${endExclusive.format('YYYY-MM-DD')}`);
+        console.log(`[SlotsDebug] Manual rows found: ${manualRows.length}`);
 
         const dateGroups = [];
         for (let i = 0; i < days; i++) {
-            const date = start.clone().add(i, 'days').format('YYYY-MM-DD');
-            const generated = generateCandidateSlotsForDate({ serviceType, dateStr: date, timezone });
-            if (!generated.success) continue;
+            const dateStr = start.clone().add(i, 'days').format('YYYY-MM-DD');
+            const manualForDate = manualRows.filter(r => r.date === dateStr);
+            
+            let combinedSlots = [];
+            
+            // 1. Get generated slots for this date
+            const generated = generateCandidateSlotsForDate({ serviceType, dateStr: dateStr, timezone });
+            if (generated.success) {
+                const defaultCapacity = serviceType === 'bible_study' ? BIBLE_STUDY_CAPACITY : 1;
+                combinedSlots = (generated.data || []).map(s => ({
+                    ...s,
+                    display: moment(s.datetime).format('h:mm A'),
+                    bookedCount: bookedCounts[s.datetime] || 0,
+                    maxCapacity: defaultCapacity,
+                    isManual: false
+                }));
+            }
+            
+            // 2. Merge manual slots
+            for (const manual of manualForDate) {
+                const manualSlot = {
+                    datetime: manual.datetime,
+                    time: manual.time,
+                    display: moment(manual.datetime).format('h:mm A'),
+                    bookedCount: bookedCounts[manual.datetime] || 0,
+                    maxCapacity: manual.max_slots,
+                    isManual: true
+                };
+                
+                const existingIndex = combinedSlots.findIndex(s => s.datetime === manual.datetime);
+                if (existingIndex !== -1) {
+                    combinedSlots[existingIndex] = manualSlot;
+                } else {
+                    combinedSlots.push(manualSlot);
+                }
+            }
 
-            const available = (generated.data || []).filter((slot) => !bookedSet.has(slot.datetime));
-            if (available.length === 0) continue;
+            const available = combinedSlots
+                .filter(s => s.bookedCount < s.maxCapacity)
+                .sort((a, b) => a.datetime.localeCompare(b.datetime));
 
-            dateGroups.push({
-                date: generated.meta.date,
-                availableSlots: available.length,
-                timeSlots: available.map((slot) => ({
-                    time: slot.time,
-                    datetime: slot.datetime
-                }))
-            });
+            if (available.length > 0) {
+                dateGroups.push({
+                    date: dateStr,
+                    availableSlots: available.length,
+                    timeSlots: available
+                });
+            }
         }
 
         return res.json({
@@ -188,6 +283,7 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
             }
         });
     } catch (error) {
+        console.error('Error in handleAvailableSlotsRequest:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 }
@@ -444,13 +540,60 @@ router.post('/submit', async (req, res) => {
             });
         }
 
+        // Attach group_id if there are companions
+        const hasCompanions = req.body.companions && Array.isArray(req.body.companions) && req.body.companions.length > 0;
+        const groupId = hasCompanions ? `GRP-${Date.now()}` : null;
+        
+        if (groupId) {
+            let notesObj = { group_id: groupId };
+            if (req.body.notes) {
+                try { 
+                    notesObj = { ...JSON.parse(req.body.notes), ...notesObj };
+                } catch (e) { 
+                    notesObj.original_notes = req.body.notes; 
+                }
+            }
+            req.body.notes = JSON.stringify(notesObj);
+        }
+
         const result = await createDiscipleshipRequest(req.body);
+
+        // Process companions if any
+        if (hasCompanions) {
+            for (const comp of req.body.companions) {
+                try {
+                    // Check duplicate for companion
+                    const compDuplicateCheck = await checkDuplicates(comp.email);
+                    if (compDuplicateCheck.valid) {
+                        await createDiscipleshipRequest({
+                            ...req.body,
+                            firstname: comp.firstname,
+                            lastname: comp.lastname,
+                            email: comp.email,
+                            birthdate: comp.birthdate,
+                            age: comp.age,
+                            companions: [], // Prevent infinite recursion if passed somehow
+                            notes: JSON.stringify({ group_id: groupId })
+                        });
+                    }
+                } catch (compError) {
+                    console.error('Error creating companion request:', compError);
+                    // Continue with other companions even if one fails
+                }
+            }
+        }
 
         // Log successful submission
         await auditTrailRecords.createAuditLog({
             action_type: 'DISCIPLESHIP_SUBMITTED',
             module: 'Discipleship',
-            description: JSON.stringify({ request_id: result.data?.request_id, firstname, lastname, email }),
+            description: JSON.stringify({ 
+                request_id: result.data?.request_id, 
+                firstname, 
+                lastname, 
+                email,
+                companions_count: req.body.companions ? req.body.companions.length : 0 
+            }),
             user_id: null,
             user_email: null,
             user_name: 'Public User',
@@ -475,8 +618,19 @@ router.post('/submit', async (req, res) => {
 // ADMIN: Get All Requests
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const { page, pageSize, search, status } = req.query;
-        const result = await getAllDiscipleshipRequests({ page, pageSize, search, status });
+        const { page, pageSize, search, status, request_type, sortBy, startDate, endDate } = req.query;
+        // For exports, we might not want pagination. Let's pass that flag.
+        const result = await getAllDiscipleshipRequests({ 
+            page, 
+            pageSize, 
+            search, 
+            status, 
+            request_type, 
+            sortBy,
+            startDate,
+            endDate,
+            noPagination: req.query.noPagination === 'true'
+        });
         res.json(result);
     } catch (error) {
         console.error('Get All error:', error);
@@ -485,6 +639,49 @@ router.get('/', authenticateToken, async (req, res) => {
             message: error.message,
             errorCode: 'FETCH_ERROR'
         });
+    }
+});
+
+// ADMIN: Export Discipleship Requests to Excel
+router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const format = req.query.format || 'xlsx';
+        const buffer = await exportDiscipleshipRequestsToExcel(req.query);
+        const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+        const filename = `salvation_export_${timestamp}.${format}`;
+        
+        const contentType = format === 'csv' 
+            ? 'text/csv' 
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+    try {
+        const format = req.body.format || 'xlsx';
+        const buffer = await exportDiscipleshipRequestsToExcel(req.body);
+        const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+        const filename = `salvation_export_${timestamp}.${format}`;
+        
+        const contentType = format === 'csv' 
+            ? 'text/csv' 
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -793,12 +990,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 let pastor_name = '';
                 if (updatePayload.pastor_id) {
                     try {
-                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [updatePayload.pastor_id]);
+                        const [pastorRows] = await query(`
+                            SELECT m.firstname, m.lastname 
+                            FROM tbl_members m 
+                            JOIN tbl_accounts a ON m.email = a.email 
+                            WHERE a.acc_id = ?
+                        `, [updatePayload.pastor_id]);
                         if (pastorRows.length > 0) {
                             pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
                         }
                     } catch (e) {
-                        console.error('Error fetching pastor:', e);
+                        console.error('Error fetching pastor name for email:', e);
                     }
                 }
 
@@ -1465,5 +1667,6 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
         });
     }
 });
+
 
 module.exports = router;

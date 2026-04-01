@@ -404,14 +404,17 @@
     <!-- View Form Dialog -->
     <v-dialog v-model="showViewDialog" max-width="600">
       <v-card v-if="selectedForm">
-        <v-card-title class="d-flex justify-space-between align-center">
-          <span>Form Details</span>
-          <v-btn icon="mdi-close" variant="text" @click="showViewDialog = false"></v-btn>
+        <v-card-title class="d-flex justify-space-between align-center bg-primary text-white py-4 px-6">
+          <h1 class="text-h5 font-weight-bold mb-0">Form Details</h1>
+          <v-btn icon="mdi-close" variant="text" color="white" @click="showViewDialog = false"></v-btn>
         </v-card-title>
         <v-card-text>
           <v-row>
             <v-col cols="12">
-              <strong>Type:</strong> {{ getFormTypeLabel(selectedForm.form_type) }}
+              <strong>Type:</strong> 
+              <span :class="`text-${getCategoryColor(selectedForm.form_type)} font-weight-bold ml-1 text-uppercase` ">
+                {{ getFormTypeLabel(selectedForm.form_type) }}
+              </span>
             </v-col>
             <v-col cols="12">
               <strong>Name:</strong> {{ selectedForm.name || selectedForm.submitted_by_name || 'Anonymous' }}
@@ -423,31 +426,27 @@
               <strong>Phone:</strong> {{ selectedForm.phone }}
             </v-col>
             <v-col cols="12">
-              <strong>Status:</strong> 
-              <v-chip :color="getStatusColor(selectedForm.status)" size="small" class="ml-2">
+              <div class="font-weight-bold mb-1">Status:</div>
+              <div :class="`text-${getStatusColor(selectedForm.status)}`" class="font-weight-bold">
                 {{ formatStatus(selectedForm.status) }}
-              </v-chip>
+              </div>
             </v-col>
             <v-col cols="12" v-if="selectedForm.form_type === 'prayer_request'">
-              <strong>Prayer Request:</strong>
-              <p class="mt-2">{{ selectedForm.form_data?.request }}</p>
+              <div class="font-weight-bold mb-1">Prayer Request:</div>
+              <p>{{ selectedForm.form_data?.request }}</p>
             </v-col>
             <v-col cols="12" v-if="selectedForm.form_type === 'schedule_change'">
-              <strong>Service Type:</strong> {{ getFormTypeLabel(selectedForm.form_data?.serviceType) }}
+              <div class="mb-1"><strong>Service Type:</strong> {{ getFormTypeLabel(selectedForm.form_data?.serviceType) }}</div>
+              <div class="mb-1"><strong>Original Date:</strong> {{ formatDate(selectedForm.form_data?.originalDate) }}</div>
+              <div class="mb-1"><strong>Requested Date:</strong> {{ formatDate(selectedForm.form_data?.requestedDate) }}</div>
             </v-col>
             <v-col cols="12" v-if="selectedForm.form_type === 'schedule_change'">
-              <strong>Original Date:</strong> {{ formatDate(selectedForm.form_data?.originalDate) }}
-            </v-col>
-            <v-col cols="12" v-if="selectedForm.form_type === 'schedule_change'">
-              <strong>Requested Date:</strong> {{ formatDate(selectedForm.form_data?.requestedDate) }}
-            </v-col>
-            <v-col cols="12" v-if="selectedForm.form_type === 'schedule_change'">
-              <strong>Reason:</strong>
-              <p class="mt-2">{{ selectedForm.form_data?.reason }}</p>
+              <div class="font-weight-bold mb-1">Reason:</div>
+              <p>{{ selectedForm.form_data?.reason }}</p>
             </v-col>
             <v-col cols="12" v-if="selectedForm.admin_notes">
-              <strong>Admin Notes:</strong>
-              <p class="mt-2">{{ selectedForm.admin_notes }}</p>
+              <div class="font-weight-bold mb-1">Admin Notes:</div>
+              <p>{{ selectedForm.admin_notes }}</p>
             </v-col>
             <v-col cols="12">
               <strong>Submitted:</strong> {{ formatDate(selectedForm.created_at) }}
@@ -817,9 +816,9 @@ const getCategoryColor = (formType) => {
 
 const getFormTypeLabel = (formType) => {
   const labels = {
-    'message': 'Message',
-    'prayer_request': 'Prayer Request',
-    'schedule_change': 'Schedule Change',
+    'message': 'Contact',
+    'prayer_request': 'Prayer',
+    'schedule_change': 'Schedule',
     'water-baptism': 'Water Baptism',
     'marriage': 'Marriage Ceremony',
     'burial': 'Burial Service',

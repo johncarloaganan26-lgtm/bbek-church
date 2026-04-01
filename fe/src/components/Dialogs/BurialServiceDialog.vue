@@ -31,7 +31,7 @@
             <el-collapse-item
               v-for="dateGroup in availableSlots"
               :key="dateGroup.date"
-              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} (${dateGroup.availableSlots} available)`"
+              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} (${dateGroup.totalBooked}/${dateGroup.totalCapacity} booked)`"
               :name="dateGroup.date"
               class="slot-date-group"
             >
@@ -250,10 +250,10 @@
           />
         </el-form-item>
 
-        <!-- Reason of Death -->
+        <!-- Cause of Death -->
         <el-form-item prop="reason_of_death">
           <template #label>
-            <span>Reason of Death</span>
+            <span>Cause of Death</span>
           </template>
           <el-input
             v-model="formData.reason_of_death"
@@ -319,12 +319,13 @@
             style="width: 100%"
             clearable
             :disabled="loading"
+            teleported
           >
             <el-option
               v-for="pastor in pastorOptions"
-              :key="pastor.name"
-              :label="pastor.name"
-              :value="pastor.name"
+              :key="pastor.id"
+              :label="`${pastor.name}${pastor.position ? ' (' + pastor.position + ')' : ''}`"
+              :value="pastor.id"
             />
           </el-select>
         </el-form-item>
@@ -370,6 +371,7 @@
             style="width: 100%"
             :disabled="loading"
             @change="handleStatusChange"
+            teleported
           >
             <el-option
               v-for="opt in statusOptions"
@@ -484,7 +486,12 @@ const fetchAvailableSlots = async (days = 14) => {
     })
     
     if (response.data.success && response.data.data) {
-      availableSlots.value = response.data.data
+      const rawData = response.data.data || []
+      availableSlots.value = rawData.map(group => ({
+        ...group,
+        totalBooked: group.timeSlots.reduce((sum, slot) => sum + (slot.bookedCount || 0), 0),
+        totalCapacity: group.timeSlots.reduce((sum, slot) => sum + (slot.maxCapacity || 0), 0)
+      }))
     }
   } catch (error) {
     console.error('Error fetching available slots:', error)
@@ -746,7 +753,7 @@ const rules = computed(() => {
       }
     ],
     reason_of_death: [
-      { required: true, message: 'Reason of death is required', trigger: 'blur' }
+      { required: true, message: 'Cause of death is required', trigger: 'blur' }
     ],
     relationship: [
       { required: true, message: 'Relationship is required', trigger: 'change' }
@@ -862,7 +869,9 @@ watch(() => props.burialServiceData, (newData) => {
     formData.reason_of_death = newData.reason_of_death || ''
     formData.relationship = newData.relationship || ''
     formData.location = newData.location || ''
-    formData.pastor_name = newData.pastor_name || ''
+    // Coerce pastor ID to number if numeric, to match el-select option.id type
+    const pastorVal = newData.pastor_name
+    formData.pastor_name = pastorVal && !isNaN(pastorVal) ? Number(pastorVal) : (pastorVal || '')
     formData.service_date = newData.service_date || newData.preferred_service_time || null
     // Convert preferred_service_time to datetime if available
     if (newData.preferred_service_time) {
@@ -1155,8 +1164,6 @@ watch(userInfo, async (newUserInfo) => {
 /* Form Panel (Right Column) */
 .form-panel {
   flex: 1;
-  overflow-y: auto;
-  max-height: 60vh;
 }
 
 .form-panel-full {
@@ -1175,11 +1182,11 @@ watch(userInfo, async (newUserInfo) => {
     border-bottom: 1px solid #dcdfe6;
     padding-right: 0;
     padding-bottom: 16px;
-    max-height: none;
+    max-height: 40vh;
   }
 
   .form-panel {
-    max-height: none;
+    max-height: 50vh;
   }
 }
 

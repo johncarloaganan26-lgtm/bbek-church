@@ -60,7 +60,7 @@
 
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
-                        v-for="dateGroup in availableScheduleDates.slice(0, 4)"
+                        v-for="dateGroup in availableScheduleDates"
                         :key="dateGroup.date"
                         variant="flat"
                         class="mb-2"
@@ -82,12 +82,16 @@
                               v-for="slot in dateGroup.timeSlots"
                               :key="slot.datetime"
                               size="small"
-                              :variant="formData.scheduled_date === slot.datetime ? 'flat' : 'outlined'"
-                              :color="formData.scheduled_date === slot.datetime ? 'teal' : 'teal-darken-2'"
-                              class="ma-1 time-slot-chip"
+                              :variant="formData.scheduled_date === slot.datetime ? 'flat' : (slot.bookedCount >= (slot.maxCapacity || 1) ? 'tonal' : 'outlined')"
+                              :color="formData.scheduled_date === slot.datetime ? 'teal' : (slot.bookedCount >= (slot.maxCapacity || 1) ? 'grey' : 'teal-darken-2')"
+                              :disabled="slot.bookedCount >= (slot.maxCapacity || 1) && formData.scheduled_date !== slot.datetime"
+                              class="ma-1 time-slot-chip font-weight-bold"
                               @click="selectSlot(slot.datetime)"
                             >
                               {{ formatTime(slot.time) }}
+                              <span class="ml-1 opacity-70" style="font-size: 10px">
+                                ({{ slot.bookedCount }}/{{ slot.maxCapacity || 1 }})
+                              </span>
                             </v-chip>
                           </div>
                           <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
@@ -97,14 +101,14 @@
                       </v-expansion-panel>
                     </v-expansion-panels>
 
-                    <p v-if="availableScheduleDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
-                      + {{ availableScheduleDates.length - 4 }} more dates available
-                    </p>
                   </div>
 
-                  <div v-else class="text-center pa-8">
-                    <v-icon size="48" color="teal-lighten-3">mdi-calendar-blank</v-icon>
-                    <p class="mt-2 grey--text">No slots currently available. Please check back later.</p>
+                  <div v-else class="text-center pa-10 bg-white rounded-xl border-dashed border-2 mt-4" style="border-color: #fca5a5 !important; background-color: #fef2f2 !important;">
+                    <v-icon size="64" color="red-lighten-3" class="mb-4">mdi-calendar-remove</v-icon>
+                    <h3 class="text-h6 font-weight-bold text-red-darken-3 mb-1" style="font-family: 'Georgia', serif;">No Slots Available</h3>
+                    <p class="text-body-2 text-red-darken-2" style="font-family: 'Georgia', serif; font-style: italic;">
+                      All Discipleship Talk slots are currently full or no schedules have been defined yet. Please check back later!
+                    </p>
                   </div>
 
                   <div v-if="formData.scheduled_date" class="mt-4">
@@ -209,7 +213,61 @@
                     </el-form-item>
                   </template>
 
-                  <el-form-item label="Selected Schedule" prop="scheduled_date" required>
+                  <v-divider class="my-6"></v-divider>
+                  
+                  <div class="d-flex align-center justify-space-between mb-4">
+                    <h3 class="text-subtitle-1 font-weight-bold" style="color: #0d9488;">Companions (Optional)</h3>
+                    <div
+                      @click="addCompanion"
+                      style="color: #4ba0ff; font-weight: 500; cursor: pointer; font-size: 14px; user-select: none;"
+                    >
+                      + Add Companion
+                    </div>
+                  </div>
+                  <p class="text-caption text-grey-darken-1 mb-4" style="line-height: 1.2;">
+                    If you wish to bring family members or friends with you, please add their details below.
+                  </p>
+
+                  <div v-for="(comp, index) in formData.companions" :key="index" class="pa-4 mb-4 rounded border bg-white position-relative" style="border-color: #e0e0e0 !important;">
+                    <v-btn icon="mdi-close" variant="text" size="small" color="error" class="position-absolute" style="top: 5px; right: 5px;" @click="removeCompanion(index)"></v-btn>
+                    <h4 class="text-caption font-weight-bold mb-2 text-teal-darken-3">Companion {{ index + 1 }}</h4>
+                    
+                    <div style="display: flex; gap: 10px;">
+                      <el-form-item :prop="'companions.' + index + '.firstname'" :rules="{ required: true, message: 'First name required', trigger: 'blur' }" style="flex: 1; margin-bottom: 10px;">
+                        <el-input v-model="comp.firstname" placeholder="First Name" />
+                      </el-form-item>
+                      <el-form-item :prop="'companions.' + index + '.lastname'" :rules="{ required: true, message: 'Last name required', trigger: 'blur' }" style="flex: 1; margin-bottom: 10px;">
+                        <el-input v-model="comp.lastname" placeholder="Last Name" />
+                      </el-form-item>
+                    </div>
+
+                    <el-form-item :prop="'companions.' + index + '.email'" :rules="[
+                      { required: true, message: 'Email required', trigger: 'blur' },
+                      { type: 'email', message: 'Valid email required', trigger: 'blur' }
+                    ]" style="margin-bottom: 10px;">
+                      <el-input v-model="comp.email" placeholder="Email Address (e.g., gmail)" />
+                    </el-form-item>
+
+                    <div style="display: flex; gap: 10px;">
+                      <el-form-item :prop="'companions.' + index + '.birthdate'" :rules="{ required: true, message: 'Birthday required', trigger: 'change' }" style="flex: 2; margin-bottom: 0;">
+                        <el-date-picker
+                          v-model="comp.birthdate"
+                          type="date"
+                          placeholder="Birthday"
+                          style="width: 100%"
+                          @change="(val) => calculateCompanionAge(index, val)"
+                        />
+                      </el-form-item>
+                      <el-form-item :prop="'companions.' + index + '.age'" :rules="[
+                        { required: true, message: 'Age required', trigger: 'blur' },
+                        { type: 'number', min: 12, message: 'Min 12 yrs', trigger: 'blur' }
+                      ]" style="flex: 1; margin-bottom: 0;">
+                        <el-input v-model.number="comp.age" type="number" placeholder="Age" />
+                      </el-form-item>
+                    </div>
+                  </div>
+
+                  <el-form-item label="Selected Schedule" prop="scheduled_date" required class="mt-4">
                     <el-input v-model="formData.scheduled_date" placeholder="Select a slot from the left" readonly />
                     <div v-if="formData.scheduled_date" class="text-caption text-teal-darken-3 mt-1">
                       {{ formatSelectedSchedule(formData.scheduled_date) }}
@@ -217,7 +275,7 @@
                   </el-form-item>
 
                   <el-form-item>
-                    <el-button type="primary" size="large" @click="handleSubmit" :loading="discipleshipStore.loading" style="width: 100%;">
+                    <el-button color="#0d9488" size="large" @click="handleSubmit" :loading="discipleshipStore.loading" style="width: 100%; color: white;">
                       Send Request
                     </el-button>
                   </el-form-item>
@@ -267,8 +325,38 @@ const formData = reactive({
   gender: '',
   address: '',
   request_type: 'Salvation',
-  scheduled_date: null
+  scheduled_date: null,
+  companions: []
 });
+
+const addCompanion = () => {
+  formData.companions.push({
+    firstname: '',
+    lastname: '',
+    email: '',
+    birthdate: '',
+    age: null
+  });
+};
+
+const removeCompanion = (index) => {
+  formData.companions.splice(index, 1);
+};
+
+const calculateCompanionAge = (index, newDate) => {
+  if (newDate) {
+    const today = new Date();
+    const birthDate = new Date(newDate);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    formData.companions[index].age = age;
+  } else {
+    formData.companions[index].age = null;
+  }
+};
 
 const fetchSlots = async () => {
   slotsLoading.value = true;
@@ -277,7 +365,7 @@ const fetchSlots = async () => {
 
   const result = await discipleshipStore.fetchAvailableSlots({
     service: 'salvation',
-    days: 14
+    days: 30
   });
 
   if (result.success) {

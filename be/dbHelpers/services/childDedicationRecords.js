@@ -297,30 +297,7 @@ async function createChildDedication(dedicationData) {
       }
     }
 
-    // Validate that preferred dedication date is a Sunday (if provided)
-    if (preferred_dedication_date) {
-      let dateMoment;
-
-      // Try parsing as datetime first (from frontend combined format)
-      if (preferred_dedication_date.includes(' ')) {
-        dateMoment = moment(preferred_dedication_date, 'YYYY-MM-DD HH:mm:ss');
-      } else {
-        dateMoment = moment(preferred_dedication_date, 'YYYY-MM-DD');
-      }
-
-      if (!dateMoment.isValid()) {
-        throw new Error('Invalid format for preferred_dedication_date. Expected YYYY-MM-DD or YYYY-MM-DD HH:mm:ss');
-      }
-
-      // Check if the date is a Sunday (0 = Sunday in moment.js)
-      const dayOfWeek = dateMoment.day();
-      if (dayOfWeek !== 0) {
-        return {
-          success: false,
-          message: 'Child dedication can only be scheduled on Sundays. Please select a Sunday date.'
-        };
-      }
-    }
+    // Sunday restriction removed as requested
 
     // Check for duplicate (same requester, same child name, same birthdate)
     const duplicateCheck = await checkDuplicateChildDedication(
@@ -387,14 +364,7 @@ async function createChildDedication(dedicationData) {
       }
     }
 
-    // Enforce 12:00 PM (noon) - Child dedications are only available on Sundays at 12:00 PM
-    if (formattedPreferredTime && formattedPreferredTime !== '12:00:00') {
-      console.warn(`Child dedication time ${formattedPreferredTime} is not 12:00. Forcing to 12:00:00`);
-      formattedPreferredTime = '12:00:00';
-    } else if (!formattedPreferredTime && formattedPreferredDate) {
-      // If no time provided but date is provided, set to 12:00
-      formattedPreferredTime = '12:00:00';
-    }
+    // Enforcement of specific hour removed as requested
 
     const formattedDateCompleted = date_completed
       ? (moment(date_completed, 'YYYY-MM-DD', true).isValid()
@@ -759,9 +729,18 @@ async function getAllChildDedications(options = {}) {
         IFNULL(cd.mother_firstname, ''),
         IF(cd.mother_middle_name IS NOT NULL AND cd.mother_middle_name != '', CONCAT(' ', cd.mother_middle_name), ''),
         IF(cd.mother_lastname IS NOT NULL AND cd.mother_lastname != '', CONCAT(' ', cd.mother_lastname), '')
-      ) as mother_fullname
+      ) as mother_fullname,
+      COALESCE(
+        CONCAT(pm_acc.firstname, ' ', pm_acc.lastname),
+        CONCAT(pm_direct.firstname, ' ', pm_direct.lastname)
+      ) as pastor_name_joined,
+      COALESCE(pm_acc.position, pm_direct.position) as pastor_position
     FROM tbl_childdedications cd
-    INNER JOIN tbl_members m ON cd.requested_by = m.member_id`;
+    INNER JOIN tbl_members m ON cd.requested_by = m.member_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN tbl_accounts pa ON cd.pastor = pa.acc_id
+    LEFT JOIN tbl_members pm_acc ON pa.email = pm_acc.email COLLATE utf8mb4_unicode_ci -- Join to get pastor name from account email
+    LEFT JOIN tbl_members pm_direct ON cd.pastor = pm_direct.member_id COLLATE utf8mb4_unicode_ci -- Join directly by member_id
+    `;
     const params = [];
 
     // Build WHERE conditions array
@@ -1350,13 +1329,7 @@ async function updateChildDedication(childId, dedicationData, isAdmin = false) {
         }
       }
 
-      // Enforce 12:00 PM - Child dedications are only available at 12:00 PM
-      if (formattedPreferredTime && !formattedPreferredTime.startsWith('12:')) {
-        console.warn(`Child dedication time ${formattedPreferredTime} is not 12:00. Forcing to 12:00`);
-        formattedPreferredTime = '12:00';
-      } else if (!formattedPreferredTime && finalDedicationDate) {
-        formattedPreferredTime = '12:00';
-      }
+      // Enforcement of specific hour removed as requested
 
       fields.push('preferred_dedication_time = ?');
       params.push(formattedPreferredTime);

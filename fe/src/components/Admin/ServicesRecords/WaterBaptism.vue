@@ -32,6 +32,7 @@
           </v-tooltip>
         </v-card>
 
+
         <v-btn 
           color="success" 
           prepend-icon="mdi-file-document" 
@@ -40,7 +41,7 @@
           :loading="loading"
           @click="openBaptismDialog"
           class="h-100"
-          style="min-height: 48px;"
+          style="min-height: 48px; border-radius: 8px;"
         >
           New Baptism
         </v-btn>
@@ -256,6 +257,7 @@
              <th class="text-left font-weight-bold">Member</th>
              <th class="text-left font-weight-bold">Baptism Date & Time</th>
              <th class="text-left font-weight-bold">Status</th>
+             <th class="text-left font-weight-bold">Pastor</th>
              <th class="text-left font-weight-bold">Date Created</th>
              <th class="text-left font-weight-bold">Actions</th>
            </tr>
@@ -287,6 +289,16 @@
               <v-chip :color="getStatusColor(baptism.status)" size="small">
                 {{ formatStatus(baptism.status) }}
               </v-chip>
+            </td>
+            <td>
+              <div v-if="baptism.pastor_name_joined" class="text-body-2 font-weight-medium">
+                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
+                {{ baptism.pastor_name_joined }}
+                <div v-if="baptism.pastor_position" class="text-caption text-grey font-italic ml-6">
+                  {{ baptism.pastor_position }}
+                </div>
+              </div>
+              <div v-else class="text-caption text-grey">Unassigned</div>
             </td>
             <td>{{ formatDateTime(baptism.date_created) }}</td>
             <td>
@@ -363,6 +375,12 @@
         ></v-pagination>
       </div>
     </v-card>
+
+    <AvailabilityManager 
+      v-model="manageSlotsDialog"
+      initial-service="water_baptism"
+    />
+
     <WaterBaptismDialog 
       v-model="baptismDialog" 
       :baptism-data="baptismData" 
@@ -471,6 +489,7 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WaterBaptismDialog from '@/components/Dialogs/WaterBaptismDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
+import AvailabilityManager from './AvailabilityManager.vue'
 
 const waterBaptismStore = useWaterBaptismStore()
 const settingsStore = useSystemSettingsStore()
@@ -576,6 +595,9 @@ const bulkCompleteDialog = ref(false)
 const completionDate = ref('')
 const completionTime = ref('13:00:00')
 const selectedBaptismsToComplete = ref([])
+
+// Manage Slots dialog state
+const manageSlotsDialog = ref(false)
 
 const disableNonSundays = (date) => {
   // getDay() returns 0 for Sunday

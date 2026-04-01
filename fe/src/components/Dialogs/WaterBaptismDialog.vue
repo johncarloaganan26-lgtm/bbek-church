@@ -26,38 +26,37 @@
           <el-progress type="circle" :percentage="0" indeterminate></el-progress>
           <p>Loading available dates...</p>
         </div>
-        <div v-else-if="availableSlots && availableSlots.length > 0" class="slots-content">
-          <el-collapse accordion>
-            <el-collapse-item
-              v-for="dateGroup in availableSlots"
-              :key="dateGroup.date"
-              :title="`${dateGroup.dayName}, ${formatDate(dateGroup.date)} - Booked: ${dateGroup.bookedSlots || 0}`"
-              :name="dateGroup.date"
-              class="slot-date-group"
-            >
-              <div class="time-slots-grid">
+        <div v-else-if="availableSlots && availableSlots.length > 0" class="slots-content custom-slots-list">
+          <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="date-group-item mb-4 pb-2 border-bottom">
+            <div class="d-flex align-items-center mb-2">
+              <span class="date-label font-weight-bold grey-darken-2 mr-3" style="min-width: 140px;">
+                {{ formatDate(dateGroup.date) }}:
+              </span>
+              <div class="time-slots-flex d-flex flex-wrap gap-2">
                 <el-button
                   v-for="timeSlot in dateGroup.timeSlots"
                   :key="timeSlot.datetime"
                   size="small"
-                  :type="isSlotSelected(timeSlot.datetime) ? 'primary' : 'default'"
-                  :plain="!isSlotSelected(timeSlot.datetime)"
-                  @click="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display)"
-                  class="time-slot-button"
+                  :title="timeSlot.bookedMembers?.length > 0 ? 'Booked by: ' + timeSlot.bookedMembers.join(', ') : 'No bookings yet'"
+                  @click="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display || formatTime(timeSlot.time))"
+                  class="time-slot-button rounded-pill"
                 >
-                  {{ timeSlot.display }}
+                  {{ timeSlot.display || formatTime(timeSlot.time) }}
+                  <span class="ml-1 opacity-60" style="font-size: 0.8em; font-weight: 500;">
+                    ({{ timeSlot.bookedCount || 0 }}/{{ timeSlot.maxCapacity || 0 }})
+                  </span>
                 </el-button>
               </div>
-            </el-collapse-item>
-          </el-collapse>
-          <div v-if="selectedSlotDisplay" class="selected-slot-info">
+            </div>
+          </div>
+          <div v-if="selectedSlotDisplay" class="selected-slot-info mt-4">
             <el-tag type="success" closable @close="clearSlotSelection">
               Selected: {{ selectedSlotDisplay }}
             </el-tag>
           </div>
         </div>
         <div v-else class="slots-empty">
-          <el-empty description="No available slots"></el-empty>
+          <el-empty description="No available slots found for the next 30 days"></el-empty>
         </div>
       </div>
 
@@ -300,8 +299,7 @@
               const today = new Date();
               today.setHours(0, 0, 0, 0);
               const isPastOrToday = date <= today;
-              const isNotSunday = date.getDay() !== 0;
-              return isEditMode ? isNotSunday : (isPastOrToday || isNotSunday);
+              return isEditMode ? false : isPastOrToday;
             }"
             @change="onDateTimeChange"
           />
@@ -341,12 +339,13 @@
           style="width: 100%"
           clearable
           :disabled="loading"
+          teleported
         >
           <el-option
             v-for="option in pastorOptions"
-            :key="option.name"
-            :label="option.name"
-            :value="option.name"
+            :key="option.id"
+            :label="`${option.name}${option.position ? ' (' + option.position + ')' : ''}`"
+            :value="option.id"
           />
         </el-select>
       </el-form-item>
@@ -360,6 +359,7 @@
           style="width: 100%"
           :disabled="loading"
           @change="handleStatusChange"
+          teleported
         >
           <el-option
             v-for="option in statusOptions"
@@ -606,7 +606,7 @@ const availableSlots = ref([])
 const selectedSlotDisplay = ref(null)
 
 // Fetch available water baptism slots
-const fetchAvailableSlots = async (days = 14) => {
+const fetchAvailableSlots = async (days = 30) => {
   slotsLoading.value = true
   try {
     const response = await axios.get('/services/water-baptisms/available-slots', {
@@ -614,7 +614,14 @@ const fetchAvailableSlots = async (days = 14) => {
     })
     
     if (response.data.success && response.data.data) {
-      availableSlots.value = response.data.data
+      availableSlots.value = response.data.data.map(group => ({
+        ...group,
+        timeSlots: group.timeSlots.map(slot => ({
+          ...slot,
+          bookedCount: slot.bookedCount || 0,
+          bookedMembers: slot.bookedMembers || []
+        }))
+      }))
     }
   } catch (error) {
     console.error('Error fetching available slots:', error)
@@ -645,6 +652,16 @@ const selectAvailableSlot = (date, time, displayTime) => {
   ElMessage.success('Slot selected! Date and time have been filled.')
 }
 
+const formatTime = (time) => {
+  if (!time) return '';
+  // Handle HH:mm format
+  const [hours, minutes] = time.split(':');
+  const h = parseInt(hours);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${minutes} ${ampm}`;
+};
+
 // Clear slot selection
 const clearSlotSelection = () => {
   selectedSlotDisplay.value = null
@@ -657,7 +674,7 @@ onMounted(async () => {
     fetchMembersWithoutBaptism(),
     fetchMinistryOptions(),
     fetchUnavailableTimeSlots(),
-    fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
+    fetchAvailableSlots(30)  // Fetch available slots for the next 30 days
   ])
 })
 
@@ -1063,7 +1080,9 @@ watch(() => props.baptismData, async (newData) => {
     }
 
     formData.location = newData.location || ''
-    formData.pastor_name = newData.pastor_name || ''
+    // Coerce pastor ID to number if numeric, to match el-select option.id type
+    const pastorVal1 = newData.pastor_name
+    formData.pastor_name = pastorVal1 && !isNaN(pastorVal1) ? Number(pastorVal1) : (pastorVal1 || '')
     formData.status = newData.status || 'pending'
     formData.rejection_reason = newData.rejection_reason || ''
     formData.guardian_name = newData.guardian_name || ''
@@ -1115,7 +1134,9 @@ watch(() => props.modelValue, async (isOpen) => {
       formData.baptism_date = data.baptism_date || null
       formData.baptism_time = data.baptism_time || null
       formData.location = data.location || ''
-      formData.pastor_name = data.pastor_name || ''
+      // Coerce pastor ID to number if numeric, to match el-select option.id type
+      const pastorVal2 = data.pastor_name
+      formData.pastor_name = pastorVal2 && !isNaN(pastorVal2) ? Number(pastorVal2) : (pastorVal2 || '')
       formData.status = data.status || 'pending'
       formData.guardian_name = data.guardian_name || ''
       formData.guardian_contact = data.guardian_contact || ''
@@ -1449,8 +1470,6 @@ defineExpose({
 /* Form Panel (Right Column) */
 .form-panel {
   flex: 1;
-  overflow-y: auto;
-  max-height: 60vh;
 }
 
 .form-panel-full {
@@ -1469,7 +1488,7 @@ defineExpose({
     border-bottom: 1px solid #dcdfe6;
     padding-right: 0;
     padding-bottom: 16px;
-    max-height: none;
+    max-height: 40vh;
   }
 
   .form-panel {
@@ -1648,6 +1667,57 @@ defineExpose({
     flex: none;
     width: 100%;
   }
+}
+
+/* Custom Slots List Styles */
+.custom-slots-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 15px;
+  border-radius: 16px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.date-group-item {
+  padding: 14px 0;
+}
+
+.date-group-item:last-child {
+  border-bottom: none !important;
+}
+
+.border-bottom {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.date-label {
+  font-size: 0.8rem;
+  color: #475569;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.time-slot-button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 700 !important;
+}
+
+.time-slot-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.12);
+}
+
+.time-slot-button.rounded-pill {
+  border-radius: 50px !important;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
 }
 </style>
 

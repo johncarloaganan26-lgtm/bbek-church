@@ -200,11 +200,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column
-          prop="ip_address"
-          label="IP Address"
-          width="130"
-        />
+
 
         <el-table-column
           prop="status"
@@ -291,7 +287,7 @@
               <el-icon class="info-icon"><Location /></el-icon>
               <div class="info-content">
                 <div class="info-label">IP Address</div>
-                <div class="info-value">{{ selectedLog.ip_address }}</div>
+                <div class="info-value">{{ maskIpAddress(selectedLog.ip_address) }}</div>
               </div>
             </div>
           </el-col>
@@ -580,7 +576,7 @@ const exportLogs = async () => {
 
 const printLogs = () => {
   const printWindow = window.open('', '_blank')
-  const tableHeaders = ['#', 'User', 'Action', 'Module/Page', 'Description', 'Date & Time', 'IP Address', 'Status']
+  const tableHeaders = ['#', 'User', 'Action', 'Module/Page', 'Description', 'Date & Time', 'Status']
 
   // Get current filter information for the header
   const filterInfo = []
@@ -612,7 +608,6 @@ const printLogs = () => {
       <td>${log.module || ''}</td>
       <td>${log.description || ''}</td>
       <td>${formatDateTime(log.date_created)}</td>
-      <td>${log.ip_address || ''}</td>
       <td>${log.status}</td>
     </tr>
   `).join('')
@@ -752,7 +747,7 @@ Action Details:
 - Entity Type: ${selectedLog.value.entity_type || 'N/A'}
 - Entity ID: ${selectedLog.value.entity_id || 'N/A'}
 - Status: ${selectedLog.value.status}
-- IP Address: ${selectedLog.value.ip_address}
+- IP Address: ${maskIpAddress(selectedLog.value.ip_address)}
 
 Description:
 ${selectedLog.value.description}
@@ -793,6 +788,17 @@ const getActionColor = (type) => {
     'LOGOUT': '#909399'
   }
   return colors[type] || '#409eff'
+}
+
+const maskIpAddress = (ip) => {
+  if (!ip) return 'N/A'
+  // Masking IPv4: 112.201.23.45 -> 112.201.xxx.xxx
+  const parts = ip.split('.')
+  if (parts.length === 4) {
+    return `${parts[0]}.${parts[1]}.xxx.xxx`
+  }
+  // For IPv6 or other formats, just show first few chars
+  return ip.substring(0, 8) + '...'
 }
 
 const formatDateTime = (dateString) => {

@@ -210,7 +210,10 @@ class AuditTrailRecords {
         module as 'Module',
         description as 'Description',
         date_created as 'Date & Time',
-        ip_address as 'IP Address',
+        CASE 
+          WHEN ip_address LIKE '%.%.%.%' THEN CONCAT(SUBSTRING_INDEX(ip_address, '.', 2), '.xxx.xxx')
+          ELSE 'Masked'
+        END as 'IP Address',
         status as 'Status'
       FROM tbl_audit_trail
       ${whereClause}

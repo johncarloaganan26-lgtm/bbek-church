@@ -209,7 +209,7 @@
                           </div>
                           <div class="roadmap-content">
                             <h3 style="font-family: 'Georgia', serif; font-style: italic;">Water Baptism</h3>
-                            <p style="font-family: 'Georgia', serif; font-style: italic;">After Bible Study is completed, you will be scheduled for Water Baptism. Water Baptism is on Sundays only.</p>
+                            <p style="font-family: 'Georgia', serif; font-style: italic;">After Bible Study is completed, you will be scheduled for Water Baptism.</p>
                           </div>
                         </div>
                       </div>

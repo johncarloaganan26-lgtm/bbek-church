@@ -10,6 +10,8 @@ const TIME_RANGES = {
   NOON_ONLY: { times: ['12:00'] },
 };
 
+const BIBLE_STUDY_CAPACITY = 999; // Effectively unlimited for now
+
 function normalizeServiceType(rawServiceType) {
   const value = String(rawServiceType || '').trim().toLowerCase();
   if (!value || value === 'salvation' || value === 'salvation_talk' || value === 'salvation-talk') {
@@ -22,6 +24,14 @@ function normalizeServiceType(rawServiceType) {
     value === 'bible-study'
   ) {
     return 'bible_study';
+  }
+  if (
+    value === 'water baptism' ||
+    value === 'water_baptism' ||
+    value === 'water-baptism' ||
+    value === 'baptism'
+  ) {
+    return 'water_baptism';
   }
   return null;
 }
@@ -39,18 +49,8 @@ function parseDateTime(dateTimeStr, timezone = DEFAULT_TIMEZONE) {
 }
 
 function getAllowedTimeRanges(serviceType, dayOfWeek) {
-  // dayOfWeek: 0=Sun .. 6=Sat (moment().day())
-  if (serviceType === 'salvation') {
-    // Salvation Talk is available daily 08:00 AM - 12:00 PM
-    return [TIME_RANGES.SALVATION_TALK];
-  }
-
-  if (serviceType === 'bible_study') {
-    if (dayOfWeek === 0) return []; // Sunday: No schedule
-    if (dayOfWeek === 3 || dayOfWeek === 6) return [TIME_RANGES.MORNING_NOON]; // Wednesday/Saturday: No evening
-    return [TIME_RANGES.ALL_DAY]; // All other days (Mon, Tue, Thu, Fri): Daily
-  }
-
+  // All services are now managed manually via tbl_service_slots by the admin.
+  // We return an empty array to disable the automatic legacy candidate slot generation.
   return [];
 }
 
@@ -67,12 +67,7 @@ function isWithinRange(slotMoment, range) {
 }
 
 function getSlotIntervalMinutes(serviceType) {
-  // Bible Study requires 90-minute (1.5 hour) gaps between sessions
-  // Salvation Talk uses standard 30-minute intervals
-  if (serviceType === 'bible_study') {
-    return 90;
-  }
-  return SLOT_INTERVAL_MINUTES; // Default 30 minutes for salvation
+  return SLOT_INTERVAL_MINUTES; // Manual slots handle their own intervals; default to 30 for display
 }
 
 function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAULT_TIMEZONE, now = null }) {
@@ -159,6 +154,12 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
     return { valid: false, message: 'Invalid time slot. Please select an exact time slot.' };
   }
 
+  // Salvation, Bible Study, and Water Baptism are now managed manually via tbl_service_slots by the admin.
+  // We bypass the automatic candidate/range checks.
+  if (normalizedService === 'salvation' || normalizedService === 'bible_study' || normalizedService === 'water_baptism') {
+    return { valid: true, serviceType: normalizedService, slot };
+  }
+
   const intervalMinutes = getSlotIntervalMinutes(normalizedService);
   
   // For intervals > 60 minutes (like Bible Study 90min), simple modulo on slot.minutes() fails.
@@ -177,7 +178,6 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
     return { valid: false, message: `Invalid time slot. Please select a valid ${intervalMinutes}-minute interval slot starting from the available range.` };
   }
 
-
   const ranges = getAllowedTimeRanges(normalizedService, slot.day());
   if (ranges.length === 0) {
     return { valid: false, message: 'No schedules are available for the selected date.' };
@@ -185,9 +185,6 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
 
   const allowed = ranges.some((range) => isWithinRange(slot, range));
   if (!allowed) {
-    if (normalizedService === 'salvation') {
-      return { valid: false, message: 'Selected slot is not available based on Salvation Talk schedule rules.' };
-    }
     return { valid: false, message: 'Selected slot is not available based on Bible Study schedule rules.' };
   }
 
@@ -196,6 +193,7 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
 
 module.exports = {
   DEFAULT_TIMEZONE,
+  BIBLE_STUDY_CAPACITY,
   normalizeServiceType,
   generateCandidateSlotsForDate,
   validateSelectedSlot,

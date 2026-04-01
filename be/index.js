@@ -3,7 +3,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 // Set timezone to UTC for consistent timestamp handling across all environments
 process.env.TZ = 'UTC';
 
-// System Logs Module Integration - Trigger nodemon restart
+// System Logs Module Integration - Trigger nodemon restart for discipleship standardization
 
 /**
  * Bible Baptist Ekklesia of Kawit Backend API
@@ -339,6 +339,7 @@ app.post('/api/public/water-baptism/register', async (req, res) => {
 app.use('/api/services/discipleship-requests', discipleshipRouter);
 app.use('/api/services/biblestudy-requests', biblestudyRouter);
 app.use('/api/services/salvation-availability', salvationAvailabilityRouter);
+app.use('/api/services/service-slots', require('./routes/services/serviceSlotRoutes'));
 app.use('/api/services/marriage-services', marriageServiceRouter);
 app.use('/api/services/promotion-visits', promotionVisitRouter);
 app.use('/api/transactions', transactionRouter);

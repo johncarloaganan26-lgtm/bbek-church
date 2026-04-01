@@ -289,7 +289,16 @@
                 {{ formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time, dedication.status) }}
               </div>
             </td>
-            <td>{{ dedication.pastor || 'N/A' }}</td>
+            <td>
+              <div v-if="dedication.pastor_name_joined" class="text-body-2 font-weight-medium">
+                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
+                {{ dedication.pastor_name_joined }}
+                <div v-if="dedication.pastor_position" class="text-caption text-grey font-italic ml-6">
+                  {{ dedication.pastor_position }}
+                </div>
+              </div>
+              <div v-else class="text-caption text-grey">{{ dedication.pastor || 'Unassigned' }}</div>
+            </td>
             <td>{{ dedication.location || 'N/A' }}</td>
             <td>{{ getFatherDisplayName(dedication) }}</td>
             <td>{{ getMotherDisplayName(dedication) }}</td>
@@ -380,6 +389,12 @@
       @submit="handleSubmit"
     />
 
+    <!-- Availability Manager Dialog -->
+    <AvailabilityManager 
+      v-model="availabilityManagerVisible" 
+      initial-service="child_dedication" 
+    />
+
     <!-- Bulk Complete Calendar Dialog -->
     <v-dialog v-model="bulkCompleteDialog" max-width="450px" persistent class="bulk-complete-dialog" style="overflow: visible;">
       <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
@@ -419,7 +434,7 @@
               class="w-100 custom-date-picker"
               size="large"
               popper-class="bulk-complete-date-picker-popper"
-              teleport="body"
+              teleported
               :popper-options="{ strategy: 'fixed' }"
             />
           </div>
@@ -474,6 +489,7 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
+import AvailabilityManager from '@/components/admin/ServicesRecords/AvailabilityManager.vue'
 
 const childDedicationStore = useChildDedicationStore()
 const settingsStore = useSystemSettingsStore()
@@ -481,6 +497,7 @@ const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedDedications = ref([])
+const availabilityManagerVisible = ref(false)
 
 // Computed properties from store
 const dedications = computed(() => childDedicationStore.dedications)

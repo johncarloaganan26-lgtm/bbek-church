@@ -7,10 +7,10 @@
           <v-card class="pa-6 rounded-xl border-teal elevation-2 mb-6" style="border-top: 6px solid #0d9488">
             <div class="d-flex align-center mb-4">
               <v-icon color="teal" class="mr-2">mdi-calendar-clock</v-icon>
-              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Sunday Slots</h3>
+              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Slots</h3>
             </div>
             <p class="text-body-2 grey--text mb-6">
-              Select one of the upcoming Sunday schedules to automatically fill the form.
+              Select one of the upcoming schedules to automatically fill the form.
             </p>
             
             <div v-if="loadingSlots" class="text-center py-4">
@@ -18,32 +18,36 @@
             </div>
 
             <div v-else class="slots-list">
-              <v-hover v-for="slot in availableSlots" :key="slot.date" v-slot="{ isHovering, props }">
-                <v-card
-                   v-bind="props"
-                   :elevation="isHovering ? 4 : 1"
-                   :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
-                   @click="selectSlot(slot)"
-                 >
-                   <div class="d-flex justify-space-between align-center">
-                     <div>
-                       <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
-                       <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.timeDisplay }}</div>
-                       <div class="text-caption grey--text mt-1 d-flex align-center">
-                       <v-icon size="14" class="mr-1">mdi-account-group</v-icon>
-                       <span v-if="slot.bookingCount && slot.bookingCount > 0">
-                         {{ slot.bookingCount }} {{ slot.bookingCount === 1 ? 'person' : 'people' }} joined
-                       </span>
-                       <span v-else class="italic">Be the first to join!</span>
-                     </div>
-                     </div>
-                     <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
-                       {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
-                     </v-icon>
-                   </div>
-                 </v-card>
-               </v-hover>
-             </div>
+              <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="mb-4">
+                <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                  <v-icon size="14" class="mr-1 mt-n1">mdi-calendar</v-icon>
+                  {{ dateGroup.displayDate }}
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <v-chip
+                      v-for="slot in dateGroup.timeSlots"
+                      :key="slot.datetime"
+                      size="small"
+                      variant="flat"
+                      :color="formData.baptism_date === dateGroup.date && formData.baptism_time === slot.time ? 'teal' : 'white'"
+                      :class="[
+                        'elevation-1 border-teal', 
+                        formData.baptism_date === dateGroup.date && formData.baptism_time === slot.time ? 'text-white' : 'text-teal font-weight-bold',
+                        slot.bookedCount >= slot.maxCapacity ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'
+                      ]"
+                      @click="slot.bookedCount < slot.maxCapacity && selectSlotByGroup(dateGroup, slot)"
+                      :disabled="slot.bookedCount >= slot.maxCapacity"
+                      :title="slot.bookedMembers?.length > 0 ? 'Booked by: ' + slot.bookedMembers.join(', ') : 'No bookings yet'"
+                    >
+                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                      {{ slot.display || formatTime(slot.time) }}
+                      <span class="ml-1 opacity-70" style="font-size: 0.75em !important; font-weight: 500;">
+                        ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 0 }})
+                      </span>
+                    </v-chip>
+                </div>
+              </div>
+            </div>
             
             <v-alert
               type="info"
@@ -52,7 +56,7 @@
               class="mt-4 text-caption"
               color="teal"
             >
-              Slots are set to 1:00 PM every Sunday.
+              Slots are manually scheduled by the church administration.
             </v-alert>
           </v-card>
         </v-col>
@@ -361,88 +365,44 @@ const loadingSlots = ref(false);
 const churchLeaders = ref([]);
 const loadingChurchLeaders = ref(false);
 
-const fetchSundaySlots = async () => {
+const fetchAvailableSlots = async (days = 30) => {
     loadingSlots.value = true;
     try {
-        console.log('[WaterBaptism] Fetching available slots...');
-        const response = await publicAxios.get('/services/water-baptisms/available-slots', {
-            params: { days: 45 } // Fetch more days to find enough Sundays
+        const response = await axios.get('/services/water-baptisms/available-slots', {
+            params: { days }
         });
         
-        console.log('[WaterBaptism] Available slots response:', response.data);
-        if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
-            const slots = [];
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            response.data.data.forEach(dateGroup => {
-                const slotDate = new Date(dateGroup.date);
-                slotDate.setHours(0, 0, 0, 0);
-                
-                // Only include future dates
-                if (slotDate <= today) return;
-
-                if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) {
-                    console.warn('[WaterBaptism] Missing or invalid timeSlots for date:', dateGroup.date);
-                    return;
-                }
-                
-                const onePmSlot = dateGroup.timeSlots.find(s => s.time === '13:00:00' || s.time === '13:00');
-                
-                if (onePmSlot) {
-                    const slotData = {
-                        date: dateGroup.date,
-                        displayDate: moment(dateGroup.date).format('MMMM D, YYYY'),
-                        time: '13:00:00',
-                        timeDisplay: '1:00 PM',
-                        bookingCount: typeof onePmSlot.bookingCount === 'number' ? onePmSlot.bookingCount : 0
-                    };
-                    slots.push(slotData);
-                }
-            });
-            
-            availableSlots.value = slots.slice(0, 4); // Keep next 4 Sundays
-        } else {
-            generateFallbackSlots();
+        if (response.data.success && response.data.data) {
+            // Map backend data to the format expected by the template
+            availableSlots.value = response.data.data.map(group => ({
+                date: group.date,
+                displayDate: moment(group.date).format('dddd, MMMM D, YYYY'),
+                dayName: group.dayName,
+                timeSlots: group.timeSlots.map(slot => ({
+                    time: slot.time,
+                    datetime: slot.datetime,
+                    display: slot.display,
+                    bookedCount: slot.bookedCount,
+                    maxCapacity: slot.maxCapacity
+                }))
+            }));
         }
     } catch (error) {
-        console.error('[WaterBaptism] Error fetching Sunday slots:', error.message, error);
-        ElMessage.warning('Could not fetch available slots. Generating default schedule...');
-        generateFallbackSlots();
+        console.error('[WaterBaptism] Error fetching available slots:', error);
     } finally {
         loadingSlots.value = false;
     }
 };
 
-const generateFallbackSlots = () => {
-  const slots = [];
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  let current = new Date(tomorrow);
-  const daysUntilSunday = (7 - tomorrow.getDay()) % 7;
-  current.setDate(tomorrow.getDate() + daysUntilSunday);
-  
-  for (let i = 0; i < 4; i++) {
-    const slotDate = new Date(current);
-    const dateStr = slotDate.toISOString().split('T')[0];
-    slots.push({
-      date: dateStr,
-      displayDate: slotDate.toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
-      }),
-      time: '13:00:00',
-      timeDisplay: '1:00 PM',
-      bookingCount: 0
-    });
-    current.setDate(current.getDate() + 7);
-  }
-  availableSlots.value = slots;
+const selectSlotByGroup = (dateGroup, slot) => {
+  formData.baptism_date = dateGroup.date;
+  formData.baptism_time = slot.time;
+  ElMessage.success(`Selected Date: ${dateGroup.displayDate} at ${slot.display || formatTime(slot.time)}`);
 };
 
-const selectSlot = (slot) => {
-  formData.baptism_date = slot.date;
-  formData.baptism_time = slot.time;
-  ElMessage.success(`Selected Sunday: ${slot.displayDate}`);
+const formatTime = (time) => {
+  if (!time) return '';
+  return moment(`2024-01-01 ${time}`).format('h:mm A');
 };
 
 const fetchChurchLeaders = async () => {
@@ -477,7 +437,7 @@ watch(() => formData.birthdate, (newDate) => {
 });
 
 onMounted(async () => {
-  fetchSundaySlots();
+  fetchAvailableSlots();
   
   if (props.adminMode && props.adminData) {
     requestId.value = props.adminData._activeItem?.request_id || null;

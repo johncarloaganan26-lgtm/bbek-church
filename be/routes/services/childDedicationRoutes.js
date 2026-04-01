@@ -640,53 +640,71 @@ router.get('/available-slots', async (req, res) => {
     const start = momentTz().tz(timezone).startOf('day');
     const endExclusive = start.clone().add(days, 'days');
 
-    // Get all 12pm child dedication requests within the date range
-    const [bookedRows] = await query(`
-      SELECT DATE_FORMAT(preferred_dedication_date, '%Y-%m-%d') AS booked_date, 
-             COUNT(*) as request_count
-      FROM tbl_childdedications
-      WHERE status IN ('Approved', 'Pending', 'Scheduled', 'Completed')
-        AND preferred_dedication_date IS NOT NULL
-        AND preferred_dedication_date >= ?
-        AND preferred_dedication_date < ?
-        AND (preferred_dedication_time = '12:00:00' OR preferred_dedication_time = '12:00')
-      GROUP BY booked_date
-      ORDER BY booked_date ASC
+    // Fetch manual slots and subquery the booking counts
+    const [manualRows] = await query(`
+      SELECT 
+             s.available_date,
+             s.available_time,
+             s.max_slots,
+             DATE_FORMAT(s.available_time, '%H:%i') as time,
+             CONCAT(DATE_FORMAT(s.available_date, '%Y-%m-%d'), ' ', DATE_FORMAT(s.available_time, '%H:%i:00')) as datetime,
+             s.status as slot_status,
+             (
+               SELECT COUNT(*) 
+               FROM tbl_childdedications c 
+               WHERE LOWER(c.status) IN ('approved', 'pending', 'scheduled')
+                 AND DATE(c.preferred_dedication_date) = DATE(s.available_date)
+                 AND TIME(COALESCE(c.preferred_dedication_time, '00:00:00')) = TIME(s.available_time)
+             ) as bookedCount,
+             (
+               SELECT GROUP_CONCAT(CONCAT(COALESCE(m.firstname, c.child_firstname), ' ', COALESCE(m.lastname, c.child_lastname)) SEPARATOR ', ')
+               FROM tbl_childdedications c
+               LEFT JOIN tbl_members m ON c.requested_by = m.member_id
+               WHERE LOWER(c.status) IN ('approved', 'pending', 'scheduled')
+                 AND DATE(c.preferred_dedication_date) = DATE(s.available_date)
+                 AND TIME(COALESCE(c.preferred_dedication_time, '00:00:00')) = TIME(s.available_time)
+             ) as bookedMembersList
+      FROM tbl_service_slots s
+      WHERE s.service_type = 'dedication'
+        AND s.status = 'Available'
+        AND s.available_date >= ?
+        AND s.available_date < ?
+      ORDER BY s.available_date ASC, s.available_time ASC
     `, [
-      start.format('YYYY-MM-DD HH:mm:ss'),
-      endExclusive.format('YYYY-MM-DD HH:mm:ss')
+      start.format('YYYY-MM-DD'),
+      endExclusive.format('YYYY-MM-DD')
     ]);
 
-    const requestCounts = {};
-    (bookedRows || []).forEach(row => {
-      requestCounts[row.booked_date] = row.request_count || 0;
+    const dateGroups = [];
+    const dateMap = {};
+
+    manualRows.forEach(row => {
+      const dateStr = momentTz(row.available_date).format('YYYY-MM-DD');
+      if (!dateMap[dateStr]) {
+        dateMap[dateStr] = {
+          date: dateStr,
+          dayName: momentTz(row.available_date).format('dddd'),
+          timeSlots: []
+        };
+        dateGroups.push(dateMap[dateStr]);
+      }
+
+      const bookedCount = row.bookedCount || 0;
+      dateMap[dateStr].timeSlots.push({
+        datetime: row.datetime,
+        time: row.time,
+        display: momentTz(row.datetime).format('h:mm A'),
+        bookedCount: bookedCount,
+        bookedMembers: row.bookedMembersList ? row.bookedMembersList.split(', ') : [],
+        maxCapacity: row.max_slots,
+        isManual: true,
+        isFull: bookedCount >= row.max_slots
+      });
     });
 
-    // Generate available Sundays with 12pm slot only
-    const dateGroups = [];
-    for (let i = 1; i <= days; i++) {
-      const date = start.clone().add(i, 'days');
-      // Child Dedication only on Sundays (day 0)
-      if (date.day() !== 0) continue;
-
-      const dateStr = date.format('YYYY-MM-DD');
-      const slotRequestCount = requestCounts[dateStr] || 0;
-
-      // Only 12:00 PM slot for child dedication
-      const slot = '12:00:00';
-      
-      dateGroups.push({
-        date: dateStr,
-        dayName: date.format('dddd'),
-        requestCount: slotRequestCount,
-        timeSlots: [{
-          time: slot,
-          datetime: `${dateStr} ${slot}`,
-          display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A'),
-          requestCount: slotRequestCount
-        }]
-      });
-    }
+    dateGroups.forEach(group => {
+      group.availableSlots = group.timeSlots.length;
+    });
 
     return res.json({
       success: true,
@@ -694,7 +712,6 @@ router.get('/available-slots', async (req, res) => {
       meta: {
         timezone,
         days,
-        slot: '12:00 PM',
         startDate: start.format('YYYY-MM-DD'),
         endDate: endExclusive.format('YYYY-MM-DD')
       }

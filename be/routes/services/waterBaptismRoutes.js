@@ -20,1063 +20,332 @@ const { query } = require('../../database/db');
 
 const router = express.Router();
 
-// Water Baptism is held on Sundays only (0 = Sunday).
-const ALLOWED_BAPTISM_DAY = 0;
+// Removed strict Sunday restriction as requested
 
+/**
+ * Validates a baptism date format and timezone.
+ * Returns { valid: true, parsed } on success.
+ */
 function validateBaptismDate(baptismDate) {
   if (!baptismDate) return { valid: true };
 
-  const d = moment(baptismDate, ['YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss', moment.ISO_8601], true);
-  const parsed = d.isValid() ? d : moment(baptismDate);
+  const momentTz = require('moment-timezone');
+  const timezone = 'Asia/Manila';
+
+  // Parse explicitly in Manila timezone.
+  const parsed = momentTz.tz(baptismDate, ['YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss', moment.ISO_8601], timezone);
 
   if (!parsed.isValid()) {
-    return { valid: false, message: 'Invalid baptism date. Please select a valid date.' };
+    return { valid: false, message: 'Invalid baptism date format. Please use YYYY-MM-DD.' };
   }
 
-  if (parsed.day() !== ALLOWED_BAPTISM_DAY) {
-    return { valid: false, message: 'Water Baptism can only be scheduled on Sundays. Please select a Sunday date.' };
-  }
-
-  return { valid: true };
+  return { valid: true, parsed };
 }
 
 /**
  * CREATE - Insert a new water baptism record
- * POST /api/services/water-baptisms/createWaterBaptism
- * Body: {
- *   baptism_id?,
- *   member_id?,           // Required for members
- *   is_member?,           // true = member, false = non-member (default: true)
- *   firstname?,           // Required for non-members
- *   lastname?,            // Required for non-members
- *   middle_name?,
- *   email?,               // Required for non-members
- *   phone_number?,
- *   birthdate?,
- *   age?,
- *   gender?,
- *   address?,
- *   civil_status?,
- *   baptism_date?,
- *   location?,
- *   pastor_name?,
- *   status?,
- *   guardian_name?,
- *   guardian_contact?,
- *   guardian_relationship?,
- *   date_created?
- * }
  */
 router.post('/createWaterBaptism', async (req, res) => {
   try {
     if (req.body && req.body.baptism_date) {
       const dateValidation = validateBaptismDate(req.body.baptism_date);
       if (!dateValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: dateValidation.message
-        });
+        return res.status(400).json({ success: false, message: dateValidation.message });
       }
     }
 
-    // Check if creating a completed baptism for non-member
-    const isNonMemberCompleted =
-      (req.body.is_member === false || req.body.is_member === 0 || req.body.is_member === 'false' || req.body.is_member === '0' || req.body.member_id === null) &&
-      req.body.status &&
-      req.body.status.toLowerCase() === 'completed';
-
-    console.log(`=== CREATING WATER BAPTISM ===`);
-    console.log(`Is non-member completed: ${isNonMemberCompleted}`);
-    console.log(`Request body:`, JSON.stringify({
-      firstname: req.body.firstname,
-      lastname: req.body.lastname,
-      email: req.body.email,
-      is_member: req.body.is_member,
-      member_id: req.body.member_id,
-      status: req.body.status
-    }, null, 2));
-
     const result = await createWaterBaptism(req.body);
-
     if (result.success) {
-      // If this is a non-member with completed status, create member and account
-      if (isNonMemberCompleted) {
-        const baptism = result.data;
-        console.log(`✅ Creating member and account for completed non-member baptism: ${baptism.baptism_id}`);
-
-        try {
-          // Format birthdate to YYYY-MM-DD
-          let formattedBirthdate = null;
-          if (baptism.birthdate) {
-            try {
-              formattedBirthdate = moment(baptism.birthdate).format('YYYY-MM-DD');
-            } catch (e) {
-              console.error('Error formatting birthdate:', e);
-              formattedBirthdate = null;
-            }
-          }
-
-          // Truncate address if too long (VARCHAR(45))
-          let formattedAddress = baptism.address || '';
-          if (formattedAddress.length > 44) {
-            formattedAddress = formattedAddress.substring(0, 44);
-          }
-
-          // Create member from baptism data
-          const memberData = {
-            firstname: baptism.firstname || '',
-            lastname: baptism.lastname || '',
-            middle_name: baptism.middle_name || null,
-            birthdate: formattedBirthdate,
-            age: baptism.age || '',
-            gender: baptism.gender || '',
-            address: formattedAddress,
-            email: baptism.email || '',
-            phone_number: baptism.phone_number || '',
-            civil_status: baptism.civil_status || null,
-            guardian_name: baptism.guardian_name || null,
-            guardian_contact: baptism.guardian_contact || null,
-            guardian_relationship: baptism.guardian_relationship || null,
-            position: 'Member'
-          };
-
-          console.log('Creating member record...');
-          const memberResult = await createMember(memberData);
-
-          let existingMemberId = null;
-
-          if (memberResult.success && memberResult.data) {
-            existingMemberId = memberResult.data.member_id;
-            console.log(`✅ Member created successfully with ID: ${existingMemberId}`);
-          } else if (memberResult.message && memberResult.message.includes('Duplicate member detected')) {
-            // Member already exists - try to find by email first
-            console.log(`⚠️ Member already exists (duplicate detected). Looking up by email...`);
-            let existingMember = await getSpecificMemberByEmailAndStatus(baptism.email);
-
-            if (!existingMember) {
-              const sql = 'SELECT member_id FROM tbl_members WHERE phone_number = ?';
-              const [rows] = await query(sql, [baptism.phone_number]);
-              if (rows.length > 0) {
-                existingMember = { member_id: rows[0].member_id };
-                console.log(`✅ Found existing member by phone with ID: ${existingMember.member_id}`);
-              }
-            } else {
-              console.log(`✅ Found existing member by email with ID: ${existingMember.member_id}`);
-            }
-
-            if (!existingMember && baptism.firstname && baptism.lastname && baptism.birthdate) {
-              const nameSql = 'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND birthdate = ?';
-              const birthdateFormatted = moment(baptism.birthdate).format('YYYY-MM-DD');
-              const [nameRows] = await query(nameSql, [baptism.firstname, baptism.lastname, birthdateFormatted]);
-              if (nameRows.length > 0) {
-                existingMember = { member_id: nameRows[0].member_id };
-                console.log(`✅ Found existing member by name + birthdate with ID: ${existingMember.member_id}`);
-              }
-            }
-
-            if (existingMember) {
-              existingMemberId = existingMember.member_id;
-            }
-          }
-
-          if (existingMemberId) {
-            // Update water baptism record with member_id
-            console.log('Updating water baptism record with member_id...');
-            await updateWaterBaptism(baptism.baptism_id, { member_id: existingMemberId, is_member: true });
-
-            // Create account for the member if not exists
-            const tempPassword = Math.random().toString(36).slice(-12);
-            console.log(`Generated temp password: ${tempPassword}`);
-
-            let accountResult = await getAccountByEmail(baptism.email);
-            if (!accountResult.success || !accountResult.data) {
-              const accountData = {
-                email: baptism.email,
-                password: tempPassword,
-                position: 'Member',
-                acc_name: `${baptism.firstname} ${baptism.lastname}`
-              };
-              console.log('Creating account record...');
-              accountResult = await createAccount(accountData);
-            } else {
-              console.log(`Account already exists for ${baptism.email}, using existing account`);
-            }
-
-            if (accountResult.success && accountResult.data) {
-              const account = accountResult.data;
-              console.log(`✅ Account ready with ID: ${account.acc_id}`);
-
-              const name = `${baptism.firstname} ${baptism.middle_name ? baptism.middle_name + ' ' : ''}${baptism.lastname}`.trim();
-              console.log(`Sending welcome email to ${baptism.email} for ${name}...`);
-
-              const emailResult = await sendAccountDetails({
-                acc_id: account.acc_id,
-                email: baptism.email,
-                name: name,
-                type: 'new_account',
-                temporaryPassword: tempPassword
-              });
-
-              if (emailResult.success) {
-                console.log(`✅ Welcome email sent successfully to ${baptism.email}`);
-
-                console.log(`Sending water baptism completion confirmation email to ${baptism.email}...`);
-                const baptismEmailResult = await sendWaterBaptismDetails({
-                  email: baptism.email,
-                  status: 'completed',
-                  recipientName: name,
-                  memberName: name,
-                  baptismDate: baptism.baptism_date || moment().format('YYYY-MM-DD'),
-                  location: baptism.location || '',
-                  pastorName: baptism.pastor_name || '',
-                  isMember: true,
-                  // Registration fields from baptism record
-                  firstname: baptism.firstname || '',
-                  middleName: baptism.middle_name || '',
-                  lastname: baptism.lastname || '',
-                  birthdate: baptism.birthdate || '',
-                  age: baptism.age || null,
-                  gender: baptism.gender || '',
-                  address: baptism.address || '',
-                  phoneNumber: baptism.phone_number || '',
-                  civilStatus: baptism.civil_status || '',
-                  profession: baptism.profession || ''
-                });
-
-                if (baptismEmailResult.success) {
-                  console.log(`✅ Water baptism completion email sent to ${baptism.email}`);
-                } else {
-                  console.error(`❌ Failed to send water baptism completion email: ${baptismEmailResult.message}`);
-                }
-              } else {
-                console.error(`❌ Failed to send welcome email: ${emailResult.message}`, emailResult.error);
-              }
-            }
-          }
-          console.log(`=== Non-member baptism completion processing complete ===`);
-        } catch (memberErr) {
-          console.error('Error creating member from completed baptism:', memberErr);
-        }
-      }
-
-      res.status(201).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
+      res.status(201).json(result);
     } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.error || result.message
-      });
+      res.status(400).json(result);
     }
   } catch (error) {
     console.error('Error creating water baptism:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to create water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * READ ALL - Get all water baptism records with pagination and filters
- * GET /api/services/water-baptisms/getAllWaterBaptisms (query params)
- * POST /api/services/water-baptisms/getAllWaterBaptisms (body payload)
- * Parameters: search, limit, offset, page, pageSize, status, sortBy
+ * READ ALL - Get all water baptism records
  */
 router.get('/getAllWaterBaptisms', async (req, res) => {
   try {
-    // Get parameters from query string
-    const options = req.query;
-    const result = await getAllWaterBaptisms(options);
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data,
-        count: result.count, // Number of records in current page
-        totalCount: result.totalCount, // Total number of records
-        summaryStats: result.summaryStats, // Summary statistics from all records
-        thisYearCount: result.thisYearCount, // Count of baptisms this year
-        pagination: result.pagination
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await getAllWaterBaptisms(req.query);
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    console.error('Error fetching water baptisms:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch water baptisms'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 router.post('/getAllWaterBaptisms', async (req, res) => {
   try {
-    // Get parameters from request body (payload)
-    const options = req.body;
-    const result = await getAllWaterBaptisms(options);
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data,
-        count: result.count, // Number of records in current page
-        totalCount: result.totalCount, // Total number of records
-        summaryStats: result.summaryStats, // Summary statistics from all records
-        thisYearCount: result.thisYearCount, // Count of baptisms this year
-        pagination: result.pagination
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await getAllWaterBaptisms(req.body);
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    console.error('Error fetching water baptisms:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch water baptisms'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * READ ONE - Get a single water baptism by ID
- * GET /api/services/water-baptisms/getWaterBaptismById/:id
+ * READ ONE - Get by ID
  */
 router.get('/getWaterBaptismById/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Baptism ID is required'
-      });
-    }
-
-    const result = await getWaterBaptismById(id);
-
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await getWaterBaptismById(req.params.id);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    console.error('Error fetching water baptism:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * READ ONE - Get a single water baptism by member_id
- * GET /api/services/water-baptisms/getWaterBaptismByMemberId/:memberId
+ * READ ONE - Get by Member ID
  */
 router.get('/getWaterBaptismByMemberId/:memberId', async (req, res) => {
   try {
-    const { memberId } = req.params;
-
-    if (!memberId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Member ID is required'
-      });
-    }
-
-    const result = await getWaterBaptismByMemberId(memberId);
-
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await getWaterBaptismByMemberId(req.params.memberId);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    console.error('Error fetching water baptism by member ID:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to fetch water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * UPDATE - Update an existing water baptism record
- * PUT /api/services/water-baptisms/updateWaterBaptism/:id
- * Body: { member_id?, baptism_date?, status?, date_created? }
- * When status is changed to "completed", sends account setup email to the member
+ * UPDATE - Update an existing baptism record
  */
 router.put('/updateWaterBaptism/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, error: 'ID required' });
 
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Baptism ID is required'
-      });
-    }
-
-    if (req.body && req.body.baptism_date) {
+    // Validate format only (Admins can override Sunday rule if needed manually)
+    if (req.body.baptism_date) {
       const dateValidation = validateBaptismDate(req.body.baptism_date);
       if (!dateValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: dateValidation.message
-        });
-      }
-    }
-
-    const isStatusCompleted =
-      req.body.status &&
-      req.body.status.toLowerCase() === 'completed';
-
-    // Auto-transition from pending to scheduled if scheduling info is provided
-    if (req.body && req.body.baptism_date && req.body.pastor_name && req.body.location) {
-      try {
-        const currentBaptismResp = await getWaterBaptismById(id);
-        if (currentBaptismResp.success && currentBaptismResp.data && 
-            currentBaptismResp.data.status && 
-            currentBaptismResp.data.status.toLowerCase() === 'pending') {
-          console.log(`Automatically transitioning baptism ${id} from pending to approved.`);
-          req.body.status = 'approved';
-        }
-      } catch (e) {
-        console.warn('Failed to check current baptism status:', e.message);
+        return res.status(400).json({ success: false, message: dateValidation.message });
       }
     }
 
     const result = await updateWaterBaptism(id, req.body);
-
     if (result.success) {
-      // If status is "completed", always ensure member/account/email existence
-      if (isStatusCompleted) {
-        console.log(`✅ Status is 'completed'. Ensuring member/account records and sending emails for baptism ${id}...`);
-        try {
-          await processBaptismCompletion(id);
-        } catch (processErr) {
-          console.error(`Error in processBaptismCompletion for ${id}:`, processErr);
-          // We don't fail the whole request since the main update succeeded
-        }
+      // Check if we need to process completion
+      const isCompleted = req.body.status && req.body.status.toLowerCase() === 'completed';
+      if (isCompleted) {
+        try { await processBaptismCompletion(id); } catch(e) {}
       }
-
-      res.status(200).json({
-        success: true,
-        message: result.message + (isStatusCompleted ? ' Processed member/account status.' : ''),
-        data: result.data
-      });
+      res.status(200).json(result);
     } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.error || result.message
-      });
+      res.status(400).json(result);
     }
   } catch (error) {
-    console.error('Error updating water baptism:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to update water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * DELETE - Delete a water baptism record
- * DELETE /api/services/water-baptisms/deleteWaterBaptism/:id
- * Body: { reason: "Reason for deletion" }
+ * DELETE
  */
 router.delete('/deleteWaterBaptism/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Baptism ID is required'
-      });
-    }
-
-    // Reason is now required for delete operations
-    if (!reason || reason.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        error: 'Reason for deletion is required'
-      });
-    }
-
     const archivedBy = req.user?.acc_id || null;
-    const result = await deleteWaterBaptism(id, archivedBy, reason);
-
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await deleteWaterBaptism(req.params.id, archivedBy, req.body.reason);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    console.error('Error deleting water baptism:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to delete water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * BULK DELETE - Delete multiple water baptism records
- * DELETE /api/services/water-baptisms/bulkDeleteWaterBaptisms
- * Body: { baptismIds: ["id1", "id2", "id3"], reason: "Reason for deletion" }
+ * BULK DELETE
  */
 router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
   try {
-    const { baptismIds, reason } = req.body;
     const archivedBy = req.user?.acc_id || null;
-
-    if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'baptismIds array is required and cannot be empty'
-      });
-    }
-
-    if (!reason || reason.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        error: 'Reason for deletion is required'
-      });
-    }
-
-    // Skip audit trail for bulk operations to improve performance
-    req.skipAuditTrail = true;
-
-    const result = await bulkDeleteWaterBaptisms(baptismIds, archivedBy, reason);
-
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    const result = await bulkDeleteWaterBaptisms(req.body.baptismIds, archivedBy, req.body.reason);
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    console.error('Error bulk deleting water baptisms:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to bulk delete water baptisms'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * EXPORT - Export water baptism records to Excel
- * GET /api/services/water-baptisms/exportExcel (query params)
- * POST /api/services/water-baptisms/exportExcel (body payload)
+ * EXPORT
  */
 router.get('/exportExcel', async (req, res) => {
   try {
-    const options = req.query;
-    const excelBuffer = await exportWaterBaptismsToExcel(options);
-
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
-    const filename = `water_baptisms_export_${timestamp}.xlsx`;
-
+    const buffer = await exportWaterBaptismsToExcel(req.query);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', excelBuffer.length);
-
-    res.send(excelBuffer);
+    res.setHeader('Content-Disposition', `attachment; filename=baptisms_${Date.now()}.xlsx`);
+    res.send(buffer);
   } catch (error) {
-    console.error('Error exporting water baptisms to Excel:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to export water baptisms to Excel'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 router.post('/exportExcel', async (req, res) => {
   try {
-    const options = req.body;
-    const excelBuffer = await exportWaterBaptismsToExcel(options);
-
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
-    const filename = `water_baptisms_export_${timestamp}.xlsx`;
-
+    const buffer = await exportWaterBaptismsToExcel(req.body);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', excelBuffer.length);
-
-    res.send(excelBuffer);
+    res.setHeader('Content-Disposition', `attachment; filename=baptisms_${Date.now()}.xlsx`);
+    res.send(buffer);
   } catch (error) {
-    console.error('Error exporting water baptisms to Excel:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to export water baptisms to Excel'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * CREATE - Non-member water baptism registration
- * POST /api/services/water-baptisms/register-non-member
- * Body: {
- *   firstname, lastname, middle_name, email, phone_number,
- *   birthdate, age, gender, address, civil_status,
- *   guardian_name, guardian_contact, guardian_relationship,
- *   baptism_date?, location?, pastor_name?
- * }
- * This creates a water baptism record WITHOUT creating a member record
+ * CREATE - Non-member registration (STRICT SUNDAY)
  */
 router.post('/register-non-member', async (req, res) => {
   try {
-    if (req.body && req.body.baptism_date) {
+    if (req.body.baptism_date) {
       const dateValidation = validateBaptismDate(req.body.baptism_date);
-      if (!dateValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: dateValidation.message
-        });
-      }
+      if (!dateValidation.valid) return res.status(400).json(dateValidation);
+      
+      // Sunday check removed
     }
 
-    // Validate required fields for non-member
     const { firstname, lastname, email } = req.body;
+    if (!firstname || !lastname || !email) return res.status(400).json({ success: false, message: 'Required fields missing' });
 
-    if (!firstname || !lastname || !email) {
-      return res.status(400).json({
-        success: false,
-        message: 'First name, last name, and email are required for non-member registration'
-      });
-    }
-
-    // Check if email already exists (in accounts or members)
-    const duplicateAccount = await checkDuplicateAccount(email);
-    if (duplicateAccount.isDuplicate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered',
-        error: 'An account with this email already exists. Please use a different email or contact support.'
-      });
-    }
-
-    const existingMember = await getSpecificMemberByEmailAndStatus(email?.trim().toLowerCase());
-    if (existingMember) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered',
-        error: 'A member with this email already exists. Please use a different email or contact support.'
-      });
-    }
-
-    // Create water baptism record with is_member = 0
-    const baptismData = {
-      ...req.body,
-      is_member: false,
-      member_id: null,
-      status: 'pending'
-    };
-
+    const baptismData = { ...req.body, is_member: false, status: 'pending' };
     const result = await createWaterBaptism(baptismData);
-
+    
     if (result.success) {
-      // Send confirmation email for pending registration
-      const recipientName = `${req.body.firstname} ${req.body.lastname}`;
-      console.log(`Sending pending registration confirmation email to ${req.body.email}...`);
-
-      const emailResult = await sendWaterBaptismDetails({
-        email: req.body.email,
-        status: 'pending',
-        recipientName: recipientName,
-        memberName: recipientName,
-        baptismDate: req.body.baptism_date || 'To be scheduled',
-        location: req.body.location || '',
-        pastorName: req.body.pastor_name || '',
-        isMember: false,
-        // Registration fields
-        firstname: req.body.firstname || '',
-        middleName: req.body.middle_name || '',
-        lastname: req.body.lastname || '',
-        birthdate: req.body.birthdate || '',
-        age: req.body.age || null,
-        gender: req.body.gender || '',
-        address: req.body.address || '',
-        phoneNumber: req.body.phone_number || '',
-        civilStatus: req.body.civil_status || '',
-        profession: req.body.profession || '',
-        spouseName: req.body.spouse_name || '',
-        children: req.body.children || '',
-        guardianName: req.body.guardian_name || '',
-        guardianContact: req.body.guardian_contact || '',
-        guardianRelationship: req.body.guardian_relationship || '',
-        testimony: req.body.testimony || '',
-        desireMinistry: req.body.desire_ministry || ''
-      });
-
-      if (emailResult.success) {
-        console.log(`✅ Pending registration confirmation email sent to ${req.body.email}`);
-      } else {
-        console.error(`❌ Failed to send pending registration email: ${emailResult.message}`);
-      }
-
-      res.status(201).json({
-        success: true,
-        message: 'Water baptism registration submitted successfully! You will receive an email with further instructions.',
-        data: result.data
-      });
+      // Send email
+      try {
+        await sendWaterBaptismDetails({
+          email: req.body.email,
+          status: 'pending',
+          recipientName: `${firstname} ${lastname}`,
+          baptismDate: req.body.baptism_date || 'TBD',
+          isMember: false
+        });
+      } catch(e) {}
+      res.status(201).json(result);
     } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.error || result.message
-      });
+      res.status(400).json(result);
     }
   } catch (error) {
-    console.error('Error registering non-member for water baptism:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to register for water baptism'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * CHECK EMAIL EXISTS - Check if an email already exists in accounts table
- * GET /api/services/water-baptisms/check-email-exists?email=xxx
- * This prevents creating duplicate accounts
+ * EMAIL CHECK
  */
 router.get('/check-email-exists', async (req, res) => {
   try {
-    const { email } = req.query;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    // Direct query to avoid circular dependency
-    const sql = 'SELECT acc_id, email FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))';
-    const [rows] = await query(sql, [email]);
-
-    if (rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'An account with this email already exists',
-        data: { exists: true, account: rows[0] }
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Email is available',
-      data: { exists: false }
-    });
+    const sql = 'SELECT acc_id FROM tbl_accounts WHERE email = ?';
+    const [rows] = await query(sql, [req.query.email]);
+    res.json({ success: true, data: { exists: rows.length > 0 } });
   } catch (error) {
-    console.error('Error checking email:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to check email'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * CHECK TIME SLOT - Check if a time slot is already booked for water baptism
- * GET /api/services/water-baptisms/check-time-slot?baptism_date=YYYY-MM-DD&baptism_time=HH:mm:ss&exclude_id=xxx
- * This prevents double-booking of baptism time slots
+ * TIME SLOT CHECK
  */
 router.get('/check-time-slot', async (req, res) => {
   try {
-    const { baptism_date, baptism_time, exclude_id } = req.query;
-
-    if (!baptism_date || !baptism_time) {
-      return res.status(400).json({
-        success: false,
-        message: 'Baptism date and time are required'
-      });
-    }
-
-    // Query to check for existing approved baptisms at the same date and time
-    let sql = `
-      SELECT baptism_id, firstname, lastname, baptism_date, preferred_baptism_time as baptism_time
-      FROM tbl_waterbaptism
-      WHERE baptism_date = ?
-      AND preferred_baptism_time = ?
-      AND status = 'approved'
-    `;
-
-    const params = [baptism_date, baptism_time];
-
-    // Exclude 1:00 PM (13:00:00) from being considered "booked" - it has no limit
-    if (baptism_time && (baptism_time === '13:00:00' || baptism_time === '13:00')) {
-      return res.status(200).json({
-        success: true,
-        message: 'Time slot is available (Unlimited slots for 1:00 PM)',
-        data: { isBooked: false }
-      });
-    }
-
-    const [rows] = await query(sql, params);
-
-    if (rows.length > 0) {
-      return res.status(200).json({
-        success: true,
-        message: 'Time slot is already booked',
-        data: {
-          isBooked: true,
-          conflictingBaptism: {
-            baptism_id: rows[0].baptism_id,
-            name: `${rows[0].firstname} ${rows[0].lastname}`,
-            baptism_date: rows[0].baptism_date,
-            baptism_time: rows[0].baptism_time
-          }
-        }
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Time slot is available',
-      data: { isBooked: false }
-    });
+    const { baptism_date, baptism_time } = req.query;
+    const sql = 'SELECT baptism_id FROM tbl_waterbaptism WHERE baptism_date = ? AND preferred_baptism_time = ? AND status = "approved"';
+    const [rows] = await query(sql, [baptism_date, baptism_time]);
+    res.json({ success: true, data: { isBooked: rows.length > 0 } });
   } catch (error) {
-    console.error('Error checking time slot:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to check time slot'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * BULK COMPLETE - Mark multiple water baptism records as completed
- * PUT /api/services/water-baptisms/bulkCompleteWaterBaptisms
- * Body: { baptismIds: ["id1", "id2", "id3"], completionDate?, completionTime? }
+ * BULK COMPLETE
  */
 router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
   try {
     const { baptismIds, completionDate, completionTime } = req.body;
-
-    if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'baptismIds array is required and cannot be empty'
-      });
-    }
-
-    // Fetch the global toggle setting
-    const { getCmsPage } = require('../../dbHelpers/cmsRecords');
-    const settingsResult = await getCmsPage('system_settings');
-    const allowWithoutSchedule = settingsResult.success && settingsResult.data && settingsResult.data.content 
-        ? settingsResult.data.content.allow_complete_without_schedule 
-        : false;
-
-    if (!allowWithoutSchedule) {
-        // If restriction is ON, validate each request's status and date
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const filteredIds = [];
-        const errors = [];
-
-        for (const id of baptismIds) {
-            const [rows] = await query('SELECT status, baptism_date FROM tbl_waterbaptism WHERE baptism_id = ?', [id]);
-            if (rows.length === 0) {
-                errors.push({ id, reason: 'Not found' });
-                continue;
-            }
-
-            const baptism = rows[0];
-            if (!['approved', 'scheduled', 'pending'].includes((baptism.status || '').toLowerCase())) {
-                errors.push({ id, reason: 'Status must be approved/scheduled/pending' });
-                continue;
-            }
-
-            if (baptism.baptism_date) {
-                const scheduledDate = new Date(baptism.baptism_date);
-                scheduledDate.setHours(0, 0, 0, 0);
-                if (scheduledDate > today) {
-                    errors.push({ id, reason: 'Future baptism date' });
-                    continue;
-                }
-            }
-            filteredIds.push(id);
-        }
-
-        if (filteredIds.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'No eligible records found for completion (must be approved and not in future)',
-                errors
-            });
-        }
-
-        const result = await bulkCompleteWaterBaptismsWithAccount(filteredIds, completionDate, completionTime);
-        return res.json({ ...result, errors });
-    }
-
     const result = await bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate, completionTime);
-
-    if (result.success) {
-      res.status(200).json({
-        success: true,
-        message: result.message,
-        data: result.data
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: result.message,
-        error: result.message
-      });
-    }
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
-    console.error('Error bulk completing water baptisms:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to bulk complete water baptisms'
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * AVAILABLE SLOTS - Get available water baptism slots for admin
- * GET /api/services/water-baptisms/available-slots?days=14
- * Returns available Sunday dates with time slots and existing bookings
+ * AVAILABLE SLOTS (MANUAL + DYNAMIC)
  */
 router.get('/available-slots', async (req, res) => {
   try {
     const timezone = 'Asia/Manila';
-    const daysRaw = req.query.days;
-    const requestedDays = Number.parseInt(String(daysRaw || '14'), 10);
-    const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 14;
-
     const momentTz = require('moment-timezone');
     const start = momentTz().tz(timezone).startOf('day');
+    const days = parseInt(req.query.days) || 30;
     const endExclusive = start.clone().add(days, 'days');
 
-    // Get all booked baptism slots within the date range
-    const [bookedRows] = await query(`
-      SELECT DATE_FORMAT(baptism_date, '%Y-%m-%d') AS booked_date, preferred_baptism_time as baptism_time
-      FROM tbl_waterbaptism
-      WHERE LOWER(status) IN ('pending', 'approved', 'scheduled')
-        AND baptism_date IS NOT NULL
-        AND baptism_date >= ?
-        AND baptism_date < ?
-      ORDER BY baptism_date ASC, preferred_baptism_time ASC
+    // Fetch manual slots and subquery the booking counts
+    const [manualRows] = await query(`
+      SELECT 
+             s.available_date,
+             s.available_time,
+             s.max_slots,
+             DATE_FORMAT(s.available_time, '%H:%i') as time,
+             CONCAT(DATE_FORMAT(s.available_date, '%Y-%m-%d'), ' ', DATE_FORMAT(s.available_time, '%H:%i:00')) as datetime,
+             s.status as slot_status,
+             (
+               SELECT COUNT(*) 
+               FROM tbl_waterbaptism b 
+               WHERE LOWER(b.status) IN ('approved', 'pending', 'scheduled')
+                 AND DATE(b.baptism_date) = DATE(s.available_date)
+                 AND TIME(COALESCE(b.preferred_baptism_time, '00:00:00')) = TIME(s.available_time)
+             ) as bookedCount,
+             (
+               SELECT GROUP_CONCAT(CONCAT(COALESCE(m.firstname, b.firstname), ' ', COALESCE(m.lastname, b.lastname)) SEPARATOR ', ')
+               FROM tbl_waterbaptism b
+               LEFT JOIN tbl_members m ON b.member_id = m.member_id
+               WHERE LOWER(b.status) IN ('approved', 'pending', 'scheduled')
+                 AND DATE(b.baptism_date) = DATE(s.available_date)
+                 AND TIME(COALESCE(b.preferred_baptism_time, '00:00:00')) = TIME(s.available_time)
+             ) as bookedMembersList
+      FROM tbl_service_slots s
+      WHERE s.service_type = 'water_baptism'
+        AND s.status = 'Available'
+        AND s.available_date >= ?
+        AND s.available_date < ?
+      ORDER BY s.available_date ASC, s.available_time ASC
     `, [
-      start.format('YYYY-MM-DD HH:mm:ss'),
-      endExclusive.format('YYYY-MM-DD HH:mm:ss')
+      start.format('YYYY-MM-DD'),
+      endExclusive.format('YYYY-MM-DD')
     ]);
 
-    const bookedMap = {};
-    (bookedRows || []).forEach(row => {
-      const dateKey = row.booked_date;
-      if (!bookedMap[dateKey]) {
-        bookedMap[dateKey] = [];
+    const dateGroupsMap = {};
+
+    manualRows.forEach(row => {
+      const date = momentTz(row.available_date).format('YYYY-MM-DD');
+      if (!dateGroupsMap[date]) {
+        dateGroupsMap[date] = {
+          date: date,
+          dayName: momentTz(row.available_date).format('dddd'),
+          timeSlots: []
+        };
       }
-      if (row.baptism_time) {
-        bookedMap[dateKey].push(row.baptism_time);
-      }
+
+      const bookedCount = row.bookedCount || 0;
+      dateGroupsMap[date].timeSlots.push({
+        time: row.time,
+        display: momentTz(row.datetime).format('h:mm A'),
+        datetime: row.datetime,
+        maxCapacity: row.max_slots,
+        bookedCount: bookedCount,
+        bookedMembers: row.bookedMembersList ? row.bookedMembersList.split(', ') : [],
+        isFull: bookedCount >= row.max_slots
+      });
     });
 
-    // Generate available Sundays with time slots
-    const dateGroups = [];
-    for (let i = 1; i <= days; i++) {
-      const date = start.clone().add(i, 'days');
-      // Water Baptism only on Sundays (day 0)
-      if (date.day() !== 0) continue;
-
-      const dateStr = date.format('YYYY-MM-DD');
-      const bookedTimes = bookedMap[dateStr] || [];
-
-      // Default time slots for water baptism: ONLY 1:00 PM (Unlimited capacity)
-      const defaultSlots = ['13:00:00'];
-      
-      // 1:00 PM (13:00:00) is always available regardless of existing bookings
-      const availableSlots = defaultSlots; // Always 1PM only
-
-      if (availableSlots.length > 0) {
-        dateGroups.push({
-          date: dateStr,
-          dayName: date.format('dddd'),
-          availableSlots: availableSlots.length,
-          bookedSlots: bookedTimes.length,
-          timeSlots: availableSlots.map(slot => {
-            const count = (bookedRows || []).filter(r => 
-              r.booked_date === dateStr && r.baptism_time === slot
-            ).length;
-            return {
-              time: slot,
-              datetime: `${dateStr} ${slot}`,
-              display: momentTz(`${dateStr} ${slot}`, 'YYYY-MM-DD HH:mm:ss').tz(timezone).format('h:mm A'),
-              bookingCount: count
-            };
-          })
-        });
-      }
-    }
-
-    return res.json({
-      success: true,
-      data: dateGroups,
-      meta: {
-        timezone,
-        days,
-        startDate: start.format('YYYY-MM-DD'),
-        endDate: endExclusive.format('YYYY-MM-DD')
-      }
-    });
+    res.json({ success: true, data: Object.values(dateGroupsMap) });
   } catch (error) {
-    console.error('Error fetching available baptism slots:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch available slots'
-    });
+    console.error('Error fetching available water baptism slots:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

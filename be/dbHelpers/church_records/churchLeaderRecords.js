@@ -654,36 +654,26 @@ async function exportChurchLeadersToExcel(options = {}) {
   }
 }
 
+const { getAllPastorsForSelect } = require('./memberRecords');
+
 /**
  * Get all church leaders for select elements (simplified data)
+ * This draws from members with 'pastor' in their position.
  * @returns {Promise<Object>} Object with leader list (id, name)
  */
 async function getAllChurchLeadersForSelect() {
   try {
-    const sql = `SELECT 
-      cl.leader_id,
-      cl.member_id,
-      m.firstname,
-      m.lastname,
-      m.middle_name,
-      CONCAT(
-        m.firstname,
-        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
-        ' ',
-        m.lastname
-      ) as fullname
-    FROM tbl_churchleaders cl
-    INNER JOIN tbl_members m ON cl.member_id = m.member_id
-    ORDER BY m.firstname ASC, m.lastname ASC`;
-
-    const [rows] = await query(sql);
+    const result = await getAllPastorsForSelect({ limit: 1000 });
+    if (!result.success) return result;
 
     return {
       success: true,
-      message: 'Church leaders retrieved successfully for select',
-      data: rows.map(leader => ({
-        id: leader.leader_id, // Use leader_id (integer) for pastor_id
-        name: leader.fullname || `${leader.firstname} ${leader.lastname}`.trim()
+      message: 'Pastors retrieved successfully for selection',
+      data: result.data.map(pastor => ({
+        id: pastor.acc_id || pastor.member_id, // Ensure we always have an ID for selection
+        member_id: pastor.member_id,
+        acc_id: pastor.acc_id,
+        name: pastor.name
       }))
     };
   } catch (error) {

@@ -771,12 +771,12 @@ async function getAllMembers(options = {}) {
     // Handle both 'search' and 'q' parameter names, and filter out empty strings
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
-      const searchCondition = `(firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR phone_number LIKE ?)`;
+      const searchCondition = `(firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
 
       whereConditions.push(searchCondition);
-      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern);
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 
@@ -844,6 +844,16 @@ async function getAllMembers(options = {}) {
       whereConditions.push('gender = ?');
       countParams.push(dbGender);
       params.push(dbGender);
+      hasWhere = true;
+    }
+
+    // Add position filter
+    const position = options.position || null;
+    if (position && position !== 'All Positions' && position.trim() !== '') {
+      const positionValue = position.trim();
+      whereConditions.push('position = ?');
+      countParams.push(positionValue);
+      params.push(positionValue);
       hasWhere = true;
     }
 
@@ -1377,29 +1387,32 @@ async function getAllPastorsForSelect(options = {}) {
 
     // Build query with optional search and pagination
     let sql = `SELECT 
-      member_id,
-      firstname,
-      lastname,
-      middle_name,
+      m.member_id,
+      m.firstname,
+      m.lastname,
+      m.middle_name,
+      m.position,
       CONCAT(
-        firstname,
-        IF(middle_name IS NOT NULL AND middle_name != '', CONCAT(' ', middle_name), ''),
+        m.firstname,
+        IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''),
         ' ',
-        lastname
-      ) as fullname
-    FROM tbl_members
-    WHERE LOWER(position) LIKE ?`;
+        m.lastname
+      ) as fullname,
+      a.acc_id
+    FROM tbl_members m
+    LEFT JOIN tbl_accounts a ON m.email = a.email COLLATE utf8mb4_unicode_ci
+    WHERE LOWER(m.position) LIKE ?`;
 
     // Add search filter if provided
     if (search && search.trim()) {
       sql += ` AND (
-        firstname LIKE ? 
-        OR lastname LIKE ? 
-        OR middle_name LIKE ?
+        m.firstname LIKE ? 
+        OR m.lastname LIKE ? 
+        OR m.middle_name LIKE ?
       )`;
     }
 
-    sql += ` ORDER BY firstname ASC, lastname ASC LIMIT ? OFFSET ?`;
+    sql += ` ORDER BY m.firstname ASC, m.lastname ASC LIMIT ? OFFSET ?`;
 
     // Build params
     const searchTerm = '%pastor%';
@@ -1424,10 +1437,13 @@ async function getAllPastorsForSelect(options = {}) {
     const [countResult] = await query(countSql, countParams);
     const totalCount = countResult[0]?.total || 0;
 
-    // Format data for select elements: [{ id, name }]
+    // Format data for select elements: [{ id, name, acc_id, position }]
     const pastorOptions = rows.map(pastor => ({
-      id: pastor.member_id,
-      name: pastor.fullname || `${pastor.firstname} ${pastor.lastname}`.trim()
+      id: pastor.acc_id || pastor.member_id, // Consistent with church leader selects
+      member_id: pastor.member_id,
+      acc_id: pastor.acc_id,
+      name: pastor.fullname || `${pastor.firstname} ${pastor.lastname}`.trim(),
+      position: pastor.position
     }));
 
     return {

@@ -10,6 +10,7 @@ export const useMemberRecordStore = defineStore('memberRecord', {
     filters: {
       ageRange: 'All Ages',
       gender: 'All Genders',
+      position: 'All Positions',
       joinMonth: 'All Months',
       sortBy: 'Name (A-Z)'
     },
@@ -107,6 +108,9 @@ export const useMemberRecordStore = defineStore('memberRecord', {
           }
           if (options.gender !== undefined) {
             this.filters.gender = gender
+          }
+          if (options.position !== undefined) {
+            this.filters.position = position
           }
           if (options.joinMonth !== undefined) {
             this.filters.joinMonth = joinMonth

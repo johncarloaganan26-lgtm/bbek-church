@@ -1,5 +1,6 @@
 const { query } = require('../../database/db');
 const moment = require('moment-timezone');
+const XLSX = require('xlsx');
 const { createWaterBaptism } = require('./waterBaptismRecords');
 const { sendDiscipleshipDetails, sendWaterBaptismInvitation } = require('../emailHelper');
 const { validateSelectedSlot } = require('../../utils/scheduling');
@@ -115,14 +116,22 @@ async function createDiscipleshipRequest(data) {
         const scheduled_time = slotValidation.slot.format('HH:mm:ss');
         const initialStatus = 'Pending';
 
-        // Prevent double-booking of the same slot.
-        if (serviceType === 'salvation') {
-            const [conflicts] = await query(
-                "SELECT request_id FROM tbl_discipleship_requests WHERE request_type = 'Salvation' AND status IN ('Pending','Scheduled') AND scheduled_date = ? LIMIT 1",
+        // Capacity Check for Manual Slots (Salvation & Bible Study)
+        if (serviceType === 'salvation' || serviceType === 'bible_study') {
+            const [slotInfo] = await query(
+                'SELECT max_slots FROM tbl_service_slots WHERE service_type = ? AND available_date = DATE(?) AND available_time = TIME(?) AND status = \'Available\'',
+                [serviceType, scheduled_date, scheduled_date]
+            );
+            
+            const maxCapacity = (slotInfo && slotInfo.length > 0) ? slotInfo[0].max_slots : 1;
+            
+            const [bookings] = await query(
+                "SELECT COUNT(*) as count FROM tbl_discipleship_requests WHERE (request_type = 'Salvation' OR request_type = 'Bible Study') AND status IN ('Pending','Scheduled') AND scheduled_date = ?",
                 [scheduled_date]
             );
-            if (conflicts.length > 0) {
-                throw new Error('Selected time slot is no longer available. Please choose a different slot.');
+            
+            if (bookings[0].count >= maxCapacity) {
+                throw new Error('This time slot is already full. Please choose a different date or time.');
             }
         }
 
@@ -187,39 +196,95 @@ async function createDiscipleshipRequest(data) {
  */
 async function getAllDiscipleshipRequests(options = {}) {
     try {
-        const { status, search, request_type, page = 1, pageSize = 10 } = options;
-        let sql = 'SELECT * FROM tbl_discipleship_requests WHERE 1=1';
+        const { status, search, request_type, page = 1, pageSize = 10, sortBy, startDate, endDate } = options;
+        let sql = `SELECT 
+          dr.*,
+          COALESCE(
+            CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+            CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+          ) as pastor_name_joined
+        FROM tbl_discipleship_requests dr
+        LEFT JOIN tbl_accounts a ON dr.pastor_id = a.acc_id
+        LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+        LEFT JOIN tbl_members m_direct ON dr.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+        WHERE 1=1`;
         const params = [];
 
-        if (status && status !== 'All Status') {
-            sql += ' AND status = ?';
+        const isAllStatus = !status || status === '' || status.toLowerCase() === 'all' || status.toLowerCase() === 'all status';
+        if (!isAllStatus) {
+            sql += ' AND dr.status = ?';
             params.push(status);
         }
 
-        if (request_type) {
-            sql += ' AND request_type = ?';
+        const isAllRequestType = !request_type || request_type === '' || request_type.toLowerCase() === 'all' || request_type.toLowerCase() === 'all type';
+        if (!isAllRequestType) {
+            sql += ' AND dr.request_type = ?';
             params.push(request_type);
         }
 
         if (search) {
-            sql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
+            sql += ' AND (dr.firstname LIKE ? OR dr.lastname LIKE ? OR dr.email LIKE ? OR dr.request_id LIKE ?)';
             const term = `%${search}%`;
             params.push(term, term, term, term);
         }
 
-        sql += ' ORDER BY date_created DESC';
+        if (startDate && endDate) {
+            sql += ' AND dr.scheduled_date BETWEEN ? AND ?';
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
 
-        // Pagination
-        const limit = parseInt(pageSize);
-        const offset = (parseInt(page) - 1) * limit;
+        let orderBy = 'dr.date_created DESC';
+        if (sortBy) {
+            switch (sortBy) {
+                case 'date_created_asc': orderBy = 'dr.date_created ASC'; break;
+                case 'date_created_desc': orderBy = 'dr.date_created DESC'; break;
+                case 'name_asc': orderBy = 'dr.firstname ASC, dr.lastname ASC'; break;
+                case 'name_desc': orderBy = 'dr.firstname DESC, dr.lastname DESC'; break;
+                case 'scheduled_asc': orderBy = 'dr.scheduled_date ASC'; break;
+                case 'scheduled_desc': orderBy = 'dr.scheduled_date DESC'; break;
+            }
+        }
 
+        sql += ` ORDER BY ${orderBy}`;
+        
         // Count total
         let whereClause = sql.substring(sql.indexOf('WHERE'));
         let orderByIdx = whereClause.lastIndexOf('ORDER BY');
         if (orderByIdx > -1) whereClause = whereClause.substring(0, orderByIdx);
 
-        const [countResult] = await query(`SELECT COUNT(*) as total FROM tbl_discipleship_requests ${whereClause}`, params);
+        const [countResult] = await query(`SELECT COUNT(*) as total FROM tbl_discipleship_requests dr ${whereClause}`, params);
         const totalCount = countResult[0]?.total || 0;
+
+        const noPagination = options.noPagination === true;
+        console.log('[DEBUG] getAllDiscipleshipRequests query:', sql, 'params:', params, 'noPagination:', noPagination);
+        if (noPagination) {
+            const [rows] = await query(sql, params);
+            console.log(`[DEBUG] Found ${rows.length} records for export`);
+            const cleanedRows = rows.map(row => {
+                const formatted = { ...row };
+                if (row.notes && Buffer.isBuffer(row.notes)) {
+                    formatted.notes = row.notes.toString('utf8');
+                }
+                if (row.address && Buffer.isBuffer(row.address)) {
+                    formatted.address = row.address.toString('utf8');
+                }
+                return formatted;
+            });
+            return {
+                success: true,
+                data: cleanedRows,
+                pagination: {
+                    page: 1,
+                    pageSize: totalCount,
+                    totalCount,
+                    totalPages: 1
+                }
+            };
+        }
+
+        // Pagination
+        const limit = parseInt(pageSize);
+        const offset = (parseInt(page) - 1) * limit;
 
         sql += ' LIMIT ? OFFSET ?';
         params.push(limit, offset);
@@ -467,6 +532,71 @@ async function archiveDiscipleshipRequest(request_id, archiveInfo = {}) {
     }
 }
 
+async function exportDiscipleshipRequestsToExcel(options = {}) {
+    const format = options.format || 'xlsx';
+    try {
+        const exportOptions = { ...options, noPagination: true };
+        // Remove ALL pagination parameters to export the full result set
+        delete exportOptions.page;
+        delete exportOptions.pageSize;
+        delete exportOptions.limit;
+        delete exportOptions.offset;
+        delete exportOptions.format;
+        
+        const result = await getAllDiscipleshipRequests(exportOptions);
+        if (!result.success || !result.data || result.data.length === 0) {
+            throw new Error('No records found to export');
+        }
+
+        const excelData = result.data.map((row, index) => ({
+            'No.': index + 1,
+            'Request ID': row.request_id,
+            'First Name': row.firstname,
+            'Last Name': row.lastname,
+            'Email': row.email,
+            'Phone Number': row.phone_number || '-',
+            'Request Type': row.request_type,
+            'Status': row.status,
+            'Scheduled Date': row.scheduled_date ? moment(row.scheduled_date).format('YYYY-MM-DD HH:mm:ss') : 'Not Scheduled',
+            'Location': row.location || '-',
+            'Notes': row.notes || '-',
+            'Date Created': moment(row.date_created).format('YYYY-MM-DD HH:mm:ss')
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        const workbook = XLSX.utils.book_new();
+
+        if (format === 'xlsx') {
+            const columnWidths = [
+                { wch: 5 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 25 },
+                { wch: 30 },
+                { wch: 20 },
+                { wch: 15 },
+                { wch: 15 },
+                { wch: 25 },
+                { wch: 30 },
+                { wch: 30 },
+                { wch: 25 }
+            ];
+            worksheet['!cols'] = columnWidths;
+        }
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Salvation Requests');
+        
+        return XLSX.write(workbook, { 
+            type: 'buffer', 
+            bookType: format === 'csv' ? 'csv' : 'xlsx',
+            compression: format === 'xlsx'
+        });
+    } catch (error) {
+        console.error('Export error:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createDiscipleshipRequest,
     getAllDiscipleshipRequests,
@@ -474,5 +604,6 @@ module.exports = {
     promoteToBaptism,
     inviteToBaptism,
     deleteDiscipleshipRequest,
-    archiveDiscipleshipRequest
+    archiveDiscipleshipRequest,
+    exportDiscipleshipRequestsToExcel
 };

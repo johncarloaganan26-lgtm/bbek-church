@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnnouncementStore } from '@/stores/announcementStore'
 import AnnouncementDisplayDialog from '@/components/Dialogs/AnnouncementDisplayDialog.vue'
@@ -71,20 +71,67 @@ const handleAnnouncementViewed = (announcementId) => {
   announcementDialogs[announcementId] = false
 }
 
+// Inactivity timeout (1 hour)
+const INACTIVITY_LIMIT = 1000 * 60 * 60
+const lastActivity = ref(Date.now())
+let inactivityInterval = null
+const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+
+const resetInactivityTimer = () => {
+  lastActivity.value = Date.now()
+  // Also store in localStorage to sync across tabs if needed
+  localStorage.setItem('last_interaction', lastActivity.value.toString())
+}
+
+const performLogout = () => {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('auth_token')
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
+  userInfo.value = null
+  router.push({ name: 'LandingPage' })
+  
+  // Force a reload to clear all state if we were on a protected route
+  if (route.path.startsWith('/admin') || route.path.startsWith('/dashboard')) {
+    window.location.reload()
+  }
+}
+
 onMounted(async () => {
-  // check token expiry every 1 hour and refresh it
-  setInterval(async() => {
-    const tokenValidation = checkAccessTokenValidity()
-    if (!tokenValidation.success) {
-      // Token is invalid or expired, clear it
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
-      userInfo.value = null
-      router.push({ name: 'LandingPage' })
+  // 1. Initial token check
+  const initialValidation = checkAccessTokenValidity()
+  if (!initialValidation.success && localStorage.getItem('userInfo')) {
+    performLogout()
+  }
+
+  // 2. Set up inactivity listeners
+  const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+  activityEvents.forEach(event => {
+    window.addEventListener(event, resetInactivityTimer)
+  })
+
+  // 3. Periodic check for inactivity and token validity
+  // Check every 1 minute
+  inactivityInterval = setInterval(() => {
+    // A. Check for inactivity
+    const lastInteraction = parseInt(localStorage.getItem('last_interaction') || lastActivity.value.toString())
+    const now = Date.now()
+    
+    if (localStorage.getItem('userInfo') && (now - lastInteraction > INACTIVITY_LIMIT)) {
+      console.log('Session expired due to inactivity')
+      performLogout()
+      return
     }
-  }, 1000 * 60 * 60)
+
+    // B. Check token validity (JWT exp claim)
+    // Since we extended JWT to 7 days, this will rarely hit unless really old
+    const tokenValidation = checkAccessTokenValidity()
+    if (localStorage.getItem('userInfo') && !tokenValidation.success) {
+      console.log('Session expired due to token expiration')
+      performLogout()
+    }
+  }, 1000 * 60) // Check every minute
+
   // Fetch announcements when app loads for all users
   await fetchActiveAnnouncements()
   
@@ -92,6 +139,18 @@ onMounted(async () => {
   setTimeout(() => {
     isLoading.value = false
   }, 800)
+})
+
+onUnmounted(() => {
+  // Clean up activity listeners
+  activityEvents.forEach(event => {
+    window.removeEventListener(event, resetInactivityTimer)
+  })
+  
+  // Clean up interval
+  if (inactivityInterval) {
+    clearInterval(inactivityInterval)
+  }
 })
 </script>
 

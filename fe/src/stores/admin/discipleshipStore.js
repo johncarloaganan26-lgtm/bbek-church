@@ -12,7 +12,8 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
     const filters = ref({
         status: 'All',
         search: '',
-        request_type: 'Salvation'
+        request_type: 'Salvation',
+        sortBy: 'date_created_desc'
     });
 
     const pastors = ref([]);
@@ -21,7 +22,12 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         try {
             const response = await axios.get('/church-records/church-leaders/getAllChurchLeadersForSelect');
             if (response.data.success) {
-                pastors.value = response.data.data;
+                // Ensure every pastor has an id field mapped to acc_id for consistency
+                pastors.value = response.data.data.map(p => ({
+                    ...p,
+                    id: p.acc_id || p.id,
+                    name: p.name
+                }));
             }
         } catch (error) {
             console.error('Error fetching pastors:', error);
@@ -36,7 +42,9 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
                 pageSize: pageSize.value,
                 search: filters.value.search,
                 status: filters.value.status === 'All' ? undefined : filters.value.status,
-                request_type: filters.value.request_type
+                request_type: filters.value.request_type,
+                startDate: filters.value.startDate,
+                endDate: filters.value.endDate
             };
 
             const response = await axios.get('/services/discipleship-requests', { params });
@@ -313,6 +321,33 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         }
     };
 
+    const exportToExcel = async (params = {}) => {
+        try {
+            const format = params.format || 'xlsx';
+            const response = await axios.get('/services/discipleship-requests/exportExcel', {
+                params,
+                responseType: 'blob'
+            });
+            
+            const contentType = format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            const blob = new Blob([response.data], { type: contentType });
+            const url = window.URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `salvation_records_${new Date().toISOString().split('T')[0]}.${format}`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            return true;
+        } catch (error) {
+            console.error('Export error:', error);
+            ElMessage.error('Failed to export records');
+            return false;
+        }
+    };
+
     return {
         requests,
         loading,
@@ -335,6 +370,7 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
         createRequest,
         schedulePromotionVisit,
         fetchPromotionVisit,
+        exportToExcel,
         setPage,
         setFilters
     };

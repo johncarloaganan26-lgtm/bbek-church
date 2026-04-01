@@ -846,63 +846,68 @@ router.get('/available-slots', async (req, res) => {
     const start = momentTz().tz(timezone).startOf('day');
     const endExclusive = start.clone().add(days, 'days');
 
-    // Get all booked burial service slots within the date range
+    // 1. Get all booked burial service slots within the date range
     const [bookedRows] = await query(`
-      SELECT DATE_FORMAT(service_date, '%Y-%m-%d') AS booked_date, preferred_service_time as service_time
+      SELECT DATE_FORMAT(service_date, '%Y-%m-%d %H:%i:%s') AS slot_datetime
       FROM tbl_burialservice
-      WHERE preferred_service_time IS NOT NULL
+      WHERE status IN ('Pending', 'Approved', 'Scheduled')
         AND service_date IS NOT NULL
         AND service_date >= ?
         AND service_date < ?
-        AND status IN ('Pending', 'Approved', 'Scheduled')
-      ORDER BY service_date ASC
     `, [
       start.format('YYYY-MM-DD HH:mm:ss'),
       endExclusive.format('YYYY-MM-DD HH:mm:ss')
     ]);
 
-    const bookedMap = {};
-    (bookedRows || []).forEach(row => {
-      const dateKey = row.booked_date;
-      if (!bookedMap[dateKey]) {
-        bookedMap[dateKey] = [];
-      }
-      if (row.service_time) {
-        bookedMap[dateKey].push(row.service_time);
-      }
-    });
+    const bookedCounts = (bookedRows || []).reduce((acc, r) => {
+      const dt = r.slot_datetime;
+      if (dt) acc[dt] = (acc[dt] || 0) + 1;
+      return acc;
+    }, {});
 
-    // Generate available dates with time slots (evening only: 6 PM - 10 PM, 30-min intervals)
+    // 2. Get manual slots from tbl_service_slots
+    const [manualRows] = await query(`
+      SELECT DATE_FORMAT(available_date, '%Y-%m-%d') as date, 
+             DATE_FORMAT(available_time, '%H:%i') as time,
+             CONCAT(DATE_FORMAT(available_date, '%Y-%m-%d'), ' ', DATE_FORMAT(available_time, '%H:%i:00')) as datetime,
+             max_slots
+      FROM tbl_service_slots
+      WHERE service_type = 'burial'
+        AND available_date >= ? AND available_date < ?
+        AND status = 'Available'
+    `, [start.format('YYYY-MM-DD'), endExclusive.format('YYYY-MM-DD')]);
+
+    // 3. Generate groups
     const dateGroups = [];
-    for (let i = 1; i <= days; i++) {
-      const date = start.clone().add(i, 'days');
-      const dateStr = date.format('YYYY-MM-DD');
-      const dayName = date.format('dddd');
-      const bookedTimes = bookedMap[dateStr] || [];
+    for (let i = 0; i < days; i++) {
+        const date = start.clone().add(i, 'days').format('YYYY-MM-DD');
+        const dayName = start.clone().add(i, 'days').format('dddd');
+        
+        const manualForDate = manualRows.filter(r => r.date === date);
+        
+        // If no manual slots, provide the DEFAULT 8:00 PM slot as fallback (if not booked)
+        let available = [];
+        if (manualForDate.length > 0) {
+            available = manualForDate
+                .map(manual => ({
+                    datetime: manual.datetime,
+                    time: manual.time,
+                    display: momentTz(manual.datetime).format('h:mm A'),
+                    bookedCount: bookedCounts[manual.datetime] || 0,
+                    maxCapacity: manual.max_slots,
+                    isManual: true,
+                    isFull: bookedCounts[manual.datetime] >= manual.max_slots
+                })); // Show all slots regardless of capacity
+        }
 
-      // Evening service times: 6:00 PM, 6:30 PM, 7:00 PM, 7:30 PM, 8:00 PM, 8:30 PM, 9:00 PM, 9:30 PM, 10:00 PM
-      const defaultSlots = ['20:00:00']; // Only 8:00 PM for burial service
-      
-      const availableSlots = defaultSlots.filter(slot => !bookedTimes.includes(slot));
-
-      if (availableSlots.length > 0) {
-        dateGroups.push({
-          date: dateStr,
-          dayName: dayName,
-          availableSlots: availableSlots.length,
-          bookedSlots: bookedTimes.length,
-          timeSlots: availableSlots.map(slot => {
-            const [hours, minutes] = slot.split(':');
-            const hour12 = parseInt(hours) % 12 || 12;
-            const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
-            return {
-              time: slot,
-              datetime: `${dateStr} ${slot}`,
-              display: `${hour12}:${minutes} ${ampm}`
-            };
-          })
-        });
-      }
+        if (available.length > 0) {
+            dateGroups.push({
+                date: date,
+                dayName: dayName,
+                availableSlots: available.length,
+                timeSlots: available
+            });
+        }
     }
 
     return res.json({
