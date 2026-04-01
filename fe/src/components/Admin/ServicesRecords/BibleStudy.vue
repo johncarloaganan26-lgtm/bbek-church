@@ -600,7 +600,7 @@ import moment from 'moment';
 import { useAdminBibleStudyStore } from '@/stores/admin/biblestudyStore';
 import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore';
 import WaterBaptismRegistration from '@/components/LandingPage/Services/WaterBaptismRegistration.vue';
-import AvailabilityManager from '@/components/admin/ServicesRecords/AvailabilityManager.vue';
+import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue';
 import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from '@/api/axios';

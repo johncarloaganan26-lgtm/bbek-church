@@ -489,7 +489,7 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
-import AvailabilityManager from '@/components/admin/ServicesRecords/AvailabilityManager.vue'
+import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue'
 
 const childDedicationStore = useChildDedicationStore()
 const settingsStore = useSystemSettingsStore()

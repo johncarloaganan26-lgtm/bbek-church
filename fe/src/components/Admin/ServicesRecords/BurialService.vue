@@ -392,7 +392,7 @@ import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
-import AvailabilityManager from '@/components/admin/ServicesRecords/AvailabilityManager.vue'
+import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue'
 
 const burialServiceStore = useBurialServiceStore()
 const settingsStore = useSystemSettingsStore()
