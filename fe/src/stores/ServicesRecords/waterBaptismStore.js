@@ -459,13 +459,13 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
-    async bulkCompleteWaterBaptisms(baptismIds, completionDate = null, completionTime = null) {
+    async bulkCompleteBaptisms(baptismIds, completionDate = null, completionTime = null, customMemberDateCreated = null) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')
       try {
         const response = await axios.put('/services/water-baptisms/bulkCompleteWaterBaptisms',
-          { baptismIds, completionDate, completionTime },
+          { baptismIds, completionDate, completionTime, customMemberDateCreated },
           {
             headers: {
               'Authorization': `Bearer ${accessToken}`,
@@ -479,25 +479,18 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
             pageSize: this.itemsPerPage,
             search: this.searchQuery
           })
-          return {
-            success: true,
-            data: response.data.data,
-            message: response.data.message
-          }
+          return { success: true, message: response.data.message, data: response.data.data }
         } else {
-          this.error = response.data.message || 'Failed to bulk complete water baptisms'
-          return { success: false, error: response.data.message }
+          this.error = response.data.message || 'Failed to complete water baptisms'
+          return { success: false, message: response.data.message }
         }
       } catch (error) {
-        this.error = error.response?.data?.error || error.message || 'Failed to bulk complete water baptisms'
+        this.error = error.response?.data?.error || error.message || 'Failed to complete water baptisms'
         console.error('Error bulk completing water baptisms:', error)
-        return { success: false, error: this.error }
+        return { success: false, message: this.error }
       } finally {
         this.loading = false
       }
-    }
+    },
   }
 })
-
-
-

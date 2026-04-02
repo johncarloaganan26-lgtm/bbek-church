@@ -21,7 +21,11 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         try {
             const response = await axios.get('/church-records/church-leaders/getAllChurchLeadersForSelect');
             if (response.data.success) {
-                pastors.value = response.data.data;
+                pastors.value = response.data.data.map(p => ({
+                    ...p,
+                    id: String(p.id),
+                    name: p.name
+                }));
             }
         } catch (error) {
             console.error('Error fetching pastors:', error);
@@ -206,8 +210,10 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
                 ElMessage.success(response.data.message || 'Bulk promotion completed successfully');
                 await fetchRequests();
                 return true;
+            } else {
+                ElMessage.error(response.data.message || 'Failed to bulk promote requests');
+                return false;
             }
-            return false;
         } catch (error) {
             console.error('Error bulk promoting Bible Study:', error);
             ElMessage.error(error.response?.data?.message || 'Failed to bulk promote requests');

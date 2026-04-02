@@ -449,6 +449,7 @@ import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore
 import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore'
 import { storeToRefs } from 'pinia'
 import axios from '@/api/axios'
+import moment from 'moment'
 
 const waterBaptismStore = useWaterBaptismStore()
 const settingsStore = useSystemSettingsStore()
@@ -1052,37 +1053,39 @@ watch(() => props.baptismData, async (newData) => {
     
     // Extract date and time from baptism_date string
     if (newData.baptism_date) {
-      const dateObj = new Date(newData.baptism_date)
-      if (!isNaN(dateObj.getTime())) {
-        // Set date part (YYYY-MM-DD)
-        formData.baptism_date = newData.baptism_date.split(' ')[0] || newData.baptism_date
-        
-        // Handle time extraction
-        if (newData.baptism_time) {
-          formData.baptism_time = newData.baptism_time
+        // Use moment for reliable parsing
+        const dateM = moment(newData.baptism_date);
+        if (dateM.isValid()) {
+            formData.baptism_date = dateM.format('YYYY-MM-DD');
+            
+            // Priority 1: Use explicit baptism_time if available
+            // Priority 2: Extract time from baptism_date column (if it's a DATETIME with time)
+            if (newData.baptism_time) {
+                // Ensure the time is in HH:mm format for el-time-picker
+                formData.baptism_time = moment(newData.baptism_time, ['HH:mm:ss', 'HH:mm', 'hh:mm A']).format('HH:mm');
+            } else if (newData.baptism_date.includes(' ') || newData.baptism_date.includes('T')) {
+                // Check if the date string has a time component
+                const hasTime = dateM.hours() !== 0 || dateM.minutes() !== 0;
+                if (hasTime) {
+                    formData.baptism_time = dateM.format('HH:mm');
+                } else {
+                    formData.baptism_time = null;
+                }
+            } else {
+                formData.baptism_time = null;
+            }
         } else {
-          const hours = dateObj.getHours()
-          const mins = dateObj.getMinutes()
-          // Check if it's not midnight
-          if (hours !== 0 || mins !== 0) {
-            formData.baptism_time = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
-          } else {
-            formData.baptism_time = null
-          }
+            formData.baptism_date = newData.baptism_date;
+            formData.baptism_time = newData.baptism_time ? moment(newData.baptism_time, ['HH:mm:ss', 'HH:mm', 'hh:mm A']).format('HH:mm') : null;
         }
-      } else {
-        formData.baptism_date = newData.baptism_date
-        formData.baptism_time = newData.baptism_time || null
-      }
     } else {
-      formData.baptism_date = null
-      formData.baptism_time = newData.baptism_time || null
+        formData.baptism_date = null;
+        formData.baptism_time = newData.baptism_time ? moment(newData.baptism_time, ['HH:mm:ss', 'HH:mm', 'hh:mm A']).format('HH:mm') : null;
     }
 
-    formData.location = newData.location || ''
-    // Coerce pastor ID to number if numeric, to match el-select option.id type
-    const pastorVal1 = newData.pastor_name
-    formData.pastor_name = pastorVal1 && !isNaN(pastorVal1) ? Number(pastorVal1) : (pastorVal1 || '')
+    formData.location = newData.location || '';
+    // Use string ID for pastors to match el-select option literal values
+    formData.pastor_name = newData.pastor_name ? String(newData.pastor_name) : '';
     formData.status = newData.status || 'pending'
     formData.rejection_reason = newData.rejection_reason || ''
     formData.guardian_name = newData.guardian_name || ''

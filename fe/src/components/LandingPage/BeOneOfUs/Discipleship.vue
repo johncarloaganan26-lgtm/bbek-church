@@ -264,6 +264,12 @@
                       ]" style="flex: 1; margin-bottom: 0;">
                         <el-input v-model.number="comp.age" type="number" placeholder="Age" />
                       </el-form-item>
+                      <el-form-item :prop="'companions.' + index + '.gender'" :rules="{ required: true, message: 'Gender required', trigger: 'change' }" style="flex: 1; margin-bottom: 0;">
+                        <el-select v-model="comp.gender" placeholder="Gender">
+                          <el-option label="Male" value="Male" />
+                          <el-option label="Female" value="Female" />
+                        </el-select>
+                      </el-form-item>
                     </div>
                   </div>
 
@@ -335,7 +341,8 @@ const addCompanion = () => {
     lastname: '',
     email: '',
     birthdate: '',
-    age: null
+    age: null,
+    gender: ''
   });
 };
 

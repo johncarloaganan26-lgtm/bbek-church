@@ -25,7 +25,7 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
                 // Ensure every pastor has an id field mapped to acc_id for consistency
                 pastors.value = response.data.data.map(p => ({
                     ...p,
-                    id: p.acc_id || p.id,
+                    id: String(p.acc_id || p.id),
                     name: p.name
                 }));
             }

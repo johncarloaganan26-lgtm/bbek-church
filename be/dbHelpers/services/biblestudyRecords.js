@@ -388,13 +388,25 @@ async function bulkCompleteBibleStudies(requestIds) {
 
                 // Send completion email
                 try {
-                    await sendBibleStudyDetails({
-                        ...request,
-                        status: 'Completed'
-                    });
-                    
-                    // Bible Study completion message is enough
+                    const [fullReqRows] = await query(`
+                        SELECT b.*, 
+                               COALESCE(
+                                 CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+                                 CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                               ) as pastor_name
+                        FROM tbl_biblestudy_requests b
+                        LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+                        LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+                        LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+                        WHERE b.request_id = ?
+                    `, [id]);
 
+                    if (fullReqRows.length > 0) {
+                        await sendBibleStudyDetails({
+                            ...fullReqRows[0],
+                            status: 'Completed'
+                        });
+                    }
                 } catch (emailError) {
                     console.warn(`Email notification failed for Bible Study completion (${id}):`, emailError.message);
                 }
@@ -426,6 +438,25 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {})
         if (rows.length === 0) throw new Error('Bible study request not found');
         const req = rows[0];
 
+        let pastorNameStr = overrides.pastor_name || overrides.pastor_id || req.pastor_id || null;
+        if (pastorNameStr) {
+            const [pRows] = await query(`
+                SELECT CONCAT(m.firstname, ' ', m.lastname) as resolved_name
+                FROM tbl_members m
+                JOIN tbl_accounts a ON m.email = a.email COLLATE utf8mb4_unicode_ci
+                WHERE a.acc_id = ?
+                UNION
+                SELECT CONCAT(firstname, ' ', lastname) as resolved_name
+                FROM tbl_members
+                WHERE member_id = ?
+                LIMIT 1
+            `, [pastorNameStr, pastorNameStr]);
+            
+            if (pRows.length > 0) {
+                pastorNameStr = pRows[0].resolved_name;
+            }
+        }
+
         const { createWaterBaptism } = require('./waterBaptismRecords');
         const baptismData = {
             request_id: id,
@@ -445,8 +476,10 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {})
             children: req.children,
             is_member: false,
             status: overrides.status || (isDecided ? 'approved' : 'pending'),
-            pastor_name: overrides.pastor_id || req.pastor_id || null,
+            pastor_name: pastorNameStr,
             location: overrides.location || req.location || null,
+            baptism_date: overrides.baptism_date || null,
+            baptism_time: overrides.baptism_time || null,
             guardian_name: req.guardian_name,
             guardian_contact: req.guardian_contact,
             guardian_relationship: req.guardian_relationship,

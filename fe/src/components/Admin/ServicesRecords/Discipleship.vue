@@ -355,11 +355,20 @@
               <v-text-field v-model="selectedRequest.email" label="Email Address" variant="outlined" density="compact"></v-text-field>
               <v-text-field v-model="selectedRequest.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
               <v-row>
-                <v-col cols="12" md="6">
+                <v-col cols="12" md="4">
                   <v-text-field v-model="selectedRequest.birthdate" label="Birthday" type="date" variant="outlined" density="compact"></v-text-field>
                 </v-col>
-                <v-col cols="12" md="6">
+                <v-col cols="12" md="4">
                   <v-text-field v-model="selectedRequest.age" label="Age" type="number" variant="outlined" density="compact" readonly></v-text-field>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-select
+                    v-model="selectedRequest.gender"
+                    :items="['Male', 'Female']"
+                    label="Gender"
+                    variant="outlined"
+                    density="compact"
+                  ></v-select>
                 </v-col>
               </v-row>
             </div>
@@ -640,7 +649,7 @@
                     size="large"
                     @click="handleBibleStudyAction(true)"
                     :loading="loadingBibleStudy"
-                    :disabled="!promotionForm.scheduled_date"
+                    :disabled="!promotionForm.scheduled_date || !promotionForm.pastor_id"
                     prepend-icon="mdi-calendar-check"
                     class="px-6"
                   >Confirm & Schedule</v-btn>
@@ -1359,9 +1368,9 @@ const openBulkUpdateDialog = () => {
     status: firstItem.status || 'Scheduled',
     request_type: firstItem.request_type || 'Salvation',
     scheduled_date: firstItem.scheduled_date || '',
-    location: firstItem.location || firstItem.address || '',
+    location: '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
     // Coerce pastor_id to number if numeric, to match v-select item-value type
-    pastor_id: (() => { const p = firstItem.pastor_id; return p && !isNaN(p) ? Number(p) : (p || null); })(),
+    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id) : null,
     notes: firstItem.notes || ''
   };
   
@@ -1732,7 +1741,7 @@ const openScheduleDialog = (item) => {
   selectedRequest.value = { ...item };
   // Coerce pastor_id to number if numeric, to match v-select item-value type
   const pid = item.pastor_id;
-  selectedRequest.value.pastor_id = pid && !isNaN(pid) ? Number(pid) : (pid || null);
+  selectedRequest.value.pastor_id = pid ? String(pid) : null;
   
   // Default location to church address if blank
   if (!selectedRequest.value.location) {
@@ -1976,7 +1985,24 @@ const handleBibleStudyAction = async (isDecided) => {
   // If decided and we haven't shown the scheduling form yet, show it
   if (isDecided && !isPromotionScheduling.value) {
     isPromotionScheduling.value = true;
+    
+    // Default location to church address if not set
+    if (!promotionForm.value.location) {
+        promotionForm.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
+    }
     return;
+  }
+
+  // Validate for scheduling
+  if (isDecided && isPromotionScheduling.value) {
+      if (!promotionForm.value.pastor_id) {
+          ElMessage.warning('Please select an assigned pastor');
+          return;
+      }
+      if (!promotionForm.value.scheduled_date) {
+          ElMessage.warning('Please select a schedule');
+          return;
+      }
   }
 
   loadingBibleStudy.value = true;
@@ -1993,8 +2019,12 @@ const handleBibleStudyAction = async (isDecided) => {
         }
 
         // Create a JSON object for notes if we have a group_id
+        // But only if we are actually promoting a group (more than 1 person)
+        // If it's just one person, we break them out of the group to be solo for Bible Study
         let finalNotes = promotionForm.value.notes;
-        if (groupId) {
+        const isActuallyGroup = isBulkPromoting.value ? selectedRequests.value.length > 1 : false;
+        
+        if (groupId && isActuallyGroup) {
             finalNotes = JSON.stringify({
                 notes: promotionForm.value.notes,
                 group_id: groupId
@@ -2023,7 +2053,7 @@ const handleBibleStudyAction = async (isDecided) => {
         }
 
         let bulkFinalNotes = promotionForm.value.notes;
-        if (currentGroupId) {
+        if (currentGroupId && selectedRequests.value.length > 1) {
             bulkFinalNotes = JSON.stringify({
                 notes: promotionForm.value.notes,
                 group_id: currentGroupId

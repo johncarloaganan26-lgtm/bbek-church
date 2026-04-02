@@ -572,6 +572,7 @@ router.post('/submit', async (req, res) => {
                             email: comp.email,
                             birthdate: comp.birthdate,
                             age: comp.age,
+                            gender: comp.gender,
                             companions: [], // Prevent infinite recursion if passed somehow
                             notes: JSON.stringify({ group_id: groupId })
                         });
@@ -1040,12 +1041,26 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 let pastor_name = '';
                 if (updatePayload.pastor_id) {
                     try {
-                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [updatePayload.pastor_id]);
-                        if (pastorRows.length > 0) {
-                            pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                        const [pastorRows] = await query(`
+                            SELECT 
+                                COALESCE(
+                                    CONCAT(m1.firstname, ' ', m1.lastname),
+                                    CONCAT(m2.firstname, ' ', m2.lastname)
+                                ) as name
+                            FROM (SELECT ? as pid) p
+                            LEFT JOIN tbl_accounts a ON p.pid = a.acc_id
+                            LEFT JOIN tbl_members m1 ON a.email = m1.email COLLATE utf8mb4_unicode_ci
+                            LEFT JOIN tbl_members m2 ON p.pid = m2.member_id COLLATE utf8mb4_unicode_ci
+                        `, [updatePayload.pastor_id]);
+
+                        if (pastorRows.length > 0 && pastorRows[0].name) {
+                            pastor_name = pastorRows[0].name;
+                        } else {
+                            pastor_name = 'To be determined';
                         }
                     } catch (e) {
                         console.error('Error fetching pastor:', e);
+                        pastor_name = 'To be determined';
                     }
                 }
 
@@ -1131,15 +1146,29 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
 
             // Send confirmation email
             if (current.email) {
-                let pastor_name = 'Church Leader';
+                let pastor_name = 'To be assigned';
                 if (pastor_id) {
                     try {
-                        const [pastorRows] = await query('SELECT firstname, lastname FROM tbl_churchleaders WHERE acc_id = ?', [pastor_id]);
-                        if (pastorRows.length > 0) {
-                            pastor_name = `Pastor ${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                        const [pastorRows] = await query(`
+                            SELECT 
+                                COALESCE(
+                                    CONCAT(m1.firstname, ' ', m1.lastname),
+                                    CONCAT(m2.firstname, ' ', m2.lastname)
+                                ) as name
+                            FROM (SELECT ? as pid) p
+                            LEFT JOIN tbl_accounts a ON p.pid = a.acc_id
+                            LEFT JOIN tbl_members m1 ON a.email = m1.email COLLATE utf8mb4_unicode_ci
+                            LEFT JOIN tbl_members m2 ON p.pid = m2.member_id COLLATE utf8mb4_unicode_ci
+                        `, [pastor_id]);
+                        
+                        if (pastorRows.length > 0 && pastorRows[0].name) {
+                            pastor_name = `Pastor ${pastorRows[0].name}`;
+                        } else {
+                            pastor_name = 'To be assigned';
                         }
                     } catch (e) {
                         console.error('Error fetching pastor for email:', e);
+                        pastor_name = 'To be assigned';
                     }
                 }
 

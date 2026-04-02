@@ -221,7 +221,18 @@ router.put('/:id', authenticateToken, async (req, res) => {
         const result = await updateBibleStudyRequest(id, req.body);
 
         // Fetch details for email
-        const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+        const [rows] = await query(`
+            SELECT b.*, 
+                   COALESCE(
+                     CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+                     CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                   ) as pastor_name
+            FROM tbl_biblestudy_requests b
+            LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+            LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+            LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+            WHERE b.request_id = ?
+        `, [id]);
         if (rows.length > 0 && req.body.status) {
             const requestData = rows[0];
             await sendBibleStudyDetails(requestData);
@@ -665,7 +676,18 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
 
                 // Send email if status or schedule changed (similar to individual update)
                 if (status || scheduled_date) {
-                    const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+                    const [rows] = await query(`
+                        SELECT b.*, 
+                               COALESCE(
+                                 CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+                                 CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                               ) as pastor_name
+                        FROM tbl_biblestudy_requests b
+                        LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+                        LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+                        LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+                        WHERE b.request_id = ?
+                    `, [id]);
                     if (rows.length > 0) {
                         try {
                             await sendBibleStudyDetails(rows[0]);
@@ -707,22 +729,30 @@ router.post('/bulk-promote', authenticateToken, async (req, res) => {
         }
 
         const { promoteBibleStudyToBaptism } = require('../../dbHelpers/services/biblestudyRecords');
-        const { sendWaterBaptismInvitation } = require('../../dbHelpers/services/waterBaptismRecords');
+        const { sendWaterBaptismInvitation } = require('../../dbHelpers/emailHelper');
         
         let processedCount = 0;
         let failedCount = 0;
+
+        const lastErrors = [];
 
         for (const id of requestIds) {
             try {
                 const [rows] = await query('SELECT status, firstname, lastname, email FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
                 if (rows.length === 0) {
                     failedCount++;
+                    lastErrors.push(`Request ${id} not found`);
                     continue;
                 }
 
                 const candidate = rows[0];
-                if (candidate.status !== 'Completed' && candidate.status !== 'Promoted') {
+                const currentStatus = (candidate.status || '').toLowerCase();
+                
+                // Allow 'completed', 'scheduled', and 'promoted' to be processed
+                // This ensures flexibility if an admin wants to promote someone who is already scheduled in Phase 2
+                if (currentStatus !== 'completed' && currentStatus !== 'promoted' && currentStatus !== 'scheduled') {
                     failedCount++;
+                    lastErrors.push(`${candidate.firstname} is in ineligible status: ${candidate.status}`);
                     continue;
                 }
 
@@ -743,7 +773,16 @@ router.post('/bulk-promote', authenticateToken, async (req, res) => {
             } catch (err) {
                 console.error(`Failed to process BS promote ${id}:`, err.message);
                 failedCount++;
+                lastErrors.push(err.message);
             }
+        }
+
+        if (processedCount === 0) {
+            return res.json({ 
+                success: false, 
+                message: lastErrors.length > 0 ? `Promotion failed: ${lastErrors[0]}` : `No eligible candidates found for promotion. Selected records must be in "Completed" or "Scheduled" status.`,
+                failedCount
+            });
         }
 
         res.json({ 
@@ -751,7 +790,8 @@ router.post('/bulk-promote', authenticateToken, async (req, res) => {
             message: isDecided 
                 ? `Successfully promoted ${processedCount} candidates to Water Baptism.` 
                 : `Successfully sent invitation links to ${processedCount} candidates.`,
-            failedCount
+            failedCount,
+            errors: lastErrors // Optional: send all errors
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

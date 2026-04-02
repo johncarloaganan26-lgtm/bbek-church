@@ -794,9 +794,6 @@ const handleBulkEdit = () => {
   isBulkEditing.value = true;
   const firstId = selectedRows.value[0];
   const firstItem = requests.value.find(r => r.request_id === firstId) || {};
-  // Coerce pastor_id to number if numeric, to match v-select item-value type
-  const pid = firstItem.pastor_id;
-  const coercedPastorId = pid && !isNaN(pid) ? Number(pid) : (pid || null);
   // Check if all selected items share the same scheduled date
   const allSchedules = selectedRows.value.map(id => {
     const r = requests.value.find(req => req.request_id === id);
@@ -809,7 +806,7 @@ const handleBulkEdit = () => {
     request_id: null,
     status: firstItem.status || 'Scheduled',
     location: firstItem.location || firstItem.address || '',
-    pastor_id: coercedPastorId,
+    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id) : null,
     scheduled_date: commonSchedule,
     notes: ''
   };
@@ -1047,7 +1044,7 @@ const openEditDialog = (item) => {
   editItem.value._originalStatus = item.status;
   // Coerce pastor_id to number if numeric, to match v-select item-value type
   const pid = item.pastor_id;
-  editItem.value.pastor_id = pid && !isNaN(pid) ? Number(pid) : (pid || null);
+  editItem.value.pastor_id = pid ? String(pid) : null;
   
   // Directly fall back to the address they input if no location was saved yet.
   if (!editItem.value.location && editItem.value.address) {
@@ -1298,7 +1295,7 @@ const handlePromotionAction = async (isDecided) => {
     loadingPromotion.value = true;
     try {
       if (isBulkPromoting.value) {
-          const success = await store.bulkPromoteRequests(selectedRows.value, false);
+          const success = await store.bulkPromoteToBaptism(selectedRows.value, false);
           if (success) {
             promotionDialogVisible.value = false;
             selectedRows.value = [];

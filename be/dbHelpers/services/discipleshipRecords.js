@@ -374,7 +374,19 @@ async function updateDiscipleshipRequest(request_id, updateData) {
         if (status || scheduled_date) {
             try {
                 // Get updated request details for email
-                const [reqRows] = await query('SELECT firstname, email, status, scheduled_date, pastor_id, location FROM tbl_discipleship_requests WHERE request_id = ?', [request_id]);
+                const [reqRows] = await query(`
+                    SELECT 
+                        dr.firstname, dr.email, dr.status, dr.scheduled_date, dr.location, dr.request_type,
+                        COALESCE(
+                            CONCAT(m_acc.firstname, ' ', m_acc.lastname),
+                            CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                        ) as pastor_name
+                    FROM tbl_discipleship_requests dr
+                    LEFT JOIN tbl_accounts a ON dr.pastor_id = a.acc_id
+                    LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+                    LEFT JOIN tbl_members m_direct ON dr.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+                    WHERE dr.request_id = ?
+                `, [request_id]);
                 if (reqRows.length > 0) {
                     await sendDiscipleshipDetails(reqRows[0]);
                 }
@@ -402,6 +414,26 @@ async function promoteToBaptism(request_id, isDecided = false) {
 
         const req = rows[0];
 
+        // Resolve pastor name from ID
+        let pastorNameStr = req.pastor_id || null;
+        if (pastorNameStr) {
+            const [pRows] = await query(`
+                SELECT CONCAT(m.firstname, ' ', m.lastname) as resolved_name
+                FROM tbl_members m
+                JOIN tbl_accounts a ON m.email = a.email COLLATE utf8mb4_unicode_ci
+                WHERE a.acc_id = ?
+                UNION
+                SELECT CONCAT(firstname, ' ', lastname) as resolved_name
+                FROM tbl_members
+                WHERE member_id = ?
+                LIMIT 1
+            `, [pastorNameStr, pastorNameStr]);
+            
+            if (pRows.length > 0) {
+                pastorNameStr = pRows[0].resolved_name;
+            }
+        }
+
         // 2. Prepare baptism data
         // Map fields from request to baptism schema
         const baptismData = {
@@ -423,10 +455,10 @@ async function promoteToBaptism(request_id, isDecided = false) {
             member_id: null,
             status: isDecided ? 'approved' : 'pending',
             desire_ministry: null,
-            pastor_name: req.pastor_id || null, // Use the pastor from Phase 1
-            location: req.location || null,    // Use the location from Phase 1
-            baptism_date: isDecided ? moment().format('YYYY-MM-DD') : null, // Set date to now if decided
-            baptism_time: isDecided ? moment().format('HH:mm:ss') : null,    // Set time to now if decided
+            pastor_name: pastorNameStr, 
+            location: req.location || null,    
+            baptism_date: isDecided ? moment().format('YYYY-MM-DD') : null, 
+            baptism_time: isDecided ? moment().format('HH:mm:ss') : null,    
             guardian_name: req.guardian_name,
             guardian_contact: req.guardian_contact,
             guardian_relationship: req.guardian_relationship
@@ -472,7 +504,7 @@ async function inviteToBaptism(request_id, isDecided = false) {
         // If undecided/hesitant, just send the invitation email with registration link
         // A record in tbl_waterbaptism is NOT created until they submit the form.
         if (req.email) {
-            await emailHelper.sendWaterBaptismInvitation({
+            await sendWaterBaptismInvitation({
                 request_id: req.request_id,
                 email: req.email,
                 firstname: req.firstname,

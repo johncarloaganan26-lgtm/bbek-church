@@ -1535,7 +1535,7 @@ async function getSpecificWaterBaptismDataByMemberIdIfBaptized(memberId) {
 
 
 // New comprehensive bulk complete function with member/account creation
-async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate = null, completionTime = '13:00') {
+async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate = null, completionTime = '13:00', customMemberDateCreated = null) {
   try {
     if (!Array.isArray(baptismIds) || baptismIds.length === 0) {
       return {
@@ -1585,7 +1585,7 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate =
         }
 
         // Use the common processing function to ensure member/account/email
-        const processResult = await processBaptismCompletion(baptismId);
+        const processResult = await processBaptismCompletion(baptismId, customMemberDateCreated);
 
         if (processResult.success) {
           completed++;
@@ -1628,7 +1628,7 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate =
  * @param {string} baptismId - ID of the baptism record
  * @returns {Promise<Object>} Success status
  */
-async function processBaptismCompletion(baptismId) {
+async function processBaptismCompletion(baptismId, customDateCreated = null) {
   try {
     const baptismResult = await getWaterBaptismById(baptismId);
     if (!baptismResult.success || !baptismResult.data) {
@@ -1652,21 +1652,31 @@ async function processBaptismCompletion(baptismId) {
 
       let existingMember = null;
 
-      // Try finding by email
-      if (email) {
-        existingMember = await getSpecificMemberByEmailAndStatus(email);
-      }
-
-      // Try finding by phone if not found by email
-      if (!existingMember && baptism.phone_number) {
-        const [rows] = await query('SELECT member_id FROM tbl_members WHERE phone_number = ?', [baptism.phone_number]);
+      // Try finding by email AND name
+      if (email && baptism.firstname && baptism.lastname) {
+        const [rows] = await query(
+          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))',
+          [email, baptism.firstname, baptism.lastname]
+        );
         if (rows.length > 0) {
           existingMember = { member_id: rows[0].member_id };
-          console.log(`Found existing member by phone: ${existingMember.member_id}`);
+          console.log(`Found existing member by email and name: ${existingMember.member_id}`);
         }
       }
 
-      // Try finding by name + birthdate
+      // Try finding by phone AND name if not found yet
+      if (!existingMember && baptism.phone_number && baptism.firstname && baptism.lastname) {
+        const [rows] = await query(
+          'SELECT member_id FROM tbl_members WHERE phone_number = ? AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))',
+          [baptism.phone_number, baptism.firstname, baptism.lastname]
+        );
+        if (rows.length > 0) {
+          existingMember = { member_id: rows[0].member_id };
+          console.log(`Found existing member by phone and name: ${existingMember.member_id}`);
+        }
+      }
+
+      // Try finding by name + birthdate (Existing fallback)
       if (!existingMember && baptism.firstname && baptism.lastname && baptism.birthdate) {
         const birthdateFormatted = moment(baptism.birthdate).format('YYYY-MM-DD');
         const [rows] = await query(
@@ -1700,7 +1710,8 @@ async function processBaptismCompletion(baptismId) {
           guardian_name: baptism.guardian_name || null,
           guardian_contact: baptism.guardian_contact || null,
           guardian_relationship: baptism.guardian_relationship || null,
-          position: 'Member'
+          position: 'Member',
+          date_created: customDateCreated || new Date()
         };
 
         const createResult = await createMember(memberData);
@@ -1708,6 +1719,20 @@ async function processBaptismCompletion(baptismId) {
           memberId = createResult.data.member_id;
           console.log(`Member record created with ID: ${memberId}`);
           await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
+        } else if (createResult.duplicateDetails && createResult.duplicateDetails.length > 0) {
+          // If duplicate found during creation, ONLY link if names match to prevent merging different people
+          const duplicate = createResult.duplicateDetails[0];
+          const baptismName = `${baptism.firstname || ''} ${baptism.lastname || ''}`.trim().toLowerCase();
+          const duplicateName = (duplicate.name || '').trim().toLowerCase();
+
+          if (baptismName === duplicateName) {
+            memberId = duplicate.member_id;
+            console.log(`Duplicate confirmed as the same person. Linking to existing member ID: ${memberId}`);
+            await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
+          } else {
+            console.error(`Duplicate detected by phone/email but names do NOT match ("${baptismName}" vs "${duplicateName}"). Linking skipped to prevent data corruption.`);
+            // Note: memberId remains null, so this baptism won't be linked to a member. The user must fix the duplicate info.
+          }
         } else {
           console.error('Failed to create member record:', createResult.message);
         }
@@ -1758,13 +1783,7 @@ async function processBaptismCompletion(baptismId) {
             [email.toLowerCase(), hashedPassword]
           );
           accountId = ins.insertId;
-
-          // Best effort: Try to update acc_name if it exists
-          try {
-            await query("UPDATE tbl_accounts SET acc_name = ? WHERE acc_id = ?", [`${baptism.firstname || ''} ${baptism.lastname || ''}`.trim(), accountId]);
-          } catch (nameErr) {
-            console.warn('Could not set acc_name (column might not exist):', nameErr.message);
-          }
+          // Note: Removed acc_name update as the column does not exist in tbl_accounts
         } catch (insertErr) {
           console.error(`Failed to insert new account for ${email}:`, insertErr);
           throw insertErr;

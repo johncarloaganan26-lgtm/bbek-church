@@ -1947,7 +1947,7 @@ const sendDiscipleshipDetails = async (details) => {
                 </span>
               </p>
               <p style="margin: 0 0 5px 0;"><strong>Schedule:</strong> ${scheduleDate}</p>
-              ${details.pastor_id ? `<p style="margin: 0 0 5px 0;"><strong>Pastor:</strong> ${details.pastor_id}</p>` : ''}
+              ${details.pastor_name ? `<p style="margin: 0 0 5px 0;"><strong>Pastor:</strong> ${details.pastor_name}</p>` : ''}
               ${details.location ? `<p style="margin: 0;"><strong>Location:</strong> ${details.location}</p>` : ''}
             </div>
 
@@ -2257,6 +2257,7 @@ const sendBibleStudyDetails = async (details) => {
             <p>Your Bible Study request status has been updated to <strong>${status}</strong>.</p>
               <p style="margin: 0 0 10px 0;"><strong>Status:</strong> <span style="color: ${statusColors[status] || '#3498db'}; font-weight: bold; text-transform: uppercase;">${status}</span></p>
               <p style="margin: 0 0 10px 0;"><strong>Schedule:</strong> ${formattedDate}</p>
+              ${details.pastor_name ? `<p style="margin: 0 0 10px 0;"><strong>Pastor:</strong> ${details.pastor_name}</p>` : ''}
               <p style="margin: 0;"><strong>Address:</strong> ${details.location || details.address || 'Your Registered Address'}</p>
             </div>
             <p>God bless you!</p>

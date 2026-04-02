@@ -298,7 +298,11 @@
                   {{ baptism.pastor_position }}
                 </div>
               </div>
-              <div v-else class="text-caption text-grey">Unassigned</div>
+              <div v-else-if="baptism.pastor_name" class="text-body-2 font-weight-medium">
+                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
+                {{ baptism.pastor_name }}
+              </div>
+              <div v-else class="text-caption grey--text italic">Not assigned</div>
             </td>
             <td>{{ formatDateTime(baptism.date_created) }}</td>
             <td>
@@ -388,9 +392,9 @@
       @submit="handleSubmit"
     />
 
-    <!-- Bulk Complete Calendar Dialog -->
-    <v-dialog v-model="bulkCompleteDialog" max-width="400px" persistent class="bulk-complete-dialog" style="overflow: visible;">
-      <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
+    <!-- Bulk Complete Dialog -->
+    <v-dialog v-model="bulkCompleteDialog" max-width="450" persistent>
+      <v-card class="rounded-xl elevation-24 overflow-visible">
         <v-btn
           icon="mdi-close"
           variant="text"
@@ -415,54 +419,44 @@
           <div class="mb-5">
             <div class="d-flex align-center mb-2">
               <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
-              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Date (Sundays Only)</span>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Date</span>
             </div>
             <el-date-picker
               v-model="completionDate"
               type="date"
-              placeholder="Select Sunday"
+              placeholder="Select Date"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              :disabled-date="disableNonSundays"
               class="w-100 custom-date-picker"
               size="large"
-              popper-class="bulk-complete-date-picker-popper"
               teleport="body"
               :popper-options="{ strategy: 'fixed' }"
             />
           </div>
 
-          <div class="mb-2">
+          <div class="mb-5">
             <div class="d-flex align-center mb-2">
               <v-icon size="18" color="primary" class="mr-2">mdi-clock-outline</v-icon>
-              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Time (1:00 PM onwards)</span>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Time</span>
             </div>
-            <v-select
+            <el-time-picker
               v-model="completionTime"
-              :items="timeOptions"
-              label="Select Time"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              style="border-radius: 8px;"
-            ></v-select>
+              placeholder="Select Time"
+              format="hh:mm A"
+              value-format="HH:mm:ss"
+              class="w-100 custom-date-picker"
+              size="large"
+              teleport="body"
+              :disabled-hours="disabledHours"
+            />
             <div class="text-caption text-grey mt-2 d-flex align-center">
-              <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
-              Water baptism is held every Sunday at 1:00 PM.
+              <v-icon size="14" class="mr-1:">mdi-information-outline</v-icon>
+              1:00 PM onwards.
             </div>
           </div>
         </v-card-text>
 
         <v-card-actions class="pa-4">
-          <v-btn
-            variant="text"
-            block
-            class="mb-2 font-weight-bold text-grey-darken-1"
-            style="border-radius: 12px; height: 48px;"
-            @click="closeBulkCompleteDialog"
-          >
-            Cancel
-          </v-btn>
           <v-btn
             color="success"
             variant="flat"
@@ -593,7 +587,7 @@ const certificateData = ref(null)
 // Bulk Complete Dialog State
 const bulkCompleteDialog = ref(false)
 const completionDate = ref('')
-const completionTime = ref('13:00:00')
+const completionTime = ref('13:00:00') // Default to 1:00 PM
 const selectedBaptismsToComplete = ref([])
 
 // Manage Slots dialog state
@@ -750,15 +744,22 @@ const bulkCompleteBaptisms = async () => {
   // Set the baptisms to be completed and open the calendar dialog
   selectedBaptismsToComplete.value = validBaptisms;
   
-  // Set default completion date to today if it's Sunday, or next Sunday
-  const now = new Date();
-  if (now.getDay() === 0) {
-    completionDate.value = now.toISOString().split('T')[0];
+  // Set default from the first selected record's existing schedule if possible
+  const first = validBaptisms[0];
+  if (first.baptism_date) {
+    const dateTime = first.baptism_date.split(' ');
+    completionDate.value = dateTime[0];
+    completionTime.value = dateTime[1] || '13:00:00';
   } else {
-    // Just keep it empty for user to select
-    completionDate.value = '';
+    // Fallback to today if Sunday
+    const now = new Date();
+    if (now.getDay() === 0) {
+      completionDate.value = now.toISOString().split('T')[0];
+    } else {
+      completionDate.value = '';
+    }
+    completionTime.value = '13:00:00';
   }
-  completionTime.value = '13:00:00';
   bulkCompleteDialog.value = true;
 };
 
@@ -771,33 +772,31 @@ const closeBulkCompleteDialog = () => {
 
 const confirmBulkComplete = async () => {
   try {
-    const baptismIds = selectedBaptismsToComplete.value.map(b => b.baptism_id);
-    
-    const result = await waterBaptismStore.bulkCompleteWaterBaptisms(
+    const baptismIds = selectedBaptismsToComplete.value.map(b => b.baptism_id)
+    const result = await waterBaptismStore.bulkCompleteBaptisms(
       baptismIds, 
       completionDate.value, 
       completionTime.value
-    );
-
+    )
+    
     if (result.success) {
-      const { completed, failed } = result.data || {};
-      
-      if (completed > 0) {
-        ElMessage.success(`Successfully marked ${completed} water baptism record(s) as completed`);
-      }
-      
-      if (failed > 0) {
-        ElMessage.warning(`Failed to mark ${failed} water baptism record(s) as completed`);
-      }
-      
-      bulkCompleteDialog.value = false;
-      clearSelection();
+      ElMessage.success(result.message || 'Records marked as completed successfully')
+      bulkCompleteDialog.value = false
+      selectedBaptismsToComplete.value = []
+      selectedBaptisms.value = [] // Clear main selection too
+    } else {
+      ElMessage.error(result.message || 'Failed to complete records')
     }
   } catch (error) {
-    console.error('Error completing baptisms:', error);
-    ElMessage.error('Failed to complete selected water baptism records');
+    console.error('Error confirming bulk complete:', error)
+    ElMessage.error('An unexpected error occurred')
   }
 };
+
+const disabledHours = () => {
+    // Disable 0-12 (midnight to noon)
+    return Array.from({ length: 13 }, (_, i) => i);
+}
 
 const markIndividualComplete = async (baptism) => {
   try {
@@ -823,7 +822,7 @@ const markIndividualComplete = async (baptism) => {
       }
     );
     
-    const result = await waterBaptismStore.bulkCompleteWaterBaptisms([baptism.baptism_id]);
+    const result = await waterBaptismStore.bulkCompleteBaptisms([baptism.baptism_id]);
     if (result.success) {
       ElMessage.success('Water baptism marked as completed');
     }
