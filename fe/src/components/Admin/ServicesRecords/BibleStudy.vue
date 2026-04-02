@@ -275,8 +275,9 @@
     <!-- Edit Dialog -->
     <v-dialog v-model="dialogVisible" max-width="500px">
       <v-card>
-        <v-card-title class="bg-primary text-white">
-           Update Bible Study Session
+        <v-card-title class="bg-primary text-white d-flex align-center">
+           <v-icon class="mr-2">{{ isBulkEditing ? 'mdi-account-group' : 'mdi-pencil' }}</v-icon>
+           {{ isBulkEditing ? `Bulk Update ${selectedRows.length} Sessions` : 'Update Bible Study Session' }}
         </v-card-title>
         <v-card-text class="mt-4">
           <v-row>
@@ -341,15 +342,15 @@
                     :key="slot.datetime"
                     size="small"
                     variant="flat"
-                    :color="editItem.scheduled_date === slot.datetime ? 'teal' : 'white'"
-                    :class="['elevation-1 border-teal', editItem.scheduled_date === slot.datetime ? 'text-white' : 'text-teal font-weight-bold']"
+                    :color="isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'teal' : 'white'"
+                    :class="['elevation-1 border-teal', isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'text-white' : 'text-teal font-weight-bold']"
                     @click="selectSlot(slot.datetime)"
                     style="cursor: pointer;"
                   >
                     <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
                     {{ formatTime(slot.time) }}
-                    <span v-if="slot.bookedCount > 0" class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                      ({{ slot.bookedCount }})
+                    <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
+                      ({{ slot.bookedCount || 0 }}{{ slot.maxCapacity ? '/' + slot.maxCapacity : '' }})
                     </span>
                   </v-chip>
                 </div>
@@ -472,6 +473,9 @@
                       >
                         <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
                         {{ formatTime(slot.time) }}
+                        <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
+                          ({{ slot.bookedCount || 0 }}{{ slot.maxCapacity ? '/' + slot.maxCapacity : '' }})
+                        </span>
                       </v-chip>
                     </div>
                   </div>
@@ -793,11 +797,20 @@ const handleBulkEdit = () => {
   // Coerce pastor_id to number if numeric, to match v-select item-value type
   const pid = firstItem.pastor_id;
   const coercedPastorId = pid && !isNaN(pid) ? Number(pid) : (pid || null);
+  // Check if all selected items share the same scheduled date
+  const allSchedules = selectedRows.value.map(id => {
+    const r = requests.value.find(req => req.request_id === id);
+    return r ? r.scheduled_date : null;
+  });
+  const uniqueSchedules = [...new Set(allSchedules)];
+  const commonSchedule = uniqueSchedules.length === 1 ? uniqueSchedules[0] : null;
+
   editItem.value = {
     request_id: null,
     status: firstItem.status || 'Scheduled',
     location: firstItem.location || firstItem.address || '',
     pastor_id: coercedPastorId,
+    scheduled_date: commonSchedule,
     notes: ''
   };
   dialogVisible.value = true;
@@ -1106,6 +1119,13 @@ const formatTime = (timeStr) => {
   return `${displayH}:${minutes} ${ampm}`;
 };
 
+const isSameSchedule = (d1, d2) => {
+  if (!d1 || !d2) return false;
+  const f1 = moment(d1).format('YYYY-MM-DD HH:mm:ss');
+  const f2 = moment(d2).format('YYYY-MM-DD HH:mm:ss');
+  return f1 === f2;
+};
+
 const formatSelectedSchedule = (dateTimeStr) => {
   if (!dateTimeStr) return '';
   return new Date(dateTimeStr).toLocaleString('en-US', {
@@ -1137,7 +1157,23 @@ const saveEdit = async () => {
     }
   }
 
-  const success = await store.updateRequest(editItem.value.request_id, editItem.value);
+  let success = false;
+  if (isBulkEditing.value) {
+    const payload = {
+      requestIds: selectedRows.value,
+      ...editItem.value
+    };
+    // Don't overwrite individual locations/notes if they were blank in bulk edit?
+    // Usually bulk edit means "update all selected to these values"
+    success = await store.bulkUpdateRequest(payload);
+    if (success) {
+      selectedRows.value = [];
+      isBulkEditing.value = false;
+    }
+  } else {
+    success = await store.updateRequest(editItem.value.request_id, editItem.value);
+  }
+  
   if (success) dialogVisible.value = false;
 };
 

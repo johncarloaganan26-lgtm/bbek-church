@@ -256,7 +256,8 @@ const fetchSlots = async () => {
     availableScheduleDates.value = rawDates.filter(dateGroup => {
       const slotDate = new Date(dateGroup.date);
       slotDate.setHours(0, 0, 0, 0);
-      return slotDate > today;
+      // Allow today and future dates. Backend will handle filtering past times for today.
+      return slotDate >= today;
     });
   }
 

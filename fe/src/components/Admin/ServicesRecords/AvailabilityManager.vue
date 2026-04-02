@@ -61,7 +61,7 @@
                   value-format="YYYY-MM-DD"
                   popper-class="salvation-datepicker-popper"
                   :append-to-body="true"
-                  :disabled-date="(time) => time.getTime() < Date.now() - 8.64e7"
+                  :disabled-date="(time) => time.getTime() <= Date.now()"
                 />
                 <div v-if="!isEditingSlot" class="text-caption grey--text mt-1 italic">Select multiple dates to apply these time slots to all of them.</div>
               </div>
@@ -386,10 +386,17 @@ const fetchSlots = async () => {
 // Grouping Logic
 const groupedSlots = computed(() => {
   const groups = {};
+  const tomorrow = moment().add(1, 'day').startOf('day');
+  
   manualSlots.value.forEach(slot => {
-    const d = slot.available_date.substring(0, 10);
-    if (!groups[d]) groups[d] = [];
-    groups[d].push(slot);
+    const dStr = slot.available_date.substring(0, 10);
+    const slotDay = moment(dStr, 'YYYY-MM-DD');
+    
+    // Only include slots from tomorrow onwards to exclude "Same Day"
+    if (slotDay.isSameOrAfter(tomorrow)) {
+      if (!groups[dStr]) groups[dStr] = [];
+      groups[dStr].push(slot);
+    }
   });
   
   return Object.keys(groups)

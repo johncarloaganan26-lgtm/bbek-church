@@ -653,13 +653,28 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
         }
 
         const { updateBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+        const { sendBibleStudyDetails } = require('../../dbHelpers/emailHelper');
+        
         let updatedCount = 0;
         let failedCount = 0;
 
         for (const id of requestIds) {
             try {
-                // If scheduled_date is provided, we use it directly or handle it
+                // Perform update
                 await updateBibleStudyRequest(id, { status, pastor_id, location, scheduled_date });
+
+                // Send email if status or schedule changed (similar to individual update)
+                if (status || scheduled_date) {
+                    const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
+                    if (rows.length > 0) {
+                        try {
+                            await sendBibleStudyDetails(rows[0]);
+                        } catch (emailErr) {
+                            console.warn(`Email failed for BS bulk update (${id}):`, emailErr.message);
+                        }
+                    }
+                }
+
                 updatedCount++;
             } catch (err) {
                 console.error(`Failed to update BS ${id}:`, err.message);

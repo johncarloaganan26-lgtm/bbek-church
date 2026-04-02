@@ -16,7 +16,18 @@ const getDBServiceType = (type) => {
  */
 router.get('/salvation-slots', authenticateToken, checkAdminRole, async (req, res) => {
     try {
-        const serviceType = getDBServiceType(req.query.service_type || 'salvation');
+        const serviceTypeRaw = req.query.service_type || 'salvation';
+        const serviceType = getDBServiceType(serviceTypeRaw);
+        
+        // AUTOMATIC CLEANUP: Remove past manual slots for this service before returning results
+        // This ensures that any slot whose date and time have already passed is purged.
+        const moment = require('moment-timezone');
+        const nowInManila = moment().tz('Asia/Manila').format('YYYY-MM-DD HH:mm:ss');
+        
+        await query(
+            'DELETE FROM tbl_service_slots WHERE service_type = ? AND CONCAT(available_date, " ", available_time) < ?',
+            [serviceType, nowInManila]
+        );
         
         // Define the booking table and column names for each service type
         const serviceMap = {
