@@ -9,6 +9,7 @@ const {
     inviteToBaptism,
     deleteDiscipleshipRequest,
     archiveDiscipleshipRequest,
+    bulkCompleteDiscipleshipRequests,
     exportDiscipleshipRequestsToExcel
 } = require('../../dbHelpers/services/discipleshipRecords');
 const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
@@ -1810,6 +1811,108 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
             success: false,
             message: error.message,
             errorCode: 'BULK_ARCHIVE_ERROR'
+        });
+    }
+});
+
+// ADMIN: Bulk Complete Requests
+router.post('/bulk-complete', authenticateToken, async (req, res) => {
+    try {
+        const { requestIds } = req.body;
+
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No requests selected'
+            });
+        }
+
+        // Fetch system settings to check for schedule restriction
+        const { getCmsPage } = require('../../dbHelpers/cmsRecords');
+        const settingsResult = await getCmsPage('system_settings');
+        let allowWithoutSchedule = false;
+        if (settingsResult.success && settingsResult.data && settingsResult.data.content) {
+            allowWithoutSchedule = !!settingsResult.data.content.allow_complete_without_schedule;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const eligibleIds = [];
+        const failed = [];
+
+        // Validation loop
+        for (const id of requestIds) {
+            const [rows] = await query('SELECT status, scheduled_date, firstname, lastname FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
+            if (rows.length === 0) {
+                failed.push({ request_id: id, reason: 'Record not found' });
+                continue;
+            }
+
+            const reqData = rows[0];
+
+            if (!allowWithoutSchedule) {
+                if (reqData.status !== 'Scheduled') {
+                    failed.push({ request_id: id, reason: 'Only Scheduled requests can be completed when restriction is ON' });
+                    continue;
+                }
+
+                if (reqData.scheduled_date) {
+                    const scheduledDate = new Date(reqData.scheduled_date);
+                    scheduledDate.setHours(0, 0, 0, 0);
+                    if (scheduledDate > today) {
+                        failed.push({ request_id: id, reason: 'Cannot complete future schedules' });
+                        continue;
+                    }
+                } else if (!reqData.scheduled_date) {
+                    failed.push({ request_id: id, reason: 'Missing scheduled date' });
+                    continue;
+                }
+            }
+
+            eligibleIds.push(id);
+        }
+
+        if (eligibleIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No eligible requests for completion',
+                data: { completed: [], failed }
+            });
+        }
+
+        const result = await bulkCompleteDiscipleshipRequests(eligibleIds);
+        
+        // Log bulk completion
+        if (result.data.completed.length > 0) {
+            await auditTrailRecords.createAuditLog({
+                action_type: 'DISCIPLESHIP_BULK_COMPLETED',
+                module: 'Discipleship',
+                description: JSON.stringify({
+                    completed_count: result.data.completed.length,
+                    failed_count: failed.length + result.data.failed.length,
+                    request_ids: result.data.completed
+                }),
+                user_id: req.user?.acc_id || null,
+                user_name: req.user?.firstname || null
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully completed ${result.data.completed.length} request(s)`,
+            data: {
+                completed: result.data.completed,
+                failed: [...failed, ...result.data.failed]
+            }
+        });
+
+    } catch (error) {
+        console.error('Bulk complete error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+            errorCode: 'BULK_COMPLETE_ERROR'
         });
     }
 });

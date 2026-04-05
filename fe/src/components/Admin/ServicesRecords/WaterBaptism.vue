@@ -302,15 +302,17 @@
               <v-tooltip v-if="['pending', 'approved'].includes(baptism.status) && (baptism.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
-                    icon="mdi-check" 
+                    icon
                     variant="text" 
                     size="small" 
                     color="success"
-                    class="mr-2"
+                    class="mr-1"
                     :disabled="loading"
                     v-bind="props"
                     @click="markIndividualComplete(baptism)"
-                  ></v-btn>
+                  >
+                    <v-icon>mdi-check-circle-outline</v-icon>
+                  </v-btn>
                 </template>
               </v-tooltip>
               <v-tooltip v-if="baptism.status === 'completed'" text="Print Certificate" location="top">
@@ -480,10 +482,10 @@
           </v-btn>
           <v-btn
             color="success"
-            variant="flat"
+            variant="outlined"
             block
-            class="font-weight-bold"
-            style="border-radius: 12px; height: 52px; font-size: 1rem;"
+            class="font-weight-bold bg-white"
+            style="border-radius: 12px; height: 52px; font-size: 1rem; border-width: 2px;"
             :disabled="!completionDate || !completionTime"
             @click="confirmBulkComplete"
           >
@@ -764,56 +766,47 @@ const clearSelection = () => {
   selectedBaptisms.value = []
 }
 
-const bulkCompleteBaptisms = async () => {
-  // Filter for eligible baptisms based on settings
-  const targetBaptisms = selectedBaptisms.value.filter(b => {
-    if (settings.value.allow_complete_without_schedule) {
-      return ['approved', 'pending', 'scheduled'].includes(b.status);
-    }
-    return ['approved', 'scheduled'].includes(b.status);
-  });
-  
-  if (targetBaptisms.length === 0) {
-    ElMessage.warning(settings.value.allow_complete_without_schedule 
-      ? 'No pending, approved or scheduled baptisms selected.' 
-      : 'No approved or scheduled baptisms selected.');
-    return;
-  }
+const openCompletionDialog = (targetBaptisms) => {
+  if (!targetBaptisms || targetBaptisms.length === 0) return;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Filter for valid baptisms based on settings and schedule
   const validBaptisms = targetBaptisms.filter(b => {
-    if (settings.value.allow_complete_without_schedule) return true;
-    if (!b.baptism_date) return false;
-    const baptismDate = new Date(b.baptism_date);
-    baptismDate.setHours(0, 0, 0, 0);
-    return baptismDate <= today;
+    // Basic status check
+    const statusEligible = settings.value.allow_complete_without_schedule
+      ? ['approved', 'pending', 'scheduled'].includes(b.status)
+      : ['approved', 'scheduled'].includes(b.status);
+
+    if (!statusEligible) return false;
+
+    // Future date check
+    if (!settings.value.allow_complete_without_schedule && b.baptism_date) {
+      const baptismDate = new Date(b.baptism_date);
+      baptismDate.setHours(0, 0, 0, 0);
+      if (baptismDate > today) return false;
+    }
+
+    return true;
   });
 
-  const skippedCount = targetBaptisms.length - validBaptisms.length;
-
   if (validBaptisms.length === 0) {
-    ElMessage.warning('Cannot mark future baptisms as completed. Please wait until the scheduled date or turn off Manual Completion restriction.');
+    ElMessage.warning(settings.value.allow_complete_without_schedule 
+      ? 'Selected record(s) are not in a valid status for completion.' 
+      : 'Selected record(s) must be approved/scheduled and not in the future.');
     return;
   }
-  
+
   // Set the baptisms to be completed and open the calendar dialog
   selectedBaptismsToComplete.value = validBaptisms;
   
-  // Try to find a common or first scheduled date/time from the selection
-  const scheduledBaptisms = validBaptisms.filter(b => b.baptism_date);
+  // Try to find a common or first scheduled date/time
+  const withSchedule = validBaptisms.find(b => b.baptism_date);
   
-  if (scheduledBaptisms.length > 0) {
-    // If only one is selected or all share same date, use it
-    completionDate.value = scheduledBaptisms[0].baptism_date;
-    // Also use the time if available
-    if (scheduledBaptisms[0].baptism_time) {
-      // Ensure time matches one of the options or use it if valid
-      completionTime.value = scheduledBaptisms[0].baptism_time;
-    } else {
-      completionTime.value = '13:00:00';
-    }
+  if (withSchedule) {
+    completionDate.value = withSchedule.baptism_date;
+    completionTime.value = withSchedule.baptism_time || '13:00:00';
   } else {
     // Falls back to Sunday logic if nothing is scheduled
     const now = new Date();
@@ -824,7 +817,16 @@ const bulkCompleteBaptisms = async () => {
     }
     completionTime.value = '13:00:00';
   }
+  
   bulkCompleteDialog.value = true;
+};
+
+const bulkCompleteBaptisms = () => {
+  openCompletionDialog(selectedBaptisms.value);
+};
+
+const markIndividualComplete = (baptism) => {
+  openCompletionDialog([baptism]);
 };
 
 const closeBulkCompleteDialog = () => {
@@ -878,51 +880,6 @@ const confirmBulkComplete = async () => {
   }
 };
 
-const markIndividualComplete = async (baptism) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (baptism.baptism_date && !settings.value.allow_complete_without_schedule) {
-        const baptismDate = new Date(baptism.baptism_date);
-        baptismDate.setHours(0, 0, 0, 0);
-        if (baptismDate > today) {
-            ElMessage.warning(`Cannot complete baptism scheduled for a future date (${baptism.baptism_date}) unless Manual Completion is ON.`);
-            return;
-        }
-    }
-
-    await ElMessageBox.confirm(
-      `Mark water baptism for ${baptism.fullname || baptism.firstname + ' ' + baptism.lastname} as completed?`,
-      'Mark Completed',
-      {
-        confirmButtonText: 'Yes, Complete',
-        cancelButtonText: 'Cancel',
-        type: 'success',
-      }
-    );
-    
-    // Diagnostic check
-    if (typeof waterBaptismStore.bulkCompleteWaterBaptisms !== 'function') {
-        console.error('CRITICAL: waterBaptismStore.bulkCompleteWaterBaptisms is missing or not a function!', waterBaptismStore);
-        ElMessage.error('System error: Baptism completion tool is missing. Please refresh the page.');
-        return;
-    }
-
-    const result = await waterBaptismStore.bulkCompleteWaterBaptisms([baptism.baptism_id]);
-    if (result.success) {
-      ElMessage.success('Water baptism marked as completed');
-    } else {
-        console.error('Individual completion returned success=false:', result);
-        ElMessage.error(result.message || 'Failed to complete water baptism');
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('Error completing individual baptism:', error);
-      ElMessage.error('Failed to complete water baptism');
-    }
-  }
-};
 
 const bulkDeleteBaptisms = async () => {
   try {

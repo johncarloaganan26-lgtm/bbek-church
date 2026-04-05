@@ -718,5 +718,78 @@ module.exports = {
     inviteToBaptism,
     deleteDiscipleshipRequest,
     archiveDiscipleshipRequest,
+    bulkCompleteDiscipleshipRequests,
     exportDiscipleshipRequestsToExcel
 };
+
+/**
+ * Bulk Complete Discipleship Requests
+ * @param {Array} requestIds - Array of request_ids to complete
+ */
+async function bulkCompleteDiscipleshipRequests(requestIds) {
+    if (!requestIds || requestIds.length === 0) {
+        return { success: false, message: 'No requests selected' };
+    }
+
+    try {
+        const completed = [];
+        const failed = [];
+
+        for (const request_id of requestIds) {
+            try {
+                // Update status to Completed
+                const sql = 'UPDATE tbl_discipleship_requests SET status = "Completed", date_updated = NOW() WHERE request_id = ?';
+                const [result] = await query(sql, [request_id]);
+
+                if (result.affectedRows > 0) {
+                    completed.push(request_id);
+
+                    // Send email notification after successful completion
+                    try {
+                        const [fullReqRows] = await query(`
+                            SELECT dr.*, 
+                                   COALESCE(
+                                     NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+                                     NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
+                                   ) as pastor_name
+                            FROM tbl_discipleship_requests dr
+                            LEFT JOIN tbl_accounts a ON (
+                                dr.pastor_id = a.acc_id OR 
+                                (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = a.acc_id)
+                            )
+                            LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
+                            LEFT JOIN tbl_members m_direct ON (
+                                dr.pastor_id = m_direct.member_id OR 
+                                (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = m_direct.member_id)
+                            ) COLLATE utf8mb4_unicode_ci
+                            WHERE dr.request_id = ?
+                        `, [request_id]);
+
+                        if (fullReqRows.length > 0) {
+                            await sendDiscipleshipDetails({
+                                ...fullReqRows[0],
+                                status: 'Completed'
+                            });
+                        }
+                    } catch (emailError) {
+                        console.warn(`Email notification failed for Discipleship completion (${request_id}):`, emailError.message);
+                    }
+                } else {
+                    failed.push({ request_id, reason: 'Record not found' });
+                }
+            } catch (err) {
+                console.error(`Error completing request ${request_id}:`, err);
+                failed.push({ request_id, reason: err.message });
+            }
+        }
+
+        return {
+            success: true,
+            message: `Successfully completed ${completed.length} requests`,
+            data: { completed, failed }
+        };
+    } catch (error) {
+        console.error('Error in bulkCompleteDiscipleshipRequests:', error);
+        throw error;
+    }
+}

@@ -120,21 +120,17 @@
             <v-icon start size="14">mdi-checkbox-marked</v-icon>
             {{ selectedRows.length }} SELECTED
           </v-chip>
-          <v-btn color="primary" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkEdit">
-            <v-icon start size="16">mdi-pencil</v-icon>
-            Bulk Edit
-          </v-btn>
-          <v-btn color="teal-darken-1" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkPromote">
-            <v-icon start size="16">mdi-water</v-icon>
-            Bulk Promote
+          <v-btn v-if="hasPendingSelection" color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkReject">
+            <v-icon start size="16">mdi-close-octagon</v-icon>
+            Reject Selected
           </v-btn>
           <v-btn color="success" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkComplete">
-            <v-icon start size="16">mdi-check</v-icon>
-            Mark Completed
+            <v-icon start size="16">mdi-check-all</v-icon>
+            Complete Selected
           </v-btn>
           <v-btn color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkArchive">
             <v-icon start size="16">mdi-archive</v-icon>
-            Archive
+            Archive Selected
           </v-btn>
           <v-spacer></v-spacer>
           <v-btn variant="text" size="small" color="grey-darken-1" class="text-none" @click="selectedRows = []">
@@ -208,7 +204,7 @@
                 </v-chip>
               </div>
             </td>
-            <td>{{ item.pastor_name || getPastorName(item.pastor_id) }}</td>
+            <td>{{ getPastorName(item.pastor_id) }}</td>
             <td>
               <div class="d-flex align-center">
                 <v-chip size="small" :color="getStatusColor(item.status)" class="text-white font-weight-bold px-2">
@@ -237,6 +233,7 @@
                 </v-btn>
 
                 <v-btn
+                  v-if="!isGroup(item)"
                   variant="outlined"
                   size="small"
                   color="primary"
@@ -247,7 +244,18 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="item.status === 'Completed'"
+                  v-if="!isGroup(item) && ['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
+                  variant="outlined"
+                  size="small"
+                  color="success"
+                  @click="markIndividualComplete(item)"
+                >
+                  <v-icon size="20">mdi-check-circle-outline</v-icon>
+                  <v-tooltip activator="parent" location="top">Mark Completed</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  v-if="item.status === 'Completed' && !isGroup(item)"
                   variant="outlined"
                   size="small"
                   color="teal-darken-3"
@@ -258,7 +266,7 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="['Pending', 'Scheduled'].includes(item.status)"
+                  v-if="item.status === 'Pending'"
                   variant="outlined"
                   size="small"
                   color="error"
@@ -401,173 +409,191 @@
     </v-dialog>
 
     <!-- Promotion Choice Dialog (Enhanced for Bulk Support) -->
-    <v-dialog v-model="promotionDialogVisible" :max-width="isBulkPromoting ? '650px' : '480px'">
+    <v-dialog v-model="promotionDialogVisible" :max-width="isBulkPromoting && showScheduleFields ? '1000px' : (isBulkPromoting ? '650px' : '480px')" scrollable transition="dialog-bottom-transition">
       <v-card class="rounded-xl overflow-hidden elevation-24 d-flex flex-column" style="max-height: 90vh;">
-        <v-card-title class="bg-teal-darken-2 text-white text-center py-5 d-flex flex-column align-center flex-shrink-0">
-          <v-avatar color="white" size="56" class="mb-2 elevation-2">
-            <v-icon color="teal-darken-2" size="32">mdi-water-check</v-icon>
+        <v-card-title class="bg-teal-darken-3 text-white text-center py-6 d-flex flex-column align-center flex-shrink-0 relative">
+          <v-btn icon="mdi-close" variant="text" color="white" class="position-absolute" style="top: 10px; right: 10px;" @click="promotionDialogVisible = false"></v-btn>
+          <v-avatar color="white" size="64" class="mb-3 elevation-4">
+            <v-icon color="teal-darken-3" size="36">mdi-water-check</v-icon>
           </v-avatar>
-          <div class="text-h5 font-weight-bold">Water Baptism Promotion</div>
-          <span v-if="isBulkPromoting" class="text-caption opacity-80" style="color: white !important;">
+          <div class="text-h5 font-weight-bold letter-spacing-1">Water Baptism Promotion</div>
+          <span v-if="isBulkPromoting" class="text-subtitle-2 font-weight-medium opacity-90 mt-1" style="color: white !important;">
             Group Action ({{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }} Selected Candidates)
           </span>
         </v-card-title>
         
-        <v-card-text class="pa-6 bg-grey-lighten-4 overflow-y-auto flex-grow-1 scrollbar-thin">
-          <div v-if="isBulkPromoting" class="mb-4">
-            <label class="text-subtitle-2 font-weight-bold d-block mb-2 text-teal-darken-3 d-flex align-center">
-              <v-icon size="18" class="mr-2">mdi-account-group</v-icon>
-              Selected Candidates ({{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }})
-            </label>
-            <v-card variant="outlined" class="pa-2 bg-white rounded-lg border-teal border-dashed" style="max-height: 120px; overflow-y: auto;">
-              <div class="d-flex flex-wrap gap-1">
-                <!-- Case A: Promotion from Companion Console -->
-                <template v-if="promotingCompanions.length > 0">
-                  <v-chip v-for="(person, idx) in promotingCompanions" :key="idx" size="x-small" color="teal-lighten-4" class="teal--text font-weight-bold">
-                    {{ person.firstname }} {{ person.lastname }}
-                  </v-chip>
-                </template>
-                <!-- Case B: Promotion from Main Requests Table -->
-                <template v-else>
-                  <v-chip v-for="id in selectedRows" :key="id" size="x-small" color="teal-lighten-4" class="teal--text font-weight-bold">
-                    {{ requests.find(r => r.request_id === id)?.firstname }} {{ requests.find(r => r.request_id === id)?.lastname }}
-                  </v-chip>
-                </template>
+        <v-card-text class="pa-0 bg-grey-lighten-4 overflow-y-auto flex-grow-1 position-relative shadow-inner">
+          <!-- Premium Loading Overlay -->
+          <v-overlay v-model="loadingPromotion" contained persistent class="align-center justify-center backdrop-blur-sm" scrim="teal-darken-4" opacity="0.3">
+            <div class="d-flex flex-column align-center pa-12 bg-white rounded-xl elevation-24 border-teal border-sm">
+              <div class="loading-animation-container mb-6">
+                <v-progress-circular indeterminate color="teal-darken-2" size="100" width="10">
+                  <v-icon color="teal-darken-2" size="48" class="pulse-animation">mdi-water-sync</v-icon>
+                </v-progress-circular>
               </div>
-            </v-card>
-          </div>
-
-          <v-expand-transition>
-            <div v-if="showScheduleFields" class="mb-4">
-              <v-divider class="mb-6"></v-divider>
-              <h3 class="text-subtitle-1 font-weight-bold mb-4 teal--text d-flex align-center">
-                <v-icon class="mr-2">mdi-calendar-plus</v-icon>
-                Common Baptism Schedule
-              </h3>
-              
-              <v-row dense>
-                <v-col cols="12" md="6">
-                  <v-select
-                    v-model="bulkPromotionData.pastor_name"
-                    :items="pastors"
-                    item-title="name"
-                    item-value="id"
-                    label="Assigned Pastor"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-account-tie"
-                    bg-color="white"
-                  ></v-select>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model="bulkPromotionData.location"
-                    label="Location"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-map-marker"
-                    bg-color="white"
-                  ></v-text-field>
-                </v-col>
-              </v-row>
-
-              <div class="mt-2">
-                <label class="text-caption font-weight-bold grey--text mb-2 d-block">Available Water Baptism Slots (30 Days)</label>
-                
-                <div v-if="slotsLoading" class="text-center pa-4 border rounded-xl bg-white mb-2">
-                  <v-progress-circular indeterminate color="teal" size="24" class="mb-2" />
-                  <div class="text-caption">Loading baptism dates...</div>
-                </div>
-
-                <div v-else-if="waterBaptismSlots.length > 0" class="slots-selection-container pa-4 bg-white rounded-xl border elevation-1 mb-2" style="max-height: 250px; overflow-y: auto;">
-                  <div v-for="dateGroup in waterBaptismSlots" :key="dateGroup.date" class="mb-4">
-                    <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                      <v-icon size="14" color="teal" class="mr-1">mdi-calendar</v-icon>
-                      {{ dateGroup.displayDate }}
-                    </div>
-                    <div class="d-flex flex-wrap gap-2">
-                       <v-chip
-                        v-for="slot in dateGroup.timeSlots"
-                        :key="slot.datetime"
-                        size="small"
-                        variant="flat"
-                        :color="bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'teal' : 'grey-lighten-4'"
-                        :class="['elevation-1', bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'text-white' : 'text-teal font-weight-bold']"
-                        @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time; overrideTime = false"
-                        style="cursor: pointer;"
-                      >
-                        <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                        {{ formatTime(slot.time) }}
-                        <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                          ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
-                        </span>
-                      </v-chip>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Custom Time Override -->
-                <div v-if="bulkPromotionData.baptism_date" class="mx-1 mb-4">
-                   <div class="d-flex align-center mb-1">
-                      <v-checkbox v-model="overrideTime" label="Use custom baptism time" density="compact" hide-details color="teal" class="custom-time-check"></v-checkbox>
-                      <v-tooltip location="right" text="Enable if you want to set a time different from the selected slot.">
-                         <template v-slot:activator="{ props }"><v-icon v-bind="props" size="14" class="ml-1 opacity-50">mdi-information-outline</v-icon></template>
-                      </v-tooltip>
-                   </div>
-                   <v-expand-transition>
-                      <div v-if="overrideTime" class="ml-8 mt-1">
-                         <v-combobox
-                            v-model="bulkPromotionData.baptism_time"
-                            :items="promotionTimeOptions"
-                            label="Set Custom Time"
-                            variant="outlined"
-                            density="compact"
-                            hide-details
-                            placeholder="e.g. 1:45 PM"
-                            @update:model-value="handlePromotionTimeInput"
-                         ></v-combobox>
-                         <p class="text-caption text-grey mt-1">Accepts formats like '2:15 PM'. Minimum 1:00 PM.</p>
-                      </div>
-                   </v-expand-transition>
-                </div>
-                
-                <v-alert v-else type="info" variant="tonal" density="compact" class="mb-2">
-                  No baptism slots found. Use the Availability Manager to create some first.
-                </v-alert>
-
-                <div v-if="bulkPromotionData.baptism_date" class="selected-schedule-confirm pa-3 bg-teal-lighten-5 rounded-lg border-teal mb-2 d-flex align-center">
-                  <v-icon color="teal" class="mr-2">mdi-check-circle</v-icon>
-                  <span class="text-caption font-weight-bold text-teal-darken-3">
-                    Selected: {{ moment(bulkPromotionData.baptism_date).format('MMMM D, YYYY') }} at {{ formatTime(bulkPromotionData.baptism_time) }}
-                  </span>
-                </div>
+              <div class="text-h5 font-weight-black text-teal-darken-4 mb-2 letter-spacing-1">Promoting Candidates</div>
+              <div class="text-subtitle-2 text-grey-darken-1 font-weight-medium text-center" style="max-width: 250px;">
+                Securely synchronizing records and preparing baptism entries...
               </div>
             </div>
-          </v-expand-transition>
-          
-          <div v-if="!showScheduleFields">
-            <p v-if="!isBulkPromoting" class="text-body-1 mb-6 text-center text-grey-darken-3">
+          </v-overlay>
+
+          <!-- Bulk Promotion Main View -->
+          <div v-if="showScheduleFields" class="pa-6">
+            <v-row>
+              <!-- LEFT COLUMN: Candidates & Settings -->
+              <v-col cols="12" md="5" class="border-e-md">
+                <div class="pe-md-4">
+                  <!-- Selected Candidates Section -->
+                  <div class="mb-6">
+                    <label class="text-overline font-weight-black d-block mb-3 text-teal-darken-4 d-flex align-center">
+                      <v-icon size="18" class="mr-2">mdi-account-group</v-icon>
+                      Selected Candidates ({{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }})
+                    </label>
+                    <v-card variant="outlined" class="pa-3 bg-white rounded-lg border-teal border-dashed" style="max-height: 140px; overflow-y: auto;">
+                      <div class="d-flex flex-wrap gap-2">
+                        <template v-if="promotingCompanions.length > 0">
+                          <v-chip v-for="(person, idx) in promotingCompanions" :key="idx" size="small" color="teal-lighten-5" class="text-teal-darken-3 font-weight-bold border-teal">
+                            <v-icon start size="14">mdi-account-check</v-icon>
+                            {{ person.firstname }} {{ person.lastname }}
+                          </v-chip>
+                        </template>
+                        <template v-else>
+                          <v-chip v-for="id in selectedRows" :key="id" size="small" color="teal-lighten-5" class="text-teal-darken-3 font-weight-bold border-teal">
+                            <v-icon start size="14">mdi-account-check</v-icon>
+                            {{ requests.find(r => r.request_id === id)?.firstname }} {{ requests.find(r => r.request_id === id)?.lastname }}
+                          </v-chip>
+                        </template>
+                      </div>
+                    </v-card>
+                  </div>
+
+                  <v-divider class="mb-6"></v-divider>
+
+                  <!-- Schedule Settings -->
+                  <div class="mb-4">
+                    <h3 class="text-subtitle-1 font-weight-bold mb-4 teal--text d-flex align-center">
+                      <v-icon class="mr-2" color="teal">mdi-cog-outline</v-icon>
+                      Common Baptism Schedule
+                    </h3>
+                    
+                    <v-select
+                      v-model="bulkPromotionData.pastor_name"
+                      :items="pastors"
+                      item-title="name"
+                      item-value="id"
+                      label="Assigned Pastor"
+                      variant="outlined"
+                      density="comfortable"
+                      prepend-inner-icon="mdi-account-tie"
+                      bg-color="white"
+                      class="mb-4"
+                      hide-details="auto"
+                    ></v-select>
+
+                    <v-text-field
+                      v-model="bulkPromotionData.location"
+                      label="Location"
+                      variant="outlined"
+                      density="comfortable"
+                      prepend-inner-icon="mdi-map-marker"
+                      bg-color="white"
+                      hide-details="auto"
+                    ></v-text-field>
+                  </div>
+
+                  <!-- Selected Confirmation Box (Moved here for better visibility) -->
+                  <v-fade-transition>
+                    <div v-if="bulkPromotionData.baptism_date" class="mt-8 pa-4 bg-teal-darken-3 text-white rounded-xl elevation-4 d-flex align-center">
+                      <v-avatar color="white" size="40" class="mr-3">
+                        <v-icon color="teal-darken-3">mdi-check-bold</v-icon>
+                      </v-avatar>
+                      <div>
+                        <div class="text-caption font-weight-bold white--text opacity-80" style="color: white !important;">Selected Schedule</div>
+                        <div class="text-subtitle-1 font-weight-bold">
+                          {{ moment(bulkPromotionData.baptism_date).format('MMMM D, YYYY') }} at {{ formatTime(bulkPromotionData.baptism_time) }}
+                        </div>
+                      </div>
+                    </div>
+                  </v-fade-transition>
+                </div>
+              </v-col>
+
+              <!-- RIGHT COLUMN: Slot Selection -->
+              <v-col cols="12" md="7">
+                <div class="ps-md-4">
+                  <div class="d-flex align-center justify-space-between mb-4">
+                    <label class="text-overline font-weight-black text-grey-darken-2 d-block">Available Water Baptism Slots (30 Days)</label>
+                    <v-btn icon="mdi-refresh" variant="text" size="small" :loading="slotsLoading" @click="fetchWaterBaptismSlots"></v-btn>
+                  </div>
+                  
+                  <div v-if="slotsLoading" class="d-flex flex-column align-center justify-center pa-12 bg-white rounded-xl border border-dashed">
+                    <v-progress-circular indeterminate color="teal" size="48" width="4" class="mb-4" />
+                    <div class="text-subtitle-1 font-weight-bold grey--text">Loading baptism dates...</div>
+                  </div>
+
+                  <div v-else-if="waterBaptismSlots.length > 0" class="slots-selection-container pa-4 bg-white rounded-xl border elevation-2" style="height: 400px; overflow-y: auto;">
+                    <div v-for="dateGroup in waterBaptismSlots" :key="dateGroup.date" class="mb-5 pb-2">
+                      <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mb-3 d-flex align-center">
+                        <v-icon size="18" color="teal" class="mr-2">mdi-calendar-range</v-icon>
+                        {{ dateGroup.displayDate }}
+                      </div>
+                      <div class="d-flex flex-wrap gap-3">
+                         <v-btn
+                          v-for="slot in dateGroup.timeSlots"
+                          :key="slot.datetime"
+                          variant="flat"
+                          size="large"
+                          :color="bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'teal-darken-1' : 'grey-lighten-4'"
+                          :class="['rounded-lg transition-swing', bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'text-white' : 'text-teal-darken-2 font-weight-bold shadow-sm']"
+                          @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time"
+                          style="min-width: 140px;"
+                        >
+                          <v-icon size="20" class="mr-2">mdi-clock-outline</v-icon>
+                          {{ formatTime(slot.time) }}
+                          <span class="ml-2 opacity-70 font-weight-medium" style="font-size: 0.7em !important;">
+                            ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
+                          </span>
+                        </v-btn>
+                      </div>
+                    </div>
+                  </div>
+
+                  <v-alert v-else type="info" variant="tonal" density="compact" class="mb-4 rounded-lg">
+                    No baptism slots found. Use the Availability Manager to create some first.
+                  </v-alert>
+                </div>
+              </v-col>
+            </v-row>
+          </div>
+
+          <!-- Initial Action Selection View -->
+          <div v-else class="pa-6">
+            <p v-if="!isBulkPromoting" class="text-h6 mb-8 text-center text-grey-darken-3 px-8 line-height-1-6">
               How would you like to proceed with <b>{{ promotionData?.firstname }} {{ promotionData?.lastname }}</b>?
             </p>
+            <p v-else class="text-h6 mb-8 text-center text-grey-darken-3 px-8 line-height-1-6">
+              How would you like to proceed with the <b>{{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }}</b> selected candidates?
+            </p>
             
-            <v-row dense>
+            <v-row dense class="px-4 pb-4">
               <v-col cols="12">
                 <v-btn
                   block
-                  color="teal-darken-1"
+                  color="teal-darken-2"
                   size="x-large"
                   variant="flat"
-                  class="mb-4 py-8 rounded-xl elevation-2 text-none"
+                  class="mb-4 py-8 rounded-xl elevation-3 text-none hover-scale transition-swing"
                   @click="handlePromotionAction(true)"
                   :loading="loadingPromotion && !isBulkPromoting"
                 >
                   <div class="d-flex align-center justify-start w-100 px-4">
-                    <v-avatar color="white" rounded size="48" class="mr-4 elevation-1">
-                      <v-icon color="teal-darken-1" size="24">mdi-calendar-edit</v-icon>
+                    <v-avatar color="white" rounded size="48" class="mr-4 elevation-2">
+                      <v-icon color="teal-darken-2" size="28">mdi-calendar-edit</v-icon>
                     </v-avatar>
                     <div class="d-flex flex-column align-start">
-                      <div class="font-weight-bold text-subtitle-1">Direct Schedule & Promote</div>
-                      <div class="text-caption opacity-90 white--text" style="color: white !important;">
+                      <div class="font-weight-black text-subtitle-1">Direct Schedule & Promote</div>
+                      <div class="text-caption opacity-90 text-white font-weight-medium">
                         {{ isBulkPromoting ? 'Set schedule for the entire group now.' : 'Candidate is ready. Open form to set schedule.' }}
                       </div>
                     </div>
@@ -581,17 +607,17 @@
                   color="white"
                   size="x-large"
                   variant="flat"
-                  class="py-8 rounded-xl elevation-1 border-teal-lighten-3 text-none"
+                  class="py-8 rounded-xl elevation-1 border-teal-lighten-2 text-none border-sm hover-scale transition-swing"
                   @click="handlePromotionAction(false)"
                   :loading="loadingPromotion"
                 >
                   <div class="d-flex align-center justify-start w-100 px-4">
                     <v-avatar color="teal-lighten-5" rounded size="48" class="mr-4">
-                      <v-icon color="teal-darken-1" size="24">mdi-email-send</v-icon>
+                      <v-icon color="teal-darken-2" size="28">mdi-email-send</v-icon>
                     </v-avatar>
                     <div class="d-flex flex-column align-start">
-                      <div class="font-weight-bold text-subtitle-1 teal--text text-teal-darken-2">Send Invitation Forms</div>
-                      <div class="text-caption text-grey-darken-1">
+                      <div class="font-weight-black text-subtitle-1 teal--text text-teal-darken-2">Send Invitation Forms</div>
+                      <div class="text-caption text-grey-darken-1 font-weight-medium">
                         {{ isBulkPromoting ? 'Send registration links to all selected group members.' : 'Candidate is hesitant. Send a link for self-scheduling.' }}
                       </div>
                     </div>
@@ -601,23 +627,26 @@
             </v-row>
           </div>
         </v-card-text>
-        <v-card-actions class="pa-4 bg-white border-top">
+        <v-card-actions class="pa-6 bg-white border-t flex-shrink-0">
+          <v-btn color="grey-darken-1" variant="text" size="large" class="px-8 font-weight-bold rounded-lg" @click="promotionDialogVisible = false">Cancel</v-btn>
           <v-spacer></v-spacer>
-          <v-btn color="grey-darken-1" variant="text" class="px-6 font-weight-bold" @click="promotionDialogVisible = false">Cancel</v-btn>
           <v-btn 
-            v-if="showScheduleFields" 
-            color="teal-darken-1" 
+            v-if="showScheduleFields"
+            color="teal-darken-2" 
             variant="flat" 
-            class="px-8 font-weight-bold rounded-lg" 
-            height="44"
+            size="large"
+            class="px-10 font-weight-bold rounded-lg elevation-4 hover-scale" 
+            @click="submitBulkPromotion"
             :loading="loadingPromotion"
-            @click="handlePromotionAction(true)"
+            :disabled="!bulkPromotionData.baptism_date || !bulkPromotionData.baptism_time || !bulkPromotionData.pastor_name"
           >
+            <v-icon start class="mr-2">mdi-check-circle</v-icon>
             Confirm Promotion
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
 
     <!-- Water Baptism Admin Registration Dialog -->
     <v-dialog v-model="adminWaterBaptismDialogVisible" max-width="1100px" persistent>
@@ -682,10 +711,6 @@
               </v-chip>
               
               <div class="d-flex gap-2">
-                <v-btn size="small" color="success" variant="outlined" @click="bulkActionInGroup('Scheduled')" class="bulk-action-btn font-weight-bold text-uppercase">
-                  <v-icon start size="16">mdi-calendar-check</v-icon>
-                  Schedule
-                </v-btn>
                 <v-btn v-if="allSelectedArePending" size="small" color="error" variant="outlined" @click="bulkActionInGroup('Rejected')" class="bulk-action-btn font-weight-bold text-uppercase">
                   <v-icon start size="16">mdi-close-circle-outline</v-icon>
                   Reject
@@ -697,7 +722,7 @@
                 </v-btn>
                 <v-btn 
                   size="small" 
-                  color="blue-darken-2" 
+                  color="teal-darken-2" 
                   variant="outlined" 
                   @click="handleConsoleBulkPromote" 
                   v-if="canBulkPromote"
@@ -705,6 +730,17 @@
                 >
                   <v-icon start size="16">mdi-water</v-icon>
                   Promote to Baptism
+                </v-btn>
+                <v-btn 
+                  size="small" 
+                  color="success" 
+                  variant="outlined" 
+                  @click="bulkActionInGroup('Completed')" 
+                  v-if="canBulkCompleteInConsole"
+                  class="bulk-action-btn font-weight-bold text-uppercase ml-1"
+                >
+                  <v-icon start size="16">mdi-check-circle-outline</v-icon>
+                  Mark Completed
                 </v-btn>
               </div>
 
@@ -800,7 +836,18 @@
                   </v-chip>
                 </td>
                  <td class="text-center">
-                  <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="teal-darken-1" @click="openCompanionEdit(idx)"></v-btn>
+                  <v-btn size="x-small" variant="text" color="teal-darken-1" @click="openCompanionSchedule(idx)" class="mr-1">
+                    <v-icon size="20">mdi-calendar-edit</v-icon>
+                    <v-tooltip activator="parent" location="top">Schedule / Update Candidate</v-tooltip>
+                  </v-btn>
+                  <v-btn v-if="person.status === 'Scheduled'" size="x-small" variant="text" color="success" @click="markConsoleParticipantComplete(idx)" class="mr-1">
+                    <v-icon size="20">mdi-check-circle-outline</v-icon>
+                    <v-tooltip activator="parent" location="top">Mark as Completed</v-tooltip>
+                  </v-btn>
+                  <v-btn v-if="person.status === 'Completed'" size="x-small" variant="text" color="teal-darken-3" @click="promoteToBaptism(person)">
+                    <v-icon size="20">mdi-water-check</v-icon>
+                    <v-tooltip activator="parent" location="top">Promote to Water Baptism</v-tooltip>
+                  </v-btn>
                 </td>
               </tr>
             </tbody>
@@ -894,44 +941,27 @@
       </v-card>
     </v-dialog>
 
-    <!-- Companion Edit Dialog -->
-    <v-dialog v-model="companionEditVisible" max-width="800px">
-      <v-card class="rounded-xl shadow-xl">
-        <v-card-title class="bg-teal-darken-1 text-white py-4 d-flex align-center">
-          <v-icon class="mr-2">mdi-account-edit</v-icon>
-          Edit Candidate Details
-          <v-btn icon="mdi-close" variant="text" size="small" @click="companionEditVisible = false" class="ml-auto"></v-btn>
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <v-row>
-            <v-col cols="12" md="6"><v-text-field v-model="companionForm.firstname" label="First Name" variant="outlined" density="compact"></v-text-field></v-col>
-            <v-col cols="12" md="6"><v-text-field v-model="companionForm.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field></v-col>
-            <v-col cols="12" md="6"><v-text-field v-model="companionForm.email" label="Email" variant="outlined" density="compact"></v-text-field></v-col>
-            <v-col cols="12" md="6"><v-text-field v-model="companionForm.phone_number" label="Phone" variant="outlined" density="compact"></v-text-field></v-col>
-          </v-row>
-          <v-row>
-            <v-col cols="12" md="4">
-                <v-select
-                  v-model="companionForm.pastor_id"
-                  :items="pastors"
-                  item-title="name"
-                  item-value="id"
-                  label="Assigned Pastor"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                ></v-select>
-            </v-col>
-            <v-col cols="12" md="8"><v-text-field v-model="companionForm.location" label="Location" variant="outlined" density="compact"></v-text-field></v-col>
-          </v-row>
-        </v-card-text>
-        <v-card-actions class="pa-4 bg-grey-lighten-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="companionEditVisible = false">Cancel</v-btn>
-          <v-btn color="teal-darken-1" variant="flat" class="px-6" @click="saveIndividualCompanion">Save Changes</v-btn>
+    <!-- Bulk Complete Confirmation Dialog -->
+    <v-dialog v-model="bulkCompleteDialog" max-width="400px" persistent>
+      <v-card class="pa-4 rounded-xl">
+        <div class="pa-4 text-center">
+          <v-avatar color="success-lighten-5" size="80" class="mb-4">
+            <v-icon color="success" size="40">mdi-check-circle</v-icon>
+          </v-avatar>
+          <h2 class="text-h5 font-weight-bold mb-1">Mark as Completed?</h2>
+          <p class="text-body-2 text-grey-darken-1">
+            Selected {{ selectedRequestsToComplete.length }} records to mark as completed. This will also send confirmation emails.
+          </p>
+        </div>
+        <v-card-actions class="pa-4 pt-0">
+          <v-btn block color="success" size="large" variant="flat" class="rounded-lg font-weight-bold" @click="confirmBulkComplete" :loading="loading">
+            Yes, Mark Completed
+          </v-btn>
         </v-card-actions>
+        <v-btn variant="text" color="grey" block @click="bulkCompleteDialog = false" :disabled="loading">Cancel</v-btn>
       </v-card>
     </v-dialog>
+
   </div>
 </template>
 
@@ -952,6 +982,71 @@ const { requests, loading, totalCount, currentPage, pastors } = storeToRefs(stor
 const { settings, loading: settingsLoading } = storeToRefs(settingsStore);
 
 // New states for companion console
+const hasPendingSelection = computed(() => {
+  return selectedRows.value.some(id => {
+    const row = requests.value.find(r => r.request_id === id);
+    return row && row.status === 'Pending';
+  });
+});
+
+const handleBulkReject = async () => {
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      'Please provide a reason for rejecting the selected pending requests.',
+      'Bulk Reject Requests',
+      {
+        confirmButtonText: 'Reject All',
+        cancelButtonText: 'Cancel',
+        inputType: 'textarea',
+        inputPlaceholder: 'Reason for rejection...',
+        inputValidator: (val) => !!val || 'Reason is required',
+      }
+    );
+
+    if (reason) {
+      const pendingIds = selectedRows.value.filter(id => {
+        const row = requests.value.find(r => r.request_id === id);
+        return row && row.status === 'Pending';
+      });
+
+      if (pendingIds.length === 0) return;
+
+      const response = await axios.post('/services/biblestudy/bulk-reject', {
+        request_ids: pendingIds,
+        reason
+      });
+
+      if (response.data.success) {
+        ElMessage.success(`${pendingIds.length} requests rejected successfully`);
+        selectedRows.value = [];
+        store.fetchRequests();
+      }
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error('Bulk reject error:', e);
+  }
+};
+
+const bulkCompleteDialog = ref(false);
+const selectedRequestsToComplete = ref([]);
+
+const openCompletionDialog = (items) => {
+  selectedRequestsToComplete.value = items;
+  bulkCompleteDialog.value = true;
+};
+
+const confirmBulkComplete = async () => {
+  try {
+    const ids = selectedRequestsToComplete.value.map(r => r.request_id);
+    const success = await store.bulkCompleteRequests(ids);
+    if (success) {
+      bulkCompleteDialog.value = false;
+      selectedRows.value = [];
+    }
+  } catch (error) {
+    console.error('Error in confirmBulkComplete:', error);
+  }
+};
 const bulkEditVisible = ref(false);
 const bulkLoading = ref(false);
 const bulkForm = ref({ status: '', pastor_id: null, location: '', scheduled_date: null });
@@ -1026,32 +1121,21 @@ const applyBulkEdit = async () => {
   } finally { bulkLoading.value = false; }
 };
 
-const openCompanionEdit = (idx) => {
+const openCompanionSchedule = (idx) => {
   editingCompanionIndex.value = idx;
   const person = companionsInGroup.value[idx];
-  companionForm.value = { ...person };
   
-  // Force Pastor ID to String for perfect v-select label matching
-  if (companionForm.value.pastor_id !== null && companionForm.value.pastor_id !== undefined) {
-    companionForm.value.pastor_id = String(companionForm.value.pastor_id).replace(/^0+/, '');
-    if (companionForm.value.pastor_id === '') companionForm.value.pastor_id = null;
-  }
+  isEditingFromConsole.value = true;
+  isBulkEditing.value = false;
+  
+  editItem.value = { ...person };
+  editItem.value._originalStatus = person.status;
 
-  companionEditVisible.value = true;
-};
-
-const saveIndividualCompanion = async () => {
-  companionsInGroup.value[editingCompanionIndex.value] = { ...companionForm.value };
+  // Find the matching pastor from the reactive list to ensure perfect v-select pairing
+  editItem.value.pastor_id = matchPastorId(person.pastor_id);
   
-  if (companionsInGroup.value[editingCompanionIndex.value].status === 'Pending') {
-    companionsInGroup.value[editingCompanionIndex.value].pastor_id = null;
-  }
-  
-  const success = await saveCompanionsUpdate();
-  if (success) {
-    companionEditVisible.value = false;
-    ElMessage.success('Candidate details updated');
-  }
+  dialogVisible.value = true;
+  fetchAvailableSlots();
 };
 
 const isGroup = (item) => {
@@ -1264,6 +1348,7 @@ const editItem = ref({});
 // Sorting & Bulk Action State
 const sortBy = ref('Date Created (Newest)');
 const isBulkEditing = ref(false);
+const isEditingFromConsole = ref(false);
 const isBulkPromoting = ref(false);
 
 // Selection state
@@ -1329,25 +1414,21 @@ const handleBulkComplete = async () => {
   if (selectedRows.value.length === 0) return;
   
   // Filter for eligible records (must be Scheduled, or Pending if restriction is off)
-  const eligibleIds = requests.value
+  const eligibleItems = requests.value
     .filter(r => selectedRows.value.includes(r.request_id))
     .filter(r => {
       if (settings.value.allow_complete_without_schedule) {
-        return ['Pending', 'Scheduled'].includes(r.status);
+        return ['Pending', 'Scheduled', 'Completed'].includes(r.status) && r.status !== 'Completed';
       }
       return r.status === 'Scheduled';
-    })
-    .map(r => r.request_id);
+    });
 
-  if (eligibleIds.length === 0) {
+  if (eligibleItems.length === 0) {
     ElMessage.warning('None of the selected records are eligible for completion based on current restrictions.');
     return;
   }
 
-  const result = await store.bulkCompleteRequests(eligibleIds);
-  if (result) {
-    selectedRows.value = [];
-  }
+  openCompletionDialog(eligibleItems);
 };
 
 const handleBulkArchive = async () => {
@@ -1395,7 +1476,7 @@ const handleBulkEdit = () => {
     request_id: null,
     status: firstItem.status || 'Scheduled',
     location: firstItem.location || firstItem.address || '',
-    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id).replace(/^0+/, '') : null,
+    pastor_id: matchPastorId(firstItem.pastor_id),
     scheduled_date: commonSchedule,
     notes: ''
   };
@@ -1446,6 +1527,26 @@ const allSelectedArePending = computed(() => {
   if (selectedInGroup.value.length === 0) return false;
   return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Pending');
 });
+
+const canBulkCompleteInConsole = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Scheduled');
+});
+
+const markConsoleParticipantComplete = async (idx) => {
+  const person = companionsInGroup.value[idx];
+  try {
+    await ElMessageBox.confirm(
+      `Mark ${person.firstname} ${person.lastname} as completed?`,
+      'Confirm Completion',
+      { confirmButtonText: 'Yes, Complete', cancelButtonText: 'Cancel', type: 'success' }
+    );
+    
+    companionsInGroup.value[idx].status = 'Completed';
+    const success = await saveCompanionsUpdate();
+    if (success) ElMessage.success('Candidate marked as completed');
+  } catch (e) { /* Cancelled */ }
+};
 
 const handleSearch = (val) => {
     if (window.searchTimeout) clearTimeout(window.searchTimeout);
@@ -1640,8 +1741,9 @@ const getStatusColor = (status) => {
       case 'Scheduled': return 'info';
       case 'Completed': return 'success';
       case 'Cancelled': return 'grey';
-      case 'Rejected': return 'error';
-      default: return 'grey';
+    case 'Promoted': return 'teal-darken-1';
+    case 'Rejected': return 'error';
+    default: return 'grey';
   }
 };
 
@@ -1660,7 +1762,10 @@ const isBaptismInvited = (item) => {
   }
 };
 
-const overrideTime = ref(false);
+const submitBulkPromotion = () => {
+  handlePromotionAction(true);
+};
+
 const promotionTimeOptions = [
   '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM',
   '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM',
@@ -1701,14 +1806,12 @@ const formatDateTime = (date) => {
 };
 
 const openEditDialog = (item) => {
+  isEditingFromConsole.value = false;
   editItem.value = { ...item };
   editItem.value._originalStatus = item.status;
   
-  // Force Pastor ID to String for perfect v-select label matching
-  if (editItem.value.pastor_id !== null && editItem.value.pastor_id !== undefined) {
-    editItem.value.pastor_id = String(editItem.value.pastor_id).replace(/^0+/, '');
-    if (editItem.value.pastor_id === '') editItem.value.pastor_id = null;
-  }
+  // Find the matching pastor from the reactive list to ensure perfect v-select pairing
+  editItem.value.pastor_id = matchPastorId(item.pastor_id);
   
   // Directly fall back to the address they input if no location was saved yet.
   if (!editItem.value.location && editItem.value.address) {
@@ -1824,12 +1927,24 @@ const saveEdit = async () => {
       requestIds: selectedRows.value,
       ...editItem.value
     };
-    // Don't overwrite individual locations/notes if they were blank in bulk edit?
-    // Usually bulk edit means "update all selected to these values"
     success = await store.bulkUpdateRequest(payload);
     if (success) {
       selectedRows.value = [];
       isBulkEditing.value = false;
+    }
+  } else if (isEditingFromConsole.value) {
+    // Update the specific companion in the local group reactive array
+    companionsInGroup.value[editingCompanionIndex.value] = { ...editItem.value };
+    
+    if (editItem.value.status === 'Pending') {
+      companionsInGroup.value[editingCompanionIndex.value].pastor_id = null;
+    }
+    
+    // Perform sync to primary record in DB
+    success = await saveCompanionsUpdate();
+    if (success) {
+      isEditingFromConsole.value = false;
+      ElMessage.success('Candidate updated and synchronized');
     }
   } else {
     if (editItem.value.status === 'Pending') {
@@ -1861,19 +1976,9 @@ const markIndividualComplete = async (item) => {
       }
     }
 
-    await ElMessageBox.confirm(
-      `Mark request for ${item.firstname} ${item.lastname} as completed?`,
-      'Mark Completed',
-      {
-        confirmButtonText: 'Yes, Complete',
-        cancelButtonText: 'Cancel',
-        type: 'success',
-      }
-    );
-    
-    await store.updateRequest(item.request_id, { status: 'Completed' });
-  } catch {
-    // User cancelled
+    openCompletionDialog([item]);
+  } catch (error) {
+    console.error('Error in markIndividualComplete:', error);
   }
 };
 
@@ -1974,10 +2079,28 @@ const handlePromotionAction = async (isDecided) => {
           selectedCompanionsPayload
         );
         if (success) {
+          ElMessage.success(`${promotionIds.length} candidate(s) promoted to Water Baptism`);
+          
+          // Update main records status locally
+          promotionIds.forEach(id => {
+            const idx = requests.value.findIndex(r => r.request_id === id);
+            if (idx !== -1) requests.value[idx].status = 'Promoted';
+          });
+
+          // Sync group console if needed
+          if (isFromConsole) {
+             promotingCompanions.value.forEach(p => {
+               const cIdx = companionsInGroup.value.findIndex(c => c.firstname === p.firstname && c.lastname === p.lastname);
+               if (cIdx !== -1) companionsInGroup.value[cIdx].status = 'Promoted';
+             });
+             saveCompanionsUpdate(); // Sync companions status into main record's notes
+          }
+
           promotionDialogVisible.value = false;
           selectedRows.value = [];
           selectedInGroup.value = [];
           promotingCompanions.value = [];
+          store.fetchRequests(); // Refresh to ensure final state consistency
         }
       } finally {
         loadingPromotion.value = false;
@@ -2023,10 +2146,27 @@ const handlePromotionAction = async (isDecided) => {
             selectedCompanionsPayload
           );
           if (success) {
+            ElMessage.success(`${promotionIds.length} invitation(s) sent successfully`);
+            
+            // Update status to 'Promoted' (or 'Invited' if preferred, but user said promotion status)
+            promotionIds.forEach(id => {
+              const idx = requests.value.findIndex(r => r.request_id === id);
+              if (idx !== -1) requests.value[idx].status = 'Promoted';
+            });
+
+            if (isFromConsole) {
+              promotingCompanions.value.forEach(p => {
+                const cIdx = companionsInGroup.value.findIndex(c => c.firstname === p.firstname && c.lastname === p.lastname);
+                if (cIdx !== -1) companionsInGroup.value[cIdx].status = 'Promoted';
+              });
+              saveCompanionsUpdate();
+            }
+
             promotionDialogVisible.value = false;
             selectedRows.value = [];
             selectedInGroup.value = [];
             promotingCompanions.value = [];
+            store.fetchRequests();
           }
       } else {
           const activeItem = promotionData.value._activeItem;
@@ -2107,11 +2247,29 @@ const disabledTime = (date) => {
   };
 };
 
+const matchPastorId = (rawId) => {
+    if (!rawId) return null;
+    const cleanRaw = String(rawId).replace(/^0+/, '').trim();
+    const found = pastors.value.find(p => String(p.id).replace(/^0+/, '').trim() === cleanRaw);
+    return found ? found.id : rawId;
+};
+
 const getPastorName = (id) => {
   if (!id) return 'Unassigned';
-  const cleanId = String(id).replace(/^0+/, '');
-  const p = pastors.value.find(p => String(p.id).replace(/^0+/, '') === cleanId);
-  return p ? p.name : `Pastor (ID: ${cleanId})`;
+  
+  // Create a clean normalized ID for comparison (removing leading zeros)
+  const normalizeId = (val) => {
+    if (val === null || val === undefined) return '';
+    return String(val).replace(/^0+/, '').trim();
+  };
+
+  const targetId = normalizeId(id);
+  
+  // Find match in the reactive pastors list
+  const p = pastors.value.find(pastor => normalizeId(pastor.id) === targetId);
+  
+  // Return the name if found, otherwise return the normalized ID
+  return p ? p.name : targetId;
 };
 
 onMounted(() => {
@@ -2122,6 +2280,13 @@ onMounted(() => {
 
 <style scoped>
 .biblestudy-records { height: 100%; }
+
+.premium-overlay {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
 
 .companion-management-table :deep(thead th) {
   background-color: #f8fafc !important;
@@ -2160,5 +2325,28 @@ onMounted(() => {
 
 .border-dashed {
   border-style: dashed !important;
+}
+
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+}
+
+.pulse-animation {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.letter-spacing-1 {
+  letter-spacing: 1px;
+}
+
+.hover-scale:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease;
 }
 </style>

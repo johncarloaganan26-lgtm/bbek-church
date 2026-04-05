@@ -78,9 +78,13 @@
           <v-icon start size="14">mdi-checkbox-marked</v-icon>
           {{ selectedRequests.length }} SELECTED
         </v-chip>
-        <v-btn size="small" color="success" variant="outlined" @click="bulkComplete" :loading="loading" class="bulk-action-btn font-weight-bold text-uppercase">
+        <v-btn v-if="hasScheduledSelectionMain" size="small" color="success" variant="outlined" @click="bulkComplete" :loading="loading" class="bulk-action-btn font-weight-bold text-uppercase">
           <v-icon start size="16">mdi-check-all</v-icon>
           Mark Completed
+        </v-btn>
+        <v-btn v-if="hasPendingSelectionMain" size="small" color="error" variant="outlined" @click="bulkRejectMain" :loading="loading" class="bulk-action-btn font-weight-bold text-uppercase">
+          <v-icon start size="16">mdi-close-circle-outline</v-icon>
+          Reject Selected
         </v-btn>
         <v-btn size="small" color="error" variant="outlined" @click="bulkArchive" class="bulk-action-btn font-weight-bold text-uppercase">
           <v-icon start size="16">mdi-archive</v-icon>
@@ -135,9 +139,21 @@
             <td>{{ item.firstname }} {{ item.lastname }}</td>
             <td>{{ item.email }}</td>
             <td>
-              <v-chip size="small" :color="getRequestTypeColor(item.request_type)" class="text-white">
-                {{ item.request_type }}
-              </v-chip>
+              <div class="d-flex align-center gap-1 flex-wrap">
+                <v-chip size="small" :color="getRequestTypeColor(item.request_type)" class="text-white">
+                  {{ item.request_type }}
+                </v-chip>
+                <v-chip
+                  size="x-small"
+                  :color="isGroup(item) ? 'deep-purple-darken-1' : 'blue-grey-lighten-1'"
+                  variant="flat"
+                  class="text-white font-weight-bold"
+                  style="font-size: 10px;"
+                >
+                  <v-icon start size="12">{{ isGroup(item) ? 'mdi-account-group' : 'mdi-account' }}</v-icon>
+                  {{ isGroup(item) ? 'GROUP' : 'SOLO' }}
+                </v-chip>
+              </div>
             </td>
             <td>{{ item.pastor_name || getPastorName(item.pastor_id) }}</td>
             <td>
@@ -146,7 +162,18 @@
                   {{ item.status }}
                 </v-chip>
                 <v-chip
-                  v-if="isBibleStudyInvited(item)"
+                  v-if="isBibleStudyInvited(item) && item.status === 'Completed'"
+                  size="x-small"
+                  color="teal-darken-1"
+                  variant="flat"
+                  class="text-white font-weight-bold"
+                  style="font-size: 9px;"
+                >
+                  <v-icon start size="10">mdi-email-fast</v-icon>
+                  Invited
+                </v-chip>
+                <v-chip
+                  v-else-if="isBibleStudyInvited(item)"
                   size="x-small"
                   color="teal-darken-1"
                   variant="flat"
@@ -184,13 +211,14 @@
                 </v-btn>
 
                 <v-btn
-                  variant="outlined"
+                  icon
+                  variant="text"
                   size="small"
                   color="success"
                   @click="markIndividualComplete(item)"
                   v-if="['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
                 >
-                  <v-icon>mdi-check</v-icon>
+                  <v-icon>mdi-check-circle-outline</v-icon>
                   <v-tooltip activator="parent" location="top">Mark Completed</v-tooltip>
                 </v-btn>
 
@@ -199,7 +227,7 @@
                   size="small"
                   color="teal-darken-1"
                   @click="openBibleStudyDialog(item)"
-                  v-if="item.status === 'Completed' && item.request_type === 'Salvation'"
+                  v-if="!isGroup(item) && item.status === 'Completed' && item.request_type === 'Salvation'"
                 >
                   <v-icon>mdi-book-open-variant</v-icon>
                   <v-tooltip activator="parent" location="top">Set Bible Study Schedule</v-tooltip>
@@ -208,7 +236,7 @@
 
 
                 <v-btn
-                  v-if="['Pending', 'Scheduled'].includes(item.status)"
+                  v-if="!isGroup(item) && item.status === 'Pending'"
                   variant="outlined"
                   size="small"
                   color="error"
@@ -660,7 +688,24 @@
           </div>
         </v-card-title>
 
-        <v-card-text class="pa-0">
+        <v-card-text class="pa-0 position-relative">
+          <!-- Loading Overlay -->
+          <v-overlay
+            v-model="groupActionLoading"
+            contained
+            persistent
+            class="align-center justify-center rounded-xl"
+            scrim="white"
+            opacity="0.8"
+            style="z-index: 100;"
+          >
+            <div class="text-center">
+              <v-progress-circular indeterminate color="teal-darken-3" size="64" width="6" class="mb-4"></v-progress-circular>
+              <div class="text-h6 font-weight-black text-teal-darken-3">PROCESSING ACTION</div>
+              <div class="text-caption text-grey-darken-1">Updating participant records and sending notifications...</div>
+            </div>
+          </v-overlay>
+
           <!-- Selection Actions Bar (Modern Style) -->
           <v-expand-transition>
             <div v-if="selectedInGroup.length > 0" class="bulk-actions-bar pa-3 d-flex align-center gap-2 sticky-top border-b" style="z-index: 5; border-radius: 0;">
@@ -674,6 +719,11 @@
                   Reject
                 </v-btn>
                 <v-divider vertical class="mx-1"></v-divider>
+                <v-btn v-if="allSelectedAreScheduled" size="small" color="success" variant="outlined" @click="bulkCompleteInGroup" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-check-all</v-icon>
+                  Mark Completed
+                </v-btn>
+                <v-divider v-if="allSelectedAreScheduled" vertical class="mx-1"></v-divider>
                 <v-btn size="small" color="teal-darken-2" variant="outlined" @click="openBulkEdit" class="bulk-action-btn font-weight-bold text-uppercase">
                   <v-icon start size="16">mdi-pencil-box-multiple</v-icon>
                   Bulk Edit
@@ -718,6 +768,7 @@
                 <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Assigned Pastor</th>
                 <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Schedule / Venue</th>
                 <th class="font-weight-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 0.5px;">Status</th>
+                <th class="font-weight-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 0.5px;">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -776,15 +827,86 @@
                   </div>
                 </td>
                 <td class="text-center">
-                  <v-chip 
-                    size="small" 
-                    :color="getStatusDisplayColor(person.status)" 
-                    variant="flat" 
-                    class="text-uppercase font-weight-black shadow-sm"
-                    style="font-size: 10px; min-width: 90px;"
-                  >
-                    {{ getStatusDisplayText(person.status) }}
-                  </v-chip>
+                  <div class="d-flex flex-column align-center gap-1">
+                    <v-chip 
+                      size="small" 
+                      :color="getStatusDisplayColor(person.status)" 
+                      variant="flat" 
+                      class="text-uppercase font-weight-black shadow-sm"
+                      style="font-size: 10px; min-width: 90px;"
+                    >
+                      {{ getStatusDisplayText(person.status) }}
+                    </v-chip>
+                    <v-chip
+                      v-if="isBibleStudyInvitedIndiv(person)"
+                      size="x-small"
+                      color="teal-darken-1"
+                      variant="flat"
+                      class="text-white font-weight-bold"
+                      style="font-size: 9px;"
+                    >
+                      <v-icon start size="10">mdi-email-check</v-icon>
+                      INVITED
+                    </v-chip>
+                  </div>
+                </td>
+                <td class="text-center">
+                  <div class="d-flex gap-2 justify-center">
+                    <v-btn
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                      @click="openCompanionEdit(idx)"
+                      v-if="person.status !== 'Promoted'"
+                    >
+                      <v-icon>mdi-calendar-clock</v-icon>
+                      <v-tooltip activator="parent" location="top">Update Status / Schedule</v-tooltip>
+                    </v-btn>
+
+                    <v-btn
+                      variant="outlined"
+                      size="small"
+                      color="success"
+                      @click="markCompanionComplete(idx)"
+                      v-if="person.status === 'Scheduled'"
+                    >
+                      <v-icon>mdi-check</v-icon>
+                      <v-tooltip activator="parent" location="top">Mark Completed</v-tooltip>
+                    </v-btn>
+
+                    <v-btn
+                      v-if="person.status === 'Completed'"
+                      variant="outlined"
+                      size="small"
+                      color="teal-darken-3"
+                      @click="promoteCompanionToBibleStudy(idx)"
+                    >
+                      <v-icon size="18">mdi-book-open-variant</v-icon>
+                      <v-tooltip activator="parent" location="top">Promote to Bible Study</v-tooltip>
+                    </v-btn>
+
+                    <v-btn
+                      v-if="person.status === 'Pending'"
+                      variant="outlined"
+                      size="small"
+                      color="error"
+                      @click="rejectCompanion(idx)"
+                    >
+                      <v-icon>mdi-close-circle</v-icon>
+                      <v-tooltip activator="parent" location="top">Reject</v-tooltip>
+                    </v-btn>
+
+                    <v-btn
+                      v-if="person.type !== 'primary' && person.status !== 'Scheduled' && person.status !== 'Completed' && person.status !== 'Promoted'"
+                      variant="outlined"
+                      size="small"
+                      color="grey"
+                      @click="removeCompanionFromGroup(idx)"
+                    >
+                      <v-icon>mdi-close</v-icon>
+                      <v-tooltip activator="parent" location="top">Remove Participant</v-tooltip>
+                    </v-btn>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -970,6 +1092,27 @@
           <v-btn variant="text" color="grey-darken-1" @click="bulkEditVisible = false" class="px-6 font-weight-bold">CANCEL</v-btn>
           <v-btn variant="flat" color="teal-darken-2" class="px-8 font-weight-bold shadow-md" @click="applyBulkEdit" :loading="bulkLoading">SAVE CHANGES</v-btn>
         </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Bulk Complete Confirmation Dialog -->
+    <v-dialog v-model="bulkCompleteDialog" max-width="400px" persistent>
+      <v-card class="pa-4 rounded-xl">
+        <div class="pa-4 text-center">
+          <v-avatar color="success-lighten-5" size="80" class="mb-4">
+            <v-icon color="success" size="40">mdi-check-circle</v-icon>
+          </v-avatar>
+          <h2 class="text-h5 font-weight-bold mb-1">Mark as Completed?</h2>
+          <p class="text-body-2 text-grey-darken-1">
+            Selected {{ selectedRequestsToComplete.length }} records to mark as completed. This will also send confirmation emails.
+          </p>
+        </div>
+        <v-card-actions class="pa-4 pt-0">
+          <v-btn block color="success" size="large" variant="flat" class="rounded-lg font-weight-bold" @click="confirmBulkComplete" :loading="loading">
+            Yes, Mark Completed
+          </v-btn>
+        </v-card-actions>
+        <v-btn variant="text" color="grey" block @click="bulkCompleteDialog = false" :disabled="loading">Cancel</v-btn>
       </v-card>
     </v-dialog>
 
@@ -1200,13 +1343,35 @@ const deleteReason = ref('');
 const showDeleteReasonDialog = ref(false);
 const itemToDelete = ref(null);
 const selectedRequests = ref([]);
+const bulkCompleteDialog = ref(false);
+const selectedRequestsToComplete = ref([]);
+
+const openCompletionDialog = (items) => {
+  selectedRequestsToComplete.value = items;
+  bulkCompleteDialog.value = true;
+};
+
+const confirmBulkComplete = async () => {
+  try {
+    const ids = selectedRequestsToComplete.value.map(r => r.request_id);
+    const result = await store.bulkCompleteRequests(ids);
+    if (result.success) {
+      bulkCompleteDialog.value = false;
+      selectedRequests.value = [];
+      fetchData();
+    }
+  } catch (error) {
+    console.error('Error in confirmBulkComplete:', error);
+  }
+};
 const selectAll = ref(false);
 
 // Companion Console State
 const companionsDialogVisible = ref(false);
 const selectedGroup = ref(null);
-const companionsInGroup = ref([]);
+const companionsInGroup = ref([]); 
 const selectedInGroup = ref([]);
+const groupActionLoading = ref(false); // To track bulk actions inside the group console
 const groupSelectAll = ref(false);
 
 const bulkEditVisible = ref(false);
@@ -1264,6 +1429,38 @@ const canBulkPromote = computed(() => {
   return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Completed');
 });
 
+const allSelectedAreScheduled = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  return selectedInGroup.value.every(idx => {
+    const person = companionsInGroup.value[idx];
+    return person && person.status === 'Scheduled';
+  });
+});
+
+const bulkCompleteInGroup = async () => {
+  if (selectedInGroup.value.length === 0) return;
+  
+  try {
+    await ElMessageBox.confirm(
+      `Mark ${selectedInGroup.value.length} selected participant(s) as completed? This will trigger completion email notifications.`,
+      'Bulk Mark Completed',
+      {
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        type: 'success',
+      }
+    );
+    
+    groupActionLoading.value = true;
+    await bulkActionInGroup('Completed');
+    selectedInGroup.value = [];
+  } catch (e) {
+    // User cancelled
+  } finally {
+    groupActionLoading.value = false;
+  }
+};
+
 const allSelectedArePending = computed(() => {
   if (selectedInGroup.value.length === 0) return false;
   return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Pending');
@@ -1274,6 +1471,22 @@ const canBulkPromoteMain = computed(() => {
   return selectedRequests.value.every(id => {
     const req = requests.value.find(r => r.request_id === id);
     return req && req.status === 'Completed' && req.request_type === 'Salvation';
+  });
+});
+
+const hasPendingSelectionMain = computed(() => {
+  if (selectedRequests.value.length === 0) return false;
+  return selectedRequests.value.some(id => {
+    const req = requests.value.find(r => r.request_id === id);
+    return req && req.status === 'Pending';
+  });
+});
+
+const hasScheduledSelectionMain = computed(() => {
+  if (selectedRequests.value.length === 0) return false;
+  return selectedRequests.value.some(id => {
+    const req = requests.value.find(r => r.request_id === id);
+    return req && req.status === 'Scheduled';
   });
 });
 
@@ -1320,7 +1533,8 @@ const openCompanionsDialog = (item) => {
     status: item.status,
     pastor_id: primaryId,
     location: item.location,
-    address: item.address, // Capture home address
+    address: item.address,
+    bible_study_invited: isBibleStudyInvited(item),
     request_type: item.request_type,
     scheduled_date: item.scheduled_date
   };
@@ -1339,7 +1553,8 @@ const openCompanionsDialog = (item) => {
       scheduled_date: c.scheduled_date || item.scheduled_date,
       pastor_id: isPending ? (c.pastor_id || null) : pId,
       location: c.location || item.location,
-      address: c.address || item.address, // Inherit lead address if companion has none
+      address: c.address || item.address,
+      bible_study_invited: !!c.bible_study_invited,
       request_type: c.request_type || item.request_type
     };
   });
@@ -1434,12 +1649,22 @@ const applyBulkEdit = async () => {
   }
 };
 
+const promoteCompanionToBibleStudy = (idx) => {
+  selectedInGroup.value = [idx];
+  bulkPromoteToBibleStudy();
+};
+
 const bulkPromoteToBibleStudy = () => {
   if (selectedInGroup.value.length === 0) return;
   
   // Find first selected to use as reference for location etc
   const firstIdx = selectedInGroup.value[0];
   const person = companionsInGroup.value[firstIdx];
+  
+  if (!person) {
+    ElMessage.error('Participant record not found.');
+    return;
+  }
   
   bibleStudyItem.value = person; // Use first person as representative for item details in dialog
   isBulkPromotion.value = true;
@@ -1461,6 +1686,8 @@ const bulkPromoteToBibleStudyMain = () => {
   
   const firstId = selectedRequests.value[0];
   const req = requests.value.find(r => r.request_id === firstId);
+  
+  if (!req) return;
   
   bibleStudyItem.value = req;
   isBulkPromotion.value = true;
@@ -1529,6 +1756,33 @@ const promoteCompanion = (idx) => {
   fetchSlotsForBibleStudy();
 };
 
+const openCompanionEdit = (idx) => {
+  selectedInGroup.value = [idx];
+  openBulkEdit();
+};
+
+const markCompanionComplete = async (idx) => {
+  groupActionLoading.value = true;
+  try {
+    selectedInGroup.value = [idx];
+    await bulkActionInGroup('Completed');
+    selectedInGroup.value = [];
+  } finally {
+    groupActionLoading.value = false;
+  }
+};
+
+const rejectCompanion = async (idx) => {
+  groupActionLoading.value = true;
+  try {
+    selectedInGroup.value = [idx];
+    await bulkActionInGroup('Rejected');
+    selectedInGroup.value = [];
+  } finally {
+    groupActionLoading.value = false;
+  }
+};
+
 const removeCompanionFromGroup = async (idx) => {
   const person = companionsInGroup.value[idx];
   if (person.type === 'primary') return;
@@ -1571,7 +1825,14 @@ const updateCompanionStatus = async (index, newStatus) => {
 
 const bulkActionInGroup = async (newStatus) => {
   try {
-    const actionLabel = newStatus === 'Approved' ? 'Approve' : 'Reject';
+    let actionLabel = '';
+    switch(newStatus) {
+      case 'Approved': actionLabel = 'Approve'; break;
+      case 'Rejected': 
+      case 'Cancelled': actionLabel = 'Reject'; break;
+      case 'Completed': actionLabel = 'Complete'; break;
+      default: actionLabel = 'Update';
+    }
     
     // Check if scheduling requirements are met for primary if approving
     if (newStatus === 'Approved') {
@@ -1589,12 +1850,19 @@ const bulkActionInGroup = async (newStatus) => {
       }
     }
 
-    await ElMessageBox.confirm(`Apply "${actionLabel}" status to ${selectedInGroup.value.length} selected participants?`, 'Bulk Action');
+    // Individual confirmations are handled by the caller (like bulkCompleteInGroup) if needed
+    // But for general internal calls, we'll keep a basic check if this wasn't called by a UI action that already confirmed
     
     selectedInGroup.value.forEach(idx => {
       const person = companionsInGroup.value[idx];
       if (person.type === 'primary') {
-        companionsInGroup.value[idx].status = newStatus === 'Approved' ? 'Scheduled' : 'Cancelled';
+        if (newStatus === 'Approved') {
+           companionsInGroup.value[idx].status = 'Scheduled';
+        } else if (newStatus === 'Rejected') {
+           companionsInGroup.value[idx].status = 'Cancelled';
+        } else {
+           companionsInGroup.value[idx].status = newStatus;
+        }
       } else {
         companionsInGroup.value[idx].status = newStatus;
       }
@@ -1717,34 +1985,42 @@ const bulkComplete = async () => {
   }
 
   try {
-    await ElMessageBox.confirm(
-      `Mark ${selectedRequests.value.length} request(s) as completed?`,
-      'Bulk Complete Requests',
-      {
-        confirmButtonText: 'Yes, Complete',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      }
-    );
-    
-    const result = await store.bulkCompleteRequests(selectedRequests.value);
-    if (result.success) {
-      const { completed, failed } = result.data || {};
-      
-      if (completed && completed.length > 0) {
-        ElMessage.success(`Successfully marked ${completed.length} request(s) as completed`);
-      } else {
-        ElMessage.success('Requests marked as completed');
-      }
-      
-      if (failed && failed.length > 0) {
-        ElMessage.warning(`${failed.length} request(s) failed to complete`);
-      }
-      
-      clearSelection();
-    } else if (result.message) {
-      ElMessage.error(result.message);
+    const scheduledIds = selectedRequests.value.filter(id => {
+      const req = requests.value.find(r => r.request_id === id);
+      return req && req.status === 'Scheduled';
+    });
+
+    if (scheduledIds.length === 0) {
+      ElMessage.warning('Only scheduled requests can be marked as completed in bulk.');
+      return;
     }
+
+    openCompletionDialog(requests.value.filter(r => scheduledIds.includes(r.request_id)));
+  } catch {
+    // User cancelled
+  }
+};
+
+const markIndividualComplete = async (item) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Manual Completion logic match from BibleStudy/WaterBaptism
+    if (!settings.value.allow_complete_without_schedule) {
+      if (item.status === 'Pending' || !item.scheduled_date) {
+        ElMessage.warning('This session must be scheduled before it can be marked as completed.');
+        return;
+      }
+      const scheduledDate = new Date(item.scheduled_date);
+      scheduledDate.setHours(0, 0, 0, 0);
+      if (scheduledDate > today) {
+        ElMessage.warning(`Wait until the scheduled date (${item.scheduled_date.split('T')[0]}) or turn off Manual Completion restriction.`);
+        return;
+      }
+    }
+
+    openCompletionDialog([item]);
   } catch {
     // User cancelled
   }
@@ -2132,6 +2408,19 @@ const selectSlot = (slotDateTime) => {
   promotionForm.value.scheduled_date = slotDateTime;
 };
 
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  try {
+    const [hours, minutes] = timeStr.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 || 12;
+    return `${displayH}:${minutes} ${ampm}`;
+  } catch (e) {
+    return timeStr;
+  }
+};
+
 const formatBibleStudyDate = (dateStr) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -2142,18 +2431,12 @@ const formatBibleStudyDate = (dateStr) => {
   });
 };
 
-const formatTime = (timeStr) => {
-  if (!timeStr) return '';
-  const [hours, minutes] = timeStr.split(':');
-  const h = parseInt(hours);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const displayH = h % 12 || 12;
-  return `${displayH}:${minutes} ${ampm}`;
-};
-
-const formatSelectedSchedule = (dateTimeStr) => {
-  if (!dateTimeStr) return '';
-  return new Date(dateTimeStr).toLocaleString('en-US', {
+const formatSelectedSchedule = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -2161,6 +2444,10 @@ const formatSelectedSchedule = (dateTimeStr) => {
     minute: '2-digit',
     hour12: true
   });
+};
+
+const isBibleStudyInvitedIndiv = (person) => {
+  return !!person?.bible_study_invited;
 };
 
 const handleBibleStudyAction = async (isDecided) => {
@@ -2173,128 +2460,118 @@ const handleBibleStudyAction = async (isDecided) => {
 
   loadingBibleStudy.value = true;
   try {
-    if (isBulkPromotion.value) {
-      const isMainTable = selectedRequests.value.length > 0 && selectedInGroup.value.length === 0;
-      const targets = isMainTable 
-        ? selectedRequests.value.map(id => requests.value.find(r => r.request_id === id))
-        : selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
+    const isMainTable = selectedRequests.value.length > 0 && selectedInGroup.value.length === 0;
+    const targets = isBulkPromotion.value 
+      ? (isMainTable ? selectedRequests.value.map(id => requests.value.find(r => r.request_id === id)) : selectedInGroup.value.map(idx => companionsInGroup.value[idx]))
+      : [bibleStudyItem.value];
 
-      if (targets.length === 0) return;
+    if (targets.length === 0) return;
 
-      // 1. Prepare Group Logic
-      const isConsoleBulk = !isMainTable;
-      const lead = isConsoleBulk ? selectedGroup.value : targets[0];
-      const leadId = lead.request_id;
-      
-      let companions = [];
-      
-      if (isConsoleBulk) {
-        // From Companion Console: Use existing companions, but update their status to match lead if selected
-        companions = getCompanions(lead).map(c => {
-          const isSelected = selectedInGroup.value.some(idx => {
-            const p = companionsInGroup.value[idx];
-            return p.type === 'companion' && p.email === c.email;
-          });
-          
-          if (isSelected) {
-            return { 
-              ...c, 
-              status: isDecided ? 'Scheduled' : 'Promoted',
-              pastor_id: promotionForm.value.pastor_id,
-              location: promotionForm.value.location,
-              scheduled_date: promotionForm.value.scheduled_date
-            };
-          }
-          return c;
+    // 1. Prepare Group Logic
+    const isConsoleBulk = isBulkPromotion.value && !isMainTable;
+    const lead = isConsoleBulk ? selectedGroup.value : targets[0];
+    const leadId = lead.request_id;
+    
+    let companions = [];
+    
+    if (isConsoleBulk) {
+      companions = getCompanions(lead).map(c => {
+        const isSelected = selectedInGroup.value.some(idx => {
+          const p = companionsInGroup.value[idx];
+          return p.type === 'companion' && p.email === c.email;
         });
-      }
-
-      // Group notes only used in Consolidation (Decided) path for console
-      const groupNotes = {
-        is_group: companions.length > 0,
-        group_size: companions.length + 1,
-        companions: companions
-      };
-
-      // 3. Promote/Invite targets
-      let successCount = 0;
-      
-      if (!isDecided) {
-        // INVITATIONS: Always individual so each person gets their own form link
-        for (const target of targets) {
-          let tId = target.request_id || (isMainTable ? target.request_id : selectedGroup.value.request_id);
-          const tPayload = { 
-            firstname: target.firstname,
-            lastname: target.lastname,
-            email: target.email,
-            isDecided: false 
+        
+        if (isSelected) {
+          return { 
+            ...c, 
+            status: isDecided ? 'Scheduled' : 'Promoted',
+            pastor_id: promotionForm.value.pastor_id,
+            location: promotionForm.value.location,
+            scheduled_date: promotionForm.value.scheduled_date
           };
-          const ok = await store.promoteToBibleStudy(tId, tPayload);
-          if (ok) successCount++;
         }
-      } else {
-        // SCHEDULING: 
-        if (!isMainTable) {
-          // 1. Console Bulk: Multiple people from ONE group selected
-          // Merge them into one Bible Study group record
-          const leadPayload = { 
-            ...promotionForm.value, 
-            notes: JSON.stringify(groupNotes),
-            isDecided: true 
-          };
-          const ok = await store.promoteToBibleStudy(leadId, leadPayload);
-          if (ok) successCount = targets.length;
-        } else {
-          // 2. Main Table Bulk: Multiple PRIMARY requesters selected
-          // Promote EACH one as their own record (which carries their own companions)
-          for (const target of targets) {
-            const tPayload = { 
-              ...promotionForm.value, 
-              isDecided: true 
-            };
-            const ok = await store.promoteToBibleStudy(target.request_id, tPayload);
-            if (ok) successCount++;
-          }
-        }
-      }
-      
-      if (successCount > 0) {
-        if (isMainTable) {
-          clearSelection();
-        } else {
-          // Only update local status to Promoted when admin has confirmed scheduling.
-          // Sending an invitation link (isDecided=false) should leave the status unchanged.
-          if (isDecided) {
-            targets.forEach(t => {
-              const idx = companionsInGroup.value.findIndex(p => p.email === t.email);
-              if (idx !== -1) companionsInGroup.value[idx].status = 'Promoted';
-            });
-            await saveCompanionsUpdate();
-          }
-          selectedInGroup.value = [];
-          groupSelectAll.value = false;
-        }
-        ElMessage.success(`${isDecided ? 'Group promoted' : 'Invitations sent'} successfully!`);
+        return c;
+      });
+    }
+
+    const groupNotes = {
+      is_group: companions.length > 0,
+      group_size: companions.length + 1,
+      companions: companions
+    };
+
+    let successCount = 0;
+    
+    if (!isDecided) {
+      for (const target of targets) {
+        let tId = target.request_id || (isMainTable ? target.request_id : selectedGroup.value.request_id);
+        const tPayload = { 
+          firstname: target.firstname,
+          lastname: target.lastname,
+          email: target.email,
+          isDecided: false 
+        };
+        const ok = await store.promoteToBibleStudy(tId, tPayload);
+        if (ok) successCount++;
       }
     } else {
-      // Single Promotion (Check if it's a group already)
-      let payload = { ...promotionForm.value, isDecided };
-      
-      if (!isDecided) {
-         payload = { 
-            firstname: bibleStudyItem.value.firstname,
-            lastname: bibleStudyItem.value.lastname,
-            email: bibleStudyItem.value.email,
-            isDecided: false 
-         };
+      if (isConsoleBulk) {
+        const leadPayload = { 
+          ...promotionForm.value, 
+          notes: JSON.stringify(groupNotes),
+          isDecided: true 
+        };
+        const ok = await store.promoteToBibleStudy(leadId, leadPayload);
+        if (ok) successCount = targets.length;
+      } else {
+        for (const target of targets) {
+          const tPayload = { 
+            ...promotionForm.value, 
+            isDecided: true 
+          };
+          const ok = await store.promoteToBibleStudy(target.request_id, tPayload);
+          if (ok) successCount++;
+        }
       }
-
-      const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, payload);
+    }
       
-      if (success && isDecided && !isMainTable && companionsDialogVisible.value) {
-        const compIdx = companionsInGroup.value.findIndex(p => p.email === bibleStudyItem.value.email);
+    if (successCount > 0) {
+      if (isMainTable) {
+        clearSelection();
+      } else {
+        // Update local status/flags
+        targets.forEach(t => {
+          const idx = companionsInGroup.value.findIndex(p => p.email === t.email);
+          if (idx !== -1) {
+            if (isDecided) {
+              companionsInGroup.value[idx].status = 'Promoted';
+            } else {
+              companionsInGroup.value[idx].bible_study_invited = true;
+            }
+          }
+        });
+        await saveCompanionsUpdate();
+        selectedInGroup.value = [];
+        groupSelectAll.value = false;
+      }
+      ElMessage.success(`${isDecided ? 'Group promoted' : 'Invitations sent'} successfully!`);
+    } else if (!isBulkPromotion.value) {
+      // Single Promotion
+      const target = bibleStudyItem.value;
+      const payload = isDecided 
+        ? { ...promotionForm.value, isDecided: true }
+        : { firstname: target.firstname, lastname: target.lastname, email: target.email, isDecided: false };
+
+      const success = await store.promoteToBibleStudy(target.request_id, payload);
+      
+      if (success && !isMainTable && companionsDialogVisible.value) {
+        const compIdx = companionsInGroup.value.findIndex(p => p.email === target.email);
         if (compIdx !== -1) {
-          companionsInGroup.value[compIdx].status = 'Promoted';
+          if (isDecided) {
+            companionsInGroup.value[compIdx].status = 'Promoted';
+          } else {
+            companionsInGroup.value[compIdx].bible_study_invited = true;
+          }
           await saveCompanionsUpdate();
         }
       }
@@ -2303,13 +2580,57 @@ const handleBibleStudyAction = async (isDecided) => {
     bibleStudyDialogVisible.value = false;
     isPromotionScheduling.value = false;
     isBulkPromotion.value = false;
-    store.fetchRequests();
+    await store.fetchRequests();
   } catch (error) {
-    console.error('Promotion error:', error);
-    ElMessage.error(error.message || 'An error occurred during promotion');
+    if (error && error !== 'cancel') {
+        console.error('Promotion error:', error);
+        ElMessage.error(error.message || 'An error occurred during promotion');
+    }
   } finally {
     loadingBibleStudy.value = false;
   }
+};
+
+const bulkRejectMain = async () => {
+    const pendingIds = selectedRequests.value.filter(id => {
+        const req = requests.value.find(r => r.request_id === id);
+        return req && req.status === 'Pending';
+    });
+
+    if (pendingIds.length === 0) {
+        ElMessage.warning('Only pending requests can be rejected.');
+        return;
+    }
+
+    try {
+        const { value: reason } = await ElMessageBox.prompt(
+            `Please provide a reason for rejecting ${pendingIds.length} selected request(s). This will be sent via email with alternative suggestions.`,
+            'Bulk Reject Requests',
+            {
+                confirmButtonText: 'Send Rejection',
+                cancelButtonText: 'Cancel',
+                inputPattern: /.+/,
+                inputPlaceholder: 'Reason for rejection...',
+                inputErrorMessage: 'Rejection reason is required',
+                type: 'warning'
+            }
+        );
+
+        if (reason) {
+            let successCount = 0;
+            for (const id of pendingIds) {
+                const ok = await store.rejectRequest(id, reason);
+                if (ok) successCount++;
+            }
+            
+            if (successCount > 0) {
+                ElMessage.success(`Successfully rejected ${successCount} request(s).`);
+                clearSelection();
+            }
+        }
+    } catch (e) {
+        // User cancelled
+    }
 };
 
 const rejectItem = async (item) => {

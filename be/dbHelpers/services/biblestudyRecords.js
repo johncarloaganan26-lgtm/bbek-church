@@ -491,6 +491,13 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
             let primaryPromoted = false;
             let promotedCount = 0;
 
+            let updatedNotes = null;
+            if (req.notes) {
+                try {
+                    updatedNotes = typeof req.notes === 'string' ? JSON.parse(req.notes) : req.notes;
+                } catch(e) {}
+            }
+
             for (const member of selectedCompanions) {
                 const isPrimary = member.type === 'primary';
 
@@ -525,6 +532,15 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
                     promotedCount++;
                     if (isPrimary) primaryPromoted = true;
                     console.log(`[BulkPromote] ✅ Promoted ${member.type}: ${member.firstname} ${member.lastname}`);
+                    
+                    if (!isPrimary && updatedNotes && updatedNotes.is_group && Array.isArray(updatedNotes.companions)) {
+                        const compMatch = updatedNotes.companions.find(c => 
+                            c.firstname === member.firstname && c.lastname === member.lastname
+                        );
+                        if (compMatch) {
+                            compMatch.status = 'Promoted';
+                        }
+                    }
                 } catch (err) {
                     console.error(`[BulkPromote] ❌ Failed to promote ${member.firstname} ${member.lastname}:`, err.message);
                 }
@@ -533,7 +549,11 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
             // Mark lead Bible Study record as Promoted if at least one primary was promoted,
             // or if any companion was promoted (to avoid inconsistent state).
             if (promotedCount > 0) {
-                await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+                if (updatedNotes) {
+                    await query('UPDATE tbl_biblestudy_requests SET status = "Promoted", notes = ? WHERE request_id = ?', [JSON.stringify(updatedNotes), id]);
+                } else {
+                    await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+                }
             }
 
             return { success: promotedCount > 0, message: `Promoted ${promotedCount} of ${selectedCompanions.length} selected members.` };
@@ -568,6 +588,7 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
             const result = await createWaterBaptism(baptismData);
 
             // Promote all companions stored in the notes field
+            let updatedNotes = null;
             if (req.notes) {
                 try {
                     const notesData = typeof req.notes === 'string' ? JSON.parse(req.notes) : req.notes;
@@ -592,10 +613,12 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
                             };
                             try {
                                 await createWaterBaptism(compBaptismData);
+                                comp.status = 'Promoted';
                             } catch (compErr) {
                                 console.error(`[BulkPromote] Failed to promote companion ${comp.firstname} for BS ${id}:`, compErr.message);
                             }
                         }
+                        updatedNotes = notesData;
                     }
                 } catch (e) {
                     // Not a valid JSON notes field — skip companion loop
@@ -603,7 +626,11 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {},
             }
 
             if (result.success) {
-                await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+                if (updatedNotes) {
+                    await query('UPDATE tbl_biblestudy_requests SET status = "Promoted", notes = ? WHERE request_id = ?', [JSON.stringify(updatedNotes), id]);
+                } else {
+                    await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+                }
             }
             return result;
         }

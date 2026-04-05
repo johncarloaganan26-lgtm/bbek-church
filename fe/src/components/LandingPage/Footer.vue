@@ -135,7 +135,37 @@
         </v-col>
       </v-row>
 
+      <!-- Copyright & Legal Row -->
+      <v-row class="py-2 border-top">
+        <v-col cols="12" class="text-center">
+          <p class="copyright-text text-white-80 mb-0">
+            &copy; {{ new Date().getFullYear() }} {{ footerData.churchName || 'Bible Baptist' }}. All rights reserved.
+            <span class="mx-2 opacity-30">|</span>
+            <v-btn
+              variant="text"
+              size="x-small"
+              color="white"
+              class="quick-link-btn text-none"
+              @click="openAgreement('privacy')"
+            >
+              Privacy Policy
+            </v-btn>
+            <span class="mx-2 opacity-30">|</span>
+            <v-btn
+              variant="text"
+              size="x-small"
+              color="white"
+              class="quick-link-btn text-none"
+              @click="openAgreement('terms')"
+            >
+              Terms of Service
+            </v-btn>
+          </p>
+        </v-col>
+      </v-row>
+
     </v-container>
+
 
     <!-- Watch Live Button -->
     <v-btn
@@ -149,6 +179,12 @@
       <v-icon color="red" size="large" class="mr-2">mdi-play</v-icon>
       <span class="text-white font-weight-bold">Watch Live</span>
     </v-btn>
+
+    <!-- Agreement Modal -->
+    <AgreementModal 
+      v-model="showAgreementModal" 
+      :initial-tab="agreementTab" 
+    />
   </v-footer>
 </template>
 
@@ -156,8 +192,17 @@
 import { ref, onMounted } from 'vue'
 import axios from '@/api/axios'
 import { useCmsStore } from '@/stores/cmsStore'
+import AgreementModal from '@/components/Common/AgreementModal.vue'
 
 const cmsStore = useCmsStore()
+
+const showAgreementModal = ref(false)
+const agreementTab = ref('terms')
+
+const openAgreement = (tab) => {
+  agreementTab.value = tab
+  showAgreementModal.value = true
+}
 
 // Default footer data
 const defaultFooterData = {
@@ -601,6 +646,64 @@ onMounted(async () => {
     font-size: 11px !important;
     padding: 2px 8px !important;
   }
+}
+
+/* Legal Content Dialog Styles */
+.legal-dialog-card {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2) !important;
+}
+
+.legal-content {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  line-height: 1.7;
+}
+
+.legal-heading {
+  color: #0f766e;
+  font-weight: 700;
+  border-bottom: 2px solid #f0fdfa;
+  padding-bottom: 8px;
+  font-family: 'Georgia', serif;
+}
+
+.legal-heading-accent {
+  color: #0d9488;
+  font-weight: 700;
+  font-family: 'Georgia', serif;
+}
+
+.border-left-4 {
+  border-left: 4px solid #14b8a6;
+}
+
+.legal-list {
+  padding-left: 20px;
+  color: #4b5563;
+}
+
+.legal-list li {
+  margin-bottom: 8px;
+}
+
+.opacity-30 {
+  opacity: 0.3;
+}
+
+.custom-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #14b8a6;
+  border-radius: 10px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #0d9488;
 }
 
 /* Ensure proper z-indexing */
