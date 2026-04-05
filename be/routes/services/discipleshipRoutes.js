@@ -133,8 +133,8 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
         const requestedDays = Number.parseInt(String(daysRaw || '7'), 10);
         const days = Number.isFinite(requestedDays) ? Math.min(Math.max(requestedDays, 1), 90) : 7;
 
-        // Start from TODAY to allow manually added slots for today to reflect.
-        const start = moment().tz(timezone).startOf('day');
+        // Start from TOMORROW to allow only future slots to reflect (as requested).
+        const start = moment().tz(timezone).add(1, 'day').startOf('day');
         const endExclusive = start.clone().add(requestedDays, 'days');
 
         // Determine normalized service type (via generator's meta, reusing its validator).
@@ -1554,12 +1554,23 @@ router.post('/reject/:id', authenticateToken, async (req, res) => {
         await auditTrailRecords.createAuditLog({
             action_type: 'SALVATION_REJECTED',
             module: 'Discipleship',
-            description: `Rejected ${id}. Reason: ${reason}. Suggestions sent.`,
+            description: `Rejected ${id}. Reason: ${reason}. Suggestions sent and record archived.`,
             user_id: req.user?.acc_id,
             user_name: req.user?.firstname
         });
 
-        res.json({ success: true, message: 'Request rejected and email with suggestions sent successfully.' });
+        // 6. Automatic Archive
+        try {
+            await archiveDiscipleshipRequest(id, {
+                archived_by: req.user?.firstname || 'system',
+                archive_reason: `System Auto-Archive: Rejected - ${reason}`
+            });
+        } catch (archiveError) {
+            console.error('Auto-archive failed for rejected salvation request:', archiveError);
+            // We continue as the rejection itself succeeded
+        }
+
+        res.json({ success: true, message: 'Request rejected, email sent, and record moved to archive.' });
 
     } catch (error) {
         console.error('Reject error:', error);
@@ -1645,12 +1656,24 @@ router.post('/biblestudy/reject/:id', authenticateToken, checkAdminRole, async (
         await auditTrailRecords.createAuditLog({
             action_type: 'BIBLE_STUDY_REJECTED',
             module: 'BibleStudy',
-            description: `Rejected ${id}. Reason: ${reason}. Suggestions sent.`,
+            description: `Rejected ${id}. Reason: ${reason}. Suggestions sent and record archived.`,
             user_id: req.user?.acc_id,
             user_name: req.user?.firstname
         });
 
-        res.json({ success: true, message: 'Bible Study request rejected and email sent.' });
+        // 6. Automatic Archive
+        try {
+            const { archiveBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+            await archiveBibleStudyRequest(id, {
+                archived_by: req.user?.firstname || 'system',
+                archive_reason: `System Auto-Archive: Rejected - ${reason}`
+            });
+        } catch (archiveError) {
+            console.error('Auto-archive failed for rejected bible study request:', archiveError);
+            // We continue as the rejection itself succeeded
+        }
+
+        res.json({ success: true, message: 'Bible study request rejected, email sent, and record moved to archive.' });
 
     } catch (error) {
         console.error('Bible Study Reject error:', error);

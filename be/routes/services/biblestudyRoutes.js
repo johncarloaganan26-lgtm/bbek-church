@@ -440,7 +440,8 @@ router.post('/reject/:id', authenticateToken, async (req, res) => {
                 request_id: id,
                 firstname: request.firstname,
                 lastname: request.lastname,
-                reason: reason
+                reason: reason,
+                archived: true
             }),
             user_id: req.user?.acc_id || null,
             user_email: req.user?.email || null,
@@ -448,7 +449,19 @@ router.post('/reject/:id', authenticateToken, async (req, res) => {
             user_position: req.user?.position || null
         });
 
-        res.json({ success: true, message: 'Request rejected and email sent with suggested dates.' });
+        // 6. Automatic Archive
+        try {
+            const { archiveBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
+            await archiveBibleStudyRequest(id, {
+                archived_by: req.user?.firstname || 'system',
+                archive_reason: `System Auto-Archive: Rejected - ${reason}`
+            });
+        } catch (archiveError) {
+            console.error('Auto-archive failed for rejected bible study request:', archiveError);
+            // We continue as the rejection itself succeeded
+        }
+
+        res.json({ success: true, message: 'Bible study request rejected, email sent, and moved to archive.' });
 
     } catch (error) {
         console.error('Reject error:', error);

@@ -429,6 +429,31 @@ router.put('/updateBurialService/:id', async (req, res) => {
     const result = await updateBurialService(id, req.body, isAdmin);
 
     if (result.success) {
+      // 6. Automatic Archive for Rejected/Cancelled status
+      const isRejected = req.body.status && (req.body.status.toLowerCase() === 'disapproved' || req.body.status.toLowerCase() === 'cancelled');
+      if (isRejected) {
+        try {
+          const { archiveRecord } = require('../../dbHelpers/archiveRecords');
+          // Fetch the full record data for archiving
+          const recordCheck = await getBurialServiceById(id);
+          if (recordCheck.success && recordCheck.data) {
+            await archiveRecord(
+              'tbl_burialservice',
+              String(id),
+              recordCheck.data,
+              req.user?.firstname || 'system',
+              `System Auto-Archive: Status set to ${req.body.status}`
+            );
+            
+            // After archiving, we should probably delete it from the original table to match the behavior of other modules
+            await query('DELETE FROM tbl_burialservice WHERE burial_id = ?', [id]);
+            console.log(`✅ Auto-archived and deleted burial service ${id} (Status: ${req.body.status})`);
+          }
+        } catch (archiveError) {
+          console.error('Auto-archive failed for rejected burial service:', archiveError);
+        }
+      }
+
       res.status(200).json({
         success: true,
         message: result.message,

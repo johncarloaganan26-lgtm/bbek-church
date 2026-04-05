@@ -116,12 +116,8 @@ function generateCandidateSlotsForDate({ serviceType, dateStr, timezone = DEFAUL
 
   const sorted = Array.from(unique.values()).sort((a, b) => a.valueOf() - b.valueOf());
 
-  // Filter out slots for today and the past by default. 
-  // Bible Study allows same-day scheduling (as long as it's in the future).
+  // Filter out slots for today and the past (Tomorrow onwards only).
   const filtered = sorted.filter((slot) => {
-    if (normalizedService === 'bible_study') {
-      return slot.isAfter(effectiveNow);
-    }
     return slot.isAfter(effectiveNow, 'day');
   });
 
@@ -153,9 +149,9 @@ function validateSelectedSlot({ serviceType, scheduledDateTimeStr, timezone = DE
 
   const effectiveNow = now || moment().tz(timezone);
   
-  // Bible Study allows same-day scheduling. Other services require tomorrow onwards.
-  if (normalizedService !== 'bible_study' && slot.isSameOrBefore(effectiveNow, 'day')) {
-    return { valid: false, message: 'Same-day scheduling is not allowed for this service. Please select a date starting from tomorrow to allow for preparation.' };
+  // All services require tomorrow onwards.
+  if (slot.isSameOrBefore(effectiveNow, 'day')) {
+    return { valid: false, message: 'Same-day scheduling is not allowed. Please select a date starting from tomorrow to allow for preparation.' };
   }
   
   // Universal rule: Cannot schedule in the past

@@ -134,6 +134,32 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
       if (isCompleted) {
         try { await processBaptismCompletion(id); } catch(e) {}
       }
+
+      // 6. Automatic Archive for Rejected/Cancelled status
+      const isRejected = req.body.status && (req.body.status.toLowerCase() === 'disapproved' || req.body.status.toLowerCase() === 'cancelled');
+      if (isRejected) {
+        try {
+          const { archiveRecord } = require('../../dbHelpers/archiveRecords');
+          // Fetch the full record data for archiving
+          const recordCheck = await getWaterBaptismById(id);
+          if (recordCheck.success && recordCheck.data) {
+            await archiveRecord(
+              'tbl_waterbaptism',
+              String(id),
+              recordCheck.data,
+              req.user?.firstname || 'system',
+              `System Auto-Archive: Status set to ${req.body.status}`
+            );
+            
+            // After archiving, we should probably delete it from the original table to match the behavior of other modules
+            await query('DELETE FROM tbl_waterbaptism WHERE baptism_id = ?', [id]);
+            console.log(`✅ Auto-archived and deleted water baptism ${id} (Status: ${req.body.status})`);
+          }
+        } catch (archiveError) {
+          console.error('Auto-archive failed for rejected water baptism:', archiveError);
+        }
+      }
+
       res.status(200).json(result);
     } else {
       res.status(400).json(result);
@@ -279,7 +305,7 @@ router.get('/available-slots', async (req, res) => {
   try {
     const timezone = 'Asia/Manila';
     const momentTz = require('moment-timezone');
-    const start = momentTz().tz(timezone).startOf('day');
+    const start = momentTz().tz(timezone).add(1, 'day').startOf('day');
     const days = parseInt(req.query.days) || 30;
     const endExclusive = start.clone().add(days, 'days');
 
