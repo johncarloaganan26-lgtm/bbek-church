@@ -1,53 +1,49 @@
 <template>
   <div class="registration-container">
-    <v-container :class="{'px-6': adminMode}">
+    <v-container :fluid="adminMode" :class="adminMode ? 'pa-0' : 'px-6'">
       <v-row justify="center">
         <!-- Available Slots Side Panel -->
-        <v-col cols="12" md="4">
-          <v-card class="pa-6 rounded-xl border-teal elevation-2 mb-6" style="border-top: 6px solid #0d9488">
+        <v-col cols="12" md="4" lg="4">
+          <v-card :class="[adminMode ? 'pa-2' : 'pa-6', 'rounded-xl border-teal elevation-2 mb-6']" style="border-top: 6px solid #0d9488">
             <div class="d-flex align-center mb-4">
               <v-icon color="teal" class="mr-2">mdi-calendar-clock</v-icon>
-              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Slots</h3>
+              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Sunday Slots</h3>
             </div>
             <p class="text-body-2 grey--text mb-6">
-              Select one of the upcoming schedules to automatically fill the form.
+              Select one of the upcoming Sunday schedules to automatically fill the form.
             </p>
             
             <div v-if="loadingSlots" class="text-center py-4">
               <v-progress-circular indeterminate color="teal" size="24"></v-progress-circular>
             </div>
 
-            <div v-else class="slots-list">
-              <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="mb-4">
-                <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                  <v-icon size="14" class="mr-1 mt-n1">mdi-calendar</v-icon>
-                  {{ dateGroup.displayDate }}
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <v-chip
-                      v-for="slot in dateGroup.timeSlots"
-                      :key="slot.datetime"
-                      size="small"
-                      variant="flat"
-                      :color="formData.baptism_date === dateGroup.date && formData.baptism_time === slot.time ? 'teal' : 'white'"
-                      :class="[
-                        'elevation-1 border-teal', 
-                        formData.baptism_date === dateGroup.date && formData.baptism_time === slot.time ? 'text-white' : 'text-teal font-weight-bold',
-                        slot.bookedCount >= slot.maxCapacity ? 'opacity-50 grayscale cursor-not-allowed' : 'cursor-pointer'
-                      ]"
-                      @click="slot.bookedCount < slot.maxCapacity && selectSlotByGroup(dateGroup, slot)"
-                      :disabled="slot.bookedCount >= slot.maxCapacity"
-                      :title="slot.bookedMembers?.length > 0 ? 'Booked by: ' + slot.bookedMembers.join(', ') : 'No bookings yet'"
-                    >
-                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                      {{ slot.display || formatTime(slot.time) }}
-                      <span class="ml-1 opacity-70" style="font-size: 0.75em !important; font-weight: 500;">
-                        ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 0 }})
-                      </span>
-                    </v-chip>
-                </div>
-              </div>
-            </div>
+            <div v-else class="slots-list overflow-y-auto pr-1" style="max-height: 480px;">
+              <v-hover v-for="slot in availableSlots" :key="slot.date" v-slot="{ isHovering, props }">
+                <v-card
+                   v-bind="props"
+                   :elevation="isHovering ? 4 : 1"
+                   :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
+                   @click="selectSlot(slot)"
+                 >
+                   <div class="d-flex justify-space-between align-center">
+                     <div>
+                       <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
+                       <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.timeDisplay }}</div>
+                       <div class="text-caption grey--text mt-1 d-flex align-center">
+                       <v-icon size="14" class="mr-1">mdi-account-group</v-icon>
+                       <span v-if="slot.bookingCount && slot.bookingCount > 0">
+                         {{ slot.bookingCount }} {{ slot.bookingCount === 1 ? 'person' : 'people' }} joined
+                       </span>
+                       <span v-else class="italic">Be the first to join!</span>
+                     </div>
+                     </div>
+                     <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
+                       {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                     </v-icon>
+                   </div>
+                 </v-card>
+               </v-hover>
+             </div>
             
             <v-alert
               type="info"
@@ -56,14 +52,14 @@
               class="mt-4 text-caption"
               color="teal"
             >
-              Slots are manually scheduled by the church administration.
+              Slots are set to 1:00 PM every Sunday.
             </v-alert>
           </v-card>
         </v-col>
 
-        <v-col cols="12" md="8" lg="7">
-          <v-card elevation="4" class="pa-6 registration-card">
-            <div class="text-center mb-6">
+        <v-col cols="12" md="8" lg="8">
+          <v-card :elevation="adminMode ? 0 : 4" :class="[adminMode ? 'pa-2' : 'pa-6', 'registration-card']">
+            <div v-if="!adminMode" class="text-center mb-6">
               <v-img src="/logo.png" height="80" contain class="mb-4"></v-img>
               <h1 class="text-h4 font-weight-bold teal--text">Water Baptism Registration</h1>
               <p class="text-subtitle-1 grey--text">Please complete your details to proceed with your baptism</p>
@@ -209,16 +205,15 @@
               <h3 class="text-h6 mt-2 mb-4 teal--text">Baptism Details</h3>
               <v-row>
                 <v-col cols="12" md="6">
-                    <v-text-field
-                      v-model="formData.baptism_date"
-                      label="Preferred Date"
-                      type="date"
-                      variant="outlined"
-                      density="comfortable"
-                      required
-                      :rules="[v => !!v || 'Baptism Date is required']"
-                      :min="new Date(Date.now() + 86400000).toISOString().split('T')[0]"
-                    ></v-text-field>
+                  <v-text-field
+                    v-model="formData.baptism_date"
+                    label="Preferred Date"
+                    type="date"
+                    variant="outlined"
+                    density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Baptism Date is required']"
+                  ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -365,44 +360,83 @@ const loadingSlots = ref(false);
 const churchLeaders = ref([]);
 const loadingChurchLeaders = ref(false);
 
-const fetchAvailableSlots = async (days = 30) => {
+const fetchSundaySlots = async () => {
     loadingSlots.value = true;
     try {
-        const response = await axios.get('/services/water-baptisms/available-slots', {
-            params: { days }
+        console.log('[WaterBaptism] Fetching available slots...');
+        const response = await publicAxios.get('/services/water-baptisms/available-slots', {
+            params: { days: 45 } // Fetch more days to find enough Sundays
         });
         
-        if (response.data.success && response.data.data) {
-            // Map backend data to the format expected by the template
-            availableSlots.value = response.data.data.map(group => ({
-                date: group.date,
-                displayDate: moment(group.date).format('dddd, MMMM D, YYYY'),
-                dayName: group.dayName,
-                timeSlots: group.timeSlots.map(slot => ({
-                    time: slot.time,
-                    datetime: slot.datetime,
-                    display: slot.display,
-                    bookedCount: slot.bookedCount,
-                    maxCapacity: slot.maxCapacity
-                }))
-            }));
+        console.log('[WaterBaptism] Available slots response:', response.data);
+        
+        if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
+            const slots = [];
+            
+            response.data.data.forEach(dateGroup => {
+                if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) {
+                    console.warn('[WaterBaptism] Missing or invalid timeSlots for date:', dateGroup.date);
+                    return;
+                }
+                
+                const onePmSlot = dateGroup.timeSlots.find(s => s.time === '13:00:00' || s.time === '13:00');
+                
+                if (onePmSlot) {
+                    const slotData = {
+                        date: dateGroup.date,
+                        displayDate: moment(dateGroup.date).format('MMMM D, YYYY'),
+                        time: '13:00:00',
+                        timeDisplay: '1:00 PM',
+                        bookingCount: typeof onePmSlot.bookingCount === 'number' ? onePmSlot.bookingCount : (onePmSlot.bookedCount || 0),
+                        maxCapacity: onePmSlot.maxCapacity || 10
+                    };
+                    slots.push(slotData);
+                }
+            });
+            
+            availableSlots.value = slots.slice(0, 4); // Keep next 4 Sundays
+        } else {
+            generateFallbackSlots();
         }
     } catch (error) {
-        console.error('[WaterBaptism] Error fetching available slots:', error);
+        console.error('[WaterBaptism] Error fetching Sunday slots:', error.message, error);
+        ElMessage.warning('Could not fetch available slots. Generating default schedule...');
+        generateFallbackSlots();
     } finally {
         loadingSlots.value = false;
     }
 };
 
-const selectSlotByGroup = (dateGroup, slot) => {
-  formData.baptism_date = dateGroup.date;
-  formData.baptism_time = slot.time;
-  ElMessage.success(`Selected Date: ${dateGroup.displayDate} at ${slot.display || formatTime(slot.time)}`);
+const generateFallbackSlots = () => {
+  const slots = [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  let current = new Date(tomorrow);
+  const daysUntilSunday = (7 - tomorrow.getDay()) % 7;
+  current.setDate(tomorrow.getDate() + daysUntilSunday);
+  
+  for (let i = 0; i < 4; i++) {
+    const slotDate = new Date(current);
+    const dateStr = slotDate.toISOString().split('T')[0];
+    slots.push({
+      date: dateStr,
+      displayDate: slotDate.toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      }),
+      time: '13:00:00',
+      timeDisplay: '1:00 PM',
+      bookingCount: 0,
+      maxCapacity: 10
+    });
+    current.setDate(current.getDate() + 7);
+  }
+  availableSlots.value = slots;
 };
 
-const formatTime = (time) => {
-  if (!time) return '';
-  return moment(`2024-01-01 ${time}`).format('h:mm A');
+const selectSlot = (slot) => {
+  formData.baptism_date = slot.date;
+  formData.baptism_time = slot.time;
+  ElMessage.success(`Selected Sunday: ${slot.displayDate}`);
 };
 
 const fetchChurchLeaders = async () => {
@@ -437,7 +471,7 @@ watch(() => formData.birthdate, (newDate) => {
 });
 
 onMounted(async () => {
-  fetchAvailableSlots();
+  fetchSundaySlots();
   
   if (props.adminMode && props.adminData) {
     requestId.value = props.adminData._activeItem?.request_id || null;
@@ -556,13 +590,20 @@ const handleSubmit = async () => {
 
 <style scoped>
 .registration-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
-  padding: 40px 0;
+  min-height: v-bind("adminMode ? '100%' : '100vh'");
+  background: v-bind("adminMode ? 'transparent' : 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)'");
+  padding: v-bind("adminMode ? '0' : '40px 0'");
+  display: flex !important;
+  flex-direction: column;
+}
+.registration-container :deep(.v-container) {
+  padding: v-bind("adminMode ? '0 !important' : ''");
 }
 .registration-card {
   border-radius: 16px;
   border-top: 6px solid #0d9488;
+  box-shadow: v-bind("adminMode ? 'none !important' : ''");
+  border: v-bind("adminMode ? 'none !important' : ''");
 }
 .teal--text {
   color: #0d9488 !important;
@@ -583,5 +624,23 @@ const handleSubmit = async () => {
 
 .slot-item {
   border: 1px solid #e0e0e0;
+}
+
+.slots-list {
+  scrollbar-width: thin;
+  scrollbar-color: #0d9488 #f0fdfa;
+}
+
+.slots-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.slots-list::-webkit-scrollbar-track {
+  background: #f0fdfa;
+}
+
+.slots-list::-webkit-scrollbar-thumb {
+  background-color: #0d9488;
+  border-radius: 20px;
 }
 </style>

@@ -280,6 +280,27 @@
                     </div>
                   </el-form-item>
 
+                  <div class="agreement-wrapper mb-6 text-left">
+                    <div class="d-flex align-start">
+                      <el-checkbox v-model="termsAgreed" class="terms-checkbox mr-3" size="large"></el-checkbox>
+                      <div class="agreement-text" style="padding-top: 2px;">
+                        <span class="text-body-2 text-grey-darken-3" style="line-height: 1.6; display: block;">
+                          I agree to the 
+                          <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('terms')">Terms of Service</a> 
+                          and 
+                          <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('privacy')">Privacy Policy</a>
+                          to proceed with my request.
+                        </span>
+                      </div>
+                    </div>
+                    <v-expand-transition>
+                      <div v-if="agreementError" class="text-caption text-error font-weight-bold mt-2 ml-10" style="color: #ef4444;">
+                        <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                        {{ agreementError }}
+                      </div>
+                    </v-expand-transition>
+                  </div>
+
                   <el-form-item>
                     <el-button color="#0d9488" size="large" @click="handleSubmit" :loading="discipleshipStore.loading" style="width: 100%; color: white;">
                       Send Request
@@ -291,6 +312,12 @@
           </div>
         </v-container>
       </section>
+
+      <!-- Agreement Modal -->
+      <AgreementModal 
+        v-model="showAgreementModal" 
+        :initial-tab="agreementTab" 
+      />
     </main>
   </div>
 </template>
@@ -299,8 +326,9 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useDiscipleshipStore } from '@/stores/discipleshipStore';
-import { ElMessageBox } from 'element-plus';
+import { ElMessageBox, ElMessage } from 'element-plus';
 import moment from 'moment';
+import AgreementModal from '@/components/Common/AgreementModal.vue';
 
 const route = useRoute();
 const discipleshipStore = useDiscipleshipStore();
@@ -334,6 +362,17 @@ const formData = reactive({
   scheduled_date: null,
   companions: []
 });
+
+// Agreement State
+const termsAgreed = ref(false)
+const showAgreementModal = ref(false)
+const agreementTab = ref('terms')
+const agreementError = ref('')
+
+const openAgreement = (tab) => {
+  agreementTab.value = tab
+  showAgreementModal.value = true
+}
 
 const addCompanion = () => {
   formData.companions.push({
@@ -487,6 +526,14 @@ const handleSubmit = async () => {
   if (!formRef.value) return;
   formData.request_type = 'Salvation';
   
+  // Validate agreement first
+  if (!termsAgreed.value) {
+    agreementError.value = 'You must agree to the Terms of Service and Privacy Policy before submitting.'
+    ElMessage.warning('Please agree to our Terms and Privacy Policy to continue.')
+    return
+  }
+  agreementError.value = ''
+
   await formRef.value.validate(async (valid) => {
     if (valid) {
       const success = await discipleshipStore.submitDiscipleshipRequest(formData);
@@ -501,6 +548,7 @@ const handleSubmit = async () => {
             type: 'success',
             callback: () => {
               formRef.value.resetFields();
+              termsAgreed.value = false;
               fetchSlots();
             }
           }
@@ -607,5 +655,58 @@ const scrollToSchedule = () => {
   font-weight: 500;
   display: inline-flex;
   align-items: center;
+}
+
+.agreement-link {
+  color: #0d9488;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  padding: 0 2px;
+}
+
+.agreement-link:hover {
+  text-decoration: underline;
+  background-color: #0d948811;
+  border-radius: 4px;
+}
+
+.terms-checkbox :deep(.el-checkbox__label) {
+  display: none;
+}
+
+/* Force Teal Color - Overriding EL-Checkbox Defaults */
+.terms-checkbox :deep(.el-checkbox__inner) {
+  width: 26px !important;
+  height: 26px !important;
+  border-color: #0d9488 !important;
+  border-width: 2px !important;
+  background-color: transparent;
+}
+
+.terms-checkbox :deep(.el-checkbox__inner::after) {
+  width: 8px !important;
+  height: 16px !important;
+  left: 9px !important;
+  top: 4px !important;
+  border-width: 3.5px !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input:hover .el-checkbox__inner) {
+  border-color: #0d9488 !important;
+}
+
+.agreement-wrapper {
+  transition: all 0.3s ease;
 }
 </style>

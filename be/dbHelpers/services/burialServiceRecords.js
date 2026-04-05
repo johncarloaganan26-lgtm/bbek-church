@@ -82,12 +82,34 @@ async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
 }
 
 /**
- * Validate that a service time is within allowed hours (any hour allowed now as requested)
+ * Validate that a service time is within night hours (6 PM - 10 PM)
  * @param {String} serviceDateTime - Service date/time to validate
  * @returns {Object} Object with isValid flag and error message
  */
 function validateNightHours(serviceDateTime) {
-  // Always valid now based on user request to remove strict traps
+  if (!serviceDateTime) {
+    return { isValid: true, message: null }; // Allow null/undefined times
+  }
+
+  const momentTime = moment(serviceDateTime, 'YYYY-MM-DD HH:mm:ss', true);
+  if (!momentTime.isValid()) {
+    // Try parsing with just date format
+    const momentDate = moment(serviceDateTime);
+    if (!momentDate.isValid()) {
+      return { isValid: true, message: null }; // Allow if we can't parse
+    }
+  }
+
+  const hour = momentTime.hour();
+
+  // Night hours: 18:00 (6 PM) to 22:00 (10 PM)
+  if (hour < 18 || hour >= 22) {
+    return {
+      isValid: false,
+      message: 'Burial services can only be scheduled between 6:00 PM and 10:00 PM (night shift hours).'
+    };
+  }
+
   return { isValid: true, message: null };
 }
 
@@ -250,21 +272,22 @@ async function createBurialService(burialData) {
       };
     }
 
-    // Check if the preferred service time slot is already booked (only 1 per exact date/time allowed)
+    // Check if the preferred service time slot is already booked (only 1 per date/time allowed)
     if (preferred_service_time) {
-      const timeSlotTime = moment(preferred_service_time).format('YYYY-MM-DD HH:mm:ss');
+      const timeSlotDate = moment(preferred_service_time).format('YYYY-MM-DD');
       const [existingSlotBooking] = await query(
         `SELECT burial_id FROM tbl_burialservice 
-         WHERE preferred_service_time = ? 
+         WHERE DATE_FORMAT(preferred_service_time, '%Y-%m-%d') = ? 
          AND (status = 'pending' OR status = 'Approved' OR status = 'Scheduled' OR status = 'completed')
+         AND HOUR(preferred_service_time) = 20
          LIMIT 1`,
-        [timeSlotTime]
+        [timeSlotDate]
       );
       
       if (existingSlotBooking && existingSlotBooking.length > 0) {
         return {
           success: false,
-          message: `This burial service time slot for ${moment(preferred_service_time).format('LLL')} is already booked. Please select another date or time.`
+          message: `This burial service time slot for ${timeSlotDate} at 8:00 PM is already booked. Please select another date.`
         };
       }
     }
@@ -291,8 +314,24 @@ async function createBurialService(burialData) {
       }
     }
 
-    // Enforcement of specific hour removed as requested
+    // Enforce 8:00 PM (20:00) - Burial service is only available at 8:00 PM
     let preferred_service_time_enforcement = preferred_service_time;
+    if (preferred_service_time_enforcement) {
+      let timeMoment = moment(preferred_service_time_enforcement);
+      
+      if (timeMoment.isValid()) {
+        const extractedHour = timeMoment.format('HH');
+        const extractedDate = timeMoment.format('YYYY-MM-DD');
+        if (extractedHour !== '20') {
+          console.warn(`Burial service time ${preferred_service_time_enforcement} is not 8:00 PM. Forcing to 20:00`);
+        }
+        // Reconstruct with forced hour but keep the date
+        preferred_service_time_enforcement = `${extractedDate} 20:00:00`;
+      } else {
+        console.error(`Could not parse preferred_service_time: ${preferred_service_time_enforcement}`);
+        preferred_service_time_enforcement = null;
+      }
+    }
 
     // Check for time slot conflicts - Only check time, not date
     // Multiple burial services are allowed on the same date, but not at the same time
@@ -453,22 +492,7 @@ async function getAllBurialServices(options = {}) {
     let countSql = 'SELECT COUNT(*) as total FROM tbl_burialservice bs INNER JOIN tbl_members m ON bs.member_id = m.member_id';
     let countParams = [];
 
-    let sql = `SELECT 
-      bs.burial_id, bs.member_id, bs.requester_name, bs.requester_email, bs.relationship, 
-      bs.location, bs.pastor_name, bs.service_date, bs.preferred_service_time, bs.status, 
-      bs.date_created, bs.deceased_name, bs.deceased_birthdate, bs.date_death, 
-      m.firstname, m.lastname, m.middle_name, m.email as member_email, 
-      CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname, 
-      COALESCE(
-        CONCAT(pm_acc.firstname, ' ', pm_acc.lastname),
-        CONCAT(pm_direct.firstname, ' ', pm_direct.lastname)
-      ) as pastor_name_joined,
-      COALESCE(pm_acc.position, pm_direct.position) as pastor_position
-    FROM tbl_burialservice bs 
-    LEFT JOIN tbl_members m ON bs.member_id = m.member_id COLLATE utf8mb4_unicode_ci
-    LEFT JOIN tbl_accounts pa ON bs.pastor_name = pa.acc_id 
-    LEFT JOIN tbl_members pm_acc ON pa.email = pm_acc.email COLLATE utf8mb4_unicode_ci
-    LEFT JOIN tbl_members pm_direct ON bs.pastor_name = pm_direct.member_id COLLATE utf8mb4_unicode_ci`;
+    let sql = `SELECT bs.burial_id, bs.member_id, bs.requester_name, bs.requester_email, bs.relationship, bs.location, bs.pastor_name, bs.service_date, bs.preferred_service_time, bs.status, bs.date_created, bs.deceased_name, bs.deceased_birthdate, bs.date_death, m.firstname, m.lastname, m.middle_name, m.email as member_email, CONCAT(m.firstname, IF(m.middle_name IS NOT NULL AND m.middle_name != '', CONCAT(' ', m.middle_name), ''), ' ', m.lastname) as fullname FROM tbl_burialservice bs LEFT JOIN tbl_members m ON bs.member_id = m.member_id`;
     const params = [];
 
     const whereConditions = [];
@@ -494,7 +518,7 @@ async function getAllBurialServices(options = {}) {
     }
 
     if (status && status !== 'All Status') {
-      whereConditions.push('bs.status = ?');
+      whereConditions.push('status = ?');
       countParams.push(status);
       params.push(status);
       hasWhere = true;
@@ -855,9 +879,22 @@ async function updateBurialService(burialId, burialData, isAdmin = false) {
         };
       }
       
-      // Enforcement of specific hour removed as requested
+      // Enforce 8:00 PM (20:00) - Burial service is only available at 8:00 PM
       if (prefServiceTime && prefServiceTime !== null && prefServiceTime !== '') {
-        // No longer forcing to 20:00
+        let timeMoment = moment(prefServiceTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
+        if (!timeMoment.isValid()) {
+          timeMoment = moment(prefServiceTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
+        }
+        
+        if (timeMoment.isValid()) {
+          const extractedHour = timeMoment.format('HH');
+          if (extractedHour !== '20') {
+            console.warn(`Burial service time ${prefServiceTime} is not 8:00 PM. Forcing to 20:00`);
+          }
+          prefServiceTime = '20:00';
+        } else {
+          prefServiceTime = '20:00';
+        }
       }
     }
 

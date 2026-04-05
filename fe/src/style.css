@@ -124,4 +124,25 @@ div.v-alert.v-alert--error .v-alert__icon {
 .admin-dashboard .v-pagination__item--active {
   background-color: #14b8a6 !important;
   color: white !important;
+}
+
+/* ---------------------------------------------------------
+   Bulk Actions Bar - Shared Style Across All Service Modules
+   --------------------------------------------------------- */
+.bulk-actions-bar {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bulk-action-btn {
+  border-radius: 8px !important;
+  letter-spacing: 0.5px;
+  font-size: 0.75rem !important;
+}
+
+.bulk-action-btn .v-icon {
+  opacity: 0.9;
 }

@@ -202,10 +202,16 @@ export const useAdminBibleStudyStore = defineStore('admin-biblestudy', () => {
         }
     };
 
-    const bulkPromoteToBaptism = async (requestIds, isDecided = false, overrides = {}) => {
+    const bulkPromoteToBaptism = async (requestIds, isDecided = false, overrides = {}, selectedCompanions = null) => {
         loading.value = true;
         try {
-            const response = await axios.post('/services/biblestudy-requests/bulk-promote', { requestIds, isDecided, overrides });
+            const payload = { requestIds, isDecided, overrides };
+            // When specific companions are provided (from the console), send them so the
+            // backend promotes only those members — not the entire group stored in notes.
+            if (selectedCompanions !== null) {
+                payload.selectedCompanions = selectedCompanions;
+            }
+            const response = await axios.post('/services/biblestudy-requests/bulk-promote', payload);
             if (response.data.success) {
                 ElMessage.success(response.data.message || 'Bulk promotion completed successfully');
                 await fetchRequests();

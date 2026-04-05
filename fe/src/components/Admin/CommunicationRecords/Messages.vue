@@ -31,18 +31,7 @@
               @update:model-value="fetchForms"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
-            <v-select
-              v-model="formTypeFilter"
-              :items="formTypeOptions"
-              label="Filter by Type"
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-              @update:model-value="fetchForms"
-            ></v-select>
-          </v-col>
+          <!-- Filter by Type removed here to be placed below as a category row -->
           <v-col cols="12" md="2">
             <v-select
               v-model="sortBy"
@@ -101,6 +90,37 @@
                 ></v-btn>
               </template>
             </v-tooltip>
+          </v-col>
+        </v-row>
+
+        <!-- Category Filtering Row -->
+        <v-row class="mt-4">
+          <v-col cols="12">
+            <div class="category-tabs-container">
+              <v-tabs
+                v-model="formTypeFilter"
+                color="primary"
+                align-tabs="start"
+                class="category-tabs"
+              >
+                <v-tab :value="null" class="text-none">
+                  <v-icon start icon="mdi-all-inclusive"></v-icon>
+                  All ({{ totalFormsCount }})
+                </v-tab>
+                <v-tab value="message" class="text-none">
+                  <v-icon start icon="mdi-message-text" color="blue"></v-icon>
+                  Message ({{ categoryCounts.message }})
+                </v-tab>
+                <v-tab value="prayer_request" class="text-none">
+                  <v-icon start icon="mdi-hands-pray" color="green"></v-icon>
+                  Prayer Request ({{ categoryCounts.prayer_request }})
+                </v-tab>
+                <v-tab value="schedule_change" class="text-none">
+                  <v-icon start icon="mdi-calendar-edit" color="orange"></v-icon>
+                  Schedule Change ({{ categoryCounts.schedule_change }})
+                </v-tab>
+              </v-tabs>
+            </div>
           </v-col>
         </v-row>
       </v-card-text>
@@ -527,6 +547,40 @@ const pendingSelectedCount = computed(() => {
   return selectedForms.value.filter(form => form.status === 'pending').length
 })
 
+// Count forms for category badges
+const categoryCounts = computed(() => {
+  const counts = {
+    message: 0,
+    prayer_request: 0,
+    schedule_change: 0
+  }
+  
+  // If we are showing all forms, we can count from forms.value
+  // If we are filtering, we might only have one type. 
+  // For a better experience, we should ideally have these from the backend
+  // but as a fallback, we'll count what's available or use the totalCount for the active filter.
+  
+  forms.value.forEach(form => {
+    if (form.form_type && counts.hasOwnProperty(form.form_type)) {
+      counts[form.form_type]++
+    }
+  })
+  
+  // If a filter is active, the active category's count should be the totalCount from store
+  if (formTypeFilter.value && counts.hasOwnProperty(formTypeFilter.value)) {
+    counts[formTypeFilter.value] = formsStore.totalCount
+  }
+  
+  return counts
+})
+
+const totalFormsCount = computed(() => {
+  // If no filter, use totalCount. If filter, totalCount is just for that type.
+  // This is tricky without a dedicated stats API. 
+  // For now, we'll use formsStore.totalCount when no filter is active.
+  return !formTypeFilter.value ? formsStore.totalCount : '...'
+})
+
 // Group forms by type (Message at top, then Prayer Request, then Schedule Change)
 const groupedForms = computed(() => {
   const groups = {
@@ -944,6 +998,24 @@ onMounted(() => {
 <style scoped>
 .messages {
   padding: 24px;
+}
+
+.category-tabs-container {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.category-tabs :deep(.v-tab) {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  min-width: 160px;
+}
+
+@media (max-width: 960px) {
+  .category-tabs :deep(.v-tab) {
+    min-width: unset;
+    flex: 1;
+    font-size: 0.8rem;
+  }
 }
 </style>
 

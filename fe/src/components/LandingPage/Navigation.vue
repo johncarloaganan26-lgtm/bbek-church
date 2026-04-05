@@ -27,7 +27,7 @@
           <div class="logo-text">
             <h1 class="logo-title" :style="{ color: headerData.acronymColor || '#0cbdaa' }">{{ headerData.acronym || 'BBEK' }}</h1>
             <p class="logo-subtitle" :style="{ color: headerData.fullnameColor || '#757575' }">
-              {{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}
+              {{ headerData.fullname || 'Bible Baptist Ekklesia of Kawit' }}
             </p>
           </div>
         </div>
@@ -225,7 +225,7 @@
             </el-avatar>
             <div class="logo-text ml-3">
               <h3 class="logo-title">{{ headerData.acronym || 'BBEK' }}</h3>
-              <p class="logo-subtitle" :style="{ color: headerData.fullnameColor || '#757575' }">{{ headerData.fullname || 'Bible Baptist Eklessia of Kawit' }}</p>
+              <p class="logo-subtitle" :style="{ color: headerData.fullnameColor || '#757575' }">{{ headerData.fullname || 'Bible Baptist Ekklesia of Kawit' }}</p>
             </div>
           </div>
         </div>
@@ -618,7 +618,7 @@ const handleMobileMenuClick = (menuItem) => {
 const defaultHeaderData = {
   logo: '/img/logobbek.png',
   acronym: 'BBEK',
-  fullname: 'Bible Baptist Eklessia of Kawit',
+  fullname: 'Bible Baptist Ekklesia of Kawit',
   bgColor: '#ffffff',
   menus: [
     {label: 'Home', value: 'home' ,to:'/'},
@@ -719,7 +719,7 @@ const fetchHeaderData = async () => {
         logo: logoUrl,
         logoFile: null,
         acronym: content.acronym || defaultHeaderData.acronym || 'BBEK',
-        fullname: content.fullname || defaultHeaderData.fullname || 'Bible Baptist Eklessia of Kawit',
+        fullname: content.fullname || defaultHeaderData.fullname || 'Bible Baptist Ekklesia of Kawit',
         bgColor: content.bgColor || defaultHeaderData.bgColor || '#ffffff',
         menus: menus,
         hoverColor: content.hoverColor || defaultHeaderData.hoverColor || '#14b8a6',

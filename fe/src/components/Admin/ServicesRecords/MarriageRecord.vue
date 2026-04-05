@@ -141,41 +141,34 @@
           </v-col>
         </v-row>
         <!-- Bulk Actions Row -->
-        <v-row v-if="selectedMarriages.length > 0" class="mt-2">
-          <v-col cols="12">
-            <v-alert
-              type="info"
-              variant="tonal"
-              class="mb-0"
-              density="compact"
-            >
-              <div class="d-flex align-center justify-space-between">
-                <div class="text-body-2">
-                  <strong>{{ selectedMarriages.length }}</strong> marriage{{ selectedMarriages.length > 1 ? 's' : '' }} selected
-                </div>
-                <div class="d-flex gap-2">
-                  <v-btn
-                    color="error"
-                    variant="flat"
-                    size="small"
-                    prepend-icon="mdi-archive"
-                    :disabled="loading"
-                    @click="bulkDeleteMarriages"
-                  >
-                    Archive Selected
-                  </v-btn>
-                  <v-btn
-                    variant="text"
-                    size="small"
-                    @click="clearSelection"
-                  >
-                    Cancel
-                  </v-btn>
-                </div>
-              </div>
-            </v-alert>
-          </v-col>
-        </v-row>
+        <div v-if="selectedMarriages.length > 0" class="bulk-actions-bar mt-3 pa-3 d-flex align-center gap-2">
+          <v-chip color="primary" size="small" class="mr-2 font-weight-bold px-3" label>
+            <v-icon start size="14">mdi-checkbox-marked</v-icon>
+            {{ selectedMarriages.length }} SELECTED
+          </v-chip>
+          <v-btn
+            color="error"
+            variant="outlined"
+            size="small"
+            :disabled="loading"
+            class="bulk-action-btn font-weight-bold text-uppercase"
+            @click="bulkDeleteMarriages"
+          >
+            <v-icon start size="16">mdi-archive</v-icon>
+            Archive Selected
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            variant="text"
+            size="small"
+            color="grey-darken-1"
+            class="text-none"
+            @click="clearSelection"
+          >
+            <v-icon start size="14">mdi-close</v-icon>
+            Cancel
+          </v-btn>
+        </div>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} marriages</span>

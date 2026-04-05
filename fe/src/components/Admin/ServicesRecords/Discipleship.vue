@@ -32,8 +32,8 @@
           prepend-icon="mdi-plus"
           size="small"
           @click="openAddDialog"
-          height="48"
-          class="px-6 rounded-lg font-weight-bold"
+          class="h-100"
+          style="min-height: 48px;"
         >
           New Request
         </v-btn>
@@ -59,62 +59,12 @@
             <v-select
               v-model="statusFilter"
               :items="['All Status', 'Pending', 'Scheduled', 'Completed', 'Promoted', 'Cancelled']"
-              label="Status"
+              label="Filter Status"
               variant="outlined"
               density="compact"
               hide-details
               @update:model-value="handleFilter"
             ></v-select>
-          </v-col>
-          <v-col cols="12" md="3">
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              start-placeholder="Start date"
-              end-placeholder="End date"
-              range-separator="to"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              :disabled="loading"
-              @change="handleDateRangeChange"
-              class="w-100"
-              style="height: 40px !important;"
-            />
-          </v-col>
-          <v-col cols="12" md="2" class="d-flex align-center gap-2">
-            <v-menu>
-              <template v-slot:activator="{ props }">
-                <v-btn
-                  icon="mdi-download"
-                  variant="outlined"
-                  v-bind="props"
-                  :loading="loading"
-                  :disabled="loading"
-                ></v-btn>
-              </template>
-              <v-list>
-                <v-list-item @click="handleExportExcel('xlsx')">
-                  <v-list-item-title>Export to Excel (.xlsx)</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="handleExportExcel('csv')">
-                  <v-list-item-title>Export to CSV (.csv)</v-list-item-title>
-                </v-list-item>
-              </v-list>
-            </v-menu>
-            <div class="d-flex align-center gap-2">
-              <v-tooltip text="Print" location="top">
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    icon="mdi-printer"
-                    variant="outlined"
-                    v-bind="props"
-                    :loading="loading"
-                    :disabled="loading"
-                    @click="handlePrint"
-                  ></v-btn>
-                </template>
-              </v-tooltip>
-            </div>
           </v-col>
         </v-row>
       </v-card-text>
@@ -123,21 +73,28 @@
     <!-- Table -->
     <v-card elevation="2">
       <!-- Selection Actions Bar -->
-      <div v-if="selectedRequests.length > 0" class="bg-success-lighten-5 pa-2 d-flex align-center">
-        <v-chip color="success" size="small" class="mr-2">{{ selectedRequests.length }} selected</v-chip>
-        <v-btn size="small" color="primary" variant="outlined" @click="openBulkUpdateDialog" :loading="loading" class="mr-2">
-          <v-icon left>mdi-update</v-icon>
-          Bulk Edit
+      <div v-if="selectedRequests.length > 0" class="bulk-actions-bar pa-3 d-flex align-center gap-2">
+        <v-chip color="primary" size="small" class="mr-2 font-weight-bold px-3" label>
+          <v-icon start size="14">mdi-checkbox-marked</v-icon>
+          {{ selectedRequests.length }} SELECTED
+        </v-chip>
+        <v-btn size="small" color="success" variant="outlined" @click="bulkComplete" :loading="loading" class="bulk-action-btn font-weight-bold text-uppercase">
+          <v-icon start size="16">mdi-check-all</v-icon>
+          Mark Completed
         </v-btn>
-        <v-btn size="small" color="teal-darken-1" variant="outlined" @click="openBulkPromoteDialog" :loading="loading" class="mr-2">
-          <v-icon left>mdi-book-plus</v-icon>
-          Bulk Promote
-        </v-btn>
-        <v-btn size="small" color="error" variant="outlined" @click="bulkArchive" :loading="loading">
-          <v-icon left>mdi-archive</v-icon>
+        <v-btn size="small" color="error" variant="outlined" @click="bulkArchive" class="bulk-action-btn font-weight-bold text-uppercase">
+          <v-icon start size="16">mdi-archive</v-icon>
           Archive Selected
         </v-btn>
-        <v-btn size="small" variant="text" class="ml-2" @click="clearSelection">Clear</v-btn>
+        <v-btn size="small" color="teal-darken-1" variant="outlined" @click="bulkPromoteToBibleStudyMain" v-if="canBulkPromoteMain" class="bulk-action-btn font-weight-bold text-uppercase">
+          <v-icon start size="16">mdi-book-arrow-up</v-icon>
+          Promote to Bible Study
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn size="small" variant="text" color="grey-darken-1" @click="clearSelection" class="text-none">
+          <v-icon start size="14">mdi-close</v-icon>
+          Clear
+        </v-btn>
       </div>
       <v-table>
         <thead>
@@ -151,21 +108,20 @@
               ></v-checkbox>
             </th>
             <th class="text-left font-weight-bold">Name</th>
-            <th class="text-left font-weight-bold">Type</th>
             <th class="text-left font-weight-bold">Email</th>
             <th class="text-left font-weight-bold">Request Type</th>
+            <th class="text-left font-weight-bold">Assigned Pastor</th>
             <th class="text-left font-weight-bold">Status</th>
-            <th class="text-left font-weight-bold">Assigned Pastors</th>
-            <th class="text-left font-weight-bold">Scheduled Date</th>
+            <th class="text-left font-weight-bold">Schedule</th>
             <th class="text-left font-weight-bold">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-             <td colspan="8" class="text-center pa-4">Loading...</td>
+             <td colspan="7" class="text-center pa-4">Loading...</td>
           </tr>
           <tr v-else-if="requests.length === 0">
-             <td colspan="8" class="text-center pa-4">No requests found.</td>
+             <td colspan="7" class="text-center pa-4">No requests found.</td>
           </tr>
           <tr v-for="item in requests" :key="item.request_id">
             <td class="text-center">
@@ -177,37 +133,47 @@
               ></v-checkbox>
             </td>
             <td>{{ item.firstname }} {{ item.lastname }}</td>
-            <td>
-              <v-chip v-if="isGroup(item)" size="small" :color="getGroupColor(item)" variant="flat" class="text-white text-caption font-weight-bold">
-                <v-icon left size="12" class="mr-1">mdi-account-group</v-icon> GROUP
-              </v-chip>
-              <v-chip v-else size="small" color="grey" variant="outlined" class="text-caption font-weight-bold">
-                <v-icon left size="12" class="mr-1">mdi-account</v-icon> SOLO
-              </v-chip>
-            </td>
             <td>{{ item.email }}</td>
             <td>
               <v-chip size="small" :color="getRequestTypeColor(item.request_type)" class="text-white">
                 {{ item.request_type }}
               </v-chip>
             </td>
+            <td>{{ item.pastor_name || getPastorName(item.pastor_id) }}</td>
             <td>
-              <v-chip size="small" :color="getStatusColor(item.status)" class="text-white">
-                {{ item.status }}
-              </v-chip>
-            </td>
-            <td>
-              <div v-if="item.pastor_name_joined" class="text-body-2 font-weight-medium text-teal-darken-3">
-                <v-icon size="small" class="mr-1">mdi-account-tie</v-icon>
-                {{ item.pastor_name_joined }}
+              <div class="d-flex align-center gap-1 flex-wrap">
+                <v-chip size="small" :color="getStatusColor(item.status)" class="text-white">
+                  {{ item.status }}
+                </v-chip>
+                <v-chip
+                  v-if="isBibleStudyInvited(item)"
+                  size="x-small"
+                  color="teal-darken-1"
+                  variant="flat"
+                  class="text-white font-weight-bold"
+                  style="font-size: 9px;"
+                >
+                  <v-icon start size="10">mdi-email-fast</v-icon>
+                  Invited
+                </v-chip>
               </div>
-              <div v-else class="text-caption text-grey">Unassigned</div>
             </td>
             <td>{{ formatDateTime(item.scheduled_date) }}</td>
             <td>
               <div class="d-flex gap-2 align-center">
                 <v-btn
-                  variant="tonal"
+                  v-if="isGroup(item)"
+                  variant="outlined"
+                  size="small"
+                  color="teal"
+                  @click="openCompanionsDialog(item)"
+                >
+                  <v-icon>mdi-account-group</v-icon>
+                  <v-tooltip activator="parent" location="top">View Companions ({{ getGroupSize(item) }})</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="outlined"
                   size="small"
                   color="primary"
                   @click="openScheduleDialog(item)"
@@ -218,7 +184,7 @@
                 </v-btn>
 
                 <v-btn
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="success"
                   @click="markIndividualComplete(item)"
@@ -229,7 +195,7 @@
                 </v-btn>
 
                 <v-btn
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="teal-darken-1"
                   @click="openBibleStudyDialog(item)"
@@ -243,7 +209,7 @@
 
                 <v-btn
                   v-if="['Pending', 'Scheduled'].includes(item.status)"
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="error"
                   @click="rejectItem(item)"
@@ -254,7 +220,7 @@
                 </v-btn>
 
                 <v-btn
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="grey"
                   @click="deleteItem(item)"
@@ -284,7 +250,7 @@
     <v-dialog v-model="dialogVisible" :max-width="showAvailableSlots ? '900px' : '500px'">
       <v-card class="discipleship-dialog">
         <v-card-title class="bg-primary text-white d-flex align-center">
-          <span>{{ isBulkEditing ? 'Bulk Update ' + selectedRequests.length + ' Requests' : (isEditing ? 'Update' : 'Add') + ' Request' }}</span>
+          <span>{{ isEditing ? 'Update' : 'Add' }} Request</span>
           <v-btn 
             icon="mdi-close"
             variant="text"
@@ -303,10 +269,8 @@
               <v-progress-circular indeterminate></v-progress-circular>
               <div class="text-caption mt-2">Loading time slots...</div>
             </div>
-            <div v-else-if="availableSlots.length === 0" class="text-center pa-8 bg-grey-lighten-4 rounded-lg border-teal border-dashed">
-              <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-calendar-remove</v-icon>
-              <div class="text-subtitle-2 font-weight-bold grey--text">No Slots Available</div>
-              <div class="text-caption grey--text">Please add new time slots using the manager button above.</div>
+            <div v-else-if="availableSlots.length === 0" class="text-center text-caption grey--text pa-4">
+              No available slots
             </div>
             <div v-else>
               <v-expansion-panels accordion>
@@ -319,19 +283,19 @@
                     <v-btn
                       v-for="slot in dateGroup.timeSlots"
                       :key="slot.datetime"
-                      variant="tonal"
+                      variant="outlined"
                       size="small"
-                      :color="isSlotSelected(slot.datetime) ? 'primary' : (slot.bookedCount >= (slot.maxCapacity || 1) ? 'error' : 'teal')"
+                      :color="isSlotSelected(slot.datetime) ? 'primary' : 'default'"
                       :class="{ 'selected-slot': isSlotSelected(slot.datetime) }"
-                      class="mb-2 mr-2 rounded-lg font-weight-bold"
+                      class="mb-2 mr-2 px-2"
                       @click="selectAvailableSlot(dateGroup.date, slot.time)"
-                      :disabled="slot.bookedCount >= (slot.maxCapacity || 1) && !isSlotSelected(slot.datetime)"
                     >
-                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                      {{ new Date(`${dateGroup.date} ${slot.time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}
-                      <span class="ml-2 opacity-70" style="font-size: 10px">
-                        ({{ slot.bookedCount }}/{{ slot.maxCapacity || 1 }})
-                      </span>
+                      <div class="d-flex align-center">
+                        <span style="font-size: 11px;">{{ new Date(`${dateGroup.date} ${slot.time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}</span>
+                        <v-chip v-if="slot.bookedCount !== undefined && slot.maxCapacity" size="x-small" :color="isSlotSelected(slot.datetime) ? 'primary' : 'grey'" class="ml-1 px-1" style="height: 16px; min-width: 16px; font-weight: bold;">
+                          {{ slot.maxCapacity - slot.bookedCount }}
+                        </v-chip>
+                      </div>
                     </v-btn>
                   </div>
                 </v-expansion-panel>
@@ -343,7 +307,7 @@
           </div>
           <!-- Right Panel: Form -->
           <div :class="['flex-grow-1', 'pa-4']" style="overflow-y: auto; max-height: 60vh;">
-            <div v-if="!isEditing && !isBulkEditing">
+            <div v-if="!isEditing">
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field v-model="selectedRequest.firstname" label="First Name" variant="outlined" density="compact"></v-text-field>
@@ -355,20 +319,11 @@
               <v-text-field v-model="selectedRequest.email" label="Email Address" variant="outlined" density="compact"></v-text-field>
               <v-text-field v-model="selectedRequest.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
               <v-row>
-                <v-col cols="12" md="4">
+                <v-col cols="12" md="6">
                   <v-text-field v-model="selectedRequest.birthdate" label="Birthday" type="date" variant="outlined" density="compact"></v-text-field>
                 </v-col>
-                <v-col cols="12" md="4">
+                <v-col cols="12" md="6">
                   <v-text-field v-model="selectedRequest.age" label="Age" type="number" variant="outlined" density="compact" readonly></v-text-field>
-                </v-col>
-                <v-col cols="12" md="4">
-                  <v-select
-                    v-model="selectedRequest.gender"
-                    :items="['Male', 'Female']"
-                    label="Gender"
-                    variant="outlined"
-                    density="compact"
-                  ></v-select>
                 </v-col>
               </v-row>
             </div>
@@ -381,6 +336,7 @@
                   item-title="name"
                   item-value="id"
                   label="Assigned Pastor"
+                  placeholder="Select a pastor"
                   variant="outlined"
                   density="compact"
                   clearable
@@ -402,6 +358,7 @@
               v-model="selectedRequest.status"
               :items="statusItems"
               label="Status"
+              @update:model-value="handleIndividualStatusChange"
               variant="outlined"
               density="compact"
             ></v-select>
@@ -415,31 +372,26 @@
             ></v-select>
 
             <label class="text-caption grey--text mb-1 d-block">Schedule Date & Time</label>
-            <div class="d-flex align-center gap-2 mb-2">
-              <el-date-picker
-                v-model="selectedRequest.scheduled_date"
-                type="datetime"
-                :placeholder="schedulePlaceholder"
-                style="width: 100%"
-                :disabled-date="disabledDate"
-                format="YYYY-MM-DD hh:mm A"
-                value-format="YYYY-MM-DD HH:mm:ss"
-                :default-time="new Date(0, 0, 0, 9, 0, 0)"
-                popper-class="discipleship-date-picker"
-              />
-              <v-btn
-                icon="mdi-refresh"
-                size="small"
-                variant="tonal"
-                color="primary"
-                @click="fetchAvailableSlots(14)"
-                :loading="slotsLoading"
-              ></v-btn>
-            </div>
-            
+            <el-date-picker
+              v-model="selectedRequest.scheduled_date"
+              type="datetime"
+              :placeholder="schedulePlaceholder"
+              style="width: 100%"
+              :disabled-date="disabledDate"
+              format="YYYY-MM-DD hh:mm A"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              :default-time="new Date(0, 0, 0, 9, 0, 0)"
+              popper-class="discipleship-date-picker"
+            />
             <div class="text-caption grey--text mt-1">{{ scheduleHelperText }}</div>
 
-
+            <v-textarea
+              v-model="selectedRequest.notes"
+              label="Notes / Remarks"
+              variant="outlined"
+              rows="3"
+              class="mt-3"
+            ></v-textarea>
 
             <div v-if="formattedSchedulePreview" class="mt-4 pa-3 bg-teal-lighten-5 rounded border-teal">
               <div class="text-caption text-teal-darken-3 font-weight-bold">VALIDATED SCHEDULE ({{ selectedRequest.request_type || 'Salvation' }})</div>
@@ -462,17 +414,35 @@
       <v-card class="rounded-xl overflow-hidden">
         <v-card-title class="bg-teal-darken-2 text-white text-center py-4">
           <v-icon large class="mr-2">{{ isPromotionScheduling ? 'mdi-calendar-clock' : 'mdi-calendar-check' }}</v-icon>
-          {{ isPromotionScheduling ? 'Schedule Bible Study Session' : 'Salvation Talk Result' }}
-          <span v-if="isBulkPromoting" class="text-caption ml-2">({{ selectedRequests.length }} Candidates)</span>
+          {{ isPromotionScheduling ? (isBulkPromotion ? 'Bulk Schedule Bible Study' : 'Schedule Bible Study Session') : 'Salvation Talk Result' }}
         </v-card-title>
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-6 position-relative">
+          <!-- Loading Overlay -->
+          <v-overlay
+            v-model="loadingBibleStudy"
+            contained
+            persistent
+            class="align-center justify-center rounded-xl"
+            scrim="white"
+            opacity="0.8"
+          >
+            <div class="text-center">
+              <v-progress-circular indeterminate color="teal-darken-2" size="64" width="6" class="mb-4"></v-progress-circular>
+              <div class="text-h6 font-weight-black text-teal-darken-3">{{ isBulkPromotion ? 'BULK PROMOTING' : 'PROMOTING CANDIDATE' }}</div>
+              <div class="text-caption text-grey-darken-1">Sending notifications and creating records...</div>
+            </div>
+          </v-overlay>
+
           <div v-if="!isPromotionScheduling">
-            <p class="text-body-1 mb-2 text-center">{{ isBulkPromoting ? 'Bulk promote these candidates to Bible Study:' : 'Phase 1 (Salvation Talk) completed for:' }}</p>
-            <p class="text-center text-h6 font-weight-bold mb-4">
-              {{ isBulkPromoting ? selectedRequests.length + ' Selected Candidates' : (bibleStudyItem?.firstname + ' ' + bibleStudyItem?.lastname) }}
+            <p class="text-body-1 mb-2 text-center">Phase 1 (Salvation Talk) completed for:</p>
+            <p class="text-center text-h6 font-weight-bold mb-4" v-if="!isBulkPromotion">
+              {{ bibleStudyItem?.firstname }} {{ bibleStudyItem?.lastname }}
+            </p>
+            <p class="text-center text-h6 font-weight-bold mb-4" v-else>
+              <v-chip color="teal" size="large" class="px-6">{{ selectedInGroup.length }} Selected Participants</v-chip>
             </p>
             <p class="text-body-2 text-grey-darken-1 text-center mb-5">
-              Select how to proceed with this candidate's discipleship journey.
+              Select how to proceed with {{ isBulkPromotion ? 'these candidates\'' : 'this candidate\'s' }} discipleship journey.
             </p>
 
             <v-btn
@@ -549,10 +519,7 @@
                             @click="selectSlot(slot.datetime)"
                             class="cursor-pointer font-weight-medium"
                           >
-                            {{ formatTime(slot.time) }}
-                            <span v-if="slot.bookedCount > 0" class="ml-1 text-caption font-weight-light" style="font-size: 0.7rem !important;">
-                              ({{ slot.bookedCount }})
-                            </span>
+                            {{ formatTime(slot.time) }} ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
                           </v-chip>
                         </div>
                       </v-expansion-panel-text>
@@ -570,10 +537,15 @@
 
               <!-- Right Column: Form Details -->
               <div style="flex: 1.2;">
-                <p class="text-h6 font-weight-bold mb-4 teal--text d-flex align-center">
-                  <v-icon color="teal" class="mr-2">mdi-account-plus</v-icon>
-                  {{ isBulkPromoting ? 'Bulk Schedule (' + selectedRequests.length + ' Candidates)' : ('Schedule for ' + bibleStudyItem?.firstname + ' ' + bibleStudyItem?.lastname) }}
-                </p>
+                <div class="mb-4">
+                  <p class="text-h6 font-weight-bold mb-1 teal--text d-flex align-center">
+                    <v-icon color="teal" class="mr-2">mdi-account-plus</v-icon>
+                    {{ isBulkPromotion ? `Group Promotion (${bulkPromoteTargetNames.length} members)` : `Schedule for ${bibleStudyItem?.firstname} ${bibleStudyItem?.lastname}` }}
+                  </p>
+                  <p v-if="isBulkPromotion" class="text-caption text-grey-darken-1 ml-8">
+                    Promoting: <span class="font-weight-bold">{{ bulkPromoteTargetNames.join(', ') }}</span>
+                  </p>
+                </div>
                 
                 <v-row dense>
                   <v-col cols="12" sm="6">
@@ -603,7 +575,7 @@
                       persistent-hint
                       hint="Defaults to the requester's home address."
                     ></v-text-field>
-                    <div v-if="!isBulkPromoting" class="text-caption text-grey-darken-1 px-1 mb-4">
+                    <div class="text-caption text-grey-darken-1 px-1 mb-4">
                       <v-icon size="12">mdi-home-city-outline</v-icon>
                       Registered Address: <b>{{ bibleStudyItem?.address || '' }}</b>
                     </div>
@@ -649,7 +621,7 @@
                     size="large"
                     @click="handleBibleStudyAction(true)"
                     :loading="loadingBibleStudy"
-                    :disabled="!promotionForm.scheduled_date || !promotionForm.pastor_id"
+                    :disabled="!promotionForm.scheduled_date"
                     prepend-icon="mdi-calendar-check"
                     class="px-6"
                   >Confirm & Schedule</v-btn>
@@ -664,306 +636,502 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <!-- Availability Manager Dialog -->
-    <v-dialog v-model="availabilityManagerVisible" max-width="1100px" persistent>
-      <v-card class="rounded-xl overflow-hidden elevation-24">
-        <v-card-title class="bg-teal-darken-2 text-white pa-6 d-flex align-center">
-          <v-icon size="32" class="mr-3">mdi-calendar-multiselect</v-icon>
-          <div class="d-flex flex-column">
-            <span class="text-h5 font-weight-bold">Availability Manager</span>
-            <span class="text-caption opacity-80" style="color: white !important;">Control the church's discipleship talk schedule manually.</span>
-          </div>
-          
-          <v-spacer></v-spacer>
-          
-          <!-- Service Selector Toggle -->
-          <v-btn-toggle
-            v-model="managerServiceType"
-            mandatory
-            density="comfortable"
-            color="white"
-            variant="tonal"
-            class="mr-4 bg-teal-darken-3 rounded-lg"
-            @update:model-value="fetchSalvationSlots"
-          >
-            <v-btn value="salvation" class="px-4 font-weight-bold">SALVATION</v-btn>
-            <v-btn value="bible_study" class="px-4 font-weight-bold">BIBLE STUDY</v-btn>
-          </v-btn-toggle>
 
-          <v-btn icon="mdi-close" variant="text" color="white" @click="availabilityManagerVisible = false"></v-btn>
+    <!-- Companion Management Console -->
+    <v-dialog v-model="companionsDialogVisible" max-width="1100px" persistent>
+      <v-card class="rounded-xl overflow-hidden shadow-2xl">
+        <v-card-title class="bg-teal-darken-3 text-white d-flex align-center py-4 px-6">
+          <div class="d-flex align-center">
+            <v-avatar color="teal-lighten-4" size="40" class="mr-3">
+              <v-icon color="teal-darken-3">mdi-account-group</v-icon>
+            </v-avatar>
+            <div class="d-flex flex-column">
+              <span class="text-h6 font-weight-bold">Group Management Console</span>
+              <span class="text-caption" style="opacity: 0.9">Managing discipleship group for <b>{{ selectedGroup?.firstname }} {{ selectedGroup?.lastname }}</b></span>
+            </div>
+          </div>
+          <v-spacer></v-spacer>
+          <div class="d-flex gap-2">
+            <v-chip color="teal-lighten-4" text-color="teal-darken-4" size="small" class="font-weight-bold mr-2 px-4 shadow-sm">
+              <v-icon start size="14">mdi-account-multiple</v-icon>
+              {{ getGroupSize(selectedGroup) + 1 }} PARTICIPANTS
+            </v-chip>
+            <v-btn icon="mdi-close" variant="text" color="white" @click="companionsDialogVisible = false"></v-btn>
+          </div>
         </v-card-title>
 
-        <v-card-text class="pa-6 bg-grey-lighten-4">
-          <v-row>
-            <!-- Left: Creator Form (TEAL) -->
-            <v-col cols="12" md="5" class="availability-creator">
-              <v-card class="pa-6 rounded-xl elevation-2 bg-white h-100 border-teal flex-column d-flex">
-                <div class="d-flex align-center mb-6">
-                  <v-avatar color="teal-lighten-4" class="mr-3" size="48">
-                    <v-icon color="teal-darken-2">{{ isEditingSlot ? 'mdi-pencil' : 'mdi-plus-box' }}</v-icon>
-                  </v-avatar>
-                  <div class="d-flex flex-column">
-                    <span class="text-h6 font-weight-bold">{{ isEditingSlot ? 'Update Time Slot' : 'Create New Slots' }}</span>
-                    <span class="text-caption grey--text">
-                      {{ isEditingSlot ? 'Modify the selected slot details' : `Bulk create ${managerServiceType === 'salvation' ? 'Salvation' : 'Bible Study'} slots` }}
-                    </span>
-                  </div>
-                </div>
+        <v-card-text class="pa-0">
+          <!-- Selection Actions Bar (Modern Style) -->
+          <v-expand-transition>
+            <div v-if="selectedInGroup.length > 0" class="bulk-actions-bar pa-3 d-flex align-center gap-2 sticky-top border-b" style="z-index: 5; border-radius: 0;">
+              <v-chip color="teal-darken-2" size="small" class="mr-2 font-weight-black px-4">
+                {{ selectedInGroup.length }} SELECTED
+              </v-chip>
+              
+              <div class="d-flex gap-2">
+                <v-btn v-if="allSelectedArePending" size="small" color="error" variant="outlined" @click="bulkActionInGroup('Rejected')" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-close-circle-outline</v-icon>
+                  Reject
+                </v-btn>
+                <v-divider vertical class="mx-1"></v-divider>
+                <v-btn size="small" color="teal-darken-2" variant="outlined" @click="openBulkEdit" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-pencil-box-multiple</v-icon>
+                  Bulk Edit
+                </v-btn>
+                <v-btn 
+                  size="small" 
+                  color="teal-darken-1" 
+                  variant="outlined" 
+                  @click="bulkPromoteToBibleStudy" 
+                  v-if="canBulkPromote"
+                  class="bulk-action-btn font-weight-bold text-uppercase"
+                >
+                  <v-icon start size="16">mdi-book-open-variant</v-icon>
+                  Promote to Bible Study
+                </v-btn>
+              </div>
 
-                <v-divider class="mb-6"></v-divider>
+              <v-spacer></v-spacer>
+              
+              <v-btn size="small" variant="text" color="grey-darken-2" @click="selectedInGroup = []" class="text-none">
+                <v-icon start size="14">mdi-selection-off</v-icon>
+                Clear Selection
+              </v-btn>
+            </div>
+          </v-expand-transition>
 
-                <!-- Date Selection -->
-                <div class="mb-4">
-                  <label class="text-subtitle-2 font-weight-bold d-block mb-2 text-teal-darken-2">Step 1: Select Date(s)</label>
-                  <el-date-picker
-                    v-model="newSlotForm.dates"
-                    :type="isEditingSlot ? 'date' : 'dates'"
-                    placeholder="Pick dates"
-                    style="width: 100%"
-                    value-format="YYYY-MM-DD"
-                    popper-class="salvation-datepicker-popper"
-                    :append-to-body="true"
-                    :disabled-date="(time) => time.getTime() < Date.now() - 8.64e7"
-                  />
-                  <div v-if="!isEditingSlot" class="text-caption grey--text mt-1 italic">Select multiple dates to apply these time slots to all of them.</div>
-                </div>
-
-                <!-- Time Selection -->
-                <div class="mb-6">
-                  <label class="text-subtitle-2 font-weight-bold d-block mb-2 text-teal-darken-2">Step 2: Select Time Slots</label>
-                  
-                  <div v-if="isEditingSlot">
-                    <v-text-field
-                      v-model="newSlotForm.times[0]"
-                      type="time"
-                      variant="outlined"
-                      density="comfortable"
-                      color="teal"
-                      class="rounded-lg"
-                    ></v-text-field>
-                  </div>
-                  <div v-else class="d-flex flex-wrap gap-2">
-                    <v-chip
-                      v-for="time in commonTimes"
-                      :key="time.value"
-                      :color="newSlotForm.times.includes(time.value) ? 'teal' : 'grey-lighten-2'"
-                      :variant="newSlotForm.times.includes(time.value) ? 'flat' : 'outlined'"
-                      class="pa-4 font-weight-bold cursor-pointer"
-                      @click="toggleBulkTime(time.value)"
-                    >
-                      <v-icon v-if="newSlotForm.times.includes(time.value)" size="14" class="mr-1">mdi-check</v-icon>
-                      {{ time.label }}
-                    </v-chip>
-                    
-                    <v-menu :close-on-content-click="false">
-                      <template v-slot:activator="{ props }">
-                        <v-chip variant="dashed" color="teal" v-bind="props" class="pa-4">
-                          <v-icon size="20" class="mr-1">mdi-plus</v-icon> Custom
-                        </v-chip>
-                      </template>
-                      <v-card min-width="200" class="pa-4 rounded-lg">
-                        <v-text-field
-                          label="Custom Time"
-                          type="time"
-                          variant="outlined"
-                          density="compact"
-                          color="teal"
-                          @change="(val) => {if(val.target.value) toggleBulkTime(val.target.value)}"
-                        ></v-text-field>
-                      </v-card>
-                    </v-menu>
-                  </div>
-                </div>
-
-                <!-- Capacity -->
-                <div class="mb-6">
-                  <label class="text-subtitle-2 font-weight-bold d-block mb-2 text-teal-darken-2">Step 3: Set Capacity</label>
-                  <v-text-field
-                    v-model.number="newSlotForm.max_slots"
-                    type="number"
-                    variant="outlined"
-                    density="comfortable"
+          <v-table hover fixed-header class="companion-management-table">
+            <thead>
+              <tr class="bg-grey-lighten-4">
+                <th class="text-center" style="width: 40px;">
+                  <v-checkbox
+                    v-model="groupSelectAll"
+                    density="compact"
+                    hide-details
                     color="teal"
-                    placeholder="Seats per slot"
-                    prepend-inner-icon="mdi-account-group"
-                    class="rounded-lg"
-                    min="1"
-                  ></v-text-field>
-                </div>
-                
-                <v-spacer></v-spacer>
-
-                <div class="d-flex gap-2">
-                  <v-btn
-                    v-if="isEditingSlot"
-                    variant="tonal"
-                    color="grey-darken-1"
-                    size="large"
-                    class="rounded-lg"
-                    @click="cancelSlotEdit"
-                  >Cancel</v-btn>
-                  <v-btn
-                    block
-                    color="teal-darken-1"
-                    size="large"
-                    class="font-weight-bold rounded-lg elevation-2 flex-grow-1"
-                    @click="addSalvationSlot"
-                    :loading="savingSlot"
-                    :prepend-icon="isEditingSlot ? 'mdi-content-save' : 'mdi-plus-circle'"
-                  >
-                    {{ isEditingSlot ? 'Confirm Save' : 'Generate Slots' }}
-                  </v-btn>
-                </div>
-              </v-card>
-            </v-col>
-
-            <!-- Right: List (Grouped) -->
-            <v-col cols="12" md="7">
-              <v-card class="rounded-xl border elevation-0 overflow-hidden bg-white h-100 flex-column d-flex">
-                <!-- Header with Sorting & Multi-select Toggle -->
-                <div class="pa-4 d-flex align-center justify-space-between border-b bg-grey-lighten-5">
+                    @update:model-value="toggleGroupSelectAll"
+                  ></v-checkbox>
+                </th>
+                <th class="font-weight-bold text-uppercase py-4" style="font-size: 11px; letter-spacing: 0.5px;">Name</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Role / Info</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Email / Phone</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Assigned Pastor</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Schedule / Venue</th>
+                <th class="font-weight-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 0.5px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(person, idx) in companionsInGroup" :key="idx" :class="{ 'role-primary-row': person.type === 'primary' }">
+                <td class="text-center">
+                  <v-checkbox
+                    v-model="selectedInGroup"
+                    :value="idx"
+                    density="compact"
+                    hide-details
+                    color="teal"
+                  ></v-checkbox>
+                </td>
+                <td>
                   <div class="d-flex align-center">
-                    <v-checkbox-btn
-                      v-if="manualSalvationSlots.length > 0"
-                      v-model="isAllSlotsSelected"
-                      color="teal"
-                      @click="toggleSelectAllSlots"
-                      class="mr-2"
-                    ></v-checkbox-btn>
-                    <v-icon color="teal-darken-2" class="mr-2">{{ selectedManualSlotIds.length > 0 ? 'mdi-checkbox-multiple-marked' : 'mdi-sort-clock-ascending' }}</v-icon>
-                    <span class="text-subtitle-1 font-weight-bold grey--text text--darken-3">Availability List</span>
-                  </div>
-                  
-                  <div class="d-flex align-center gap-2">
-                    <v-btn
-                      v-if="selectedManualSlotIds.length > 0"
-                      color="red-darken-2"
-                      prepend-icon="mdi-trash-can"
-                      size="small"
-                      variant="flat"
-                      class="rounded-lg mr-2"
-                      @click="bulkDeleteSalvationSlots"
-                    >
-                      Delete ({{ selectedManualSlotIds.length }})
-                    </v-btn>
-
-                    <v-btn-toggle
-                      v-model="slotsSortOrder"
-                      mandatory
-                      density="compact"
-                      color="teal"
-                      variant="outlined"
-                      class="rounded-lg bg-white"
-                      v-show="selectedManualSlotIds.length === 0"
-                    >
-                      <v-btn value="upcoming" size="x-small" class="px-2 font-weight-bold">UPCOMING</v-btn>
-                      <v-btn value="newest" size="x-small" class="px-2 font-weight-bold">NEWEST</v-btn>
-                    </v-btn-toggle>
-                    
-                    <v-btn icon="mdi-refresh" variant="text" size="small" color="teal" @click="fetchSalvationSlots" :loading="slotsListLoading"></v-btn>
-                  </div>
-                </div>
-                
-                <!-- Content -->
-                <div class="slots-list-container flex-grow-1" style="max-height: 520px; overflow-y: auto; background-color: #fcfcfc;">
-                  <div v-if="slotsListLoading" class="text-center pa-10">
-                    <v-progress-circular indeterminate color="teal" size="40" width="3"></v-progress-circular>
-                    <div class="text-caption mt-2 grey--text">Loading active schedules...</div>
-                  </div>
-                  <div v-else-if="manualSalvationSlots.length === 0" class="text-center pa-12 text-grey-darken-1">
-                    <v-icon size="64" color="teal-lighten-4" class="mb-3">mdi-calendar-remove</v-icon>
-                    <div class="text-h6 font-weight-bold opacity-80">Empty Schedule</div>
-                    <div class="text-caption">Select dates and times on the left to start.</div>
-                  </div>
-                  
-                  <v-expansion-panels v-else v-model="activeManualGroups" variant="popout" accordion class="pa-3">
-                    <v-expansion-panel v-for="group in groupedManualSlots" :key="group.date" class="mb-3 rounded-lg border shadow-sm overflow-hidden">
-                      <v-expansion-panel-title class="py-2 px-4 bg-teal-darken-2">
-                        <div class="d-flex align-center justify-space-between w-100 pr-2">
-                          <div class="d-flex align-center">
-                            <v-checkbox-btn
-                              :model-value="isGroupFullySelected(group)"
-                              @click.stop="toggleSelectGroup(group)"
-                              color="white"
-                              class="mr-2"
-                              theme="dark"
-                            ></v-checkbox-btn>
-                            <v-icon color="white" size="20" class="mr-2">mdi-calendar-star</v-icon>
-                            <span class="font-weight-bold text-white">{{ formatDateManual(group.date) }}</span>
-                          </div>
-                          <v-chip size="x-small" color="white" variant="flat" class="font-weight-black text-teal-darken-2 px-2">
-                            {{ group.slots.length }} SESSIONS
-                          </v-chip>
-                        </div>
-                      </v-expansion-panel-title>
-                      <v-expansion-panel-text class="pa-0">
-                        <div class="pa-2">
-                          <div v-for="slot in group.slots" :key="slot.slot_id" 
-                               class="d-flex align-center justify-space-between pa-3 rounded-lg hover-bg mb-2 border border-dotted cursor-pointer"
-                               :class="{'bg-yellow-lighten-4 border-teal border-solid shadow-sm': editingSlotId === slot.slot_id, 'bg-teal-lighten-5': selectedManualSlotIds.includes(slot.slot_id)}"
-                               @click="toggleSelectSlot(slot.slot_id)">
-                            <div class="d-flex align-center">
-                              <v-checkbox-btn
-                                :model-value="selectedManualSlotIds.includes(slot.slot_id)"
-                                color="teal"
-                                class="mr-2"
-                                @click.stop="toggleSelectSlot(slot.slot_id)"
-                              ></v-checkbox-btn>
-                              <v-chip size="default" variant="flat" color="teal-lighten-4" class="text-teal-darken-4 font-weight-black px-4">
-                                {{ formatTimeManual(slot.available_time) }}
-                              </v-chip>
-                              <div class="ml-4 d-flex align-center grey--text text-subtitle-2">
-                                <v-icon size="16" class="mr-1">mdi-account-multiple</v-icon>
-                                <span class="font-weight-bold">{{ slot.max_slots }} SEATS</span>
-                              </div>
-                            </div>
-                            <!-- VISIBLE SOLID BUTTONS WITH WHITE ICONS -->
-                            <div class="d-flex gap-2" v-show="selectedManualSlotIds.length === 0">
-                              <v-btn 
-                                icon 
-                                variant="flat" 
-                                color="teal-darken-1" 
-                                size="small"
-                                class="rounded-lg elevation-2 action-btn shadow-teal"
-                                @click.stop="editSlot(slot)"
-                              >
-                                <v-icon color="white">mdi-pencil</v-icon>
-                              </v-btn>
-
-                              <v-btn 
-                                icon 
-                                variant="flat" 
-                                color="red-darken-2" 
-                                size="small"
-                                class="rounded-lg elevation-2 action-btn shadow-red"
-                                @click.stop="deleteOneSlotId(slot.slot_id)"
-                              >
-                                <v-icon color="white">mdi-trash-can</v-icon>
-                              </v-btn>
-                            </div>
-                          </div>
-                        </div>
-                      </v-expansion-panel-text>
-                    </v-expansion-panel>
-                  </v-expansion-panels>
-                </div>
-                
-                <!-- Footer Info (REMOVED CROSS LINE) -->
-                <div class="pa-3 bg-grey-lighten-4 d-flex justify-space-between border-t-0">
-                    <div class="text-caption grey--text d-flex align-center">
-                      <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
-                      Managing manual overrides for {{ managerServiceType === 'salvation' ? 'Salvation Talk' : 'Bible Study' }} sessions.
+                    <v-avatar :color="person.type === 'primary' ? 'teal-darken-1' : 'grey-lighten-2'" size="32" class="mr-3">
+                      <span class="text-caption font-weight-bold" :class="person.type === 'primary' ? 'text-white' : 'text-grey-darken-2'">
+                        {{ person.firstname.charAt(0) }}{{ person.lastname.charAt(0) }}
+                      </span>
+                    </v-avatar>
+                    <div>
+                      <div class="font-weight-bold text-body-2">{{ person.firstname }} {{ person.lastname }}</div>
+                      <div class="text-caption text-grey">{{ person.type === 'primary' ? 'Group Leader' : 'Companion' }}</div>
                     </div>
-                   <v-btn size="x-small" variant="text" color="grey-darken-1" @click="cancelSlotEdit" v-if="isEditingSlot">Cancel Selection</v-btn>
-                </div>
-              </v-card>
-            </v-col>
-          </v-row>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex flex-column gap-1">
+                    <v-chip size="x-small" :color="person.type === 'primary' ? 'teal' : 'blue-grey'" variant="flat" class="text-uppercase font-weight-black" style="font-size: 9px;">
+                      {{ person.type }}
+                    </v-chip>
+                    <div class="d-flex gap-1 mt-1">
+                      <span class="text-caption text-grey-darken-1">{{ person.age }}y, {{ person.gender }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="text-body-2">{{ person.email || 'No Email' }}</div>
+                  <div class="text-caption text-grey">{{ person.phone_number || 'No Phone' }}</div>
+                </td>
+                <td>
+                  <div class="text-caption font-weight-bold text-grey-darken-3">
+                    <v-icon size="14" color="teal" class="mr-1">mdi-account-tie</v-icon>
+                    {{ getPastorName(person.pastor_id) }}
+                  </div>
+                </td>
+                <td>
+                  <div v-if="person.scheduled_date" class="text-caption font-weight-bold text-teal-darken-2">
+                    <v-icon size="12" class="mr-1">mdi-calendar-clock</v-icon>
+                    {{ formatDateTime(person.scheduled_date) }}
+                  </div>
+                  <div v-else class="text-caption text-grey font-italic">No schedule set</div>
+                  <div v-if="person.location" class="text-caption text-truncate" style="max-width: 150px;">
+                    <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
+                    {{ person.location }}
+                  </div>
+                </td>
+                <td class="text-center">
+                  <v-chip 
+                    size="small" 
+                    :color="getStatusDisplayColor(person.status)" 
+                    variant="flat" 
+                    class="text-uppercase font-weight-black shadow-sm"
+                    style="font-size: 10px; min-width: 90px;"
+                  >
+                    {{ getStatusDisplayText(person.status) }}
+                  </v-chip>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
         </v-card-text>
+        
+        <v-card-actions class="pa-4 bg-grey-lighten-4 border-t d-flex justify-space-between align-center">
+          <div class="d-flex align-center">
+            <v-icon color="grey-darken-1" size="18" class="mr-2">mdi-information-outline</v-icon>
+            <span class="text-caption grey--text font-italic">
+              Changes performed here are synchronized with the primary requester's metadata. 
+              <span class="text-teal-darken-3 font-weight-bold">Primary requester governs overall group status.</span>
+            </span>
+          </div>
+          <v-btn color="grey-darken-2" variant="outlined" size="small" @click="companionsDialogVisible = false" class="px-6 rounded-lg">
+            Close Console
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Bulk Edit Dialog (Inside Console Context) -->
+    <v-dialog v-model="bulkEditVisible" max-width="900px">
+      <v-card class="rounded-xl overflow-hidden shadow-xl">
+        <v-card-title class="bg-teal-darken-2 text-white py-4 px-6 d-flex align-center">
+          <v-icon class="mr-3">mdi-pencil-box-multiple</v-icon>
+          <span class="text-h6 font-weight-bold font-heading">Update {{ selectedInGroup.length }} Group Requests</span>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="bulkEditVisible = false" class="ml-auto"></v-btn>
+        </v-card-title>
+        
+        <v-card-text class="pa-0 d-flex bg-white flex-column flex-md-row position-relative">
+          <!-- Loading Overlay -->
+          <v-overlay
+            v-model="bulkLoading"
+            contained
+            persistent
+            class="align-center justify-center rounded-xl"
+            scrim="white"
+            opacity="0.8"
+          >
+            <div class="text-center">
+              <v-progress-circular indeterminate color="teal-darken-2" size="64" width="6" class="mb-4"></v-progress-circular>
+              <div class="text-h6 font-weight-black text-teal-darken-3">PROCESSING UPDATES</div>
+              <div class="text-caption text-grey-darken-1">Please wait while we sync the group data...</div>
+            </div>
+          </v-overlay>
+
+          <!-- Left Panel: Available Slots -->
+          <div class="pa-4 flex-shrink-0" style="width: 35%; border-right: 1px solid #e0e0e0; overflow-y: auto; max-height: 65vh; background-color: #f8fafc;">
+            <div class="d-flex align-center mb-4">
+              <v-icon color="teal-darken-2" class="mr-2">mdi-clock-outline</v-icon>
+              <span class="text-subtitle-2 font-weight-black text-teal-darken-3 text-uppercase letter-spacing-1">Available Time Slots</span>
+            </div>
+            
+            <div v-if="slotsLoading" class="text-center pa-8">
+              <v-progress-circular indeterminate color="teal" />
+              <div class="text-caption mt-2">Loading slots...</div>
+            </div>
+            
+            <div v-else-if="availableSlots.length === 0" class="text-center pa-8 text-grey">
+              No available slots found.
+            </div>
+            
+            <v-expansion-panels v-else variant="accordion" class="border rounded-lg overflow-hidden bg-white">
+              <v-expansion-panel v-for="dateGroup in availableSlots.slice(0, 7)" :key="dateGroup.date">
+                <template #title>
+                  <div class="d-flex align-center justify-space-between w-100">
+                    <span class="font-weight-bold text-body-2">{{ formatDate(dateGroup.date) }}</span>
+                    <v-chip size="x-small" color="teal" class="ml-2 font-weight-bold">{{ dateGroup.availableSlots }}</v-chip>
+                  </div>
+                </template>
+                <v-card-text class="pa-2 bg-grey-lighten-5">
+                  <div class="d-flex flex-wrap gap-2">
+                    <v-btn
+                      v-for="slot in dateGroup.timeSlots"
+                      :key="slot.datetime"
+                      variant="outlined"
+                      size="small"
+                      :color="isSlotSelected(slot.datetime) ? 'teal' : 'grey-darken-2'"
+                      :class="{ 'bg-teal-lighten-5': isSlotSelected(slot.datetime) }"
+                      @click="selectAvailableSlot(dateGroup.date, slot.time)"
+                    >
+                      <div class="d-flex align-center">
+                        <span style="font-size: 11px;">{{ new Date(`${dateGroup.date} ${slot.time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}</span>
+                        <v-chip v-if="slot.maxCapacity" size="x-small" :color="isSlotSelected(slot.datetime) ? 'teal' : 'grey'" class="ml-1 px-1" style="height: 16px; min-width: 16px; font-weight: bold;">
+                          ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity }})
+                        </v-chip>
+                      </div>
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </div>
+
+          <!-- Right Panel: Form Fields -->
+          <div class="pa-6 flex-grow-1" style="overflow-y: auto; max-height: 65vh;">
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="bulkForm.pastor_id"
+                  :items="pastors"
+                  item-title="name"
+                  item-value="id"
+                  label="Assigned Pastor"
+                  variant="outlined"
+                  density="compact"
+                  placeholder="Keep Current"
+                  clearable
+                  class="mb-2"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="bulkForm.location"
+                  label="Location"
+                  variant="outlined"
+                  density="compact"
+                  persistent-hint
+                  hint="Defaults to the church address."
+                  clearable
+                  class="mb-2"
+                ></v-text-field>
+              </v-col>
+            </v-row>
+
+            <v-select
+              v-model="bulkForm.status"
+              :items="statusItems"
+              label="Update Status"
+              @update:model-value="handleBulkStatusChange"
+              variant="outlined"
+              density="compact"
+              placeholder="Keep Current"
+              clearable
+              class="mb-3"
+            ></v-select>
+
+            <v-select
+              v-model="bulkForm.request_type"
+              :items="requestTypeItems"
+              label="Stage (Request Type)"
+              variant="outlined"
+              density="compact"
+              placeholder="Keep Current"
+              clearable
+              class="mb-3"
+            ></v-select>
+
+            <label class="text-caption grey--text mb-1 d-block font-weight-bold">Schedule Date & Time</label>
+            <el-date-picker
+              v-model="bulkForm.scheduled_date"
+              type="datetime"
+              placeholder="Select date and time"
+              style="width: 100%"
+              format="YYYY-MM-DD hh:mm A"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              popper-class="discipleship-date-picker"
+            />
+            <p class="text-caption text-grey mt-1">Salvation Talk / Bible Study schedules are available daily.</p>
+
+            <v-textarea
+              v-model="bulkForm.notes"
+              label="Notes / Remarks"
+              variant="outlined"
+              rows="3"
+              class="mt-4"
+              placeholder="Internal record notes..."
+            ></v-textarea>
+
+            <transition name="fade">
+              <div v-if="bulkFormattedSchedulePreview" class="mt-4 pa-4 bg-teal-lighten-5 rounded-lg border-teal shadow-sm border">
+                <div class="text-caption text-teal-darken-3 font-weight-black text-uppercase letter-spacing-1">VALIDATED SCHEDULE ({{ bulkForm.request_type || 'Salvation' }})</div>
+                <div class="text-h6 text-teal-darken-4 mt-1 font-weight-bold">{{ bulkFormattedSchedulePreview }}</div>
+              </div>
+            </transition>
+          </div>
+        </v-card-text>
+
         <v-divider></v-divider>
-        <v-card-actions class="pa-4 bg-white border-t">
+        <v-card-actions class="pa-4 bg-white">
           <v-spacer></v-spacer>
-          <v-btn color="grey-darken-2" variant="tonal" class="rounded-lg px-8 py-2" @click="availabilityManagerVisible = false">Close Manager</v-btn>
+          <v-btn variant="text" color="grey-darken-1" @click="bulkEditVisible = false" class="px-6 font-weight-bold">CANCEL</v-btn>
+          <v-btn variant="flat" color="teal-darken-2" class="px-8 font-weight-bold shadow-md" @click="applyBulkEdit" :loading="bulkLoading">SAVE CHANGES</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Individual Edit Dialog (for Companions) -->
+    <v-dialog v-model="companionEditVisible" max-width="900px">
+      <v-card class="rounded-xl overflow-hidden shadow-xl">
+        <v-card-title class="bg-teal-darken-2 text-white py-4 px-6 d-flex align-center">
+          <v-icon class="mr-3">mdi-account-edit</v-icon>
+          <span class="text-h6 font-weight-bold font-heading">Edit Participant Details</span>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="companionEditVisible = false" class="ml-auto"></v-btn>
+        </v-card-title>
+        
+        <v-card-text class="pa-0 d-flex bg-white flex-column flex-md-row">
+          <!-- Left Panel: Available Slots -->
+          <div class="pa-4 flex-shrink-0" style="width: 35%; border-right: 1px solid #e0e0e0; overflow-y: auto; max-height: 70vh; background-color: #f8fafc;">
+            <div class="d-flex align-center mb-4">
+              <v-icon color="teal-darken-2" class="mr-2">mdi-clock-outline</v-icon>
+              <span class="text-subtitle-2 font-weight-black text-teal-darken-3 text-uppercase letter-spacing-1">Available Schedules</span>
+            </div>
+            
+            <div v-if="slotsLoading" class="text-center pa-8">
+              <v-progress-circular indeterminate color="teal" />
+            </div>
+            
+            <v-expansion-panels v-else variant="accordion" class="border rounded-lg overflow-hidden bg-white">
+              <v-expansion-panel v-for="dateGroup in availableSlots.slice(0, 7)" :key="dateGroup.date">
+                <template #title>
+                  <div class="d-flex align-center justify-space-between w-100">
+                    <span class="font-weight-bold text-body-2">{{ formatDate(dateGroup.date) }}</span>
+                    <v-chip size="x-small" color="teal" class="font-weight-bold">{{ dateGroup.availableSlots }}</v-chip>
+                  </div>
+                </template>
+                <v-card-text class="pa-2 bg-grey-lighten-5">
+                  <div class="d-flex flex-wrap gap-2">
+                    <v-btn
+                      v-for="slot in dateGroup.timeSlots"
+                      :key="slot.datetime"
+                      variant="outlined"
+                      size="small"
+                      :color="isSlotSelected(slot.datetime) ? 'teal' : 'grey-darken-2'"
+                      :class="{ 'bg-teal-lighten-5': isSlotSelected(slot.datetime), 'px-2': true }"
+                      @click="selectAvailableSlot(dateGroup.date, slot.time)"
+                    >
+                      <div class="d-flex align-center">
+                        <span style="font-size: 11px;">{{ new Date(`${dateGroup.date} ${slot.time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) }}</span>
+                        <v-chip v-if="slot.maxCapacity" size="x-small" :color="isSlotSelected(slot.datetime) ? 'teal' : 'grey'" class="ml-1 px-1" style="height: 16px; min-width: 16px; font-weight: bold;">
+                          ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity }})
+                        </v-chip>
+                      </div>
+                    </v-btn>
+                  </div>
+                </v-card-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </div>
+
+          <!-- Right Panel: Form Fields -->
+          <div class="pa-6 flex-grow-1" style="overflow-y: auto; max-height: 70vh;">
+            <div class="text-subtitle-2 font-weight-bold text-grey-darken-3 mb-4 d-flex align-center">
+              <v-icon size="18" class="mr-2">mdi-account-details</v-icon>
+              PERSONAL INFORMATION
+            </div>
+            
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="companionForm.firstname" label="First Name" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="companionForm.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+              <v-col cols="12">
+                <v-text-field v-model="companionForm.email" label="Email Address" variant="outlined" density="compact" type="email"></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="companionForm.phone_number" label="Phone Number" variant="outlined" density="compact"></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <div class="d-flex gap-2">
+                  <v-text-field v-model="companionForm.age" label="Age" type="number" variant="outlined" density="compact" class="flex-grow-1"></v-text-field>
+                  <v-select v-model="companionForm.gender" :items="['Male', 'Female']" label="Gender" variant="outlined" density="compact" style="width: 120px;"></v-select>
+                </div>
+              </v-col>
+            </v-row>
+
+            <v-divider class="my-6"></v-divider>
+            
+            <div class="text-subtitle-2 font-weight-bold text-grey-darken-3 mb-4 d-flex align-center">
+              <v-icon size="18" class="mr-2">mdi-shield-edit</v-icon>
+              ADMINISTRATIVE DETAILS
+            </div>
+
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="companionForm.status"
+                  :items="statusItems"
+                  label="Status"
+                  @update:model-value="handleCompanionStatusChange"
+                  variant="outlined"
+                  density="compact"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="companionForm.pastor_id"
+                  :items="pastors"
+                  item-title="name"
+                  item-value="id"
+                  label="Assigned Pastor"
+                  placeholder="Select a pastor"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-text-field 
+                  v-model="companionForm.location" 
+                  label="Location" 
+                  variant="outlined" 
+                  density="compact"
+                  persistent-hint
+                  hint="Defaults to the church address."
+                  clearable
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="companionForm.request_type"
+                  :items="requestTypeItems"
+                  label="Stage"
+                  variant="outlined"
+                  density="compact"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="6">
+                <el-date-picker
+                  v-model="companionForm.scheduled_date"
+                  type="datetime"
+                  placeholder="Set Schedule"
+                  style="width: 100%"
+                  format="YYYY-MM-DD hh:mm A"
+                  value-format="YYYY-MM-DD HH:mm:ss"
+                  popper-class="discipleship-date-picker"
+                ></el-date-picker>
+              </v-col>
+            </v-row>
+            
+            <transition name="fade">
+              <div v-if="companionFormattedSchedulePreview" class="mt-6 pa-4 bg-teal-lighten-5 rounded-lg border-teal border shadow-sm">
+                <div class="text-caption text-teal-darken-3 font-weight-black text-uppercase letter-spacing-1">VALIDATED SCHEDULE ({{ companionForm.request_type || 'Selected' }})</div>
+                <div class="text-h6 text-teal-darken-4 mt-1 font-weight-bold">{{ companionFormattedSchedulePreview }}</div>
+              </div>
+            </transition>
+          </div>
+        </v-card-text>
+
+        <v-divider></v-divider>
+        <v-card-actions class="pa-4 bg-white">
+          <v-spacer></v-spacer>
+          <v-btn variant="text" color="grey-darken-1" @click="companionEditVisible = false" class="px-6 font-weight-bold uppercase">Cancel</v-btn>
+          <v-btn variant="flat" color="teal-darken-2" class="px-8 font-weight-bold uppercase shadow-md" @click="saveCompanionEdit">Save Changes</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -977,7 +1145,6 @@ import { useAdminDiscipleshipStore } from '@/stores/admin/discipleshipStore';
 import { useSystemSettingsStore } from '@/stores/admin/systemSettingsStore';
 import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import moment from 'moment';
 import axios from '@/api/axios';
 
 const store = useAdminDiscipleshipStore();
@@ -985,7 +1152,6 @@ const settingsStore = useSystemSettingsStore();
 const router = useRouter();
 const { requests, loading, totalCount, currentPage, pageSize, pastors } = storeToRefs(store);
 const { settings, loading: settingsLoading } = storeToRefs(settingsStore);
-const user = JSON.parse(localStorage.getItem('user') || '{}');
 
 onMounted(() => {
     store.fetchRequests();
@@ -998,9 +1164,7 @@ const toggleRestriction = async (val) => {
 };
 
 const search = ref('');
-const statusFilter = ref('All Status');
-const dateRange = ref([]);
-const editDialogVisible = ref(false);
+const statusFilter = ref('All Status'); // Standardized to 'All Status' for consistency across admin pages
 const sortBy = ref('Date Created (Newest)'); // Added
 const page = ref(1); // Added
 // pageSize is already destructured from storeToRefs, so no need to declare here.
@@ -1015,272 +1179,493 @@ const selectedSlotDisplay = ref(null);
 const bibleStudyDialogVisible = ref(false);
 const bibleStudyItem = ref(null);
 const loadingBibleStudy = ref(false);
+const isBulkPromotion = ref(false);
+const bulkPromoteTargetNames = computed(() => {
+  if (!isBulkPromotion.value) return [];
+  const isMainTable = selectedRequests.value.length > 0 && selectedInGroup.value.length === 0;
+  const targets = isMainTable 
+    ? selectedRequests.value.map(id => requests.value.find(r => r.request_id === id))
+    : selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
+  return targets.map(t => `${t.firstname} ${t.lastname}`);
+});
+const isPromotionScheduling = ref(false);
+const promotionForm = ref({
+  pastor_id: null,
+  location: '',
+  scheduled_date: '',
+  notes: ''
+});
 const isEditing = ref(false);
 const deleteReason = ref('');
 const showDeleteReasonDialog = ref(false);
 const itemToDelete = ref(null);
 const selectedRequests = ref([]);
 const selectAll = ref(false);
-const isBulkPromoting = ref(false);
-const activeDayPanel = ref(0);
 
-// Salvation Availability Manager State
-const availabilityManagerVisible = ref(false);
-const manualSalvationSlots = ref([]);
-const slotsListLoading = ref(false);
-const savingSlot = ref(false);
-const isEditingSlot = ref(false);
-const editingSlotId = ref(null);
-const managerServiceType = ref('salvation');
+// Companion Console State
+const companionsDialogVisible = ref(false);
+const selectedGroup = ref(null);
+const companionsInGroup = ref([]);
+const selectedInGroup = ref([]);
+const groupSelectAll = ref(false);
 
-const newSlotForm = ref({
-  dates: [moment().add(1, 'day').format('YYYY-MM-DD')],
-  times: [],
-  max_slots: 1
-});
-
-// Common 12-hr display times for quick selection
-const commonTimes = [
-  { label: '08:00 AM', value: '08:00' },
-  { label: '09:00 AM', value: '09:00' },
-  { label: '10:00 AM', value: '10:00' },
-  { label: '11:00 AM', value: '11:00' },
-  { label: '12:00 PM', value: '12:00' },
-  { label: '01:00 PM', value: '13:00' },
-  { label: '02:00 PM', value: '14:00' },
-  { label: '03:00 PM', value: '15:00' },
-  { label: '04:00 PM', value: '16:00' },
-  { label: '05:00 PM', value: '17:00' }
-];
-
-const toggleBulkTime = (timeValue) => {
-  const idx = newSlotForm.value.times.indexOf(timeValue);
-  if (idx > -1) newSlotForm.value.times.splice(idx, 1);
-  else newSlotForm.value.times.push(timeValue);
-};
-
-const openAvailabilityManager = () => {
-  availabilityManagerVisible.value = true;
-  fetchSalvationSlots();
-};
-
-const fetchSalvationSlots = async () => {
-  slotsListLoading.value = true;
-  try {
-    const response = await axios.get('/services/salvation-availability/salvation-slots', {
-      params: { service_type: managerServiceType.value }
-    });
-    manualSalvationSlots.value = response.data.data;
-  } catch (error) {
-    console.error('Error fetching salvation slots:', error);
-    ElMessage.error('Failed to load slots');
-  } finally {
-    slotsListLoading.value = false;
-  }
-};
-
-// Group manual slots by date
-const slotsSortOrder = ref('upcoming'); // 'upcoming' or 'newest'
-
-const groupedManualSlots = computed(() => {
-  const groups = {};
-  manualSalvationSlots.value.forEach(slot => {
-    const d = slot.available_date.substring(0, 10);
-    if (!groups[d]) groups[d] = [];
-    groups[d].push(slot);
+const bulkEditVisible = ref(false);
+const bulkLoading = ref(false);
+const bulkForm = ref({ status: '', pastor_id: null, location: '', request_type: '', scheduled_date: null, notes: '' });
+const bulkFormattedSchedulePreview = computed(() => {
+  if (!bulkForm.value.scheduled_date) return '';
+  const d = new Date(bulkForm.value.scheduled_date);
+  if (isNaN(d.getTime())) return '';
+  
+  return d.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
   });
+});
+const companionEditVisible = ref(false);
+const editingCompanionIndex = ref(-1);
+const companionForm = ref({ 
+  firstname: '', 
+  lastname: '', 
+  email: '', 
+  phone_number: '', 
+  age: '', 
+  gender: '',
+  status: '',
+  pastor_id: null,
+  location: '',
+  request_type: '',
+  scheduled_date: null
+});
+const companionFormattedSchedulePreview = computed(() => {
+  if (!companionForm.value.scheduled_date) return '';
+  const d = new Date(companionForm.value.scheduled_date);
+  if (isNaN(d.getTime())) return '';
   
-  // Sort dates: Upcoming first (ASC) or Newest created/latest (DESC)
-  return Object.keys(groups)
-    .sort((a, b) => slotsSortOrder.value === 'upcoming' ? a.localeCompare(b) : b.localeCompare(a))
-    .map(date => ({
-      date,
-      slots: groups[date].sort((a,b) => a.available_time.localeCompare(b.available_time))
-    }));
+  return d.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 });
 
-const activeManualGroups = ref([]);
-const selectedManualSlotIds = ref([]);
-const isAllSlotsSelected = computed({
-  get: () => manualSalvationSlots.value.length > 0 && selectedManualSlotIds.value.length === manualSalvationSlots.value.length,
-  set: (val) => toggleSelectAllSlots(val)
+const canBulkPromote = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  // All selected must be 'Completed' to promote
+  return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Completed');
 });
 
-const toggleSelectSlot = (id) => {
-  const index = selectedManualSlotIds.value.indexOf(id);
-  if (index > -1) selectedManualSlotIds.value.splice(index, 1);
-  else selectedManualSlotIds.value.push(id);
-};
+const allSelectedArePending = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Pending');
+});
 
-const toggleSelectAllSlots = () => {
-  if (selectedManualSlotIds.value.length === manualSalvationSlots.value.length) {
-    selectedManualSlotIds.value = [];
-  } else {
-    selectedManualSlotIds.value = manualSalvationSlots.value.map(s => s.slot_id);
-  }
-};
+const canBulkPromoteMain = computed(() => {
+  if (selectedRequests.value.length === 0) return false;
+  return selectedRequests.value.every(id => {
+    const req = requests.value.find(r => r.request_id === id);
+    return req && req.status === 'Completed' && req.request_type === 'Salvation';
+  });
+});
 
-const isGroupFullySelected = (group) => {
-  return group.slots.every(s => selectedManualSlotIds.value.includes(s.slot_id));
-};
-
-const toggleSelectGroup = (group) => {
-  const groupIds = group.slots.map(s => s.slot_id);
-  const allSelected = isGroupFullySelected(group);
-  
-  if (allSelected) {
-    selectedManualSlotIds.value = selectedManualSlotIds.value.filter(id => !groupIds.includes(id));
-  } else {
-    groupIds.forEach(id => {
-      if (!selectedManualSlotIds.value.includes(id)) {
-        selectedManualSlotIds.value.push(id);
-      }
-    });
-  }
-};
-
-const bulkDeleteSalvationSlots = async () => {
-  if (selectedManualSlotIds.value.length === 0) return;
-  
+const isGroup = (item) => {
+  if (!item?.notes) return false;
   try {
-    await ElMessageBox.confirm(
-      `Are you sure you want to delete ${selectedManualSlotIds.value.length} selected slots?`,
-      'Bulk Delete',
-      {
-        confirmButtonText: 'Yes, Delete All',
-        cancelButtonText: 'Cancel',
-        type: 'error'
-      }
-    );
-    
-    savingSlot.value = true;
-    const response = await axios.post('/services/salvation-availability/bulk-delete', {
-      slotIds: selectedManualSlotIds.value,
-      service_type: managerServiceType.value
-    });
-    
-    if (response.data.success) {
-      ElMessage.success(response.data.message);
-      selectedManualSlotIds.value = [];
-      await fetchSalvationSlots();
-    }
-  } catch (err) {
-    if (err !== 'cancel') console.error(err);
-  } finally {
-    savingSlot.value = false;
+    const notesData = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    // Must have the flag AND at least one companion to show the management button
+    return !!notesData.is_group && Array.isArray(notesData.companions) && notesData.companions.length > 0;
+  } catch (e) {
+    return false;
   }
 };
 
-const deleteOneSlotId = async (id) => {
+const getCompanions = (item) => {
+  if (!item?.notes) return [];
   try {
-    await ElMessageBox.confirm('Delete this time slot permanently?', 'Confirm Delete', {
-      type: 'warning',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel'
-    });
-    const response = await axios.delete(`/services/salvation-availability/salvation-slots/${id}`, {
-      params: { service_type: managerServiceType.value }
-    });
-    if (response.data.success) {
-      ElMessage.success('Slot deleted');
-      await fetchSalvationSlots();
-    }
-  } catch (err) {}
+    const notesData = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    return notesData.companions || [];
+  } catch (e) {
+    return [];
+  }
 };
 
-const addSalvationSlot = async () => {
-  if (newSlotForm.value.dates.length === 0 || newSlotForm.value.times.length === 0) {
-    ElMessage.warning('Please select at least one date and one time');
-    return;
-  }
+const getGroupSize = (item) => {
+  return getCompanions(item).length;
+};
+
+const openCompanionsDialog = (item) => {
+  selectedGroup.value = item;
   
-  savingSlot.value = true;
-  try {
-    // If editing a single slot, we don't do bulk (though the UI should prevent it)
-    if (isEditingSlot.value) {
-      await axios.put(`/services/salvation-availability/salvation-slots/${editingSlotId.value}`, {
-        available_date: newSlotForm.value.dates[0],
-        available_time: newSlotForm.value.times[0],
-        max_slots: newSlotForm.value.max_slots || 1,
-        service_type: managerServiceType.value
-      });
-      ElMessage.success('Slot updated successfully');
-      cancelSlotEdit();
-    } else {
-      // Bulk Create
-      await axios.post('/services/salvation-availability/salvation-slots', {
-        isBulk: true,
-        dates: newSlotForm.value.dates,
-        times: newSlotForm.value.times,
-        max_slots: newSlotForm.value.max_slots || 1,
-        service_type: managerServiceType.value
-      });
-      ElMessage.success('Slots created successfully');
-      // Reset times but keep dates for convenience
-      newSlotForm.value.times = [];
-    }
-    
-    fetchSalvationSlots();
-    refreshAdminSlots();
-  } catch (error) {
-    console.error('Error saving slot:', error);
-    ElMessage.error('Failed to save slots');
-  } finally {
-    savingSlot.value = false;
-  }
-};
+  // Normalize Primary requester pastor ID
+  let primaryId = item.pastor_id;
+  if (primaryId && /^[0-9]+$/.test(primaryId)) primaryId = String(Number(primaryId));
 
-const editSlot = (slot) => {
-  isEditingSlot.value = true;
-  editingSlotId.value = slot.slot_id;
-  newSlotForm.value = {
-    dates: [moment(slot.available_date).format('YYYY-MM-DD')],
-    times: [slot.available_time.substring(0, 5)],
-    max_slots: slot.max_slots
+  const primary = {
+    firstname: item.firstname,
+    lastname: item.lastname,
+    email: item.email,
+    phone_number: item.phone_number || '',
+    age: item.age,
+    gender: item.gender,
+    type: 'primary',
+    status: item.status,
+    pastor_id: primaryId,
+    location: item.location,
+    address: item.address, // Capture home address
+    request_type: item.request_type,
+    scheduled_date: item.scheduled_date
   };
-  // Scroll to top of creator form
-  const el = document.querySelector('.availability-creator');
-  if (el) el.scrollIntoView({ behavior: 'smooth' });
+
+  // Map Companions
+  const companions = getCompanions(item).map(c => {
+    const isPending = (c.status || 'Pending') === 'Pending';
+    let pId = c.pastor_id || item.pastor_id;
+    // Normalize pastor_id
+    if (pId && /^[0-9]+$/.test(pId)) pId = String(Number(pId));
+
+    return {
+      ...c,
+      type: 'companion',
+      status: c.status || 'Pending',
+      scheduled_date: c.scheduled_date || item.scheduled_date,
+      pastor_id: isPending ? (c.pastor_id || null) : pId,
+      location: c.location || item.location,
+      address: c.address || item.address, // Inherit lead address if companion has none
+      request_type: c.request_type || item.request_type
+    };
+  });
+
+  companionsInGroup.value = [primary, ...companions];
+  selectedInGroup.value = [];
+  groupSelectAll.value = false;
+  companionsDialogVisible.value = true;
 };
 
-const cancelSlotEdit = () => {
-  isEditingSlot.value = false;
-  editingSlotId.value = null;
-  newSlotForm.value = {
-    dates: [moment().add(1, 'day').format('YYYY-MM-DD')],
-    times: [],
-    max_slots: 1
+const openBulkEdit = () => {
+  if (selectedInGroup.value.length === 0) return;
+  
+  const selectedPeople = selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
+  
+  // Helper to find common value if all items share it
+  const getCommon = (key) => {
+    const values = selectedPeople.map(p => p[key]);
+    const first = values[0];
+    const allSame = values.every(v => v === first);
+    return allSame ? first : null;
   };
+
+  bulkForm.value = { 
+    status: getCommon('status') || '', 
+    pastor_id: getCommon('pastor_id') || null,
+    location: getCommon('location') || '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite', 
+    request_type: getCommon('request_type') || '', 
+    scheduled_date: getCommon('scheduled_date') || null,
+    notes: '' 
+  };
+
+  // Normalize Pastor ID
+  if (bulkForm.value.pastor_id !== null && bulkForm.value.pastor_id !== undefined) {
+    bulkForm.value.pastor_id = String(bulkForm.value.pastor_id).replace(/^0+/, '');
+    if (bulkForm.value.pastor_id === '') bulkForm.value.pastor_id = null;
+  }
+  
+  bulkEditVisible.value = true;
+  fetchAvailableSlots();
 };
 
-const deleteSalvationSlot = async (id) => {
+const applyBulkEdit = async () => {
+  bulkLoading.value = true;
   try {
-    await ElMessageBox.confirm(
-      'Are you sure you want to delete this time slot? This cannot be undone.', 
-      'Delete Confirmation', 
-      {
-        confirmButtonText: 'Yes, Delete',
-        cancelButtonText: 'No, Keep',
-        type: 'warning',
-        confirmButtonClass: 'bg-error'
+    selectedInGroup.value.forEach(idx => {
+      const person = companionsInGroup.value[idx];
+      
+      if (bulkForm.value.status) {
+        if (person.type === 'primary') {
+          companionsInGroup.value[idx].status = bulkForm.value.status === 'Approved' ? 'Scheduled' : 
+                                               bulkForm.value.status === 'Rejected' ? 'Cancelled' : 
+                                               bulkForm.value.status;
+        } else {
+          companionsInGroup.value[idx].status = bulkForm.value.status;
+        }
+
+        // Rule: If status is Pending, clear the pastor
+        if (companionsInGroup.value[idx].status === 'Pending') {
+          companionsInGroup.value[idx].pastor_id = null;
+        }
       }
-    );
-    
-    await axios.delete(`/services/salvation-availability/salvation-slots/${id}`, {
-      params: { service_type: managerServiceType.value }
+      
+      if (bulkForm.value.pastor_id !== null) {
+        companionsInGroup.value[idx].pastor_id = bulkForm.value.pastor_id;
+      }
+      if (bulkForm.value.location && bulkForm.value.location.trim() !== '') {
+        companionsInGroup.value[idx].location = bulkForm.value.location;
+      }
+      if (bulkForm.value.request_type) {
+        companionsInGroup.value[idx].request_type = bulkForm.value.request_type;
+      }
+      if (bulkForm.value.scheduled_date) {
+        companionsInGroup.value[idx].scheduled_date = bulkForm.value.scheduled_date;
+      }
+      if (bulkForm.value.notes && bulkForm.value.notes.trim() !== '') {
+        companionsInGroup.value[idx].notes = bulkForm.value.notes;
+      }
     });
-    ElMessage.success('Slot deleted');
-    fetchSalvationSlots();
-    refreshAdminSlots();
+
+    const success = await saveCompanionsUpdate();
+    if (success) {
+      bulkEditVisible.value = false;
+      selectedInGroup.value = [];
+      groupSelectAll.value = false;
+      ElMessage.success('Bulk updates applied successfully');
+    }
+  } catch (e) {
+    console.error('Apply Bulk Edit error:', e);
+  } finally {
+    bulkLoading.value = false;
+  }
+};
+
+const bulkPromoteToBibleStudy = () => {
+  if (selectedInGroup.value.length === 0) return;
+  
+  // Find first selected to use as reference for location etc
+  const firstIdx = selectedInGroup.value[0];
+  const person = companionsInGroup.value[firstIdx];
+  
+  bibleStudyItem.value = person; // Use first person as representative for item details in dialog
+  isBulkPromotion.value = true;
+  isPromotionScheduling.value = false;
+  bibleStudyDialogVisible.value = true;
+  
+  promotionForm.value = {
+    pastor_id: person.pastor_id ? String(person.pastor_id).replace(/^0+/, '') : null,
+    location: person.address || person.location || '', // Prioritize home address
+    scheduled_date: '',
+    notes: person.notes || '' 
+  };
+
+  fetchSlotsForBibleStudy();
+};
+
+const bulkPromoteToBibleStudyMain = () => {
+  if (selectedRequests.value.length === 0) return;
+  
+  const firstId = selectedRequests.value[0];
+  const req = requests.value.find(r => r.request_id === firstId);
+  
+  bibleStudyItem.value = req;
+  isBulkPromotion.value = true;
+  isPromotionScheduling.value = false;
+  bibleStudyDialogVisible.value = true;
+  
+  promotionForm.value = {
+    pastor_id: req.pastor_id ? String(req.pastor_id).replace(/^0+/, '') : null,
+    location: req.address || req.location || '', // Prioritize home address for promotion
+    scheduled_date: '',
+    notes: req.notes || ''
+  };
+
+  fetchSlotsForBibleStudy();
+};
+
+const editCompanionDetails = (idx) => {
+  editingCompanionIndex.value = idx;
+  const person = companionsInGroup.value[idx];
+  companionForm.value = { ...person };
+  
+  // Force Pastor ID to String for perfect v-select label matching
+  if (companionForm.value.pastor_id !== null && companionForm.value.pastor_id !== undefined) {
+    companionForm.value.pastor_id = String(companionForm.value.pastor_id).replace(/^0+/, '');
+    if (companionForm.value.pastor_id === '') companionForm.value.pastor_id = null;
+  }
+  
+  companionEditVisible.value = true;
+  fetchAvailableSlots();
+};
+
+const saveCompanionEdit = async () => {
+  if (editingCompanionIndex.value === -1) return;
+  
+  companionsInGroup.value[editingCompanionIndex.value] = {
+    ...companionsInGroup.value[editingCompanionIndex.value],
+    ...companionForm.value
+  };
+
+  // Rule: If status is Pending, clear the pastor
+  if (companionsInGroup.value[editingCompanionIndex.value].status === 'Pending') {
+    companionsInGroup.value[editingCompanionIndex.value].pastor_id = null;
+  }
+  
+  await saveCompanionsUpdate();
+  companionEditVisible.value = false;
+  ElMessage.success('Participant details updated');
+};
+
+const promoteCompanion = (idx) => {
+  const person = companionsInGroup.value[idx];
+  if (person.status !== 'Completed') return;
+  
+  bibleStudyItem.value = person;
+  isBulkPromotion.value = false;
+  isPromotionScheduling.value = false;
+  bibleStudyDialogVisible.value = true;
+  
+  promotionForm.value = {
+    pastor_id: null,
+    location: person.location || person.address || '',
+    scheduled_date: '',
+    notes: ''
+  };
+
+  fetchSlotsForBibleStudy();
+};
+
+const removeCompanionFromGroup = async (idx) => {
+  const person = companionsInGroup.value[idx];
+  if (person.type === 'primary') return;
+  
+  try {
+    await ElMessageBox.confirm(`Remove ${person.firstname} from this group? This action only removes them from the companion list.`, 'Remove Participant');
+    companionsInGroup.value.splice(idx, 1);
+    await saveCompanionsUpdate();
+    // After splice, we should clear selections as indices changed
+    selectedInGroup.value = [];
+    groupSelectAll.value = false;
+    ElMessage.success('Participant removed from group');
   } catch (e) {}
 };
 
-const formatDateManual = (d) => moment(d).format('MMM DD, YYYY');
-const formatTimeManual = (t) => moment(t, 'HH:mm:ss').format('h:mm A');
+const getStatusDisplayColor = (status) => {
+  if (['Approved', 'Scheduled', 'Completed'].includes(status)) return 'success';
+  if (['Rejected', 'Cancelled'].includes(status)) return 'error';
+  return 'warning';
+};
 
-const refreshAdminSlots = () => {
-  if (typeof fetchAvailableSlots === 'function') {
-    fetchAvailableSlots();
+const getStatusDisplayText = (status) => {
+  if (status === 'Cancelled') return 'Rejected';
+  if (status === 'Scheduled') return 'Scheduled';
+  return status || 'Pending';
+};
+
+const toggleGroupSelectAll = (val) => {
+  if (val) {
+    selectedInGroup.value = companionsInGroup.value.map((_, idx) => idx);
+  } else {
+    selectedInGroup.value = [];
+  }
+};
+
+const updateCompanionStatus = async (index, newStatus) => {
+  companionsInGroup.value[index].status = newStatus;
+  await saveCompanionsUpdate();
+};
+
+const bulkActionInGroup = async (newStatus) => {
+  try {
+    const actionLabel = newStatus === 'Approved' ? 'Approve' : 'Reject';
+    
+    // Check if scheduling requirements are met for primary if approving
+    if (newStatus === 'Approved') {
+      const primaryIdx = companionsInGroup.value.findIndex(p => p.type === 'primary');
+      if (primaryIdx !== -1) {
+        const primary = companionsInGroup.value[primaryIdx];
+        if (!primary.scheduled_date || !primary.pastor_id) {
+          await ElMessageBox.alert(
+            'The group leader must have an assigned pastor and schedule before you can mark the group as Scheduled.',
+            'Schedule Required',
+            { type: 'warning' }
+          );
+          return;
+        }
+      }
+    }
+
+    await ElMessageBox.confirm(`Apply "${actionLabel}" status to ${selectedInGroup.value.length} selected participants?`, 'Bulk Action');
+    
+    selectedInGroup.value.forEach(idx => {
+      const person = companionsInGroup.value[idx];
+      if (person.type === 'primary') {
+        companionsInGroup.value[idx].status = newStatus === 'Approved' ? 'Scheduled' : 'Cancelled';
+      } else {
+        companionsInGroup.value[idx].status = newStatus;
+      }
+    });
+    
+    await saveCompanionsUpdate();
+    selectedInGroup.value = [];
+    groupSelectAll.value = false;
+    ElMessage.success(`Participants updated successfully`);
+  } catch (e) {
+    if (e !== 'cancel') console.error('Bulk Action error:', e);
+  }
+};
+
+const saveCompanionsUpdate = async () => {
+  if (!selectedGroup.value) return;
+  
+  try {
+    const primaryEntry = companionsInGroup.value.find(p => p.type === 'primary');
+    const companionEntries = companionsInGroup.value.filter(p => p.type === 'companion');
+
+    // Robust JSON parsing for notes
+    let currentNotes = {};
+    try {
+      const rawNotes = selectedGroup.value.notes;
+      currentNotes = typeof rawNotes === 'string' 
+        ? (rawNotes.startsWith('{') ? JSON.parse(rawNotes) : { text: rawNotes }) 
+        : (rawNotes || {});
+    } catch (e) {
+      console.warn('Failed to parse notes as JSON');
+    }
+    
+    currentNotes.companions = companionEntries.map(({ type, ...rest }) => rest);
+    currentNotes.is_group = true;
+    currentNotes.group_size = companionEntries.length + 1;
+
+    const updatePayload = {
+      notes: currentNotes
+    };
+
+    if (primaryEntry) {
+      updatePayload.status = primaryEntry.status;
+      updatePayload.pastor_id = primaryEntry.pastor_id;
+      updatePayload.location = primaryEntry.location;
+      updatePayload.request_type = primaryEntry.request_type;
+      updatePayload.scheduled_date = primaryEntry.scheduled_date;
+    }
+    
+    const success = await store.updateRequest(selectedGroup.value.request_id, updatePayload);
+    
+    if (success) {
+      // Sync local state so it reflects in the UI immediately
+      selectedGroup.value.notes = JSON.stringify(currentNotes);
+      if (updatePayload.status) selectedGroup.value.status = updatePayload.status;
+      if (updatePayload.pastor_id) selectedGroup.value.pastor_id = updatePayload.pastor_id;
+      if (updatePayload.location) selectedGroup.value.location = updatePayload.location;
+      if (updatePayload.request_type) selectedGroup.value.request_type = updatePayload.request_type;
+      if (updatePayload.scheduled_date) selectedGroup.value.scheduled_date = updatePayload.scheduled_date;
+      
+      // Update the main requests list too
+      const idx = requests.value.findIndex(r => r.request_id === selectedGroup.value.request_id);
+      if (idx !== -1) {
+        requests.value[idx] = { ...requests.value[idx], ...updatePayload, notes: JSON.stringify(currentNotes) };
+      }
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Save companions error:', error);
+    ElMessage.error('Failed to update group information');
+    return false;
   }
 };
 
@@ -1322,66 +1707,6 @@ const scheduleHelperText = computed(() => {
 const clearSelection = () => {
   selectedRequests.value = [];
   selectAll.value = false;
-};
-
-const isGroup = (item) => {
-  if (!item.notes) return false;
-  try {
-     const notesObj = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
-     if (typeof notesObj !== 'object' || notesObj === null) return false;
-     return !!(notesObj.group_id || (notesObj.notes && typeof notesObj.notes === 'object' && notesObj.notes.group_id));
-  } catch (e) { return false; }
-};
-
-const getGroupColor = (item) => {
-  if (!item.notes) return '#0d9488';
-  try {
-     const notesObj = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
-     if (typeof notesObj !== 'object' || notesObj === null) return '#0d9488';
-     
-     const groupId = notesObj.group_id || (notesObj.notes && typeof notesObj.notes === 'object' ? notesObj.notes.group_id : null);
-     if (!groupId) return '#0d9488';
-     let hash = 0;
-     for (let i = 0; i < groupId.length; i++) {
-        hash = groupId.charCodeAt(i) + ((hash << 5) - hash);
-     }
-     const colors = ['#059669', '#2563eb', '#dc2626', '#d97706', '#7c3aed', '#0891b2', '#c026d3', '#be123c', '#4f46e5'];
-     return colors[Math.abs(hash) % colors.length];
-  } catch (e) { return '#0d9488'; }
-};
-
-const isBulkEditing = ref(false);
-
-const openBulkUpdateDialog = () => {
-  if (!selectedRequests.value.length) {
-    ElMessage.warning('No requests selected');
-    return;
-  }
-  isBulkEditing.value = true;
-  isEditing.value = true;
-  
-  const firstId = selectedRequests.value[0];
-  const firstItem = requests.value.find(r => r.request_id === firstId) || {};
-
-  selectedRequest.value = {
-    request_id: null,
-    status: firstItem.status || 'Scheduled',
-    request_type: firstItem.request_type || 'Salvation',
-    scheduled_date: firstItem.scheduled_date || '',
-    location: '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
-    // Coerce pastor_id to number if numeric, to match v-select item-value type
-    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id) : null,
-    notes: firstItem.notes || ''
-  };
-  
-  // Ensure notes is a string and not [object Object]
-  if (typeof selectedRequest.value.notes === 'object' && selectedRequest.value.notes !== null) {
-    selectedRequest.value.notes = JSON.stringify(selectedRequest.value.notes);
-  } else if (selectedRequest.value.notes === null || selectedRequest.value.notes === undefined) {
-    selectedRequest.value.notes = '';
-  }
-
-  dialogVisible.value = true;
 };
 
 // Bulk complete selected requests
@@ -1476,6 +1801,28 @@ watch(() => selectedRequest.value?.birthdate, (newDate) => {
   }
 }, { deep: true });
 
+// Handle status changes across different forms
+const handleBulkStatusChange = (val) => {
+  if (val === 'Pending') {
+    bulkForm.value.pastor_id = null;
+    bulkForm.value.scheduled_date = null;
+  }
+};
+
+const handleIndividualStatusChange = (val) => {
+  if (val === 'Pending') {
+    selectedRequest.value.pastor_id = null;
+    selectedRequest.value.scheduled_date = null;
+  }
+};
+
+const handleCompanionStatusChange = (val) => {
+  if (val === 'Pending') {
+    companionForm.value.pastor_id = null;
+    companionForm.value.scheduled_date = null;
+  }
+};
+
 const formattedSchedulePreview = computed(() => {
   if (!selectedRequest.value.scheduled_date) return '';
   const d = new Date(selectedRequest.value.scheduled_date);
@@ -1523,170 +1870,8 @@ const handleFilter = (val) => {
     store.setFilters({ status: val });
 };
 
-const handleDateRangeChange = (val) => {
-    if (val && val.length === 2) {
-        store.setFilters({ startDate: val[0], endDate: val[1] });
-    } else {
-        store.setFilters({ startDate: null, endDate: null });
-    }
-};
-
 const handlePageChange = (page) => {
-    store.setPage(page);
-};
-
-const handlePrint = () => {
-  const printWindow = window.open('', '_blank');
-  const tableHeaders = ['Name', 'Type', 'Email', 'Request Type', 'Status', 'Schedule', 'Created'];
-  const logoUrl = window.location.origin + '/logo.png';
-  
-  // Get current user info for printed by
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const printedBy = userInfo?.member 
-    ? `${userInfo.member.firstname || ''} ${userInfo.member.lastname || ''}`.trim()
-    : 'Admin';
-    
-  const tableRows = requests.value.map(item => `
-    <tr>
-      <td><strong>${item.firstname} ${item.lastname}</strong></td>
-      <td>${isGroup(item) ? 'GROUP' : 'SOLO'}</td>
-      <td>${item.email}</td>
-      <td>${item.request_type}</td>
-      <td>${item.status}</td>
-      <td>${item.scheduled_date ? moment(item.scheduled_date).format('MMM DD, YYYY hh:mm A') : 'Not Scheduled'}</td>
-      <td>${moment(item.date_created).format('MMM DD, YYYY')}</td>
-    </tr>
-  `).join('');
-
-  const currentDate = new Date().toLocaleString();
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Salvation Requests Report - Print</title>
-        <style>
-          @media print {
-            @page { margin: 1cm; }
-          }
-          body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            position: relative;
-          }
-          .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            opacity: 0.08;
-            z-index: -1;
-            pointer-events: none;
-          }
-          .watermark img {
-            width: 100%;
-            height: auto;
-          }
-          .org-name {
-             text-align: center;
-             color: #1a365d;
-             font-weight: bold;
-             font-size: 22px;
-             margin-bottom: 20px;
-             margin-top: 10px;
-           }
-           .church-header {
-             display: flex;
-             align-items: center;
-             justify-content: center;
-             margin-bottom: 15px;
-           }
-           .church-header img {
-             width: 50px;
-             height: 50px;
-             margin-right: 15px;
-           }
-           .report-title {
-             text-align: center;
-             font-size: 18px;
-             color: #333;
-             margin-bottom: 20px;
-             font-weight: bold;
-           }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-          }
-          th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-            font-size: 11px;
-          }
-          th {
-            background-color: #1a365d;
-            color: white;
-            font-weight: bold;
-          }
-          tr:nth-child(even) {
-            background-color: #f9f9f9;
-          }
-          .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: #666;
-          }
-          .footer-info {
-            text-align: right;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="watermark">
-          <img src="${logoUrl}" alt="Watermark" />
-        </div>
-        <div class="church-header">
-          <img src="${logoUrl}" alt="Church Logo" />
-          <div class="org-name">Bible Baptist Ekklesia of Kawit</div>
-        </div>
-        <div class="report-title">Salvation Requests Activity Report</div>
-        <table>
-          <thead>
-            <tr>
-              ${tableHeaders.map(header => `<th>${header}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows || '<tr><td colspan="' + tableHeaders.length + '" style="text-align: center;">No records found</td></tr>'}
-          </tbody>
-        </table>
-        <div class="footer">
-          <div>Total Records: ${requests.value.length}</div>
-          <div class="footer-info">
-            <div>Printed on: ${currentDate}</div>
-            <div>Printed by: ${printedBy}</div>
-          </div>
-        </div>
-      </body>
-    </html>
-  `);
-  
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 500);
-};
-
-const handleExportExcel = async (format = 'xlsx') => {
-    await store.exportToExcel({ ...store.filters, format });
+  store.setPage(page);
 };
 
 const getRequestTypeColor = (type) => {
@@ -1720,7 +1905,6 @@ const formatDateTime = (date) => {
 
 const openAddDialog = () => {
   isEditing.value = false;
-  isBulkEditing.value = false;
   selectedRequest.value = {
     firstname: '',
     lastname: '',
@@ -1728,6 +1912,7 @@ const openAddDialog = () => {
     phone_number: '',
     request_type: 'Salvation',
     status: 'Pending',
+    pastor_id: null,
     scheduled_date: '',
     location: '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite',
     notes: ''
@@ -1737,13 +1922,15 @@ const openAddDialog = () => {
 
 const openScheduleDialog = (item) => {
   isEditing.value = true;
-  isBulkEditing.value = false;
   selectedRequest.value = { ...item };
-  // Coerce pastor_id to number if numeric, to match v-select item-value type
-  const pid = item.pastor_id;
-  selectedRequest.value.pastor_id = pid ? String(pid) : null;
   
-  // Default location to church address if blank
+  // Force Pastor ID to String for perfect v-select label matching
+  if (selectedRequest.value.pastor_id !== null && selectedRequest.value.pastor_id !== undefined) {
+    selectedRequest.value.pastor_id = String(selectedRequest.value.pastor_id).replace(/^0+/, '');
+    if (selectedRequest.value.pastor_id === '') selectedRequest.value.pastor_id = null;
+  }
+  
+  // Default location to church address if blank for Salvation Talk
   if (!selectedRequest.value.location) {
     selectedRequest.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
   }
@@ -1762,8 +1949,14 @@ const openScheduleDialog = (item) => {
 const fetchAvailableSlots = async (days = 7) => {
   try {
     slotsLoading.value = true;
+    
+    // Determine which service type to use based on the active dialog
+    const service = bulkEditVisible.value ? (bulkForm.value.request_type || 'Salvation') :
+                   companionEditVisible.value ? (companionForm.value.request_type || 'Salvation') :
+                   (selectedRequest.value?.request_type || 'Salvation');
+
     const response = await axios.get('/services/discipleship-requests/available-slots', {
-      params: { days, service: selectedRequest.value?.request_type || 'Salvation' }
+      params: { days, service }
     });
     
     if (response.data.success) {
@@ -1779,11 +1972,34 @@ const fetchAvailableSlots = async (days = 7) => {
 
 // Select an available slot
 const selectAvailableSlot = (date, time) => {
-  // Add seconds if not present so el-date-picker handles it correctly
-  const fullTime = time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time;
-  selectedRequest.value.scheduled_date = `${date} ${fullTime}`;
-  selectedSlotDisplay.value = formatSlotDisplay(date, fullTime);
-  ElMessage.success('Slot selected! Date and time have been filled.');
+  const finalDatetime = `${date} ${time}`;
+  if (bulkEditVisible.value) {
+    bulkForm.value.scheduled_date = finalDatetime;
+    // Auto-update status to Scheduled if it's currently Pending or blank
+    if (!bulkForm.value.status || bulkForm.value.status === 'Pending') {
+      bulkForm.value.status = 'Scheduled';
+    }
+    selectedSlotDisplay.value = formatSlotDisplay(date, time);
+    return;
+  }
+
+  if (companionEditVisible.value) {
+    companionForm.value.scheduled_date = finalDatetime;
+    if (!companionForm.value.status || companionForm.value.status === 'Pending') {
+      companionForm.value.status = 'Scheduled';
+    }
+    selectedSlotDisplay.value = formatSlotDisplay(date, time);
+    return;
+  }
+  
+  selectedRequest.value.scheduled_date = finalDatetime;
+  // Auto-update status for individual request
+  if (selectedRequest.value.status === 'Pending' || !selectedRequest.value.status) {
+    selectedRequest.value.status = 'Scheduled';
+  }
+  
+  selectedSlotDisplay.value = formatSlotDisplay(date, time);
+  ElMessage.success('Slot selected! Schedule and status updated.');
 };
 
 // Format slot for display
@@ -1811,42 +2027,23 @@ const formatDate = (dateStr) => {
 
 // Check if slot is selected
 const isSlotSelected = (datetime) => {
-  if (!selectedRequest.value.scheduled_date) return false;
+  if (bulkEditVisible.value) {
+     return bulkForm.value.scheduled_date === datetime;
+  }
+  if (companionEditVisible.value) {
+     return companionForm.value.scheduled_date === datetime;
+  }
   return selectedRequest.value.scheduled_date === datetime;
 };
 
 // Watch dialog visibility to fetch slots when it opens
 watch(dialogVisible, async (isOpen) => {
   if (isOpen) {
-    fetchAvailableSlots(60);
+    fetchAvailableSlots(7);
   }
 });
 
 const saveUpdate = async () => {
-  if (isBulkEditing.value) {
-    let successCount = 0;
-    
-    for (const id of selectedRequests.value) {
-      const updatePayload = {
-        status: selectedRequest.value.status,
-        request_type: selectedRequest.value.request_type,
-        scheduled_date: selectedRequest.value.scheduled_date,
-        pastor_id: selectedRequest.value.pastor_id,
-        location: selectedRequest.value.location
-      };
-      
-      const success = await store.updateRequest(id, updatePayload);
-      if (success) successCount++;
-    }
-    
-    if (successCount > 0) {
-      ElMessage.success(`Successfully bulk updated ${successCount} request(s)`);
-      dialogVisible.value = false;
-      clearSelection();
-    }
-    return;
-  }
-
   if (!isEditing.value) {
     if (!selectedRequest.value.firstname || !selectedRequest.value.lastname || !selectedRequest.value.email) {
       ElMessage.warning('Please fill in required fields (Name and Email)');
@@ -1857,6 +2054,11 @@ const saveUpdate = async () => {
         dialogVisible.value = false;
     }
   } else {
+    // Rule: If status is Pending, clear the pastor
+    if (selectedRequest.value.status === 'Pending') {
+      selectedRequest.value.pastor_id = null;
+    }
+
     const success = await store.updateRequest(selectedRequest.value.request_id, {
       firstname: selectedRequest.value.firstname,
       lastname: selectedRequest.value.lastname,
@@ -1864,6 +2066,7 @@ const saveUpdate = async () => {
       request_type: selectedRequest.value.request_type,
       status: selectedRequest.value.status,
       scheduled_date: selectedRequest.value.scheduled_date,
+      notes: selectedRequest.value.notes,
       pastor_id: selectedRequest.value.pastor_id,
       location: selectedRequest.value.location
     });
@@ -1877,53 +2080,35 @@ const saveUpdate = async () => {
 
 
 
-// ── Bible Study promotion ────────────────────────────────
-const openBulkPromoteDialog = () => {
-  if (selectedRequests.value.length === 0) {
-    ElMessage.warning('No requests selected');
-    return;
-  }
-  
-  isBulkPromoting.value = true;
-  bibleStudyItem.value = null;
-  bibleStudyDialogVisible.value = true;
-  isPromotionScheduling.value = false;
-  
-  const firstId = selectedRequests.value[0];
-  const firstItem = requests.value.find(r => r.request_id === firstId) || {};
-  
-  promotionForm.value = {
-    pastor_id: null,
-    location: firstItem.address || firstItem.location || '',
-    scheduled_date: '',
-    notes: ''
-  };
-
-  fetchSlotsForBibleStudy();
-};
-
-const isPromotionScheduling = ref(false);
-const promotionForm = ref({
-  pastor_id: null,
-  location: '',
-  scheduled_date: '',
-  notes: ''
-});
 
 const openBibleStudyDialog = (item) => {
-  isBulkPromoting.value = false;
   bibleStudyItem.value = item;
   bibleStudyDialogVisible.value = true;
   isPromotionScheduling.value = false;
   
   promotionForm.value = {
-    pastor_id: null,
+    pastor_id: item.pastor_id ? String(item.pastor_id).replace(/^0+/, '') : null,
     location: item.address || item.location || '',
     scheduled_date: '',
-    notes: ''
+    notes: item.notes || ''
   };
+  if (promotionForm.value.pastor_id === '') promotionForm.value.pastor_id = null;
 
   fetchSlotsForBibleStudy();
+};
+
+const isBibleStudyInvited = (item) => {
+  if (!item?.notes) return false;
+  try {
+    const notes = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    return typeof notes === 'object' && notes !== null && !!notes.bible_study_invited;
+  } catch {
+    // Fallback if not valid JSON: Check if the string contains the invited flag substring
+    if (typeof item.notes === 'string') {
+      return item.notes.includes('"bible_study_invited":true') || item.notes.includes("'bible_study_invited':true");
+    }
+    return false;
+  }
 };
 
 const fetchSlotsForBibleStudy = async () => {
@@ -1979,104 +2164,149 @@ const formatSelectedSchedule = (dateTimeStr) => {
 };
 
 const handleBibleStudyAction = async (isDecided) => {
-  // Check if we have items to promote
-  if (!isBulkPromoting.value && !bibleStudyItem.value) return;
+  if (!isBulkPromotion.value && !bibleStudyItem.value) return;
 
-  // If decided and we haven't shown the scheduling form yet, show it
   if (isDecided && !isPromotionScheduling.value) {
     isPromotionScheduling.value = true;
-    
-    // Default location to church address if not set
-    if (!promotionForm.value.location) {
-        promotionForm.value.location = '485 Acacia St. Villa Ramirez Tabon 1, Kawit Cavite';
-    }
     return;
-  }
-
-  // Validate for scheduling
-  if (isDecided && isPromotionScheduling.value) {
-      if (!promotionForm.value.pastor_id) {
-          ElMessage.warning('Please select an assigned pastor');
-          return;
-      }
-      if (!promotionForm.value.scheduled_date) {
-          ElMessage.warning('Please select a schedule');
-          return;
-      }
   }
 
   loadingBibleStudy.value = true;
   try {
-    let promotePayload = {};
-    if (isDecided) {
-        // Extract group_id if exists
-        let groupId = null;
-        if (bibleStudyItem.value && bibleStudyItem.value.notes) {
-            try {
-                const existingNotes = typeof bibleStudyItem.value.notes === 'string' ? JSON.parse(bibleStudyItem.value.notes) : bibleStudyItem.value.notes;
-                if (existingNotes && existingNotes.group_id) groupId = existingNotes.group_id;
-            } catch (e) {}
-        }
+    if (isBulkPromotion.value) {
+      const isMainTable = selectedRequests.value.length > 0 && selectedInGroup.value.length === 0;
+      const targets = isMainTable 
+        ? selectedRequests.value.map(id => requests.value.find(r => r.request_id === id))
+        : selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
 
-        // Create a JSON object for notes if we have a group_id
-        // But only if we are actually promoting a group (more than 1 person)
-        // If it's just one person, we break them out of the group to be solo for Bible Study
-        let finalNotes = promotionForm.value.notes;
-        const isActuallyGroup = isBulkPromoting.value ? selectedRequests.value.length > 1 : false;
-        
-        if (groupId && isActuallyGroup) {
-            finalNotes = JSON.stringify({
-                notes: promotionForm.value.notes,
-                group_id: groupId
-            });
-        }
+      if (targets.length === 0) return;
 
-        promotePayload = {
-            ...promotionForm.value,
-            notes: finalNotes,
-            isDecided: true
-        };
-    } else {
-        promotePayload = { isDecided: false };
-    }
-    
-    if (isBulkPromoting.value) {
+      // 1. Prepare Group Logic
+      const isConsoleBulk = !isMainTable;
+      const lead = isConsoleBulk ? selectedGroup.value : targets[0];
+      const leadId = lead.request_id;
+      
+      let companions = [];
+      
+      if (isConsoleBulk) {
+        // From Companion Console: Use existing companions, but update their status to match lead if selected
+        companions = getCompanions(lead).map(c => {
+          const isSelected = selectedInGroup.value.some(idx => {
+            const p = companionsInGroup.value[idx];
+            return p.type === 'companion' && p.email === c.email;
+          });
+          
+          if (isSelected) {
+            return { 
+              ...c, 
+              status: isDecided ? 'Scheduled' : 'Promoted',
+              pastor_id: promotionForm.value.pastor_id,
+              location: promotionForm.value.location,
+              scheduled_date: promotionForm.value.scheduled_date
+            };
+          }
+          return c;
+        });
+      }
+
+      // Group notes only used in Consolidation (Decided) path for console
+      const groupNotes = {
+        is_group: companions.length > 0,
+        group_size: companions.length + 1,
+        companions: companions
+      };
+
+      // 3. Promote/Invite targets
       let successCount = 0;
-      for (const id of selectedRequests.value) {
-        const item = requests.value.find(r => r.request_id === id);
-        let currentGroupId = null;
-        if (item && item.notes) {
-            try {
-                const existingNotes = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
-                if (existingNotes && existingNotes.group_id) currentGroupId = existingNotes.group_id;
-            } catch (e) {}
+      
+      if (!isDecided) {
+        // INVITATIONS: Always individual so each person gets their own form link
+        for (const target of targets) {
+          let tId = target.request_id || (isMainTable ? target.request_id : selectedGroup.value.request_id);
+          const tPayload = { 
+            firstname: target.firstname,
+            lastname: target.lastname,
+            email: target.email,
+            isDecided: false 
+          };
+          const ok = await store.promoteToBibleStudy(tId, tPayload);
+          if (ok) successCount++;
         }
-
-        let bulkFinalNotes = promotionForm.value.notes;
-        if (currentGroupId && selectedRequests.value.length > 1) {
-            bulkFinalNotes = JSON.stringify({
-                notes: promotionForm.value.notes,
-                group_id: currentGroupId
-            });
+      } else {
+        // SCHEDULING: 
+        if (!isMainTable) {
+          // 1. Console Bulk: Multiple people from ONE group selected
+          // Merge them into one Bible Study group record
+          const leadPayload = { 
+            ...promotionForm.value, 
+            notes: JSON.stringify(groupNotes),
+            isDecided: true 
+          };
+          const ok = await store.promoteToBibleStudy(leadId, leadPayload);
+          if (ok) successCount = targets.length;
+        } else {
+          // 2. Main Table Bulk: Multiple PRIMARY requesters selected
+          // Promote EACH one as their own record (which carries their own companions)
+          for (const target of targets) {
+            const tPayload = { 
+              ...promotionForm.value, 
+              isDecided: true 
+            };
+            const ok = await store.promoteToBibleStudy(target.request_id, tPayload);
+            if (ok) successCount++;
+          }
         }
-
-        const success = await store.promoteToBibleStudy(id, { ...promotePayload, notes: bulkFinalNotes });
-        if (success) successCount++;
       }
       
       if (successCount > 0) {
-        ElMessage.success(`Successfully promoted ${successCount} candidates to Bible Study`);
-        bibleStudyDialogVisible.value = false;
-        isPromotionScheduling.value = false;
-        clearSelection();
+        if (isMainTable) {
+          clearSelection();
+        } else {
+          // Only update local status to Promoted when admin has confirmed scheduling.
+          // Sending an invitation link (isDecided=false) should leave the status unchanged.
+          if (isDecided) {
+            targets.forEach(t => {
+              const idx = companionsInGroup.value.findIndex(p => p.email === t.email);
+              if (idx !== -1) companionsInGroup.value[idx].status = 'Promoted';
+            });
+            await saveCompanionsUpdate();
+          }
+          selectedInGroup.value = [];
+          groupSelectAll.value = false;
+        }
+        ElMessage.success(`${isDecided ? 'Group promoted' : 'Invitations sent'} successfully!`);
       }
     } else {
-      const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, promotePayload);
-      if (success) {
-        bibleStudyDialogVisible.value = false;
-        isPromotionScheduling.value = false;
+      // Single Promotion (Check if it's a group already)
+      let payload = { ...promotionForm.value, isDecided };
+      
+      if (!isDecided) {
+         payload = { 
+            firstname: bibleStudyItem.value.firstname,
+            lastname: bibleStudyItem.value.lastname,
+            email: bibleStudyItem.value.email,
+            isDecided: false 
+         };
+      }
+
+      const success = await store.promoteToBibleStudy(bibleStudyItem.value.request_id, payload);
+      
+      if (success && isDecided && !isMainTable && companionsDialogVisible.value) {
+        const compIdx = companionsInGroup.value.findIndex(p => p.email === bibleStudyItem.value.email);
+        if (compIdx !== -1) {
+          companionsInGroup.value[compIdx].status = 'Promoted';
+          await saveCompanionsUpdate();
+        }
       }
     }
+    
+    bibleStudyDialogVisible.value = false;
+    isPromotionScheduling.value = false;
+    isBulkPromotion.value = false;
+    store.fetchRequests();
+  } catch (error) {
+    console.error('Promotion error:', error);
+    ElMessage.error(error.message || 'An error occurred during promotion');
   } finally {
     loadingBibleStudy.value = false;
   }
@@ -2158,6 +2388,13 @@ const disabledDate = (time) => {
 
   return false;
 };
+
+const getPastorName = (id) => {
+  if (!id) return 'Unassigned';
+  const cleanId = String(id).replace(/^0+/, '');
+  const p = pastors.value.find(p => String(p.id).replace(/^0+/, '') === cleanId);
+  return p ? p.name : `Pastor (ID: ${cleanId})`;
+};
 </script>
 
 <style scoped>
@@ -2167,21 +2404,8 @@ const disabledDate = (time) => {
 </style>
 
 <style>
-/* Global style to fix z-index for element-plus components in vuetify dialog */
-.discipleship-date-picker,
-.salvation-datepicker-popper,
-.el-message-box__wrapper,
-.el-message,
-.el-overlay {
-  z-index: 99999 !important;
-}
-
-.hover-bg:hover {
-  background-color: #f5f5f5;
-  transition: background-color 0.2s ease;
-}
-
-.border-b-dotted {
-  border-bottom: 1px dotted #e0e0e0;
+/* Global style to fix z-index for element-plus date picker popper in vuetify dialog */
+.discipleship-date-picker {
+  z-index: 3000 !important;
 }
 </style>

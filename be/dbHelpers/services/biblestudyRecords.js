@@ -124,12 +124,13 @@ async function createBibleStudyRequest(data) {
         const formattedBirth = birthdate ? moment(birthdate).format('YYYY-MM-DD') : null;
         const formattedMarriage = marriage_date ? moment(marriage_date).format('YYYY-MM-DD') : null;
         const childrenStr = (children && typeof children === 'object') ? JSON.stringify(children) : (children || null);
+        const notesStr = (notes && typeof notes === 'object') ? JSON.stringify(notes) : (notes || null);
 
         const params = [
             request_id, salvation_id, firstname, lastname, middle_name,
             normalizedEmail, phone_number, formattedBirth, age, gender,
             address, civil_status, profession, spouse_name, formattedMarriage,
-            childrenStr, formattedDate, pastor_id, location, notes, status,
+            childrenStr, formattedDate, pastor_id, location, notesStr, status,
             guardian_name, guardian_contact, guardian_relationship
         ];
 
@@ -180,17 +181,24 @@ async function getAllBibleStudyRequests(params = {}) {
                    COALESCE(b.guardian_relationship, s.guardian_relationship) as guardian_relationship,
                    COALESCE(b.address, s.address) as address,
                    COALESCE(
-                     CONCAT(m_acc.firstname, ' ', m_acc.lastname),
-                     CONCAT(m_direct.firstname, ' ', m_direct.lastname)
-                   ) as pastor_name_joined
+                     NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
+                   ) as pastor_name_joined,
+                   COALESCE(
+                     NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+                     NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
+                   ) as pastor_name
             FROM tbl_biblestudy_requests b
             LEFT JOIN tbl_discipleship_requests s ON (
                 (b.salvation_id IS NOT NULL AND b.salvation_id = s.request_id) OR
                 (b.salvation_id IS NULL AND LOWER(b.email) = LOWER(s.email))
             )
-            LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+            LEFT JOIN tbl_accounts a ON (b.pastor_id = a.acc_id OR (b.pastor_id REGEXP '^[0-9]+$' AND CAST(b.pastor_id AS UNSIGNED) = a.acc_id))
             LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
-            LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN tbl_members m_direct ON (
+                b.pastor_id = m_direct.member_id OR 
+                (b.pastor_id REGEXP '^[0-9]+$' AND CAST(b.pastor_id AS UNSIGNED) = m_direct.member_id)
+            ) COLLATE utf8mb4_unicode_ci
             WHERE 1=1`;
         const queryParams = [];
 
@@ -391,11 +399,14 @@ async function bulkCompleteBibleStudies(requestIds) {
                     const [fullReqRows] = await query(`
                         SELECT b.*, 
                                COALESCE(
-                                 CONCAT(m_acc.firstname, ' ', m_acc.lastname),
-                                 CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                                 NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+                                 NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
                                ) as pastor_name
                         FROM tbl_biblestudy_requests b
-                        LEFT JOIN tbl_accounts a ON b.pastor_id = a.acc_id
+                        LEFT JOIN tbl_accounts a ON (
+                 b.pastor_id = a.acc_id OR 
+                 (b.pastor_id REGEXP '^[0-9]+$' AND CAST(b.pastor_id AS UNSIGNED) = a.acc_id)
+             )
                         LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
                         LEFT JOIN tbl_members m_direct ON b.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
                         WHERE b.request_id = ?
@@ -431,8 +442,14 @@ async function bulkCompleteBibleStudies(requestIds) {
 
 /**
  * Promote Bible Study Candidate to Water Baptism
+ * @param {string} id - Bible Study request ID
+ * @param {boolean} isDecided - Whether admin scheduled directly
+ * @param {object} overrides - Field overrides (pastor, location, dates)
+ * @param {Array|null} selectedCompanions - When set, only these specific members are promoted.
+ *        Each entry: { firstname, lastname, email, phone_number, age, gender, birthdate, civil_status, address, type }
+ *        When null, all companions stored in the notes JSON are promoted (legacy behavior).
  */
-async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {}) {
+async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {}, selectedCompanions = null) {
     try {
         const [rows] = await query('SELECT * FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
         if (rows.length === 0) throw new Error('Bible study request not found');
@@ -441,16 +458,16 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {})
         let pastorNameStr = overrides.pastor_name || overrides.pastor_id || req.pastor_id || null;
         if (pastorNameStr) {
             const [pRows] = await query(`
-                SELECT CONCAT(m.firstname, ' ', m.lastname) as resolved_name
+                SELECT NULLIF(TRIM(CONCAT_WS(' ', m.firstname, m.lastname)), '') as resolved_name
                 FROM tbl_members m
                 JOIN tbl_accounts a ON m.email = a.email COLLATE utf8mb4_unicode_ci
-                WHERE a.acc_id = ?
+                WHERE (a.acc_id = ? OR (? REGEXP '^[0-9]+$' AND a.acc_id = CAST(? AS UNSIGNED)))
                 UNION
-                SELECT CONCAT(firstname, ' ', lastname) as resolved_name
+                SELECT NULLIF(TRIM(CONCAT_WS(' ', firstname, lastname)), '') as resolved_name
                 FROM tbl_members
-                WHERE member_id = ?
+                WHERE (member_id = ? OR (? REGEXP '^[0-9]+$' AND member_id = CAST(? AS UNSIGNED)))
                 LIMIT 1
-            `, [pastorNameStr, pastorNameStr]);
+            `, [pastorNameStr, pastorNameStr, pastorNameStr, pastorNameStr, pastorNameStr, pastorNameStr]);
             
             if (pRows.length > 0) {
                 pastorNameStr = pRows[0].resolved_name;
@@ -458,39 +475,138 @@ async function promoteBibleStudyToBaptism(id, isDecided = false, overrides = {})
         }
 
         const { createWaterBaptism } = require('./waterBaptismRecords');
-        const baptismData = {
-            request_id: id,
-            firstname: req.firstname,
-            lastname: req.lastname,
-            middle_name: req.middle_name,
-            email: req.email,
-            phone_number: req.phone_number,
-            birthdate: req.birthdate,
-            age: req.age,
-            gender: req.gender,
-            address: req.address,
-            civil_status: req.civil_status,
-            profession: req.profession,
-            spouse_name: req.spouse_name,
-            marriage_date: req.marriage_date,
-            children: req.children,
-            is_member: false,
+
+        // Common baptism metadata from overrides
+        const sharedBaptismMeta = {
             status: overrides.status || (isDecided ? 'approved' : 'pending'),
             pastor_name: pastorNameStr,
             location: overrides.location || req.location || null,
             baptism_date: overrides.baptism_date || null,
             baptism_time: overrides.baptism_time || null,
-            guardian_name: req.guardian_name,
-            guardian_contact: req.guardian_contact,
-            guardian_relationship: req.guardian_relationship,
-            notes: overrides.notes || req.notes || ''
         };
 
-        const result = await createWaterBaptism(baptismData);
-        if (result.success) {
-            await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+        if (selectedCompanions && Array.isArray(selectedCompanions) && selectedCompanions.length > 0) {
+            // ── SELECTIVE MODE ────────────────────────────────────────────────────────
+            // Only promote the exact members that were checked in the console.
+            let primaryPromoted = false;
+            let promotedCount = 0;
+
+            for (const member of selectedCompanions) {
+                const isPrimary = member.type === 'primary';
+
+                const memberData = {
+                    request_id: id,
+                    firstname: member.firstname || '',
+                    lastname: member.lastname || '',
+                    middle_name: member.middle_name || (isPrimary ? req.middle_name : ''),
+                    email: member.email || '',
+                    phone_number: member.phone_number || '',
+                    birthdate: member.birthdate || (isPrimary ? req.birthdate : null),
+                    age: member.age || (isPrimary ? req.age : null),
+                    gender: member.gender || (isPrimary ? req.gender : ''),
+                    address: member.address || req.address,
+                    civil_status: member.civil_status || (isPrimary ? req.civil_status : 'Single'),
+                    profession: isPrimary ? (req.profession || '') : '',
+                    spouse_name: isPrimary ? (req.spouse_name || '') : '',
+                    marriage_date: isPrimary ? (req.marriage_date || null) : null,
+                    children: isPrimary ? (req.children || null) : null,
+                    is_member: false,
+                    guardian_name: isPrimary ? (req.guardian_name || '') : '',
+                    guardian_contact: isPrimary ? (req.guardian_contact || '') : '',
+                    guardian_relationship: isPrimary ? (req.guardian_relationship || '') : '',
+                    notes: isPrimary
+                        ? (overrides.notes || '')
+                        : `Group Companion of ${req.firstname} ${req.lastname}`,
+                    ...sharedBaptismMeta
+                };
+
+                try {
+                    await createWaterBaptism(memberData);
+                    promotedCount++;
+                    if (isPrimary) primaryPromoted = true;
+                    console.log(`[BulkPromote] ✅ Promoted ${member.type}: ${member.firstname} ${member.lastname}`);
+                } catch (err) {
+                    console.error(`[BulkPromote] ❌ Failed to promote ${member.firstname} ${member.lastname}:`, err.message);
+                }
+            }
+
+            // Mark lead Bible Study record as Promoted if at least one primary was promoted,
+            // or if any companion was promoted (to avoid inconsistent state).
+            if (promotedCount > 0) {
+                await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+            }
+
+            return { success: promotedCount > 0, message: `Promoted ${promotedCount} of ${selectedCompanions.length} selected members.` };
+
+        } else {
+            // ── LEGACY / FULL-GROUP MODE ──────────────────────────────────────────────
+            // No specific selection: promote the lead + all companions in notes, as before.
+            const baptismData = {
+                request_id: id,
+                firstname: req.firstname,
+                lastname: req.lastname,
+                middle_name: req.middle_name,
+                email: req.email,
+                phone_number: req.phone_number,
+                birthdate: req.birthdate,
+                age: req.age,
+                gender: req.gender,
+                address: req.address,
+                civil_status: req.civil_status,
+                profession: req.profession,
+                spouse_name: req.spouse_name,
+                marriage_date: req.marriage_date,
+                children: req.children,
+                is_member: false,
+                guardian_name: req.guardian_name,
+                guardian_contact: req.guardian_contact,
+                guardian_relationship: req.guardian_relationship,
+                notes: overrides.notes || req.notes || '',
+                ...sharedBaptismMeta
+            };
+
+            const result = await createWaterBaptism(baptismData);
+
+            // Promote all companions stored in the notes field
+            if (req.notes) {
+                try {
+                    const notesData = typeof req.notes === 'string' ? JSON.parse(req.notes) : req.notes;
+                    if (notesData.is_group && notesData.companions && Array.isArray(notesData.companions)) {
+                        console.log(`[BulkPromote] Promoting all ${notesData.companions.length} companions (full-group mode) for BS ${id}`);
+                        for (const comp of notesData.companions) {
+                            const compBaptismData = {
+                                request_id: id,
+                                firstname: comp.firstname || '',
+                                lastname: comp.lastname || '',
+                                middle_name: comp.middle_name || '',
+                                email: comp.email || '',
+                                phone_number: comp.phone_number || '',
+                                birthdate: comp.birthdate || null,
+                                age: comp.age || null,
+                                gender: comp.gender || '',
+                                address: req.address,
+                                civil_status: comp.civil_status || 'Single',
+                                is_member: false,
+                                notes: `Group Companion of ${req.firstname} ${req.lastname}`,
+                                ...sharedBaptismMeta
+                            };
+                            try {
+                                await createWaterBaptism(compBaptismData);
+                            } catch (compErr) {
+                                console.error(`[BulkPromote] Failed to promote companion ${comp.firstname} for BS ${id}:`, compErr.message);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Not a valid JSON notes field — skip companion loop
+                }
+            }
+
+            if (result.success) {
+                await query('UPDATE tbl_biblestudy_requests SET status = "Promoted" WHERE request_id = ?', [id]);
+            }
+            return result;
         }
-        return result;
     } catch (error) {
         console.error('Error promoting BS to Baptism:', error);
         throw error;
@@ -556,6 +672,7 @@ async function exportBibleStudyRequestsToExcel(options = {}) {
             'Email': row.email,
             'Phone Number': row.phone_number || '-',
             'Status': row.status,
+            'Assigned Pastor': row.pastor_name || 'Unassigned',
             'Scheduled Date': row.scheduled_date ? moment(row.scheduled_date).format('YYYY-MM-DD HH:mm:ss') : 'Not Scheduled',
             'Location': row.location || '-',
             'Notes': row.notes || '-',

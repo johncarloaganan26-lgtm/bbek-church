@@ -164,15 +164,29 @@
                     <el-input v-model="formData.address" type="textarea" placeholder="Your Address" />
                   </el-form-item>
 
-                  <el-form-item label="Preferred Schedule" prop="scheduled_date" required>
-                    <el-input v-model="formData.scheduled_date" placeholder="Select a slot from the left" readonly />
-                    <div v-if="formData.scheduled_date" class="text-caption text-teal-darken-3 mt-1">
-                      {{ formatSelectedSchedule(formData.scheduled_date) }}
+                    <div class="agreement-wrapper mb-6 text-left">
+                      <div class="d-flex align-start">
+                        <el-checkbox v-model="termsAgreed" class="terms-checkbox mr-3" size="large"></el-checkbox>
+                      <div class="agreement-text" style="padding-top: 2px;">
+                        <span class="text-body-2 text-grey-darken-3" style="line-height: 1.6; display: block;">
+                          I agree to the 
+                          <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('terms')">Terms of Service</a> 
+                          and 
+                          <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('privacy')">Privacy Policy</a>
+                          to proceed with my request.
+                        </span>
+                      </div>
                     </div>
-                  </el-form-item>
+                    <v-expand-transition>
+                      <div v-if="agreementError" class="text-caption text-error font-weight-bold mt-2 ml-10" style="color: #ef4444;">
+                        <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                        {{ agreementError }}
+                      </div>
+                    </v-expand-transition>
+                  </div>
 
                   <el-form-item>
-                    <el-button type="primary" size="large" @click="handleSubmit" :loading="discipleshipStore.loading" style="width: 100%;">
+                    <el-button type="primary" size="large" @click="handleSubmit" :loading="discipleshipStore.loading" style="width: 100%; background-color: #0d9488; border-color: #0d9488;">
                       Submit Bible Study Request
                     </el-button>
                   </el-form-item>
@@ -182,6 +196,12 @@
           </div>
         </v-container>
       </section>
+
+      <!-- Agreement Modal -->
+      <AgreementModal 
+        v-model="showAgreementModal" 
+        :initial-tab="agreementTab" 
+      />
     </main>
   </div>
 </template>
@@ -191,8 +211,9 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import moment from 'moment'
 import axios from '@/api/axios'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { useDiscipleshipStore } from '@/stores/discipleshipStore'
+import AgreementModal from '@/components/Common/AgreementModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -225,6 +246,17 @@ const formData = reactive({
   guardian_contact: '',
   guardian_relationship: ''
 })
+
+// Agreement State
+const termsAgreed = ref(false)
+const showAgreementModal = ref(false)
+const agreementTab = ref('terms')
+const agreementError = ref('')
+
+const openAgreement = (tab) => {
+  agreementTab.value = tab
+  showAgreementModal.value = true
+}
 
 const rules = {
   firstname: [{ required: true, message: 'First name is required', trigger: 'blur' }],
@@ -317,6 +349,14 @@ const formatSelectedSchedule = (dateTimeStr) => moment(dateTimeStr, 'YYYY-MM-DD 
 
 const handleSubmit = async () => {
   if (!formRef.value) return
+
+  // Validate agreement first
+  if (!termsAgreed.value) {
+    agreementError.value = 'You must agree to the Terms of Service and Privacy Policy before submitting.'
+    ElMessage.warning('Please agree to our Terms and Privacy Policy to continue.')
+    return
+  }
+  agreementError.value = ''
 
   await formRef.value.validate(async (valid) => {
     if (!valid) return
@@ -453,6 +493,59 @@ const handleSubmit = async () => {
   font-weight: 500;
   display: inline-flex;
   align-items: center;
+}
+
+.agreement-link {
+  color: #0d9488;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  padding: 0 2px;
+}
+
+.agreement-link:hover {
+  text-decoration: underline;
+  background-color: #0d948811;
+  border-radius: 4px;
+}
+
+.terms-checkbox :deep(.el-checkbox__label) {
+  display: none;
+}
+
+/* Force Teal Color - Overriding EL-Checkbox Defaults */
+.terms-checkbox :deep(.el-checkbox__inner) {
+  width: 26px !important;
+  height: 26px !important;
+  border-color: #0d9488 !important;
+  border-width: 2px !important;
+  background-color: transparent;
+}
+
+.terms-checkbox :deep(.el-checkbox__inner::after) {
+  width: 8px !important;
+  height: 16px !important;
+  left: 9px !important;
+  top: 4px !important;
+  border-width: 3.5px !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input:hover .el-checkbox__inner) {
+  border-color: #0d9488 !important;
+}
+
+.agreement-wrapper {
+  transition: all 0.3s ease;
 }
 </style>
 

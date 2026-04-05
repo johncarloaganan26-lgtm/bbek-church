@@ -137,7 +137,7 @@
               </div>
               <div class="parent-row">
                 <div class="field-group">
-                  <span class="field-label">Email:</span>
+                  <span class="field-label">Email Address:</span>
                   <span class="field-value">{{ fatherEmail || 'N/A' }}</span>
                 </div>
               </div>
@@ -172,7 +172,7 @@
               </div>
               <div class="parent-row">
                 <div class="field-group">
-                  <span class="field-label">Email:</span>
+                  <span class="field-label">Email Address:</span>
                   <span class="field-value">{{ motherEmail || 'N/A' }}</span>
                 </div>
               </div>
@@ -443,7 +443,7 @@ onMounted(async () => {
     linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%),
     repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(139, 115, 85, 0.02) 1px, rgba(139, 115, 85, 0.02) 2px),
     repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(139, 115, 85, 0.01) 1px, rgba(139, 115, 85, 0.01) 2px);
-  padding: 20px 18px;
+  padding: 20px 18px 60px 18px;
   border: 1px solid #8b7355;
   position: relative;
   box-shadow: 
@@ -847,18 +847,17 @@ onMounted(async () => {
 }
 
 .signature-label {
-  font-size: 10px;
+  font-size: 8px;
   color: #4a3728;
   margin: 0;
   font-family: 'Times New Roman', serif;
-  text-transform: uppercase;
 }
 
 .footer-section {
   display: flex;
   justify-content: space-between;
-  margin-top: 20px;
-  padding-top: 12px;
+  margin-top: 40px;
+  padding-top: 15px;
   border-top: 1px solid #8b7355;
   position: relative;
   z-index: 3;
@@ -925,17 +924,16 @@ onMounted(async () => {
   }
 
   .inner-border {
-    padding: 0.12in 0.4in !important;
+    padding: 0.12in 0.4in 0.3in 0.4in !important;
     background-color: #f3e6c4 !important;
     background-image: none !important;
     box-shadow: none !important;
     border: 2px solid #8b7355 !important;
     width: calc(100% - 0.8in - 4px) !important;
-    height: calc(100% - 0.24in - 4px) !important;
+    height: auto !important;
     min-height: auto !important;
     box-sizing: border-box !important;
     position: relative !important;
-    overflow: hidden !important;
   }
 
   * {
@@ -1051,11 +1049,11 @@ onMounted(async () => {
 
   .minister-name { font-size: 12px !important; margin-bottom: 4px !important; }
   .signature-line { width: 120px !important; margin-bottom: 3px !important; }
-  .signature-label { font-size: 9px !important; }
+  .signature-label { font-size: 7px !important; }
 
   .footer-section {
-    margin-top: 0.1in !important;
-    padding-top: 0.05in !important;
+    margin-top: 0.2in !important;
+    padding-top: 0.08in !important;
   }
 
   .cert-number, .issue-date { font-size: 9px !important; }

@@ -2235,6 +2235,25 @@ const sendBibleStudyDetails = async (details) => {
     const recipientName = `${details.firstname || ''} ${details.lastname || ''}`.trim() || 'Member';
     const formattedDate = details.scheduled_date ? moment(details.scheduled_date).tz('Asia/Manila').format('MMMM D, YYYY [at] h:mm A') : 'To be determined';
 
+    // Build recipient list (Lead + Companions)
+    let recipients = [details.email];
+    
+    // Check if there are group members in notes
+    if (details.notes) {
+      try {
+        const notesData = typeof details.notes === 'string' ? JSON.parse(details.notes) : details.notes;
+        if (notesData.is_group && notesData.companions && Array.isArray(notesData.companions)) {
+          notesData.companions.forEach(member => {
+            if (member.email && member.email.trim() !== '' && !recipients.includes(member.email.trim())) {
+              recipients.push(member.email.trim());
+            }
+          });
+        }
+      } catch (e) {
+        // Not a JSON notes or different format, ignore group parsing
+      }
+    }
+
     const statusColors = {
       pending: '#f39c12',
       scheduled: '#3498db',
@@ -2245,7 +2264,7 @@ const sendBibleStudyDetails = async (details) => {
 
     const mailOptions = {
       from: `"Bible Baptist Ekklesia of Kawit" <${CHURCH_EMAIL}>`,
-      to: details.email,
+      to: recipients.join(', '),
       subject: `Bible Study Update: ${status.charAt(0).toUpperCase() + status.slice(1)} - BBEK`,
       html: `
         <!DOCTYPE html>

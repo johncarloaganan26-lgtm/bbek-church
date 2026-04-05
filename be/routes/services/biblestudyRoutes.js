@@ -723,7 +723,7 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
 // ADMIN: Bulk Promote Bible Study (to Baptism)
 router.post('/bulk-promote', authenticateToken, async (req, res) => {
     try {
-        const { requestIds, isDecided = false, overrides = {} } = req.body;
+        const { requestIds, isDecided = false, overrides = {}, selectedCompanions = null } = req.body;
         if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
             return res.status(400).json({ success: false, message: 'No requests selected' });
         }
@@ -733,7 +733,6 @@ router.post('/bulk-promote', authenticateToken, async (req, res) => {
         
         let processedCount = 0;
         let failedCount = 0;
-
         const lastErrors = [];
 
         for (const id of requestIds) {
@@ -757,17 +756,38 @@ router.post('/bulk-promote', authenticateToken, async (req, res) => {
                 }
 
                 if (isDecided) {
-                    // READY: Create record directly
-                    await promoteBibleStudyToBaptism(id, true, overrides);
+                    // READY: Create record directly.
+                    // Pass selectedCompanions so the dbHelper promotes only those specific members.
+                    await promoteBibleStudyToBaptism(id, true, overrides, selectedCompanions);
                 } else {
-                    // HESITANT: Just send invitation link
-                    await sendWaterBaptismInvitation({
-                        request_id: id,
-                        email: candidate.email,
-                        firstname: candidate.firstname,
-                        lastname: candidate.lastname,
-                        isDecided: false
-                    });
+                    // HESITANT: Send invitation links.
+                    // If selectedCompanions is provided, only send to those members;
+                    // otherwise the helper handles the whole group via notes.
+                    if (selectedCompanions && Array.isArray(selectedCompanions)) {
+                        for (const comp of selectedCompanions) {
+                            if (!comp.email) continue;
+                            try {
+                                await sendWaterBaptismInvitation({
+                                    request_id: id,
+                                    email: comp.email,
+                                    firstname: comp.firstname,
+                                    lastname: comp.lastname,
+                                    isDecided: false
+                                });
+                            } catch (compEmailErr) {
+                                console.warn(`Failed to send invitation to ${comp.firstname}:`, compEmailErr.message);
+                            }
+                        }
+                    } else {
+                        // No specific companions — invite the lead record only
+                        await sendWaterBaptismInvitation({
+                            request_id: id,
+                            email: candidate.email,
+                            firstname: candidate.firstname,
+                            lastname: candidate.lastname,
+                            isDecided: false
+                        });
+                    }
                 }
                 processedCount++;
             } catch (err) {

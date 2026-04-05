@@ -82,8 +82,8 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
 
     // Check for duplicate name + birthdate combination (case-insensitive, trimmed)
     if (firstname && lastname && birthdate) {
-      conditions.push('(LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND birthdate = ?)');
-      params.push(firstname, lastname, moment(birthdate).format('YYYY-MM-DD'));
+      conditions.push('(LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL)) AND birthdate = ?)');
+      params.push(firstname, lastname, memberData.middle_name || null, memberData.middle_name || null, moment(birthdate).format('YYYY-MM-DD'));
     }
 
     if (conditions.length === 0) {
@@ -138,9 +138,13 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
         const memberBirthdate = moment(member.birthdate).format('YYYY-MM-DD');
         const inputBirthdate = moment(birthdate).format('YYYY-MM-DD');
 
+        const mName1 = (member.middle_name || '').trim().toLowerCase();
+        const mName2 = (memberData.middle_name || '').trim().toLowerCase();
+
         if (member.firstname && member.lastname &&
           member.firstname.trim().toLowerCase() === firstname.trim().toLowerCase() &&
           member.lastname.trim().toLowerCase() === lastname.trim().toLowerCase() &&
+          mName1 === mName2 &&
           memberBirthdate === inputBirthdate) {
           matches.push('name and birthdate');
           duplicateFields.push('name_birthdate');

@@ -156,7 +156,7 @@ const churchName = ref('Bible Baptist Ekklesia of Kawit')
 // Home page data from CMS
 const homeData = ref({
   backgroundType: 'none',
-  welcomeText: 'Welcome to Bible Baptist Church of Kwali',
+  welcomeText: 'Welcome to Bible Baptist Ekklesia of Kawit',
   sundayService: 'Sunday Worship 9:30 AM - 12:00 PM',
   wednesdayService: 'Wednesday Service 7:00 PM - 9:00 PM',
   // Shared button color for both buttons

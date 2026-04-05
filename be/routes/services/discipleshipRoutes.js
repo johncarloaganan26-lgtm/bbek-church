@@ -74,10 +74,11 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                       scheduled_date
                     ),
                     '%Y-%m-%d %H:%i:%s'
-                  ) AS slot_datetime
+                  ) AS slot_datetime,
+                  COALESCE(CAST(JSON_EXTRACT(notes, '$.group_size') AS UNSIGNED), 1) as group_size
                   FROM tbl_discipleship_requests
                   WHERE request_type = 'Salvation'
-                    AND status IN ('Pending', 'Scheduled', 'Rejected')
+                    AND status IN ('Pending', 'Scheduled')
                     AND scheduled_date IS NOT NULL
                     AND DATE(scheduled_date) = ?
                 `;
@@ -104,7 +105,7 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
             // Map booked slots to counts
             const bookedCounts = (bookedRows || []).reduce((acc, r) => {
                 const dt = r.slot_datetime;
-                if (dt) acc[dt] = (acc[dt] || 0) + 1;
+                if (dt) acc[dt] = (acc[dt] || 0) + (r.group_size || 1);
                 return acc;
             }, {});
 
@@ -162,10 +163,11 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
                   scheduled_date
                 ),
                 '%Y-%m-%d %H:%i:%s'
-              ) AS slot_datetime
+              ) AS slot_datetime,
+              COALESCE(CAST(JSON_EXTRACT(notes, '$.group_size') AS UNSIGNED), 1) as group_size
               FROM tbl_discipleship_requests
               WHERE request_type = 'Salvation'
-                AND status IN ('Pending', 'Scheduled', 'Rejected')
+                AND status IN ('Pending', 'Scheduled')
                 AND scheduled_date IS NOT NULL
                 AND scheduled_date >= ?
                 AND scheduled_date < ?
@@ -195,7 +197,7 @@ async function handleAvailableSlotsRequest(req, res, serviceOverride = null) {
         // Map booked slots to counts
         const bookedCounts = (bookedRows || []).reduce((acc, r) => {
             const dt = r.slot_datetime;
-            if (dt) acc[dt] = (acc[dt] || 0) + 1;
+            if (dt) acc[dt] = (acc[dt] || 0) + (r.group_size || 1);
             return acc;
         }, {});
 
@@ -426,11 +428,11 @@ function validateRequiredFields(action, data) {
             break;
 
         case 'update':
-            if (data.pastor_id === '' && data.scheduled_date) {
-                errors.push('Cannot schedule without assigning a pastor');
-            }
-            if (data.scheduled_date && !data.pastor_id) {
-                errors.push('Cannot schedule without assigning a pastor');
+            // Only require a pastor if the status is being set to Scheduled or Approved
+            // OR if it's already Scheduled and has a date
+            const isScheduling = ['Scheduled', 'Approved', 'Completed'].includes(data.status);
+            if (isScheduling && data.scheduled_date && !data.pastor_id) {
+                errors.push('Pastor must be assigned before scheduling');
             }
             break;
     }
@@ -540,49 +542,30 @@ router.post('/submit', async (req, res) => {
             });
         }
 
-        // Attach group_id if there are companions
+        // Attach companions to notes if they exist
         const hasCompanions = req.body.companions && Array.isArray(req.body.companions) && req.body.companions.length > 0;
-        const groupId = hasCompanions ? `GRP-${Date.now()}` : null;
         
-        if (groupId) {
-            let notesObj = { group_id: groupId };
-            if (req.body.notes) {
-                try { 
-                    notesObj = { ...JSON.parse(req.body.notes), ...notesObj };
-                } catch (e) { 
-                    notesObj.original_notes = req.body.notes; 
-                }
+        let notesObj = {};
+        if (req.body.notes) {
+            try { 
+                notesObj = typeof req.body.notes === 'string' ? JSON.parse(req.body.notes) : req.body.notes;
+            } catch (e) { 
+                notesObj.original_notes = req.body.notes; 
             }
-            req.body.notes = JSON.stringify(notesObj);
         }
+
+        if (hasCompanions) {
+            notesObj.companions = req.body.companions;
+            notesObj.is_group = true;
+            notesObj.group_size = req.body.companions.length + 1;
+        }
+        
+        req.body.notes = JSON.stringify(notesObj);
 
         const result = await createDiscipleshipRequest(req.body);
 
-        // Process companions if any
-        if (hasCompanions) {
-            for (const comp of req.body.companions) {
-                try {
-                    // Check duplicate for companion
-                    const compDuplicateCheck = await checkDuplicates(comp.email);
-                    if (compDuplicateCheck.valid) {
-                        await createDiscipleshipRequest({
-                            ...req.body,
-                            firstname: comp.firstname,
-                            lastname: comp.lastname,
-                            email: comp.email,
-                            birthdate: comp.birthdate,
-                            age: comp.age,
-                            gender: comp.gender,
-                            companions: [], // Prevent infinite recursion if passed somehow
-                            notes: JSON.stringify({ group_id: groupId })
-                        });
-                    }
-                } catch (compError) {
-                    console.error('Error creating companion request:', compError);
-                    // Continue with other companions even if one fails
-                }
-            }
-        }
+        // Process companions: NO LONGER creating separate records
+        // Just log the action
 
         // Log successful submission
         await auditTrailRecords.createAuditLog({
@@ -825,9 +808,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
         const updatePayload = { ...req.body };
         const { firstname, lastname, email, request_type } = updatePayload;
 
+        console.log(`[DiscipleshipDebug] Updating request ${id}:`, JSON.stringify(updatePayload, null, 2));
+
         // Get current record for validations/fallbacks
         const [currentRows] = await query(
-            'SELECT status, scheduled_date, pastor_id, location, request_type FROM tbl_discipleship_requests WHERE request_id = ?',
+            'SELECT status, scheduled_date, pastor_id, location, request_type, notes FROM tbl_discipleship_requests WHERE request_id = ?',
             [id]
         );
         if (currentRows.length === 0) {
@@ -946,11 +931,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
         const locationForValidation =
             updatePayload.location !== undefined ? updatePayload.location : currentLocation;
 
-        const isSchedulingAction =
-            updatePayload.status === 'Scheduled' ||
-            (updatePayload.scheduled_date !== undefined && !!updatePayload.scheduled_date);
+        const effectiveStatus = updatePayload.status || currentStatus;
+        const isTransitioningToScheduled = 
+            (updatePayload.status === 'Scheduled' || updatePayload.status === 'Approved') &&
+            currentStatus !== 'Scheduled' && currentStatus !== 'Approved';
 
-        if (isSchedulingAction) {
+        if (isTransitioningToScheduled) {
             const requiredValidation = validateRequiredFields('schedule', {
                 pastor_id: pastorIdForValidation,
                 scheduled_date: scheduledDateForValidation,
@@ -968,7 +954,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // Perform the update
         const result = await updateDiscipleshipRequest(id, updatePayload);
 
-        // Log status change
+        const isGroupUpdated = updatePayload.notes !== undefined && String(updatePayload.notes) !== String(currentRows[0].notes);
+
+        // Log status change (Only if status actually changed)
         if (updatePayload.status && updatePayload.status !== currentStatus) {
             await auditTrailRecords.createAuditLog({
                 action_type: 'DISCIPLESHIP_STATUS_CHANGED',
@@ -985,37 +973,116 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 user_name: req.user?.firstname || null,
                 user_position: req.user?.position || null
             });
+        }
 
-            // Send email notification for status change
-            if (email) {
-                let pastor_name = '';
-                if (updatePayload.pastor_id) {
+        // Send email notification for status change OR group update
+        const shouldNotify = (updatePayload.status && updatePayload.status !== currentStatus) || 
+                            (isGroupUpdated && ['Scheduled', 'Completed', 'Approved'].includes(currentStatus));
+
+        if (shouldNotify) {
+            // Prepare common email parameters (pastor, date, location)
+            let pastor_name = 'To be determined';
+            const effectivePastorId = updatePayload.pastor_id !== undefined ? updatePayload.pastor_id : currentPastorId;
+            if (effectivePastorId) {
+                try {
+                    const [pastorRows] = await query(`
+                        SELECT m.firstname, m.lastname 
+                        FROM tbl_members m 
+                        JOIN tbl_accounts a ON m.email = a.email 
+                        WHERE a.acc_id = ?
+                    `, [effectivePastorId]);
+                    if (pastorRows.length > 0) {
+                        pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                    }
+                } catch (pErr) {
+                    console.error('Error fetching pastor name for group email:', pErr);
+                }
+            }
+
+            const commonEmailParams = {
+                request_type: effectiveRequestType,
+                status: updatePayload.status || currentStatus,
+                scheduled_date: updatePayload.scheduled_date !== undefined ? updatePayload.scheduled_date : currentScheduledDate,
+                pastor_name,
+                location: updatePayload.location !== undefined ? updatePayload.location : currentLocation
+            };
+
+            // 1. Send to Primary (if they have email)
+            if (email && email.trim() !== '') {
+                try {
+                    await sendStatusNotificationEmail({
+                        ...commonEmailParams,
+                        email,
+                        firstname,
+                        lastname
+                    });
+                } catch (eErr) {
+                    console.error(`Status update email failed for primary ${email}:`, eErr);
+                }
+            }
+
+            // 2. Send to Companions (All companions with valid emails)
+            let companions = [];
+            try {
+                const rawNotes = updatePayload.notes || currentRows[0].notes;
+                const notesObj = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+                if (notesObj && Array.isArray(notesObj.companions)) {
+                    companions = notesObj.companions;
+                }
+            } catch (e) {
+                console.error('Error parsing notes for companion emails:', e);
+            }
+
+            // Iterate and send to each companion
+            for (const companion of companions) {
+                if (companion.email && companion.email.trim() !== '') {
                     try {
-                        const [pastorRows] = await query(`
-                            SELECT m.firstname, m.lastname 
-                            FROM tbl_members m 
-                            JOIN tbl_accounts a ON m.email = a.email 
-                            WHERE a.acc_id = ?
-                        `, [updatePayload.pastor_id]);
-                        if (pastorRows.length > 0) {
-                            pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
-                        }
-                    } catch (e) {
-                        console.error('Error fetching pastor name for email:', e);
+                        await sendStatusNotificationEmail({
+                            ...commonEmailParams,
+                            email: companion.email.trim(),
+                            firstname: companion.firstname,
+                            lastname: companion.lastname
+                        });
+                        console.log(`[DiscipleshipNotification] Sent companion email for ${id} to ${companion.email}`);
+                    } catch (cErr) {
+                        console.error(`Status update email failed for companion ${companion.email}:`, cErr);
                     }
                 }
-
-                await sendStatusNotificationEmail({
-                    email,
-                    firstname,
-                    lastname,
-                    request_type: effectiveRequestType,
-                    status: updatePayload.status,
-                    scheduled_date: updatePayload.scheduled_date !== undefined ? updatePayload.scheduled_date : currentScheduledDate,
-                    pastor_name,
-                    location: updatePayload.location !== undefined ? updatePayload.location : currentLocation
-                });
             }
+        }
+
+        // Silent companion update logic (redundant now handled above)
+        if (!updatePayload.status && isGroupUpdated && currentStatus === 'Scheduled') {
+             // Re-fetch email params for the silent companion update
+             let pastor_name = '';
+             if (currentPastorId) {
+                 try {
+                     const [pastorRows] = await query(`
+                         SELECT m.firstname, m.lastname FROM tbl_members m JOIN tbl_accounts a ON m.email = a.email WHERE a.acc_id = ?
+                     `, [currentPastorId]);
+                     if (pastorRows.length > 0) pastor_name = `${pastorRows[0].firstname} ${pastorRows[0].lastname}`;
+                 } catch (e) {}
+             }
+
+             const emailParams = {
+                 email, firstname, lastname, request_type: effectiveRequestType, status: currentStatus,
+                 scheduled_date: currentScheduledDate, pastor_name, location: currentLocation
+             };
+
+             // Send to ALL companions (newly added will get it, existing will see it again - safer for sync)
+             let companions = [];
+             try {
+                const notesObj = typeof updatePayload.notes === 'string' ? JSON.parse(updatePayload.notes) : updatePayload.notes;
+                if (notesObj && Array.isArray(notesObj.companions)) companions = notesObj.companions;
+             } catch (e) {}
+
+             for (const companion of companions) {
+                 if (companion.email) {
+                    try {
+                        await sendStatusNotificationEmail({ ...emailParams, email: companion.email, firstname: companion.firstname, lastname: companion.lastname });
+                    } catch (e) {}
+                 }
+             }
         }
 
         // Log scheduling
@@ -1037,9 +1104,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
             });
 
             // Send email notification for scheduling if status is Scheduled
-            if (email && updatePayload.status === 'Scheduled') {
+            if (email && (updatePayload.status === 'Scheduled' || currentStatus === 'Scheduled')) {
                 let pastor_name = '';
-                if (updatePayload.pastor_id) {
+                const effectivePastorId = updatePayload.pastor_id !== undefined ? updatePayload.pastor_id : currentPastorId;
+                if (effectivePastorId) {
                     try {
                         const [pastorRows] = await query(`
                             SELECT 
@@ -1051,7 +1119,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                             LEFT JOIN tbl_accounts a ON p.pid = a.acc_id
                             LEFT JOIN tbl_members m1 ON a.email = m1.email COLLATE utf8mb4_unicode_ci
                             LEFT JOIN tbl_members m2 ON p.pid = m2.member_id COLLATE utf8mb4_unicode_ci
-                        `, [updatePayload.pastor_id]);
+                        `, [effectivePastorId]);
 
                         if (pastorRows.length > 0 && pastorRows[0].name) {
                             pastor_name = pastorRows[0].name;
@@ -1064,7 +1132,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     }
                 }
 
-                await sendStatusNotificationEmail({
+                const emailParams = {
                     email,
                     firstname,
                     lastname,
@@ -1073,7 +1141,34 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     scheduled_date: updatePayload.scheduled_date,
                     pastor_name,
                     location: updatePayload.location !== undefined ? updatePayload.location : currentLocation
-                });
+                };
+
+                await sendStatusNotificationEmail(emailParams);
+
+                // Send to Companions
+                let companions = [];
+                try {
+                    const rawNotes = updatePayload.notes || currentRows[0].notes;
+                    const notesObj = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+                    if (notesObj && Array.isArray(notesObj.companions)) {
+                        companions = notesObj.companions;
+                    }
+                } catch (e) {}
+
+                for (const companion of companions) {
+                    if (companion.email) {
+                        try {
+                            await sendStatusNotificationEmail({
+                                ...emailParams,
+                                email: companion.email,
+                                firstname: companion.firstname,
+                                lastname: companion.lastname
+                            });
+                        } catch (cErr) {
+                            console.error(`Companion schedule update failed for ${companion.email}:`, cErr);
+                        }
+                    }
+                }
             }
         }
 
@@ -1120,23 +1215,23 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
             const { createBibleStudyRequest } = require('../../dbHelpers/services/biblestudyRecords');
             await createBibleStudyRequest({
                 salvation_id: id,
-                firstname: current.firstname,
-                lastname: current.lastname,
-                middle_name: current.middle_name,
-                email: current.email,
-                phone_number: current.phone_number,
-                birthdate: current.birthdate,
-                age: current.age,
-                gender: current.gender,
-                address: current.address,
-                civil_status: current.civil_status,
-                profession: current.profession,
-                spouse_name: current.spouse_name,
-                marriage_date: current.marriage_date,
-                children: current.children,
-                guardian_name: current.guardian_name,
-                guardian_contact: current.guardian_contact,
-                guardian_relationship: current.guardian_relationship,
+                firstname: req.body.firstname || current.firstname,
+                lastname: req.body.lastname || current.lastname,
+                middle_name: req.body.middle_name !== undefined ? req.body.middle_name : current.middle_name,
+                email: req.body.email || current.email,
+                phone_number: req.body.phone_number || current.phone_number,
+                birthdate: req.body.birthdate || current.birthdate,
+                age: req.body.age || current.age,
+                gender: req.body.gender || current.gender,
+                address: req.body.address || current.address,
+                civil_status: req.body.civil_status || current.civil_status,
+                profession: req.body.profession || current.profession,
+                spouse_name: req.body.spouse_name || current.spouse_name,
+                marriage_date: req.body.marriage_date || current.marriage_date,
+                children: req.body.children || current.children,
+                guardian_name: req.body.guardian_name || current.guardian_name,
+                guardian_contact: req.body.guardian_contact || current.guardian_contact,
+                guardian_relationship: req.body.guardian_relationship || current.guardian_relationship,
                 scheduled_date,
                 pastor_id,
                 location,
@@ -1144,57 +1239,79 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
                 status: scheduled_date ? 'Scheduled' : 'Pending'
             });
 
-            // Send confirmation email
-            if (current.email) {
-                let pastor_name = 'To be assigned';
-                if (pastor_id) {
-                    try {
-                        const [pastorRows] = await query(`
-                            SELECT 
-                                COALESCE(
-                                    CONCAT(m1.firstname, ' ', m1.lastname),
-                                    CONCAT(m2.firstname, ' ', m2.lastname)
-                                ) as name
-                            FROM (SELECT ? as pid) p
-                            LEFT JOIN tbl_accounts a ON p.pid = a.acc_id
-                            LEFT JOIN tbl_members m1 ON a.email = m1.email COLLATE utf8mb4_unicode_ci
-                            LEFT JOIN tbl_members m2 ON p.pid = m2.member_id COLLATE utf8mb4_unicode_ci
-                        `, [pastor_id]);
-                        
-                        if (pastorRows.length > 0 && pastorRows[0].name) {
-                            pastor_name = `Pastor ${pastorRows[0].name}`;
-                        } else {
-                            pastor_name = 'To be assigned';
-                        }
-                    } catch (e) {
-                        console.error('Error fetching pastor for email:', e);
-                        pastor_name = 'To be assigned';
-                    }
-                }
-
+            // --- EMAIL NOTIFICATION LOGIC ---
+            const pastor_name = await getResolvedPastorName(pastor_id);
+            
+            // 1. Send to Lead/Primary
+            const targetEmail = req.body.email || current.email;
+            if (targetEmail && targetEmail.trim() !== '') {
                 await emailHelper.sendBibleStudyInvitation({
-                    email: current.email,
-                    firstname: current.firstname,
-                    lastname: current.lastname,
+                    email: targetEmail,
+                    firstname: req.body.firstname || current.firstname,
+                    lastname: req.body.lastname || current.lastname,
                     scheduled_date,
                     location,
                     pastor_name
                 });
             }
-        } else {
+
+            // 2. Send to Companions (if this is a group promotion)
+            try {
+                const notesStr = req.body.notes || '';
+                const notesObj = typeof notesStr === 'string' ? JSON.parse(notesStr || '{}') : notesStr;
+                if (notesObj.companions && Array.isArray(notesObj.companions)) {
+                    for (const comp of notesObj.companions) {
+                        if (comp.email && comp.email.trim() !== '') {
+                            await emailHelper.sendBibleStudyInvitation({
+                                email: comp.email,
+                                firstname: comp.firstname,
+                                lastname: comp.lastname,
+                                scheduled_date: comp.scheduled_date || scheduled_date,
+                                location: comp.location || location,
+                                pastor_name: comp.pastor_name || pastor_name
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error sending companion emails during group promotion:', e);
+            }
+            } else {
             // Hesitant: Send form link
-            const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
-            const bibleStudyLink = `${frontendUrl}/beoneofus/bible-study?ref=${id}`;
-            await emailHelper.sendBibleStudyFormLink({
-                email: current.email,
-                firstname: current.firstname,
-                lastname: current.lastname,
-                formLink: bibleStudyLink,
-                request_id: id
-            });
+            const targetEmail = req.body.email || current.email;
+            if (targetEmail && targetEmail.trim() !== '') {
+                const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
+                const bibleStudyLink = `${frontendUrl}/beoneofus/bible-study?ref=${id}`;
+                await emailHelper.sendBibleStudyFormLink({
+                    email: targetEmail,
+                    firstname: req.body.firstname || current.firstname,
+                    lastname: req.body.lastname || current.lastname,
+                    formLink: bibleStudyLink,
+                    request_id: id
+                });
+            }
+
+            // Add bible_study_invited flag to notes
+            let notesData = {};
+            try {
+                notesData = typeof current.notes === 'string' 
+                    ? (current.notes.startsWith('{') ? JSON.parse(current.notes) : { text: current.notes })
+                    : (current.notes || {});
+            } catch (e) {
+                notesData = { text: current.notes };
+            }
+            
+            notesData.bible_study_invited = true;
+            
+            await query(
+                'UPDATE tbl_discipleship_requests SET notes = ?, date_updated = NOW() WHERE request_id = ?',
+                [JSON.stringify(notesData), id]
+            );
         }
 
-        // 2. Mark Salvation as Promoted (Only if step 1 created the Bible Study record)
+
+        // 2. Only mark as Promoted when admin confirms scheduling (isDecided = true).
+        //    Sending an invitation link (isDecided = false) is just a nudge — keep their status unchanged.
         if (isDecided) {
             await query(
                 'UPDATE tbl_discipleship_requests SET status = \'Promoted\', date_updated = NOW() WHERE request_id = ?',
@@ -1697,5 +1814,26 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
     }
 });
 
+async function getResolvedPastorName(pastor_id) {
+    if (!pastor_id) return 'To be assigned';
+    try {
+        const [pastorRows] = await query(`
+            SELECT 
+                COALESCE(
+                    NULLIF(TRIM(CONCAT_WS(' ', m1.firstname, m1.lastname)), ''),
+                    NULLIF(TRIM(CONCAT_WS(' ', m2.firstname, m2.lastname)), '')
+                ) as name
+            FROM (SELECT ? as pid) p
+            LEFT JOIN tbl_accounts a ON (p.pid = a.acc_id OR (p.pid REGEXP '^[0-9]+$' AND CAST(p.pid AS UNSIGNED) = a.acc_id))
+            LEFT JOIN tbl_members m1 ON a.email = m1.email COLLATE utf8mb4_unicode_ci
+            LEFT JOIN tbl_members m2 ON (p.pid = m2.member_id OR (p.pid REGEXP '^[0-9]+$' AND CAST(p.pid AS UNSIGNED) = m2.member_id)) COLLATE utf8mb4_unicode_ci
+        `, [pastor_id, pastor_id, pastor_id, pastor_id, pastor_id]);
+        
+        return (pastorRows.length > 0 && pastorRows[0].name) ? `Pastor ${pastorRows[0].name}` : 'To be assigned';
+    } catch (e) {
+        console.error('Error resolving pastor name:', e);
+        return 'To be assigned';
+    }
+}
 
 module.exports = router;

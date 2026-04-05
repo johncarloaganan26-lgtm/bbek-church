@@ -1575,9 +1575,11 @@ async function bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate =
           // Use provided completion date if available, otherwise fallback to existing or current date
           let finalCompletionDate;
           if (completionDate) {
-             finalCompletionDate = completionTime ? `${completionDate} ${completionTime}` : completionDate;
+             const datePart = moment(completionDate).format('YYYY-MM-DD');
+             const timePart = completionTime || '13:00:00';
+             finalCompletionDate = `${datePart} ${timePart}`;
           } else {
-             finalCompletionDate = baptism.baptism_date || moment().format('YYYY-MM-DD HH:mm');
+             finalCompletionDate = baptism.baptism_date ? moment(baptism.baptism_date).format('YYYY-MM-DD HH:mm:ss') : moment().format('YYYY-MM-DD HH:mm:ss');
           }
 
           console.log(`📅 Marking baptism ${baptismId} as completed with date ${finalCompletionDate}`);
@@ -1652,11 +1654,11 @@ async function processBaptismCompletion(baptismId, customDateCreated = null) {
 
       let existingMember = null;
 
-      // Try finding by email AND name
+      // Try finding by email AND full name (now including middle name)
       if (email && baptism.firstname && baptism.lastname) {
         const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))',
-          [email, baptism.firstname, baptism.lastname]
+          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL))',
+          [email, baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null]
         );
         if (rows.length > 0) {
           existingMember = { member_id: rows[0].member_id };
@@ -1664,11 +1666,11 @@ async function processBaptismCompletion(baptismId, customDateCreated = null) {
         }
       }
 
-      // Try finding by phone AND name if not found yet
+      // Try finding by phone AND full name if not found yet
       if (!existingMember && baptism.phone_number && baptism.firstname && baptism.lastname) {
         const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE phone_number = ? AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))',
-          [baptism.phone_number, baptism.firstname, baptism.lastname]
+          'SELECT member_id FROM tbl_members WHERE phone_number = ? AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL))',
+          [baptism.phone_number, baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null]
         );
         if (rows.length > 0) {
           existingMember = { member_id: rows[0].member_id };
@@ -1676,12 +1678,12 @@ async function processBaptismCompletion(baptismId, customDateCreated = null) {
         }
       }
 
-      // Try finding by name + birthdate (Existing fallback)
+      // Try finding by full name + birthdate (Existing fallback - now with middle name)
       if (!existingMember && baptism.firstname && baptism.lastname && baptism.birthdate) {
         const birthdateFormatted = moment(baptism.birthdate).format('YYYY-MM-DD');
         const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND birthdate = ?',
-          [baptism.firstname, baptism.lastname, birthdateFormatted]
+          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL)) AND birthdate = ?',
+          [baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null, birthdateFormatted]
         );
         if (rows.length > 0) {
           existingMember = { member_id: rows[0].member_id };
@@ -1725,7 +1727,10 @@ async function processBaptismCompletion(baptismId, customDateCreated = null) {
           const baptismName = `${baptism.firstname || ''} ${baptism.lastname || ''}`.trim().toLowerCase();
           const duplicateName = (duplicate.name || '').trim().toLowerCase();
 
-          if (baptismName === duplicateName) {
+          const mName1 = (baptism.middle_name || '').trim().toLowerCase();
+          const mName2 = (duplicate.middle_name || '').trim().toLowerCase();
+
+          if (baptismName === duplicateName && mName1 === mName2) {
             memberId = duplicate.member_id;
             console.log(`Duplicate confirmed as the same person. Linking to existing member ID: ${memberId}`);
             await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
@@ -1915,7 +1920,8 @@ async function bulkCompleteWaterBaptisms(baptismIds, completionDate = null, comp
               status: 'completed',
               recipientName: recipientName,
               memberName: recipientName,
-              baptismDate: completionTimestamp,  // Use the completion timestamp as the baptism date
+              completionDate: b.baptism_date || moment().format('YYYY-MM-DD HH:mm'),
+              baptismDate: finalCompletionDate,
               baptismTime: baptism.baptism_time || '',
               location: baptism.location || '',
               pastorName: baptism.pastor_name || '',

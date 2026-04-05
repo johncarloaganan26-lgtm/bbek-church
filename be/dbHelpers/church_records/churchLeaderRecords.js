@@ -670,7 +670,7 @@ async function getAllChurchLeadersForSelect() {
       success: true,
       message: 'Pastors retrieved successfully for selection',
       data: result.data.map(pastor => ({
-        id: pastor.acc_id || pastor.member_id, // Ensure we always have an ID for selection
+        id: String(pastor.acc_id || pastor.member_id), // Force String format for reliable v-select matching
         member_id: pastor.member_id,
         acc_id: pastor.acc_id,
         name: pastor.name

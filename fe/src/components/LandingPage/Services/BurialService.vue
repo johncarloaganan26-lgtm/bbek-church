@@ -88,7 +88,7 @@
                     </p>
                     <v-expansion-panels variant="accordion" class="dates-panel">
                       <v-expansion-panel
-                        v-for="(dateGroup, index) in availableBurialDates" 
+                        v-for="(dateGroup, index) in availableBurialDates.slice(0, 4)" 
                         :key="dateGroup.date"
                         variant="flat"
                         class="mb-2 sunday-panel"
@@ -117,7 +117,7 @@
                                 variant="flat"
                                 style="color: white !important;"
                               >
-                                {{ dateGroup.bookedByCount }}/{{ dateGroup.timeSlots[0]?.maxCapacity || 1 }} booked
+                                {{ dateGroup.bookedByCount }}/1 booked
                               </v-chip>
                             </div>
                           </div>
@@ -140,9 +140,12 @@
                           <p v-else style="font-family: 'Georgia', serif; color: #115e59;">
                             No time slots available for this date.
                           </p>
-                 </v-expansion-panel-text>
+                        </v-expansion-panel-text>
                       </v-expansion-panel>
                     </v-expansion-panels>
+                    <p v-if="availableBurialDates.length > 4" class="text-caption text-grey mt-2" style="font-family: 'Georgia', serif;">
+                      + {{ availableBurialDates.length - 4 }} more dates available
+                    </p>
                   </div>
                   <!-- No dates available -->
                   <div v-else class="text-center py-4">
@@ -433,10 +436,10 @@
                       </div>
                     </div>
 
-                    <!-- Cause of Death -->
+                    <!-- Reason of Death -->
                     <div class="form-group">
                       <label for="reason-of-death">
-                        Cause of Death <span class="required-text">Required</span>
+                        Reason of Death <span class="required-text">Required</span>
                       </label>
                       <p class="field-note">Cause of death (if known)</p>
                       <v-text-field
@@ -452,7 +455,7 @@
                       ></v-text-field>
                     </div>
 
-                    <!-- Preferred Service Date & Time -->
+                    <!-- Preferred Service Date & Time (Night Service Default) -->
                     <div class="form-group">
                       <label for="preferred-service-date">
                         Preferred Service Date & Time <span class="required-text">Required</span>
@@ -502,6 +505,27 @@
                         :disabled="burialServiceStore.loading"
                         maxlength="255"
                       ></v-text-field>
+                    </div>
+
+                    <div class="agreement-wrapper my-6">
+                      <div class="d-flex align-start justify-center">
+                        <el-checkbox v-model="termsAgreed" class="terms-checkbox large-checkbox mr-4" size="large"></el-checkbox>
+                        <div class="agreement-text" style="padding-top: 6px;">
+                          <span class="text-body-2 text-grey-darken-3 font-weight-medium" style="line-height: 1.6; font-size: 0.95rem;">
+                            I agree to the 
+                            <a href="#" class="agreement-link font-weight-bold" style="color: #0d9488; text-decoration: none;" @click.stop.prevent="openAgreement('terms')">Terms of Service</a> 
+                            and 
+                            <a href="#" class="agreement-link font-weight-bold" style="color: #0d9488; text-decoration: none;" @click.stop.prevent="openAgreement('privacy')">Privacy Policy</a>
+                            to proceed with my request.
+                          </span>
+                        </div>
+                      </div>
+                      <v-expand-transition>
+                        <div v-if="agreementError" class="text-caption text-error font-weight-bold mt-2 text-center" style="color: #ef4444;">
+                          <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                          {{ agreementError }}
+                        </div>
+                      </v-expand-transition>
                     </div>
 
                     <v-btn
@@ -566,7 +590,7 @@
                       </el-select>
                     </el-form-item>
 
-                    <!-- Preferred Service Date & Time -->
+                    <!-- Preferred Service Date & Time (Night Service Default) -->
                     <el-form-item>
                       <template #label>
                         <span>Preferred Service Date & Time <span class="required-text">Required</span></span>
@@ -639,7 +663,7 @@
 
                     <el-form-item>
                       <template #label>
-                        <span>Cause of Death <span class="required-text">Required</span></span>
+                        <span>Reason of Death <span class="required-text">Required</span></span>
                       </template>
                       <el-input
                         v-model="memberFormData.reason_of_death"
@@ -648,6 +672,27 @@
                         maxlength="255"
                       />
                     </el-form-item>
+
+                    <div class="agreement-wrapper my-6 text-left">
+                      <div class="d-flex align-start">
+                        <el-checkbox v-model="termsAgreed" class="terms-checkbox mr-3" size="large"></el-checkbox>
+                        <div class="agreement-text" style="padding-top: 2px;">
+                          <span class="text-body-2 text-grey-darken-3" style="line-height: 1.6; display: block;">
+                            I agree to the 
+                            <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('terms')">Terms of Service</a> 
+                            and 
+                            <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('privacy')">Privacy Policy</a>
+                            to proceed with my request.
+                          </span>
+                        </div>
+                      </div>
+                      <v-expand-transition>
+                        <div v-if="agreementError" class="text-caption text-error font-weight-bold mt-2 ml-10" style="color: #ef4444;">
+                          <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                          {{ agreementError }}
+                        </div>
+                      </v-expand-transition>
+                    </div>
 
                     <el-form-item>
                       <el-button
@@ -696,6 +741,12 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Agreement Modal -->
+    <AgreementModal 
+      v-model="showAgreementModal" 
+      :initial-tab="agreementTab" 
+    />
   </div>
 </template>
 
@@ -705,6 +756,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useBurialServiceStore } from '@/stores/ServicesRecords/burialServiceStore'
 import BurialServiceDialog from '@/components/Dialogs/BurialServiceDialog.vue'
+import AgreementModal from '@/components/Common/AgreementModal.vue'
 import axios from '@/api/axios'
 import { useCms } from '@/composables/useCms'
 
@@ -742,29 +794,18 @@ const autoRefreshIntervalId = ref(null)
 const fetchAvailableBurialDates = async () => {
   loadingAvailableDates.value = true
   try {
-    const response = await axios.get('/services/burial-services/available-slots', {
-      params: { days: 30 }
+    const token = localStorage.getItem('token')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+    
+    const response = await axios.get('/church-records/burial-services/getAvailableBurialDates', {
+      params: { daysAhead: 30 },
+      headers
     })
     
     if (response.data && response.data.success) {
-      const rawDates = response.data.data || []
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      availableBurialDates.value = rawDates
-        .filter(group => {
-          const slotDate = new Date(group.date)
-          slotDate.setHours(0, 0, 0, 0)
-          return slotDate > today
-        })
-        .map(group => ({
-          ...group,
-          bookedByCount: group.timeSlots.reduce((sum, slot) => sum + (slot.bookedCount || 0), 0),
-          timeSlots: group.timeSlots.map(slot => ({
-            ...slot,
-            displayTime: slot.display || slot.time
-          }))
-        }))
+      // API returns { success: true, data: { availableDates: [...] } }
+      const responseData = response.data.data || response.data
+      availableBurialDates.value = responseData.availableDates || responseData.dates || response.data.dates || []
     } else {
       availableBurialDates.value = []
     }
@@ -817,20 +858,20 @@ const memberFormData = reactive({
   preferred_service_date: null
 })
 
-// Default service time (tomorrow at 10:00 AM instead of hardcoded 8 PM)
+// Preferred service date/time (default to tomorrow 6:00 PM)
 const getDefaultNightTimeDate = () => {
   const date = new Date()
   date.setDate(date.getDate() + 1) // Tomorrow
-  date.setHours(10, 0, 0, 0) // Default to 10:00 AM
+  date.setHours(20, 0, 0, 0) // 8:00 PM
   return date
 }
 
 const preferredServiceDate = ref(getDefaultNightTimeDate())
 const defaultNightTimeDate = computed(() => getDefaultNightTimeDate())
 
-// Allow all hours now
+// Disable hours - only allow night hours (6 PM - 10 PM)
 const disabledNightHours = () => {
-  return []
+  return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23]
 }
 
 // Relationship options for dropdown
@@ -853,6 +894,17 @@ const submitError = ref('')
 const isSubmitting = ref(false)
 const showBurialDialog = ref(false)
 const burialDialogRef = ref(null)
+
+// Agreement State
+const termsAgreed = ref(false)
+const showAgreementModal = ref(false)
+const agreementTab = ref('terms')
+const agreementError = ref('')
+
+const openAgreement = (tab) => {
+  agreementTab.value = tab
+  showAgreementModal.value = true
+}
 
 // Success dialog state
 const successDialog = ref({
@@ -1004,6 +1056,14 @@ const handleSubmit = async (e) => {
     return
   }
 
+  // Agreement validation
+  if (!termsAgreed.value) {
+    agreementError.value = 'You must agree to the Terms of Service and Privacy Policy.'
+    ElMessage.error('Please agree to the Terms of Service and Privacy Policy.')
+    return
+  }
+  agreementError.value = ''
+
   try {
     // Show confirmation dialog
     const isMemberRequest = isLoggedIn.value && userInfo.value.member && userInfo.value.member.member_id
@@ -1099,7 +1159,6 @@ const handleMemberSubmit = async () => {
   submitMessage.value = ''
   submitError.value = ''
 
-  // Basic validation
   if (!memberFormData.deceased_name.trim() || !memberFormData.deceased_birthdate || 
       !memberFormData.date_death || !memberFormData.relationship || !memberFormData.burial_location.trim() ||
       !memberFormData.reason_of_death.trim() || !preferredServiceDate.value) {
@@ -1107,6 +1166,14 @@ const handleMemberSubmit = async () => {
     ElMessage.error('Please select a burial service time slot from the available dates on the left.')
     return
   }
+
+  // Agreement validation
+  if (!termsAgreed.value) {
+    agreementError.value = 'You must agree to the Terms of Service and Privacy Policy.'
+    ElMessage.error('Please agree to the Terms of Service and Privacy Policy.')
+    return
+  }
+  agreementError.value = ''
 
   try {
     isSubmitting.value = true
@@ -1697,5 +1764,29 @@ const selectBurialTimeSlot = (date, time) => {
   margin-top: -4px;
   margin-bottom: 8px;
   font-style: italic;
+}
+
+/* Large Checkbox Overrides */
+.large-checkbox :deep(.el-checkbox__inner) {
+  width: 32px !important;
+  height: 32px !important;
+  border-width: 2px !important;
+  border-color: #0d9488 !important;
+}
+
+.large-checkbox :deep(.el-checkbox__inner::after) {
+  height: 16px !important;
+  width: 8px !important;
+  left: 11px !important;
+  top: 4px !important;
+  border-width: 3px !important;
+}
+
+.large-checkbox.is-checked :deep(.el-checkbox__inner) {
+  background-color: #0d9488 !important;
+}
+
+.large-checkbox :deep(.el-checkbox__label) {
+  display: none !important; /* We use a custom div for text for better control */
 }
 </style>

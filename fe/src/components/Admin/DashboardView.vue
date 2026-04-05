@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="mb-6">
       <h1 class="text-h3 font-weight-bold mb-2">Church Admin Dashboard</h1>
-      <p class="text-body-1 grey--text">Welcome back! Here's what's happening at BBEK Church.</p>
+      <p class="text-body-1 grey--text">Welcome back! Here's what's happening at Bible Baptist Ekklesia of Kawit.</p>
     </div>
 
     <!-- Summary Cards -->

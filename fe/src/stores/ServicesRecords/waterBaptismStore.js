@@ -459,7 +459,7 @@ export const useWaterBaptismStore = defineStore('waterBaptism', {
       }
     },
 
-    async bulkCompleteBaptisms(baptismIds, completionDate = null, completionTime = null, customMemberDateCreated = null) {
+    async bulkCompleteWaterBaptisms(baptismIds, completionDate = null, completionTime = null, customMemberDateCreated = null) {
       this.loading = true
       this.error = null
       const accessToken = localStorage.getItem('accessToken')

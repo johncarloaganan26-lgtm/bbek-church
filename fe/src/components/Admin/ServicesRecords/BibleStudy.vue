@@ -115,39 +115,33 @@
         </v-row>
 
         <!-- Bulk Action Summary (Tonal Alert Style) -->
-        <v-row v-if="selectedRows.length > 0" class="mt-4">
-          <v-col cols="12">
-            <v-alert
-              type="info"
-              variant="tonal"
-              class="mb-0"
-              density="compact"
-            >
-              <div class="d-flex align-center justify-space-between">
-                <div class="text-body-2">
-                  <strong>{{ selectedRows.length }}</strong> record{{ selectedRows.length > 1 ? 's' : '' }} selected
-                </div>
-                <div class="d-flex gap-2">
-                  <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-pencil" @click="handleBulkEdit">
-                    Bulk Edit
-                  </v-btn>
-                  <v-btn color="teal-darken-1" variant="flat" size="small" prepend-icon="mdi-water" @click="handleBulkPromote">
-                    Bulk Promote
-                  </v-btn>
-                  <v-btn color="success" variant="flat" size="small" prepend-icon="mdi-check" @click="handleBulkComplete">
-                    Mark Completed
-                  </v-btn>
-                  <v-btn color="error" variant="flat" size="small" prepend-icon="mdi-archive" @click="handleBulkArchive">
-                    Archive
-                  </v-btn>
-                  <v-btn variant="outlined" size="small" prepend-icon="mdi-close" @click="selectedRows = []">
-                    Clear
-                  </v-btn>
-                </div>
-              </div>
-            </v-alert>
-          </v-col>
-        </v-row>
+        <div v-if="selectedRows.length > 0" class="bulk-actions-bar mt-3 pa-3 d-flex align-center gap-2">
+          <v-chip color="primary" size="small" class="mr-2 font-weight-bold px-3" label>
+            <v-icon start size="14">mdi-checkbox-marked</v-icon>
+            {{ selectedRows.length }} SELECTED
+          </v-chip>
+          <v-btn color="primary" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkEdit">
+            <v-icon start size="16">mdi-pencil</v-icon>
+            Bulk Edit
+          </v-btn>
+          <v-btn color="teal-darken-1" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkPromote">
+            <v-icon start size="16">mdi-water</v-icon>
+            Bulk Promote
+          </v-btn>
+          <v-btn color="success" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkComplete">
+            <v-icon start size="16">mdi-check</v-icon>
+            Mark Completed
+          </v-btn>
+          <v-btn color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkArchive">
+            <v-icon start size="16">mdi-archive</v-icon>
+            Archive
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" size="small" color="grey-darken-1" class="text-none" @click="selectedRows = []">
+            <v-icon start size="14">mdi-close</v-icon>
+            Clear
+          </v-btn>
+        </div>
       </v-card-text>
     </v-card>
 
@@ -169,6 +163,7 @@
             <th class="text-left font-weight-bold">Type</th>
             <th class="text-left font-weight-bold" style="min-width: 130px; color: #424242">Contact</th>
             <th class="text-left font-weight-bold" style="min-width: 150px; color: #424242">Address</th>
+            <th class="text-left font-weight-bold">Assigned Pastor</th>
             <th class="text-left font-weight-bold">Status</th>
             <th class="text-left font-weight-bold">Schedule</th>
             <th class="text-left font-weight-bold" style="width: 120px;">Actions</th>
@@ -204,14 +199,22 @@
               <div v-if="item.phone_number" class="text-caption text-grey">{{ item.phone_number }}</div>
             </td>
             <td>
-              <div class="text-caption text-grey-darken-2" style="max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="item.location || item.address || ''">
-                {{ item.location || item.address || '' }}
+              <div class="d-flex align-center">
+                <div class="text-caption text-grey-darken-2 text-truncate" style="max-width: 150px;" :title="item.location || item.address || ''">
+                  <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>{{ item.location || item.address || '' }}
+                </div>
+                <v-chip v-if="isGroup(item)" size="x-small" color="teal" variant="flat" class="ml-2 font-weight-black shadow-sm" style="font-size: 9px; height: 16px;">
+                  +{{ getGroupSize(item) }} COMPANIONS
+                </v-chip>
               </div>
             </td>
+            <td>{{ item.pastor_name || getPastorName(item.pastor_id) }}</td>
             <td>
-              <v-chip size="small" :color="getStatusColor(item.status)" class="text-white font-weight-bold px-2">
-                {{ item.status }}
-              </v-chip>
+              <div class="d-flex align-center">
+                <v-chip size="small" :color="getStatusColor(item.status)" class="text-white font-weight-bold px-2">
+                  {{ item.status === 'Completed' && isBaptismInvited(item) ? 'Completed | Invited' : item.status }}
+                </v-chip>
+              </div>
             </td>
             <td>
                <div v-if="item.scheduled_date">
@@ -223,7 +226,18 @@
             <td>
               <div class="d-flex gap-2">
                 <v-btn
-                  variant="tonal"
+                  v-if="isGroup(item)"
+                  variant="outlined"
+                  size="small"
+                  color="teal"
+                  @click="openCompanionsDialog(item)"
+                >
+                  <v-icon>mdi-account-group</v-icon>
+                  <v-tooltip activator="parent" location="top">View Companions ({{ getGroupSize(item) }})</v-tooltip>
+                </v-btn>
+
+                <v-btn
+                  variant="outlined"
                   size="small"
                   color="primary"
                   @click="openEditDialog(item)"
@@ -234,7 +248,7 @@
 
                 <v-btn
                   v-if="item.status === 'Completed'"
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="teal-darken-3"
                   @click="promoteToBaptism(item)"
@@ -245,7 +259,7 @@
 
                 <v-btn
                   v-if="['Pending', 'Scheduled'].includes(item.status)"
-                  variant="tonal"
+                  variant="outlined"
                   size="small"
                   color="error"
                   @click="rejectItem(item)"
@@ -273,13 +287,13 @@
     </v-card>
 
     <!-- Edit Dialog -->
-    <v-dialog v-model="dialogVisible" max-width="500px">
-      <v-card>
-        <v-card-title class="bg-primary text-white d-flex align-center">
-           <v-icon class="mr-2">{{ isBulkEditing ? 'mdi-account-group' : 'mdi-pencil' }}</v-icon>
-           {{ isBulkEditing ? `Bulk Update ${selectedRows.length} Sessions` : 'Update Bible Study Session' }}
+    <v-dialog v-model="dialogVisible" max-width="900px" persistent>
+      <v-card class="rounded-xl overflow-hidden d-flex flex-column" style="max-height: 90vh;">
+        <v-card-title class="bg-primary text-white d-flex align-center flex-shrink-0">
+           <v-icon class="mr-2">mdi-pencil</v-icon>
+           Update Bible Study Session
         </v-card-title>
-        <v-card-text class="mt-4">
+        <v-card-text class="mt-4 flex-grow-1 overflow-y-auto scrollbar-thin">
           <v-row>
             <v-col cols="12" md="6">
               <v-select
@@ -350,7 +364,7 @@
                     <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
                     {{ formatTime(slot.time) }}
                     <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                      ({{ slot.bookedCount || 0 }}{{ slot.maxCapacity ? '/' + slot.maxCapacity : '' }})
+                      ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
                     </span>
                   </v-chip>
                 </div>
@@ -388,26 +402,37 @@
 
     <!-- Promotion Choice Dialog (Enhanced for Bulk Support) -->
     <v-dialog v-model="promotionDialogVisible" :max-width="isBulkPromoting ? '650px' : '480px'">
-      <v-card class="rounded-xl overflow-hidden elevation-24">
-        <v-card-title class="bg-teal-darken-2 text-white text-center py-5 d-flex flex-column align-center">
+      <v-card class="rounded-xl overflow-hidden elevation-24 d-flex flex-column" style="max-height: 90vh;">
+        <v-card-title class="bg-teal-darken-2 text-white text-center py-5 d-flex flex-column align-center flex-shrink-0">
           <v-avatar color="white" size="56" class="mb-2 elevation-2">
             <v-icon color="teal-darken-2" size="32">mdi-water-check</v-icon>
           </v-avatar>
           <div class="text-h5 font-weight-bold">Water Baptism Promotion</div>
-          <span v-if="isBulkPromoting" class="text-caption opacity-80" style="color: white !important;">Group Action ({{ selectedRows.length }} Selected Candidates)</span>
+          <span v-if="isBulkPromoting" class="text-caption opacity-80" style="color: white !important;">
+            Group Action ({{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }} Selected Candidates)
+          </span>
         </v-card-title>
         
-        <v-card-text class="pa-6 bg-grey-lighten-4">
+        <v-card-text class="pa-6 bg-grey-lighten-4 overflow-y-auto flex-grow-1 scrollbar-thin">
           <div v-if="isBulkPromoting" class="mb-4">
             <label class="text-subtitle-2 font-weight-bold d-block mb-2 text-teal-darken-3 d-flex align-center">
               <v-icon size="18" class="mr-2">mdi-account-group</v-icon>
-              Selected Candidates ({{ selectedRows.length }})
+              Selected Candidates ({{ promotingCompanions.length > 0 ? promotingCompanions.length : selectedRows.length }})
             </label>
             <v-card variant="outlined" class="pa-2 bg-white rounded-lg border-teal border-dashed" style="max-height: 120px; overflow-y: auto;">
               <div class="d-flex flex-wrap gap-1">
-                <v-chip v-for="id in selectedRows" :key="id" size="x-small" color="teal-lighten-4" class="teal--text font-weight-bold">
-                  {{ requests.find(r => r.request_id === id)?.firstname }} {{ requests.find(r => r.request_id === id)?.lastname }}
-                </v-chip>
+                <!-- Case A: Promotion from Companion Console -->
+                <template v-if="promotingCompanions.length > 0">
+                  <v-chip v-for="(person, idx) in promotingCompanions" :key="idx" size="x-small" color="teal-lighten-4" class="teal--text font-weight-bold">
+                    {{ person.firstname }} {{ person.lastname }}
+                  </v-chip>
+                </template>
+                <!-- Case B: Promotion from Main Requests Table -->
+                <template v-else>
+                  <v-chip v-for="id in selectedRows" :key="id" size="x-small" color="teal-lighten-4" class="teal--text font-weight-bold">
+                    {{ requests.find(r => r.request_id === id)?.firstname }} {{ requests.find(r => r.request_id === id)?.lastname }}
+                  </v-chip>
+                </template>
               </div>
             </v-card>
           </div>
@@ -461,24 +486,49 @@
                       {{ dateGroup.displayDate }}
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                      <v-chip
+                       <v-chip
                         v-for="slot in dateGroup.timeSlots"
                         :key="slot.datetime"
                         size="small"
                         variant="flat"
                         :color="bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'teal' : 'grey-lighten-4'"
                         :class="['elevation-1', bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'text-white' : 'text-teal font-weight-bold']"
-                        @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time"
+                        @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time; overrideTime = false"
                         style="cursor: pointer;"
                       >
                         <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
                         {{ formatTime(slot.time) }}
                         <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                          ({{ slot.bookedCount || 0 }}{{ slot.maxCapacity ? '/' + slot.maxCapacity : '' }})
+                          ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
                         </span>
                       </v-chip>
                     </div>
                   </div>
+                </div>
+
+                <!-- Custom Time Override -->
+                <div v-if="bulkPromotionData.baptism_date" class="mx-1 mb-4">
+                   <div class="d-flex align-center mb-1">
+                      <v-checkbox v-model="overrideTime" label="Use custom baptism time" density="compact" hide-details color="teal" class="custom-time-check"></v-checkbox>
+                      <v-tooltip location="right" text="Enable if you want to set a time different from the selected slot.">
+                         <template v-slot:activator="{ props }"><v-icon v-bind="props" size="14" class="ml-1 opacity-50">mdi-information-outline</v-icon></template>
+                      </v-tooltip>
+                   </div>
+                   <v-expand-transition>
+                      <div v-if="overrideTime" class="ml-8 mt-1">
+                         <v-combobox
+                            v-model="bulkPromotionData.baptism_time"
+                            :items="promotionTimeOptions"
+                            label="Set Custom Time"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            placeholder="e.g. 1:45 PM"
+                            @update:model-value="handlePromotionTimeInput"
+                         ></v-combobox>
+                         <p class="text-caption text-grey mt-1">Accepts formats like '2:15 PM'. Minimum 1:00 PM.</p>
+                      </div>
+                   </v-expand-transition>
                 </div>
                 
                 <v-alert v-else type="info" variant="tonal" density="compact" class="mb-2">
@@ -570,31 +620,318 @@
     </v-dialog>
 
     <!-- Water Baptism Admin Registration Dialog -->
-    <v-dialog v-model="adminWaterBaptismDialogVisible" max-width="900px" persistent height="90vh">
-      <v-card class="rounded-xl overflow-hidden position-relative d-flex flex-column" height="100%">
-        <v-btn
-          icon="mdi-close"
-          variant="text"
-          color="grey-darken-2"
-          class="position-absolute z-10"
-          style="top: 10px; right: 10px;"
-          @click="adminWaterBaptismDialogVisible = false"
-        ></v-btn>
-        <v-card-text class="pa-0 flex-grow-1 overflow-y-auto">
+    <v-dialog v-model="adminWaterBaptismDialogVisible" max-width="1100px" persistent>
+      <v-card class="rounded-xl bg-white overflow-y-auto" style="max-height: 90vh;">
+        <!-- Dialog Header (Fixed via sticky) -->
+        <div class="bg-teal-darken-3 text-white d-flex align-center py-4 px-6 shadow-sm sticky-top" style="z-index: 10;">
+          <div class="d-flex align-center">
+            <v-icon icon="mdi-water" class="mr-3" size="28"></v-icon>
+            <div>
+              <div class="font-weight-bold text-h6">Water Baptism Promotion</div>
+              <div class="text-caption">Complete registration for {{ promotionData?.firstname }} {{ promotionData?.lastname }}</div>
+            </div>
+          </div>
+          <v-spacer></v-spacer>
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            color="white"
+            @click="adminWaterBaptismDialogVisible = false"
+          ></v-btn>
+        </div>
+
+        <div class="pa-4">
           <WaterBaptismRegistration
             admin-mode
             :admin-data="promotionData"
             @success="handlePromotionSubmit"
           />
-        </v-card-text>
+        </div>
       </v-card>
     </v-dialog>
 
-    <!-- Availability Manager Dialog -->
-    <AvailabilityManager 
-      v-model="availabilityManagerVisible" 
-      initial-service="bible_study" 
-    />
+    <!-- Companion Management Console -->
+    <v-dialog v-model="companionsDialogVisible" max-width="1100px" persistent>
+      <v-card class="rounded-xl overflow-hidden shadow-2xl d-flex flex-column" style="max-height: 90vh;">
+        <div class="bg-teal-darken-3 text-white d-flex align-center py-4 px-6 flex-shrink-0">
+          <div class="d-flex align-center">
+            <v-avatar color="teal-lighten-4" size="40" class="mr-3">
+              <v-icon color="teal-darken-3">mdi-account-group</v-icon>
+            </v-avatar>
+            <div class="d-flex flex-column">
+              <span class="text-h6 font-weight-bold">Group Management Console (Bible Study)</span>
+              <span class="text-caption" style="opacity: 0.9">Managing discipleship group for <b>{{ selectedGroup?.firstname }} {{ selectedGroup?.lastname }}</b></span>
+            </div>
+          </div>
+          <v-spacer></v-spacer>
+          <div class="d-flex gap-2">
+            <v-chip color="teal-lighten-4" text-color="teal-darken-4" size="small" class="font-weight-bold mr-2 px-4 shadow-sm">
+              <v-icon start size="14">mdi-account-multiple</v-icon>
+              {{ getGroupSize(selectedGroup) + 1 }} PARTICIPANTS
+            </v-chip>
+            <v-btn icon="mdi-close" variant="text" color="white" @click="companionsDialogVisible = false"></v-btn>
+          </div>
+        </div>
+
+        <v-card-text class="pa-0 flex-grow-1 overflow-y-auto bg-white">
+          <!-- Selection Actions Bar -->
+          <v-expand-transition>
+            <div v-if="selectedInGroup.length > 0" class="bulk-actions-bar pa-3 d-flex align-center gap-2 sticky-top border-b" style="z-index: 5; border-radius: 0;">
+              <v-chip color="teal-darken-2" size="small" class="mr-2 font-weight-black px-4">
+                {{ selectedInGroup.length }} SELECTED
+              </v-chip>
+              
+              <div class="d-flex gap-2">
+                <v-btn size="small" color="success" variant="outlined" @click="bulkActionInGroup('Scheduled')" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-calendar-check</v-icon>
+                  Schedule
+                </v-btn>
+                <v-btn v-if="allSelectedArePending" size="small" color="error" variant="outlined" @click="bulkActionInGroup('Rejected')" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-close-circle-outline</v-icon>
+                  Reject
+                </v-btn>
+                <v-divider vertical class="mx-1"></v-divider>
+                <v-btn size="small" color="teal-darken-2" variant="outlined" @click="openBulkEdit" class="bulk-action-btn font-weight-bold text-uppercase">
+                  <v-icon start size="16">mdi-pencil-box-multiple</v-icon>
+                  Bulk Edit
+                </v-btn>
+                <v-btn 
+                  size="small" 
+                  color="blue-darken-2" 
+                  variant="outlined" 
+                  @click="handleConsoleBulkPromote" 
+                  v-if="canBulkPromote"
+                  class="bulk-action-btn font-weight-bold text-uppercase"
+                >
+                  <v-icon start size="16">mdi-water</v-icon>
+                  Promote to Baptism
+                </v-btn>
+              </div>
+
+              <v-spacer></v-spacer>
+              
+              <v-btn size="small" variant="text" color="grey-darken-2" @click="selectedInGroup = []" class="text-none">
+                <v-icon start size="14">mdi-selection-off</v-icon>
+                Clear Selection
+              </v-btn>
+            </div>
+          </v-expand-transition>
+
+          <v-table hover fixed-header class="companion-management-table">
+            <thead>
+              <tr class="bg-grey-lighten-4">
+                <th class="text-center" style="width: 40px;">
+                  <v-checkbox
+                    v-model="groupSelectAll"
+                    density="compact"
+                    hide-details
+                    color="teal"
+                    @update:model-value="toggleGroupSelectAll"
+                  ></v-checkbox>
+                </th>
+                <th class="font-weight-bold text-uppercase py-4" style="font-size: 11px; letter-spacing: 0.5px;">Name</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Role / Info</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Email / Phone</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Assigned Pastor</th>
+                <th class="font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Schedule / Venue</th>
+                <th class="font-weight-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 0.5px;">Status</th>
+                <th class="text-center font-weight-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(person, idx) in companionsInGroup" :key="idx" :class="{ 'role-primary-row': person.type === 'primary' }">
+                <td class="text-center">
+                  <v-checkbox
+                    v-model="selectedInGroup"
+                    :value="idx"
+                    density="compact"
+                    hide-details
+                    color="teal"
+                  ></v-checkbox>
+                </td>
+                <td>
+                  <div class="d-flex align-center">
+                    <v-avatar :color="person.type === 'primary' ? 'teal-darken-1' : 'grey-lighten-2'" size="32" class="mr-3">
+                      <span class="text-caption font-weight-bold" :class="person.type === 'primary' ? 'text-white' : 'text-grey-darken-2'">
+                        {{ person.firstname.charAt(0) }}{{ person.lastname.charAt(0) }}
+                      </span>
+                    </v-avatar>
+                    <div>
+                      <div class="font-weight-bold text-body-2">{{ person.firstname }} {{ person.lastname }}</div>
+                      <div class="text-caption text-grey">{{ person.type === 'primary' ? 'Group Leader' : 'Companion' }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex flex-column gap-1">
+                    <v-chip size="x-small" :color="person.type === 'primary' ? 'teal' : 'blue-grey'" variant="flat" class="text-uppercase font-weight-black" style="font-size: 9px;">
+                      {{ person.type }}
+                    </v-chip>
+                  </div>
+                </td>
+                <td>
+                  <div class="text-body-2">{{ person.email || 'No Email' }}</div>
+                  <div class="text-caption text-grey">{{ person.phone_number || 'No Phone' }}</div>
+                </td>
+                <td>
+                  <div class="text-caption font-weight-bold text-grey-darken-3">
+                    <v-icon size="14" color="teal" class="mr-1">mdi-account-tie</v-icon>
+                    {{ getPastorName(person.pastor_id) }}
+                  </div>
+                </td>
+                <td>
+                  <div v-if="person.scheduled_date" class="text-caption font-weight-bold text-teal-darken-2">
+                    <v-icon size="12" class="mr-1">mdi-calendar-clock</v-icon>
+                    {{ formatDateTime(person.scheduled_date) }}
+                  </div>
+                  <div v-else class="text-caption text-grey font-italic">No schedule set</div>
+                  <div v-if="person.location" class="text-caption text-truncate" style="max-width: 150px;">
+                    <v-icon size="12" class="mr-1">mdi-map-marker</v-icon>
+                    {{ person.location }}
+                  </div>
+                </td>
+                <td class="text-center">
+                  <v-chip 
+                    size="small" 
+                    :color="getStatusColor(person.status)" 
+                    class="text-white font-weight-bold"
+                  >
+                     {{ person.status === 'Completed' && isBaptismInvited(person) ? 'Completed | Invited' : person.status }}
+                  </v-chip>
+                </td>
+                 <td class="text-center">
+                  <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" color="teal-darken-1" @click="openCompanionEdit(idx)"></v-btn>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+        
+        <v-card-actions class="pa-4 bg-grey-lighten-4 border-t d-flex justify-space-between align-center">
+            <div class="d-flex align-center">
+            <v-icon color="grey-darken-1" size="18" class="mr-2">mdi-information-outline</v-icon>
+            <span class="text-caption grey--text font-italic">
+                Bible Study groups are synchronized with the lead's record.
+            </span>
+            </div>
+            <v-btn color="grey-darken-2" variant="outlined" size="small" @click="companionsDialogVisible = false" class="px-6 rounded-lg">
+            Close Console
+            </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Bulk Edit Dialog (Console Context) -->
+    <v-dialog v-model="bulkEditVisible" max-width="900px">
+      <v-card class="rounded-xl overflow-hidden shadow-xl">
+        <v-card-title class="bg-teal-darken-2 text-white py-4 px-6 d-flex align-center">
+          <v-icon class="mr-3">mdi-pencil-box-multiple</v-icon>
+          <span class="text-h6 font-weight-bold font-heading">Update {{ selectedInGroup.length }} Candidates</span>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="bulkEditVisible = false" class="ml-auto"></v-btn>
+        </v-card-title>
+        
+        <v-card-text class="pa-0 d-flex bg-white flex-column flex-md-row position-relative">
+          <v-overlay v-model="bulkLoading" contained persistent class="align-center justify-center rounded-xl" scrim="white" opacity="0.8">
+            <v-progress-circular indeterminate color="teal-darken-2" size="64" width="6" class="mb-4"></v-progress-circular>
+          </v-overlay>
+
+          <div class="pa-6 flex-grow-1" style="overflow-y: auto; max-height: 65vh;">
+            <v-row dense>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="bulkForm.pastor_id"
+                  :items="pastors"
+                  item-title="name"
+                  item-value="id"
+                  label="Assigned Pastor"
+                  variant="outlined"
+                  density="compact"
+                  placeholder="Keep Current"
+                  clearable
+                  class="mb-2"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field v-model="bulkForm.location" label="Location" variant="outlined" density="compact" placeholder="Keep Current"></v-text-field>
+              </v-col>
+            </v-row>
+
+            <v-select v-model="bulkForm.status" :items="['Pending', 'Scheduled', 'Completed', 'Cancelled']" label="New Status" variant="outlined" density="compact" class="mt-2"></v-select>
+
+            <div v-if="slotsLoading" class="text-center pa-4">
+              <v-progress-circular indeterminate color="teal"></v-progress-circular>
+            </div>
+            <div v-else class="mt-4">
+                <label class="text-caption font-weight-bold grey--text d-block mb-2">New Schedule (Daily)</label>
+                <div class="bg-grey-lighten-5 rounded pa-3 border shadow-inner overflow-y-auto" style="max-height: 300px;">
+                <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="mb-4">
+                    <div class="text-caption font-weight-bold teal--text mb-2">{{ formatBibleStudyDate(dateGroup.date) }}</div>
+                    <div class="d-flex flex-wrap gap-2">
+                    <v-chip
+                        v-for="slot in dateGroup.timeSlots" :key="slot.datetime"
+                        size="small" variant="flat"
+                        :color="bulkForm.scheduled_date === slot.datetime ? 'teal' : 'white'"
+                        :class="[bulkForm.scheduled_date === slot.datetime ? 'text-white' : 'text-teal border']"
+                        @click="bulkForm.scheduled_date = slot.datetime"
+                    >
+                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                      {{ formatTime(slot.time) }}
+                      <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
+                        ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
+                      </span>
+                    </v-chip>
+                    </div>
+                </div>
+                </div>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions class="pa-4 bg-grey-lighten-4 border-t">
+          <v-spacer></v-spacer>
+          <v-btn color="grey-darken-1" variant="text" @click="bulkEditVisible = false">Cancel</v-btn>
+          <v-btn color="teal-darken-2" variant="flat" class="px-6" @click="applyBulkEdit">Apply Updates</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Companion Edit Dialog -->
+    <v-dialog v-model="companionEditVisible" max-width="800px">
+      <v-card class="rounded-xl shadow-xl">
+        <v-card-title class="bg-teal-darken-1 text-white py-4 d-flex align-center">
+          <v-icon class="mr-2">mdi-account-edit</v-icon>
+          Edit Candidate Details
+          <v-btn icon="mdi-close" variant="text" size="small" @click="companionEditVisible = false" class="ml-auto"></v-btn>
+        </v-card-title>
+        <v-card-text class="pa-6">
+          <v-row>
+            <v-col cols="12" md="6"><v-text-field v-model="companionForm.firstname" label="First Name" variant="outlined" density="compact"></v-text-field></v-col>
+            <v-col cols="12" md="6"><v-text-field v-model="companionForm.lastname" label="Last Name" variant="outlined" density="compact"></v-text-field></v-col>
+            <v-col cols="12" md="6"><v-text-field v-model="companionForm.email" label="Email" variant="outlined" density="compact"></v-text-field></v-col>
+            <v-col cols="12" md="6"><v-text-field v-model="companionForm.phone_number" label="Phone" variant="outlined" density="compact"></v-text-field></v-col>
+          </v-row>
+          <v-row>
+            <v-col cols="12" md="4">
+                <v-select
+                  v-model="companionForm.pastor_id"
+                  :items="pastors"
+                  item-title="name"
+                  item-value="id"
+                  label="Assigned Pastor"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                ></v-select>
+            </v-col>
+            <v-col cols="12" md="8"><v-text-field v-model="companionForm.location" label="Location" variant="outlined" density="compact"></v-text-field></v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions class="pa-4 bg-grey-lighten-4">
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="companionEditVisible = false">Cancel</v-btn>
+          <v-btn color="teal-darken-1" variant="flat" class="px-6" @click="saveIndividualCompanion">Save Changes</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -614,15 +951,266 @@ const settingsStore = useSystemSettingsStore();
 const { requests, loading, totalCount, currentPage, pastors } = storeToRefs(store);
 const { settings, loading: settingsLoading } = storeToRefs(settingsStore);
 
-const isGroup = (item) => {
-  if (!item.notes) return false;
+// New states for companion console
+const bulkEditVisible = ref(false);
+const bulkLoading = ref(false);
+const bulkForm = ref({ status: '', pastor_id: null, location: '', scheduled_date: null });
+
+const companionEditVisible = ref(false);
+const editingCompanionIndex = ref(-1);
+const companionForm = ref({ 
+  firstname: '', 
+  lastname: '', 
+  email: '', 
+  phone_number: '', 
+  age: '', 
+  gender: '',
+  status: '',
+  pastor_id: null,
+  location: '',
+  scheduled_date: null
+});
+
+const openBulkEdit = () => {
+  if (selectedInGroup.value.length === 0) return;
+  const selectedPeople = selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
+  
+  const getCommon = (key) => {
+    const values = selectedPeople.map(p => p[key]);
+    const first = values[0];
+    const allSame = values.every(v => v === first);
+    return allSame ? first : null;
+  };
+
+  bulkForm.value = { 
+    status: getCommon('status') || '', 
+    pastor_id: getCommon('pastor_id') || null, 
+    location: getCommon('location') || '', 
+    scheduled_date: getCommon('scheduled_date') || null 
+  };
+  bulkEditVisible.value = true;
+  fetchAvailableSlots();
+};
+
+const applyBulkEdit = async () => {
+  bulkLoading.value = true;
   try {
-     const notesObj = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
-     if (typeof notesObj !== 'object' || notesObj === null) return false;
-     
-     // The structure can vary: { group_id } or { notes: { group_id } }
-     return !!(notesObj.group_id || (notesObj.notes && typeof notesObj.notes === 'object' && notesObj.notes.group_id));
-  } catch (e) { return false; }
+    selectedInGroup.value.forEach(idx => {
+      const person = companionsInGroup.value[idx];
+      if (bulkForm.value.status) {
+        companionsInGroup.value[idx].status = bulkForm.value.status;
+        if (bulkForm.value.status === 'Pending') companionsInGroup.value[idx].pastor_id = null;
+      }
+      if (bulkForm.value.pastor_id !== null) companionsInGroup.value[idx].pastor_id = bulkForm.value.pastor_id;
+      if (bulkForm.value.location) companionsInGroup.value[idx].location = bulkForm.value.location;
+      if (bulkForm.value.scheduled_date) companionsInGroup.value[idx].scheduled_date = bulkForm.value.scheduled_date;
+    });
+
+    // Pass information about what was actually changed to avoid aggressive sync
+    const changesMade = {
+      status: !!bulkForm.value.status,
+      pastor: bulkForm.value.pastor_id !== null,
+      schedule: !!bulkForm.value.scheduled_date,
+      location: !!bulkForm.value.location
+    };
+
+    const success = await saveCompanionsUpdate(changesMade);
+    if (success) {
+      bulkEditVisible.value = false;
+      selectedInGroup.value = [];
+      groupSelectAll.value = false;
+      ElMessage.success('Bulk updates applied successfully');
+    }
+  } catch (e) {
+    console.error(e);
+  } finally { bulkLoading.value = false; }
+};
+
+const openCompanionEdit = (idx) => {
+  editingCompanionIndex.value = idx;
+  const person = companionsInGroup.value[idx];
+  companionForm.value = { ...person };
+  
+  // Force Pastor ID to String for perfect v-select label matching
+  if (companionForm.value.pastor_id !== null && companionForm.value.pastor_id !== undefined) {
+    companionForm.value.pastor_id = String(companionForm.value.pastor_id).replace(/^0+/, '');
+    if (companionForm.value.pastor_id === '') companionForm.value.pastor_id = null;
+  }
+
+  companionEditVisible.value = true;
+};
+
+const saveIndividualCompanion = async () => {
+  companionsInGroup.value[editingCompanionIndex.value] = { ...companionForm.value };
+  
+  if (companionsInGroup.value[editingCompanionIndex.value].status === 'Pending') {
+    companionsInGroup.value[editingCompanionIndex.value].pastor_id = null;
+  }
+  
+  const success = await saveCompanionsUpdate();
+  if (success) {
+    companionEditVisible.value = false;
+    ElMessage.success('Candidate details updated');
+  }
+};
+
+const isGroup = (item) => {
+  if (!item?.notes) return false;
+  try {
+    const notesData = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    // Must have the group flag/id AND actual companions to show management
+    const hasGroupFlag = !!(notesData.is_group || notesData.group_id);
+    const hasCompanions = Array.isArray(notesData.companions) && notesData.companions.length > 0;
+    return hasGroupFlag && hasCompanions;
+  } catch (e) {
+    return false;
+  }
+};
+
+const getCompanions = (item) => {
+  if (!item?.notes) return [];
+  try {
+    const notesData = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    return notesData.companions || [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const getGroupSize = (item) => {
+  return getCompanions(item).length;
+};
+
+const companionsDialogVisible = ref(false);
+const selectedGroup = ref(null);
+const companionsInGroup = ref([]);
+const selectedInGroup = ref([]);
+const groupSelectAll = ref(false);
+// Snapshot of which companions were selected when the promotion dialog was opened
+const promotingCompanions = ref([]);
+
+const openCompanionsDialog = (item) => {
+  selectedGroup.value = item;
+  
+  // Normalize Primary Requester pastor_id
+  let primaryId = item.pastor_id;
+  if (primaryId !== null && primaryId !== undefined) {
+    primaryId = String(primaryId).replace(/^0+/, '');
+    if (primaryId === '') primaryId = null;
+  }
+
+  const primary = {
+    firstname: item.firstname,
+    lastname: item.lastname,
+    email: item.email,
+    phone_number: item.phone_number || '',
+    age: item.age,
+    gender: item.gender,
+    type: 'primary',
+    status: item.status,
+    pastor_id: primaryId,
+    location: item.location,
+    request_type: 'Bible Study',
+    scheduled_date: item.scheduled_date
+  };
+
+  // Map Companions
+  const companions = getCompanions(item).map(c => {
+    const isPending = (c.status || 'Pending') === 'Pending';
+    let pId = c.pastor_id || item.pastor_id;
+    // Normalize pastor_id
+    if (pId !== null && pId !== undefined) {
+      pId = String(pId).replace(/^0+/, '');
+      if (pId === '') pId = null;
+    }
+
+    return {
+      ...c,
+      type: 'companion',
+      status: c.status || 'Pending',
+      scheduled_date: c.scheduled_date || item.scheduled_date,
+      pastor_id: isPending ? (c.pastor_id || null) : pId,
+      location: c.location || item.location,
+      request_type: 'Bible Study'
+    };
+  });
+
+  companionsInGroup.value = [primary, ...companions];
+  selectedInGroup.value = [];
+  groupSelectAll.value = false;
+  companionsDialogVisible.value = true;
+};
+
+const toggleGroupSelectAll = () => {
+  if (groupSelectAll.value) {
+    selectedInGroup.value = companionsInGroup.value.map((_, i) => i);
+  } else {
+    selectedInGroup.value = [];
+  }
+};
+
+const saveCompanionsUpdate = async (changesMade = null) => {
+  if (!selectedGroup.value) return false;
+  
+  try {
+    const primary = companionsInGroup.value.find(p => p.type === 'primary');
+    const companions = companionsInGroup.value.filter(p => p.type === 'companion');
+    
+    // 1. Prepare updated notes for primary record
+    const updatedNotes = {
+      is_group: true,
+      group_size: companionsInGroup.value.length,
+      companions: companions.map(c => ({
+        firstname: c.firstname,
+        lastname: c.lastname,
+        email: c.email,
+        phone_number: c.phone_number,
+        age: c.age,
+        gender: c.gender,
+        status: c.status,
+        pastor_id: c.pastor_id,
+        location: c.location,
+        scheduled_date: c.scheduled_date
+      }))
+    };
+
+    // 2. Update Primary Record in DB
+    const updatePayload = {
+      ...primary,
+      notes: JSON.stringify(updatedNotes)
+    };
+
+    const success = await store.updateRequest(selectedGroup.value.request_id, updatePayload);
+
+    if (success) {
+      // Sync local main table data
+      const idx = requests.value.findIndex(r => r.request_id === selectedGroup.value.request_id);
+      if (idx !== -1) {
+        requests.value[idx] = { ...requests.value[idx], ...updatePayload };
+      }
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Save companions error:', error);
+    return false;
+  }
+};
+
+const bulkActionInGroup = async (newStatus) => {
+  if (selectedInGroup.value.length === 0) return;
+  
+  selectedInGroup.value.forEach(idx => {
+    // Note: status transition rules are relaxed in group console to allow manual fixes
+    companionsInGroup.value[idx].status = newStatus;
+  });
+  
+  const success = await saveCompanionsUpdate();
+  if (success) {
+    ElMessage.success(`Status updated for ${selectedInGroup.value.length} group members`);
+    selectedInGroup.value = [];
+    groupSelectAll.value = false;
+  }
 };
 
 const getGroupColor = (item) => {
@@ -704,9 +1292,10 @@ watch(promotionDialogVisible, (newVal) => {
   if (!newVal) {
     isBulkPromoting.value = false;
     showScheduleFields.value = false;
+    promotingCompanions.value = [];
     bulkPromotionData.value = {
       pastor_name: '',
-      location: 'Church Pool',
+      location: '',
       baptism_date: '',
       baptism_time: ''
     };
@@ -721,7 +1310,7 @@ const slotsLoading = ref(false);
 const showScheduleFields = ref(false);
 const bulkPromotionData = ref({
   pastor_name: '',
-  location: 'Church Pool',
+  location: '',
   baptism_date: '',
   baptism_time: ''
 });
@@ -806,7 +1395,7 @@ const handleBulkEdit = () => {
     request_id: null,
     status: firstItem.status || 'Scheduled',
     location: firstItem.location || firstItem.address || '',
-    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id) : null,
+    pastor_id: firstItem.pastor_id ? String(firstItem.pastor_id).replace(/^0+/, '') : null,
     scheduled_date: commonSchedule,
     notes: ''
   };
@@ -818,8 +1407,12 @@ const handleBulkPromote = () => {
   if (selectedRows.value.length === 0) return;
   isBulkPromoting.value = true;
   
-  // For bulk mode, we don't pre-set promotionData to a single item.
-  // Instead, the dialog will use selectedRows.
+  const firstId = selectedRows.value[0];
+  const firstItem = requests.value.find(r => r.request_id === firstId) || {};
+  
+  // Pre-fill location from the first selected record
+  bulkPromotionData.value.location = firstItem.location || firstItem.address || '';
+  
   promotionData.value = {
     firstname: '',
     lastname: ''
@@ -827,7 +1420,32 @@ const handleBulkPromote = () => {
   promotionDialogVisible.value = true;
 };
 
+const handleConsoleBulkPromote = () => {
+  if (selectedInGroup.value.length === 0) return;
+  isBulkPromoting.value = true;
+  
+  // Snapshot the exact companions that are selected so the backend
+  // only promotes those specific members — not the entire notes group.
+  promotingCompanions.value = selectedInGroup.value.map(idx => companionsInGroup.value[idx]);
+
+  // Use current group leader's location as default
+  const leader = selectedGroup.value;
+  bulkPromotionData.value.location = leader.location || leader.address || '';
+  
+  promotionDialogVisible.value = true;
+};
+
 const totalPages = computed(() => Math.ceil(totalCount.value / 10) || 1);
+
+const canBulkPromote = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Completed');
+});
+
+const allSelectedArePending = computed(() => {
+  if (selectedInGroup.value.length === 0) return false;
+  return selectedInGroup.value.every(idx => companionsInGroup.value[idx].status === 'Pending');
+});
 
 const handleSearch = (val) => {
     if (window.searchTimeout) clearTimeout(window.searchTimeout);
@@ -1027,6 +1645,49 @@ const getStatusColor = (status) => {
   }
 };
 
+const isBaptismInvited = (item) => {
+  if (!item || !item.notes) return false;
+  
+  // Notes can be a stringified object or regular string
+  try {
+    const notesData = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
+    // Check for "invited to water baptism" or similar in notes
+    return (notesData.invitedToBaptism === true) || 
+           (notesData.status === 'invited') ||
+           (typeof item.notes === 'string' && item.notes.toLowerCase().includes('invited to water baptism'));
+  } catch (e) {
+    return typeof item.notes === 'string' && item.notes.toLowerCase().includes('invited to water baptism');
+  }
+};
+
+const overrideTime = ref(false);
+const promotionTimeOptions = [
+  '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM',
+  '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM', '6:30 PM',
+  '7:00 PM', '7:30 PM', '8:00 PM'
+];
+
+const handlePromotionTimeInput = (val) => {
+  if (!val) return;
+  const timeStr = String(val).toUpperCase().trim();
+  const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i;
+  const match = timeStr.match(timeRegex);
+
+  if (match) {
+    let [_, hours, minutes, ampm] = match;
+    let h = parseInt(hours);
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    
+    if (h < 13) {
+      ElMessage.warning('Baptism time must be 1:00 PM onwards.');
+      bulkPromotionData.value.baptism_time = '13:00:00';
+      return;
+    }
+    bulkPromotionData.value.baptism_time = `${String(h).padStart(2, '0')}:${minutes}:00`;
+  }
+};
+
 const formatDateTime = (date) => {
   if (!date) return '-';
   return new Date(date).toLocaleString('en-US', {
@@ -1042,9 +1703,12 @@ const formatDateTime = (date) => {
 const openEditDialog = (item) => {
   editItem.value = { ...item };
   editItem.value._originalStatus = item.status;
-  // Coerce pastor_id to number if numeric, to match v-select item-value type
-  const pid = item.pastor_id;
-  editItem.value.pastor_id = pid ? String(pid) : null;
+  
+  // Force Pastor ID to String for perfect v-select label matching
+  if (editItem.value.pastor_id !== null && editItem.value.pastor_id !== undefined) {
+    editItem.value.pastor_id = String(editItem.value.pastor_id).replace(/^0+/, '');
+    if (editItem.value.pastor_id === '') editItem.value.pastor_id = null;
+  }
   
   // Directly fall back to the address they input if no location was saved yet.
   if (!editItem.value.location && editItem.value.address) {
@@ -1168,6 +1832,9 @@ const saveEdit = async () => {
       isBulkEditing.value = false;
     }
   } else {
+    if (editItem.value.status === 'Pending') {
+      editItem.value.pastor_id = null;
+    }
     success = await store.updateRequest(editItem.value.request_id, editItem.value);
   }
   
@@ -1247,7 +1914,7 @@ const promoteToBaptism = (item) => {
     lastname: item.lastname,
     email: item.email,
     phone_number: item.phone_number,
-    address: item.address,
+    address: item.location || item.address,
     age: item.age || null,
     birthdate: item.birthdate || '',
     gender: item.gender || '',
@@ -1277,10 +1944,40 @@ const handlePromotionAction = async (isDecided) => {
 
       loadingPromotion.value = true;
       try {
-        const success = await store.bulkPromoteToBaptism(selectedRows.value, true, bulkPromotionData.value);
+        // If promoting from console, pass the exact selected companions snapshot.
+        // Otherwise fall back to selectedRows from main table.
+        const isFromConsole = isBulkPromoting.value && promotingCompanions.value.length > 0;
+        const promotionIds = isFromConsole
+          ? [selectedGroup.value.request_id]
+          : selectedRows.value;
+
+        // Build companion payload so backend knows exactly who to promote
+        const selectedCompanionsPayload = isFromConsole ? promotingCompanions.value.map(p => ({
+          firstname: p.firstname,
+          lastname: p.lastname,
+          middle_name: p.middle_name || '',
+          email: p.email || '',
+          phone_number: p.phone_number || '',
+          age: p.age || null,
+          gender: p.gender || '',
+          birthdate: p.birthdate || null,
+          civil_status: p.civil_status || 'Single',
+          address: p.location || p.address || selectedGroup.value?.location || selectedGroup.value?.address || '',
+          pastor_id: p.pastor_id || null,
+          type: p.type  // 'primary' or 'companion'
+        })) : null;
+
+        const success = await store.bulkPromoteToBaptism(
+          promotionIds,
+          true,
+          bulkPromotionData.value,
+          selectedCompanionsPayload
+        );
         if (success) {
           promotionDialogVisible.value = false;
           selectedRows.value = [];
+          selectedInGroup.value = [];
+          promotingCompanions.value = [];
         }
       } finally {
         loadingPromotion.value = false;
@@ -1288,6 +1985,15 @@ const handlePromotionAction = async (isDecided) => {
       return;
     }
     // Individual direct schedule
+    const activeItem = promotionData.value._activeItem;
+    // IF it's a group, we MUST use the promotion API to bring companions along
+    // Registration form is better for truly individual requests
+    if (isGroup(activeItem)) {
+       showScheduleFields.value = true;
+       fetchWaterBaptismSlots();
+       return;
+    }
+
     promotionDialogVisible.value = false;
     adminWaterBaptismDialogVisible.value = true;
   } else {
@@ -1295,10 +2001,32 @@ const handlePromotionAction = async (isDecided) => {
     loadingPromotion.value = true;
     try {
       if (isBulkPromoting.value) {
-          const success = await store.bulkPromoteToBaptism(selectedRows.value, false);
+          const isFromConsole = promotingCompanions.value.length > 0;
+          const promotionIds = isFromConsole
+            ? [selectedGroup.value.request_id]
+            : selectedRows.value;
+
+          const selectedCompanionsPayload = isFromConsole ? promotingCompanions.value.map(p => ({
+            firstname: p.firstname,
+            lastname: p.lastname,
+            email: p.email || '',
+            phone_number: p.phone_number || '',
+            age: p.age || null,
+            gender: p.gender || '',
+            type: p.type
+          })) : null;
+
+          const success = await store.bulkPromoteToBaptism(
+            promotionIds,
+            false,
+            {},
+            selectedCompanionsPayload
+          );
           if (success) {
             promotionDialogVisible.value = false;
             selectedRows.value = [];
+            selectedInGroup.value = [];
+            promotingCompanions.value = [];
           }
       } else {
           const activeItem = promotionData.value._activeItem;
@@ -1314,9 +2042,17 @@ const handlePromotionAction = async (isDecided) => {
 };
 
 const handlePromotionSubmit = () => {
-  // If the dialogue successfully schedules a baptism, close the prompt.
   adminWaterBaptismDialogVisible.value = false;
-  store.fetchRequests(); // Refresh table
+  
+  // Important: Since the manual registration form might not trigger the companion loop,
+  // we do a final sync if it was a group record.
+  const activeItem = promotionData.value._activeItem;
+  if (activeItem && isGroup(activeItem)) {
+     // Mark it as promoted in BS table if the registration form succeeded
+     store.updateRequest(activeItem.request_id, { status: 'Promoted' });
+  }
+
+  store.fetchRequests(); 
 };
 
 const disabledDate = (time) => {
@@ -1370,8 +2106,59 @@ const disabledTime = (date) => {
     disabledSeconds: () => Array.from({ length: 60 }, (_, i) => i),
   };
 };
+
+const getPastorName = (id) => {
+  if (!id) return 'Unassigned';
+  const cleanId = String(id).replace(/^0+/, '');
+  const p = pastors.value.find(p => String(p.id).replace(/^0+/, '') === cleanId);
+  return p ? p.name : `Pastor (ID: ${cleanId})`;
+};
+
+onMounted(() => {
+  store.fetchRequests();
+  store.fetchPastors();
+});
 </script>
 
 <style scoped>
 .biblestudy-records { height: 100%; }
+
+.companion-management-table :deep(thead th) {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.role-primary-row {
+  background-color: #f0fdfa !important; /* Extremely light teal */
+}
+
+.role-primary-row:hover {
+  background-color: #ccfbf1 !important;
+}
+
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.border-b {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.shadow-inner {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+.border-teal {
+  border-color: #0d9488 !important;
+}
+
+.border-dashed {
+  border-style: dashed !important;
+}
 </style>

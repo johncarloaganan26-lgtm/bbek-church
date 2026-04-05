@@ -130,7 +130,7 @@
               </div>
            
               <div class="info-field-row">
-                <span class="label">Email:</span>
+                <span class="label">Email Address:</span>
                 <span class="value">{{ email || 'N/A' }}</span>
               </div>
               
@@ -497,7 +497,7 @@ onMounted(async () => {
     linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%),
     repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(139, 115, 85, 0.02) 1px, rgba(139, 115, 85, 0.02) 2px),
     repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(139, 115, 85, 0.01) 1px, rgba(139, 115, 85, 0.01) 2px);
-  padding: 20px 18px;
+  padding: 15px 12px 50px 12px;
   border: 1px solid #8b7355;
   position: relative;
   box-shadow: 
@@ -712,7 +712,7 @@ onMounted(async () => {
 }
 
 .main-title {
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 700;
   color: #2c1810;
   margin: 0;
@@ -721,7 +721,7 @@ onMounted(async () => {
 }
 
 .subtitle {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
   color: #2c1810;
   margin: 0;
@@ -748,12 +748,12 @@ onMounted(async () => {
 }
 
 .member-name {
-  font-size: 18px;
+  font-size: 26px;
   font-weight: 700;
   color: #2c1810;
   font-family: 'Times New Roman', serif;
   display: inline-block;
-  padding: 4px 20px;
+  padding: 8px 30px;
   border-bottom: 2px solid #8b7355;
 }
 
@@ -941,19 +941,19 @@ onMounted(async () => {
 }
 
 .signature-label {
-  font-size: 10px;
+  font-size: 8px;
   color: #4a3728;
   margin: 0;
   font-family: 'Times New Roman', serif;
-  text-transform: uppercase;
 }
 
 /* Footer Section */
 .footer-section {
   display: flex;
   justify-content: space-between;
-  margin-top: 12px;
-  padding-top: 8px;
+  margin-top: 30px;
+  padding-top: 12px;
+  border-top: 1px solid #8b7355;
   position: relative;
   z-index: 3;
 }
@@ -1016,12 +1016,12 @@ onMounted(async () => {
   }
 
   .inner-border {
-    padding: 0.25in 0.35in !important;
+    padding: 0.25in 0.35in 0.25in 0.35in !important;
     background-color: #f3e6c4 !important;
     background-image: none !important;
     box-shadow: none !important;
     border: 2px solid #8b7355 !important;
-    height: calc(100% - 0.5in - 4px);
+    height: auto;
     box-sizing: border-box;
   }
 
@@ -1101,12 +1101,12 @@ onMounted(async () => {
   }
 
   .main-title {
-    font-size: 36px !important;
+    font-size: 24px !important;
     letter-spacing: 6px !important;
   }
 
   .subtitle {
-    font-size: 22px !important;
+    font-size: 16px !important;
     letter-spacing: 5px !important;
   }
 
@@ -1120,7 +1120,7 @@ onMounted(async () => {
   }
 
   .member-name {
-    font-size: 32px !important;
+    font-size: 40px !important;
     border-bottom-width: 3px !important;
     padding: 0.05in 0.3in !important;
   }
@@ -1183,12 +1183,12 @@ onMounted(async () => {
   }
 
   .signature-label {
-    font-size: 12px !important;
+    font-size: 7px !important;
   }
 
   .footer-section {
-    margin-top: 0.2in !important;
-    padding-top: 0.1in !important;
+    margin-top: 0.18in !important;
+    padding-top: 0.08in !important;
   }
 
   .cert-number,

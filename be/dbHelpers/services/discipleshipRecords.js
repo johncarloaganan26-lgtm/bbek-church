@@ -125,13 +125,27 @@ async function createDiscipleshipRequest(data) {
             
             const maxCapacity = (slotInfo && slotInfo.length > 0) ? slotInfo[0].max_slots : 1;
             
+            // Extract current request size
+            let requestSize = 1;
+            if (notes && typeof notes === 'object' && notes.group_size) {
+                requestSize = parseInt(notes.group_size);
+            } else if (notes && typeof notes === 'string' && notes.startsWith('{')) {
+                try { 
+                    const parsed = JSON.parse(notes); 
+                    if (parsed.group_size) requestSize = parseInt(parsed.group_size);
+                } catch (e) {}
+            }
+
             const [bookings] = await query(
-                "SELECT COUNT(*) as count FROM tbl_discipleship_requests WHERE (request_type = 'Salvation' OR request_type = 'Bible Study') AND status IN ('Pending','Scheduled') AND scheduled_date = ?",
+                "SELECT SUM(COALESCE(CAST(JSON_EXTRACT(notes, '$.group_size') AS UNSIGNED), 1)) as total FROM tbl_discipleship_requests WHERE (request_type = 'Salvation' OR request_type = 'Bible Study') AND status IN ('Pending','Scheduled') AND scheduled_date = ?",
                 [scheduled_date]
             );
             
-            if (bookings[0].count >= maxCapacity) {
-                throw new Error('This time slot is already full. Please choose a different date or time.');
+            const currentTotal = (bookings[0] && bookings[0].total) ? parseInt(bookings[0].total) : 0;
+            
+            if (currentTotal + requestSize > maxCapacity) {
+                const remaining = maxCapacity - currentTotal;
+                throw new Error(`This time slot only has ${remaining} spot(s) left, but you are requesting for ${requestSize} person(s).`);
             }
         }
 
@@ -167,8 +181,9 @@ async function createDiscipleshipRequest(data) {
 
         await query(sql, params);
 
-        // Send Email Notification
+        // Send Email Notifications
         try {
+            // Requester
             await sendDiscipleshipDetails({
                 email: normalizedEmail,
                 firstname,
@@ -176,6 +191,25 @@ async function createDiscipleshipRequest(data) {
                 request_type,
                 scheduled_date
             });
+
+            // Companions
+            if (data.companions && Array.isArray(data.companions)) {
+                for (const companion of data.companions) {
+                    if (companion.email) {
+                        try {
+                            await sendDiscipleshipDetails({
+                                email: companion.email,
+                                firstname: companion.firstname,
+                                status: initialStatus,
+                                request_type,
+                                scheduled_date
+                            });
+                        } catch (cErr) {
+                            console.error(`Companion email failed for ${companion.email}:`, cErr);
+                        }
+                    }
+                }
+            }
         } catch (emailError) {
             console.error('Email notification failed for discipleship request:', emailError);
         }
@@ -200,13 +234,23 @@ async function getAllDiscipleshipRequests(options = {}) {
         let sql = `SELECT 
           dr.*,
           COALESCE(
-            CONCAT(m_acc.firstname, ' ', m_acc.lastname),
-            CONCAT(m_direct.firstname, ' ', m_direct.lastname)
-          ) as pastor_name_joined
+            NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+            NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
+          ) as pastor_name_joined,
+          COALESCE(
+            NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+            NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
+          ) as pastor_name
         FROM tbl_discipleship_requests dr
-        LEFT JOIN tbl_accounts a ON dr.pastor_id = a.acc_id
+        LEFT JOIN tbl_accounts a ON (
+          dr.pastor_id = a.acc_id OR
+          (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = a.acc_id)
+        )
         LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
-        LEFT JOIN tbl_members m_direct ON dr.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+        LEFT JOIN tbl_members m_direct ON (
+          dr.pastor_id = m_direct.member_id OR 
+          (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = m_direct.member_id)
+        ) COLLATE utf8mb4_unicode_ci
         WHERE 1=1`;
         const params = [];
 
@@ -336,7 +380,44 @@ async function updateDiscipleshipRequest(request_id, updateData) {
         if (status) { updates.push('status = ?'); params.push(status); }
         if (scheduled_date !== undefined) {
             updates.push('scheduled_date = ?');
-            params.push(scheduled_date ? moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss') : null);
+            const finalDateStr = scheduled_date ? moment(scheduled_date).format('YYYY-MM-DD HH:mm:ss') : null;
+            params.push(finalDateStr);
+            
+            // If setting a NEW schedule via update, we should also check capacity.
+            if (finalDateStr) {
+                // Determine current request size (from payload or DB if not in payload)
+                let requestSize = 1;
+                const notesToUse = notes !== undefined ? notes : null;
+                if (notesToUse && typeof notesToUse === 'object' && notesToUse.group_size) {
+                    requestSize = parseInt(notesToUse.group_size);
+                } else if (notesToUse && typeof notesToUse === 'string' && notesToUse.startsWith('{')) {
+                    try { 
+                        const parsed = JSON.parse(notesToUse); 
+                        if (parsed.group_size) requestSize = parseInt(parsed.group_size);
+                    } catch (e) {}
+                } else {
+                    // Fallback to DB fetch if needed, but for now we trust the payload if it's there
+                }
+
+                const [slotInfo] = await query(
+                    'SELECT max_slots FROM tbl_service_slots WHERE available_date = DATE(?) AND available_time = TIME(?) AND status = \'Available\'',
+                    [finalDateStr, finalDateStr]
+                );
+                
+                if (slotInfo && slotInfo.length > 0) {
+                    const maxCapacity = slotInfo[0].max_slots;
+                    const [bookings] = await query(
+                        "SELECT SUM(COALESCE(CAST(JSON_EXTRACT(notes, '$.group_size') AS UNSIGNED), 1)) as total FROM tbl_discipleship_requests WHERE status IN ('Pending','Scheduled') AND scheduled_date = ? AND request_id != ?",
+                        [finalDateStr, request_id]
+                    );
+                    
+                    const currentTotal = (bookings[0] && bookings[0].total) ? parseInt(bookings[0].total) : 0;
+                    if (currentTotal + requestSize > maxCapacity) {
+                        const remaining = maxCapacity - currentTotal;
+                        throw new Error(`Capacity exceeded. This slot only has ${remaining} spot(s) remaining but the group size is ${requestSize}.`);
+                    }
+                }
+            }
         }
         if (scheduled_time !== undefined) {
             updates.push('scheduled_time = ?');
@@ -378,13 +459,13 @@ async function updateDiscipleshipRequest(request_id, updateData) {
                     SELECT 
                         dr.firstname, dr.email, dr.status, dr.scheduled_date, dr.location, dr.request_type,
                         COALESCE(
-                            CONCAT(m_acc.firstname, ' ', m_acc.lastname),
-                            CONCAT(m_direct.firstname, ' ', m_direct.lastname)
+                            NULLIF(TRIM(CONCAT_WS(' ', m_acc.firstname, m_acc.lastname)), ''),
+                            NULLIF(TRIM(CONCAT_WS(' ', m_direct.firstname, m_direct.lastname)), '')
                         ) as pastor_name
                     FROM tbl_discipleship_requests dr
-                    LEFT JOIN tbl_accounts a ON dr.pastor_id = a.acc_id
+                    LEFT JOIN tbl_accounts a ON (dr.pastor_id = a.acc_id OR (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = a.acc_id))
                     LEFT JOIN tbl_members m_acc ON a.email = m_acc.email COLLATE utf8mb4_unicode_ci
-                    LEFT JOIN tbl_members m_direct ON dr.pastor_id = m_direct.member_id COLLATE utf8mb4_unicode_ci
+                    LEFT JOIN tbl_members m_direct ON (dr.pastor_id = m_direct.member_id OR (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = m_direct.member_id)) COLLATE utf8mb4_unicode_ci
                     WHERE dr.request_id = ?
                 `, [request_id]);
                 if (reqRows.length > 0) {
@@ -418,16 +499,16 @@ async function promoteToBaptism(request_id, isDecided = false) {
         let pastorNameStr = req.pastor_id || null;
         if (pastorNameStr) {
             const [pRows] = await query(`
-                SELECT CONCAT(m.firstname, ' ', m.lastname) as resolved_name
+                SELECT NULLIF(TRIM(CONCAT_WS(' ', m.firstname, m.lastname)), '') as resolved_name
                 FROM tbl_members m
                 JOIN tbl_accounts a ON m.email = a.email COLLATE utf8mb4_unicode_ci
-                WHERE a.acc_id = ?
+                WHERE (a.acc_id = ? OR (a.acc_id REGEXP '^[0-9]+$' AND a.acc_id = CAST(? AS UNSIGNED)))
                 UNION
-                SELECT CONCAT(firstname, ' ', lastname) as resolved_name
+                SELECT NULLIF(TRIM(CONCAT_WS(' ', firstname, lastname)), '') as resolved_name
                 FROM tbl_members
-                WHERE member_id = ?
+                WHERE (member_id = ? OR (member_id REGEXP '^[0-9]+$' AND member_id = CAST(? AS UNSIGNED)))
                 LIMIT 1
-            `, [pastorNameStr, pastorNameStr]);
+            `, [pastorNameStr, pastorNameStr, pastorNameStr, pastorNameStr]);
             
             if (pRows.length > 0) {
                 pastorNameStr = pRows[0].resolved_name;

@@ -23,11 +23,16 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
             const response = await axios.get('/church-records/church-leaders/getAllChurchLeadersForSelect');
             if (response.data.success) {
                 // Ensure every pastor has an id field mapped to acc_id for consistency
-                pastors.value = response.data.data.map(p => ({
-                    ...p,
-                    id: String(p.acc_id || p.id),
-                    name: p.name
-                }));
+                // and normalized (no leading zeros) for perfect v-select matching
+                pastors.value = response.data.data.map(p => {
+                    const rawId = String(p.acc_id || p.id || '');
+                    const cleanId = rawId.replace(/^0+/, '');
+                    return {
+                        ...p,
+                        id: cleanId === '' ? (rawId === '0' ? '0' : null) : cleanId,
+                        name: p.name
+                    };
+                });
             }
         } catch (error) {
             console.error('Error fetching pastors:', error);
@@ -73,6 +78,9 @@ export const useAdminDiscipleshipStore = defineStore('admin-discipleship', () =>
             return false;
         } catch (error) {
             console.error('Error updating request:', error);
+            if (error.response?.data) {
+                console.warn('API Error Details:', JSON.stringify(error.response.data, null, 2));
+            }
             const errorMessage = error.response?.data?.message || error.response?.data?.errorCode || 'Failed to update request';
             ElMessage.error(errorMessage);
             return false;

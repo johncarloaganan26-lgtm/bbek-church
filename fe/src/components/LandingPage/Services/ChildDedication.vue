@@ -545,6 +545,27 @@
                       </el-form-item>
                     </div>
 
+                    <div class="agreement-wrapper mb-6 text-left">
+                      <div class="d-flex align-start">
+                        <el-checkbox v-model="termsAgreed" class="terms-checkbox mr-3" size="large"></el-checkbox>
+                        <div class="agreement-text" style="padding-top: 2px;">
+                          <span class="text-body-2 text-grey-darken-3" style="line-height: 1.6; display: block;">
+                            I agree to the 
+                            <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('terms')">Terms of Service</a> 
+                            and 
+                            <a href="#" class="agreement-link" @click.stop.prevent="openAgreement('privacy')">Privacy Policy</a>
+                            to proceed with my request.
+                          </span>
+                        </div>
+                      </div>
+                      <v-expand-transition>
+                        <div v-if="agreementError" class="text-caption text-error font-weight-bold mt-2 ml-10" style="color: #ef4444;">
+                          <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+                          {{ agreementError }}
+                        </div>
+                      </v-expand-transition>
+                    </div>
+
                     <!-- Submit Button -->
                     <v-btn
                       color="teal"
@@ -636,6 +657,12 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Agreement Modal -->
+    <AgreementModal 
+      v-model="showAgreementModal" 
+      :initial-tab="agreementTab" 
+    />
   </div>
 </template>
 
@@ -648,6 +675,7 @@ import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vu
 import LoginDialog from '@/components/Dialogs/LoginDialog.vue'
 import axios from '@/api/axios'
 import { useCms } from '@/composables/useCms'
+import AgreementModal from '@/components/Common/AgreementModal.vue'
 
 const childDedicationStore = useChildDedicationStore()
 const showLoginDialog = ref(false)
@@ -756,6 +784,17 @@ const inlineFormData = reactive({
   mother_address: '',
   sponsors: []
 })
+
+// Agreement State
+const termsAgreed = ref(false)
+const showAgreementModal = ref(false)
+const agreementTab = ref('terms')
+const agreementError = ref('')
+
+const openAgreement = (tab) => {
+  agreementTab.value = tab
+  showAgreementModal.value = true
+}
 
 // Inline form validation rules
 const inlineFormRules = {
@@ -941,6 +980,13 @@ const inlineRequesterDisplayName = computed(() => {
 
   // Handle inline form submission
   const handleInlineFormSubmit = async () => {
+    // Validate agreement first
+    if (!termsAgreed.value) {
+      agreementError.value = 'You must agree to the Terms of Service and Privacy Policy before submitting.'
+      ElMessage.warning('Please agree to our Terms and Privacy Policy to continue.')
+      return
+    }
+    agreementError.value = ''
     // Check if user is logged in
     if (!userInfo.value?.member?.member_id) {
       ElMessage.warning('Please log in to submit a child dedication request.')
@@ -1797,6 +1843,58 @@ const inlineRequesterDisplayName = computed(() => {
     padding: 4px 2px;
     font-size: 0.75rem;
   }
+}
+.agreement-link {
+  color: #0d9488;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  padding: 0 2px;
+}
+
+.agreement-link:hover {
+  text-decoration: underline;
+  background-color: #0d948811;
+  border-radius: 4px;
+}
+
+.terms-checkbox :deep(.el-checkbox__label) {
+  display: none;
+}
+
+/* Force Teal Color - Overriding EL-Checkbox Defaults */
+.terms-checkbox :deep(.el-checkbox__inner) {
+  width: 26px !important;
+  height: 26px !important;
+  border-color: #0d9488 !important;
+  border-width: 2px !important;
+  background-color: transparent !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__inner::after) {
+  width: 8px !important;
+  height: 16px !important;
+  left: 9px !important;
+  top: 4px !important;
+  border-width: 3.5px !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+.terms-checkbox :deep(.el-checkbox__input:hover .el-checkbox__inner) {
+  border-color: #0d9488 !important;
+}
+
+.agreement-wrapper {
+  transition: all 0.3s ease;
 }
 </style>
 

@@ -184,52 +184,45 @@
           </v-col>
         </v-row>
         <!-- Bulk Actions Row -->
-        <v-row v-if="selectedDedications.length > 0" class="mt-2">
-          <v-col cols="12">
-            <v-alert
-              type="info"
-              variant="tonal"
-              class="mb-0"
-              density="compact"
-            >
-              <div class="d-flex align-center justify-space-between">
-                <div class="text-body-2">
-                  <strong>{{ selectedDedications.length }}</strong> dedication{{ selectedDedications.length > 1 ? 's' : '' }} selected
-                </div>
-                <div class="d-flex gap-2">
-                  <v-btn
-                    color="success"
-                    variant="flat"
-                    size="small"
-                    :disabled="loading"
-                    @click="bulkCompleteDedications"
-                  >
-                    <v-icon left>mdi-check-all</v-icon>
-                    Mark as Completed
-                  </v-btn>
-                  <v-btn
-                    color="error"
-                    variant="flat"
-                    size="small"
-                    :disabled="loading"
-                    @click="bulkDeleteDedications"
-                  >
-                    <v-icon left>mdi-delete</v-icon>
-                    Archive Selected
-                  </v-btn>
-                  <v-btn
-                    variant="outlined"
-                    size="small"
-                    @click="clearSelection"
-                  >
-                    <v-icon left>mdi-close</v-icon>
-                    Clear Selection
-                  </v-btn>
-                </div>
-              </div>
-            </v-alert>
-          </v-col>
-        </v-row>
+        <div v-if="selectedDedications.length > 0" class="bulk-actions-bar mt-3 pa-3 d-flex align-center gap-2">
+          <v-chip color="primary" size="small" class="mr-2 font-weight-bold px-3" label>
+            <v-icon start size="14">mdi-checkbox-marked</v-icon>
+            {{ selectedDedications.length }} SELECTED
+          </v-chip>
+          <v-btn
+            color="success"
+            variant="outlined"
+            size="small"
+            :disabled="loading"
+            class="bulk-action-btn font-weight-bold text-uppercase"
+            @click="bulkCompleteDedications"
+          >
+            <v-icon start size="16">mdi-check-all</v-icon>
+            Mark Completed
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="outlined"
+            size="small"
+            :disabled="loading"
+            class="bulk-action-btn font-weight-bold text-uppercase"
+            @click="bulkDeleteDedications"
+          >
+            <v-icon start size="16">mdi-archive</v-icon>
+            Archive Selected
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            variant="text"
+            size="small"
+            color="grey-darken-1"
+            class="text-none"
+            @click="clearSelection"
+          >
+            <v-icon start size="14">mdi-close</v-icon>
+            Clear Selection
+          </v-btn>
+        </div>
         <v-row>
           <v-col cols="12" class="d-flex align-center">
             <span class="text-body-2">Showing {{ getStartIndex() }} - {{ getEndIndex() }} of {{ totalCount }} dedications</span>
@@ -289,16 +282,7 @@
                 {{ formatDateTimeWithTime(dedication.preferred_dedication_date, dedication.preferred_dedication_time, dedication.status) }}
               </div>
             </td>
-            <td>
-              <div v-if="dedication.pastor_name_joined" class="text-body-2 font-weight-medium">
-                <v-icon size="small" class="mr-1" color="primary">mdi-account-tie</v-icon>
-                {{ dedication.pastor_name_joined }}
-                <div v-if="dedication.pastor_position" class="text-caption text-grey font-italic ml-6">
-                  {{ dedication.pastor_position }}
-                </div>
-              </div>
-              <div v-else class="text-caption text-grey">{{ dedication.pastor || 'Unassigned' }}</div>
-            </td>
+            <td>{{ dedication.pastor || 'N/A' }}</td>
             <td>{{ dedication.location || 'N/A' }}</td>
             <td>{{ getFatherDisplayName(dedication) }}</td>
             <td>{{ getMotherDisplayName(dedication) }}</td>
@@ -389,12 +373,6 @@
       @submit="handleSubmit"
     />
 
-    <!-- Availability Manager Dialog -->
-    <AvailabilityManager 
-      v-model="availabilityManagerVisible" 
-      initial-service="child_dedication" 
-    />
-
     <!-- Bulk Complete Calendar Dialog -->
     <v-dialog v-model="bulkCompleteDialog" max-width="450px" persistent class="bulk-complete-dialog" style="overflow: visible;">
       <v-card class="pa-4" style="border-radius: 20px; overflow: visible; position: relative;">
@@ -434,7 +412,7 @@
               class="w-100 custom-date-picker"
               size="large"
               popper-class="bulk-complete-date-picker-popper"
-              teleported
+              teleport="body"
               :popper-options="{ strategy: 'fixed' }"
             />
           </div>
@@ -489,7 +467,6 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
-import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue'
 
 const childDedicationStore = useChildDedicationStore()
 const settingsStore = useSystemSettingsStore()
@@ -497,7 +474,6 @@ const { settings, loading: settingsLoading } = storeToRefs(settingsStore)
 
 // Selection state
 const selectedDedications = ref([])
-const availabilityManagerVisible = ref(false)
 
 // Computed properties from store
 const dedications = computed(() => childDedicationStore.dedications)
