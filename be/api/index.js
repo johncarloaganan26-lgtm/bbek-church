@@ -50,7 +50,7 @@ let childDedicationRouter, burialServiceRouter, waterBaptismRouter, discipleship
 let biblestudyRouter, salvationAvailabilityRouter, promotionVisitRouter;
 let transactionRouter, memberRegistrationRouter, archiveRouter, announcementRouter;
 let formRouter, cmsRouter, dashboardRouter, auditTrailRouter, auditTrailMiddleware, authRouter;
-let notificationRouter;
+let notificationRouter, aiRouter;
 
 try {
   const authMiddleware = require('../middleware/authMiddleware');
@@ -85,6 +85,7 @@ try {
   authRouter = require('../routes/authRoutes');
   console.log('🔄 Loading notificationRouter...');
   notificationRouter = require('../routes/notificationRoutes');
+  aiRouter = require('../routes/aiRoutes');
   console.log('📋 Loaded notificationRouter:', !!notificationRouter, typeof notificationRouter);
   console.log('📋 notificationRouter stack length:', notificationRouter ? notificationRouter.stack.length : 'N/A');
 } catch (error) {
@@ -307,6 +308,11 @@ app.post('/api/example', (req, res) => {
 // Authentication routes (public - no auth required)
 if (authRouter) {
   app.use('/api/auth', authRouter);
+}
+
+// AI Chat Support (public - no auth required)
+if (aiRouter) {
+  app.use('/api/public/ai', aiRouter);
 }
 
 // PUBLIC WATER BAPTISM REGISTRATION ROUTE (no auth required)
