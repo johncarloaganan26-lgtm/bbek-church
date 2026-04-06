@@ -148,10 +148,13 @@
                     </p>
                   </div>
                   <!-- No dates available -->
-                  <div v-else class="text-center py-4">
-                    <v-icon color="teal" size="48" class="mb-2">mdi-calendar-check</v-icon>
-                    <p style="font-family: 'Georgia', serif; color: #115e59;">
-                      All dates are currently available!
+                  <div v-else class="text-center py-6 px-4 bg-white rounded-lg border-dashed border-2" style="border-color: #fca5a5 !important; background-color: #fef2f2 !important;">
+                    <v-icon color="red-lighten-2" size="48" class="mb-3">mdi-calendar-remove</v-icon>
+                    <p class="text-h6 font-weight-bold text-red-darken-3 mb-1" style="font-family: 'Georgia', serif;">
+                      No Available Slots
+                    </p>
+                    <p class="text-body-2 text-red-darken-1" style="font-family: 'Georgia', serif; font-style: italic;">
+                      All burial support slots are currently full or not yet scheduled. Please contact the church office for immediate assistance.
                     </p>
                   </div>
                 </v-card-text>
@@ -858,16 +861,8 @@ const memberFormData = reactive({
   preferred_service_date: null
 })
 
-// Preferred service date/time (default to tomorrow 6:00 PM)
-const getDefaultNightTimeDate = () => {
-  const date = new Date()
-  date.setDate(date.getDate() + 1) // Tomorrow
-  date.setHours(20, 0, 0, 0) // 8:00 PM
-  return date
-}
-
-const preferredServiceDate = ref(getDefaultNightTimeDate())
-const defaultNightTimeDate = computed(() => getDefaultNightTimeDate())
+// Preferred service date/time (Set to null to force manual selection from Slots Manager)
+const preferredServiceDate = ref(null)
 
 // Disable hours - only allow night hours (6 PM - 10 PM)
 const disabledNightHours = () => {

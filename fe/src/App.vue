@@ -9,6 +9,10 @@
     <Footer v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <SocialMediaIcons v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
     <MembershipJourneyBanner v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
+    
+    <!-- AI Church Assistant (Public Only) -->
+    <AIChatbot v-if=" !route.path.startsWith('/admin') && !route.path.startsWith('/change-password')"/>
+
     <!-- Announcement Display for all users -->
     <AnnouncementDisplayDialog
       v-for="announcement in activeAnnouncements"
@@ -31,6 +35,8 @@ import PageLoader from './components/Common/PageLoader.vue'
 import Footer from './components/LandingPage/Footer.vue'
 import SocialMediaIcons from './components/LandingPage/SocialMediaIcons.vue'
 import MembershipJourneyBanner from './components/LandingPage/MembershipJourneyBanner.vue'
+import AIChatbot from './components/Common/AIChatbot.vue'
+
 
 const announcementStore = useAnnouncementStore()
 const activeAnnouncements = ref([])

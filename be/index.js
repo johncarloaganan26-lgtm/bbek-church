@@ -69,7 +69,9 @@ const auditTrailRouter = require('./routes/auditTrailRoutes');
 const auditTrailMiddleware = require('./middleware/auditTrailMiddleware');
 const authRouter = require('./routes/authRoutes');
 const notificationRouter = require('./routes/notificationRoutes');
+const aiRouter = require('./routes/aiRoutes');
 const { autoRejectSalvationNoShows } = require('./utils/cronJobs');
+
 
 const app = express();
 
@@ -238,6 +240,10 @@ app.post('/api/example', (req, res) => {
 
 // Authentication routes (public - no auth required)
 app.use('/api/auth', authRouter);
+
+// AI Chat Support (public - no auth required)
+app.use('/api/public/ai', aiRouter);
+
 
 // Apply JWT authentication middleware to all routes
 // Public routes are handled within the middleware itself

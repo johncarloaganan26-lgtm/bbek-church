@@ -1585,86 +1585,74 @@ async function bulkCompleteBurialServices(burialIds) {
  */
 async function getAvailableBurialDates(daysAhead = 60) {
   try {
-    // Get all burial services that are NOT approved (i.e., pending, rejected, etc.)
-    const sql = `SELECT 
-                  burial_id, 
-                  deceased_name, 
-                  service_date, 
-                  status
-                FROM tbl_burialservice 
-                WHERE status != 'Approved'
-                AND status != 'completed'
-                AND status != 'Scheduled'
-                ORDER BY service_date ASC`;
+    // Get all manual slots created via Availability Manager for burial service
+    const slotsSql = `
+      SELECT 
+        s.slot_id,
+        s.available_date,
+        s.available_time,
+        s.max_slots,
+        (
+          SELECT COUNT(*) 
+          FROM tbl_burialservice b 
+          WHERE LOWER(b.status) NOT IN ('completed', 'cancelled', 'disapproved')
+          AND DATE_FORMAT(b.service_date, '%Y-%m-%d') = DATE_FORMAT(s.available_date, '%Y-%m-%d')
+          AND DATE_FORMAT(b.service_date, '%H:%i') = DATE_FORMAT(s.available_time, '%H:%i')
+        ) as bookedCount
+      FROM tbl_service_slots s
+      WHERE s.service_type = 'burial' 
+      AND s.available_date >= CURDATE()
+      AND s.status = 'Available'
+      ORDER BY s.available_date ASC, s.available_time ASC
+    `;
     
-    const [rows] = await query(sql);
+    const [slots] = await query(slotsSql);
     
-    // Generate all upcoming days for the next N days (starting from tomorrow)
-    const availableDays = [];
-    const today = moment().startOf('day');
+    // Group slots by date
+    const dateGroups = {};
     
-    for (let i = 1; i <= daysAhead; i++) {
-      const currentDay = today.clone().add(i, 'days');
+    slots.forEach(slot => {
+      const dateKey = moment(slot.available_date).format('YYYY-MM-DD');
+      if (!dateGroups[dateKey]) {
+        dateGroups[dateKey] = {
+          date: dateKey,
+          displayDate: moment(slot.available_date).format('MMMM DD, YYYY'),
+          dayOfWeek: moment(slot.available_date).format('dddd'),
+          timeSlots: [],
+          totalSlots: 0,
+          availableSlotsCount: 0,
+          requestCount: 0,
+          isFullyBooked: true // Default to true, will update
+        };
+      }
       
-      // Only add future days (starting tomorrow)
-      availableDays.push({
-        date: currentDay.format('YYYY-MM-DD'),
-        displayDate: currentDay.format('MMMM DD, YYYY'),
-        dayOfWeek: currentDay.format('dddd'),
-        timeSlots: generateBurialTimeSlots()
+      const isBooked = slot.bookedCount >= slot.max_slots;
+      
+      dateGroups[dateKey].timeSlots.push({
+        slot_id: slot.slot_id,
+        time: moment(slot.available_time, 'HH:mm:ss').format('HH:mm'),
+        displayTime: moment(slot.available_time, 'HH:mm:ss').format('h:mm A'),
+        hour: parseInt(slot.available_time.split(':')[0]),
+        maxCapacity: slot.max_slots,
+        bookedCount: slot.bookedCount,
+        isBooked: isBooked
       });
-    }
-    
-    // Get counts of burial service requests per date - count pending, approved, scheduled only
-    const requestCountsql = `SELECT 
-                          DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d') as serviceDate,
-                          COUNT(*) as count
-                        FROM tbl_burialservice 
-                        WHERE status IN ('pending', 'Approved', 'Scheduled', 'approved', 'scheduled')
-                        AND DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d') >= CURDATE()
-                        GROUP BY DATE_FORMAT(COALESCE(service_date, preferred_service_time), '%Y-%m-%d')`;
-    
-    const [requestCountRows] = await query(requestCountsql);
-    
-    // Create a map of request counts by date
-    const requestCounts = {};
-    requestCountRows.forEach(row => {
-      requestCounts[row.serviceDate] = row.count;
+      
+      dateGroups[dateKey].totalSlots++;
+      dateGroups[dateKey].requestCount += slot.bookedCount;
+      if (!isBooked) {
+        dateGroups[dateKey].availableSlotsCount++;
+        dateGroups[dateKey].isFullyBooked = false;
+      }
     });
     
-    // Filter available days and add request counts
-    const filteredResult = availableDays.map(day => {
-      const dateKey = day.date;
-      const requestCount = requestCounts[dateKey] || 0;
-      const isFullyBooked = requestCount >= 1; // Only 1 request per date allowed
-      
-      // Update time slots with booking count
-      const updatedTimeSlots = day.timeSlots.map(slot => ({
-        ...slot,
-        bookingCount: requestCount,
-        isBooked: isFullyBooked
-      }));
-      
-      return {
-        ...day,
-        timeSlots: updatedTimeSlots,
-        totalSlots: 1, 
-        availableSlotsCount: isFullyBooked ? 0 : 1,
-        requestCount: requestCount,
-        isFullyBooked: isFullyBooked,
-        bookedByCount: requestCount
-      };
-    }).filter(day => !day.isFullyBooked); // ONLY return available dates to "close" booked ones
-    
-    // Get pending burial services count
-    const pendingCount = rows.length;
+    // Convert to array and filter out dates with NO available slots
+    const filteredResult = Object.values(dateGroups).filter(day => !day.isFullyBooked);
     
     return {
       success: true,
       data: {
         availableDates: filteredResult,
-        pendingBurialServices: rows,
-        pendingCount: pendingCount,
         generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
       }
     };
