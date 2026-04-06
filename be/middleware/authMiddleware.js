@@ -161,6 +161,7 @@ const publicRoutes = [
   '/api/church-records/department-officers/getAllDepartmentOfficers',
   '/api/church-records/departments/getAllDepartments',
   '/api/church-records/members/getAllMembers',
+  '/api/public/ai/**',
 ];
 
 /**
