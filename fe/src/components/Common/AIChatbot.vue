@@ -1,12 +1,16 @@
 <template>
   <div class="ai-chatbot-wrapper" :class="{ 'is-open': isOpen }">
+    <!-- Floating Greeting Bubble (Visible when closed) -->
+    <div v-if="!isOpen" class="chat-greeting-bubble elevation-4">
+      Hi 👋 How can I help?
+    </div>
+
     <!-- Simple Message Icon (Teal) -->
     <v-btn
       v-if="!isOpen"
       icon
       size="x-large"
-      class="chat-bubble-btn"
-      elevation="4"
+      class="chat-bubble-btn elevation-6"
       @click="toggleChat"
     >
       <v-icon size="30" color="white">mdi-comment-text-outline</v-icon>
@@ -78,8 +82,8 @@
               </v-img>
           </v-avatar>
           <div class="message-bubble bot-message elevation-1">
-            Hi! Welcome to BBEK Church. How can I assist you today?
-            <v-btn icon size="x-small" variant="text" class="speech-btn mt-1 ml-n1 d-block" color="#0cbdaa" @click="speak('Hi! Welcome to BBEK Church. How can I assist you today?', -2)">
+            Hi! I am BBEK.Bot, your church assistant. How can I help you today? 👋
+            <v-btn icon size="x-small" variant="text" class="speech-btn mt-1 ml-n1 d-block" color="#0cbdaa" @click="speak('Hi! I am BBEK.Bot, your church assistant. How can I help you today? 👋', -2)">
                <v-icon size="14">{{ (isSpeaking && currentlySpeakingIndex === -2) ? 'mdi-volume-off' : 'mdi-volume-high' }}</v-icon>
             </v-btn>
           </div>
@@ -362,19 +366,34 @@ const sendMessage = async () => {
   let botMessageIndex = -1;
 
   try {
-    const response = await fetch('/api/public/ai/chat', {
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const apiUrl = `${cleanBaseUrl}/api/public/ai/chat`;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         message: currentMessage,
         history: chatHistory.value,
-        language: selectedLanguage.value
+        language: selectedLanguage.value.name // Send as string name
       })
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to connect');
+      // Safely check if response is JSON to avoid "Unexpected end of JSON input"
+      const contentType = response.headers.get("content-type");
+      let errorMessage = 'Failed to connect';
+      
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } else {
+        const textError = await response.text();
+        console.error('Non-JSON Error Response:', textError.substring(0, 100));
+        errorMessage = `Server Error (${response.status})`;
+      }
+      throw new Error(errorMessage);
     }
 
     // Hide typing dots and show the bot message avatar
@@ -436,6 +455,41 @@ watch(messages, () => scrollToBottom(), { deep: true });
   right: 25px;
   bottom: 25px;
   z-index: 2000;
+}
+
+.chat-greeting-bubble {
+  position: absolute;
+  right: -5px;
+  bottom: 80px;
+  background-color: white;
+  color: #333;
+  padding: 10px 18px;
+  border-radius: 20px;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  animation: float-bounce 3s infinite ease-in-out;
+  cursor: pointer;
+  z-index: 10;
+}
+
+/* Little triangle "tail" for the chat bubble */
+.chat-greeting-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 25px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 10px solid white;
+}
+
+@keyframes float-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 .chat-bubble-btn {
