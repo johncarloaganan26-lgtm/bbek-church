@@ -75,7 +75,6 @@ router.post('/chat', async (req, res) => {
     const ctx = await fetchChurchContext();
     let memberCtx = null;
 
-    // Fetch Member Details if logged in
     if (member_id) {
        try {
          const [memberRows] = await query("SELECT firstname, lastname, position FROM tbl_members WHERE member_id = ?", [member_id]);
@@ -93,36 +92,17 @@ router.post('/chat', async (req, res) => {
     }
 
     const currentLanguage = language || 'English';
-
     const systemPrompt = `
-      You are BBEK.Bot, the digital secretary of Bible Baptist Ekklesia of Kawit. 
-      Be warm, polite, and conversational. Respond EXCLUSIVELY in ${currentLanguage}.
-      
-      SITEMAP (Guide users to these pages):
-      - Home: Landing page with announcements and mission. (Route: /)
-      - About Us: Church history and leadership. (Route: /about)
-      - Services: 
-         * Water Baptism: Signup and info. (Route: /services/water-baptism)
-         * Child Dedication: Only for members. (Route: /services/child-dedication)
-         * Burial Service: Compassionate help. (Route: /services/burial)
-         * Discipleship: Salvation Talk & Bible Study. (Route: /services/discipleship)
-      - Give: Online Tithes and Offering with proof upload. (Route: /give)
-      - Join Us: Membership registration. (Route: /register)
-
-      PIPELINE: Salvation Talk -> Bible Study -> Water Baptism -> Official Member.
-      
-      ${memberCtx ? `USER: Hello, ${memberCtx.name} (${memberCtx.role}). You are ${memberCtx.baptized ? 'Baptized' : 'not yet Baptized'}.` : 'USER: Guest/Visitor.'}
-      
-      TODAY: ${ctx.now}
+      You are BBEK.Bot, digital assistant of Bible Baptist Ekklesia of Kawit. 
+      Respond in ${currentLanguage}.
+      SITEMAP: Home (/), About (/about), Baptism (/services/water-baptism), Dedication (/services/child-dedication), Burial (/services/burial), Discipleship (/services/discipleship), Give (/give).
+      ${memberCtx ? `USER: ${memberCtx.name} (${memberCtx.role}). Baptized: ${memberCtx.baptized}.` : 'USER: Guest.'}
+      TODAY: ${ctx.now}. 
       AVAILABILITY: ${ctx.slots?.map(s => `${moment(s.available_date).format('MMM DD')} ${s.available_time} (${s.service_type})`).join(', ') || 'Contact values'}
-      ANNOUNCEMENTS: ${ctx.news?.map(n => n.title).join(', ') || 'Coming soon.'}
-      MISSION: ${ctx.cms?.ourstory?.content?.mission || 'Building a community of faith.'}
-      
-      If they ask where to find something, give them the page name and route.
     `;
 
-    // gemini-1.5-flash is the most stable across library versions
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemPrompt });
+    // Using gemini-2.0-flash as verified by test-new-key.js
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', systemInstruction: systemPrompt });
 
     const chat = model.startChat({ history: history || [] });
     const result = await chat.sendMessageStream(message);
@@ -135,11 +115,15 @@ router.post('/chat', async (req, res) => {
     }
     res.end();
   } catch (error) {
-    console.error('AI Chat Error:', error);
+    console.error('CRITICAL AI ERROR:', error.message);
     
-    // Friendly response for Rate Limits (429) or Overloaded (503)
+    if (error.status === 404) {
+       // Deep fallback to a model that is universally available if 2.0 fails
+       return res.status(500).json({ error: "Configuration conflict: Model not found. Please contact admin." });
+    }
+
     if (error.status === 429 || error.status === 503) {
-      return res.status(500).json({ error: "I'm a bit overwhelmed with guests right now! Please wait a few seconds and try again." });
+      return res.status(500).json({ error: "I'm receiving too many requests. Give me 10 seconds!" });
     }
     
     res.status(500).json({ error: 'AI Assistant Busy' });

@@ -36,13 +36,13 @@
                 <v-icon icon="mdi-drag-vertical" size="small" color="grey-lighten-1"></v-icon>
               </div>
 
-              <!-- Individual Item (e.g., Dashboard) - Hidden in Rail mode as requested -->
+              <!-- Individual Item (e.g., Dashboard) -->
               <v-list-item
-                v-if="(!isRail || isMobile) && element.type === 'item' && (!element.adminOnly || isAdmin)"
+                v-if="element.type === 'item' && (!element.adminOnly || isAdmin)"
                 :prepend-icon="element.icon"
                 :title="element.title"
                 :value="element.id"
-                :active="$route.name === element.activeName"
+                :active="(!isRail || isMobile) && $route.name === element.activeName"
                 :to="element.to"
                 class="mb-2"
                 @click="closeDrawerOnMobile"
@@ -53,15 +53,12 @@
                 <!-- Rail Mode: Simple Icon with Floating Menu -->
                 <v-list-item
                   v-if="isRail && !isMobile"
+                  :prepend-icon="element.icon"
                   :value="element.id"
-                  class="rail-group-activator pa-0"
-                  :class="{ 'activator-active': isGroupActive(element) }"
+                  class="rail-group-activator"
+                  :active="false"
                   @click.stop.prevent="handleRailClick"
                 >
-                  <div class="d-flex justify-center align-center w-100">
-                    <v-icon :icon="element.icon" size="24" :color="isGroupActive(element) ? 'teal' : 'grey-darken-1'"></v-icon>
-                  </div>
-                  
                   <v-menu
                     activator="parent"
                     location="end top"
@@ -104,7 +101,7 @@
                     @change="saveSidebarOrder"
                     :animation="250"
                     class="nested-draggable"
-                    :disabled="true"
+                    :disabled="isRail && !isMobile"
                   >
                     <template #item="{ element: subItem }">
                       <div v-if="!subItem.adminOnly || isAdmin" class="nested-item-wrapper">
@@ -1054,30 +1051,12 @@ onUnmounted(() => {
 
 /* Floating Rail Menu Styles */
 .rail-group-activator {
-  height: 48px !important;
-  width: 100% !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
   position: relative;
   cursor: default !important;
-  padding: 0 !important;
 }
 
-.rail-group-activator :deep(.v-list-item__content),
 .rail-group-activator :deep(.v-list-item__spacer) {
   display: none !important;
-}
-
-.activator-active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 4px;
-  background: #14b8a6;
-  border-radius: 0 4px 4px 0;
 }
 
 .sidebar-popup-card {
