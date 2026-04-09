@@ -20,7 +20,7 @@ async function fetchChurchContext() {
   };
 
   try {
-    // 1. Live Slots - Direct query that checks for specific booking counts per service
+    // 1. Live Slots
     const [rows] = await query(`
       SELECT service_type, available_date, available_time, max_slots,
       (
@@ -38,45 +38,26 @@ async function fetchChurchContext() {
       AND service_type IN ('water_baptism', 'burial', 'dedication', 'salvation', 'bible_study')
       HAVING booked < max_slots
       ORDER BY available_date ASC
-      LIMIT 8
+      LIMIT 10
     `);
     context.slots = rows;
 
     // 2. Announcements
     try {
-        const [newsRows] = await query("SELECT title FROM tbl_announcements WHERE is_active = 1 LIMIT 2");
+        const [newsRows] = await query("SELECT title FROM tbl_announcements WHERE is_active = 1 LIMIT 3");
         context.news = newsRows;
     } catch (e) {}
 
-    // 3. CMS Pages - INDIVIDUAL FETCH with try/catch to avoid table-not-found crashes
-    const pageKeys = {
-        'header': 'header',
-        'about': 'about',
-        'ourstory': 'ourstory',
-        'home': 'home',
-        'water_baptism': 'water_baptism',
-        'burial_service': 'burial_service',
-        'child_dedication': 'child_dedication'
-    };
-
-    for (const [key, pageName] of Object.entries(pageKeys)) {
+    // 3. CMS Pages
+    const pageKeys = ['header', 'about', 'ourstory', 'home', 'water_baptism', 'burial_service', 'child_dedication'];
+    for (const pageName of pageKeys) {
       try {
         const result = await getCmsPage(pageName);
-        if (result.success && result.data) {
-            context.cms[key] = result.data;
-        }
-      } catch (pageErr) {
-        // Silently skip if table doesn't exist
-      }
+        if (result.success && result.data) context.cms[pageName] = result.data;
+      } catch (pageErr) {}
     }
-
-    // --- FINAL FAILSAFE ---
-    // Ensure important keys exist even if empty
-    if (!context.cms.about) context.cms.about = { content: {} };
-    if (!context.cms.ourstory) context.cms.ourstory = { content: {} };
-    if (!context.cms.home) context.cms.home = { content: {} };
   } catch (e) {
-    console.error('AI Context Warning (non-fatal):', e.message);
+    console.error('AI Context Warning:', e.message);
   }
   return context;
 }
@@ -86,39 +67,62 @@ async function fetchChurchContext() {
  */
 router.post('/chat', async (req, res) => {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      console.error('CRITICAL: GEMINI_API_KEY is missing from environment variables!');
-      return res.status(500).json({ error: 'AI Service Config Error' });
-    }
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'AI Service Config Error' });
 
-    const { message, history, language } = req.body;
+    const { message, history, language, member_id } = req.body;
     if (!message) return res.status(400).json({ error: 'Missing message' });
 
-    let ctx;
-    try {
-      ctx = await fetchChurchContext();
-    } catch (ctxError) {
-      console.error('Error building AI context:', ctxError);
-      // Fallback context so the user still gets an answer
-      ctx = { slots: [], cms: {}, now: moment().format('LLLL') };
+    const ctx = await fetchChurchContext();
+    let memberCtx = null;
+
+    // Fetch Member Details if logged in
+    if (member_id) {
+       try {
+         const [memberRows] = await query("SELECT firstname, lastname, position FROM tbl_members WHERE member_id = ?", [member_id]);
+         if (memberRows.length > 0) {
+            const m = memberRows[0];
+            const [baptismRows] = await query("SELECT status FROM tbl_waterbaptism WHERE member_id = ? AND status = 'completed'", [member_id]);
+            memberCtx = {
+               name: `${m.firstname} ${m.lastname}`,
+               role: m.position,
+               is_member: m.position === 'Member',
+               baptized: baptismRows.length > 0
+            };
+         }
+       } catch (e) {}
     }
 
     const currentLanguage = language || 'English';
 
     const systemPrompt = `
-      You are BBEK.Bot. Be friendly, real-time, and helpful to guests.
-      TODAY: ${ctx.now}
-      LANGUAGE: ${currentLanguage}. Respond EXCLUSIVELY in ${currentLanguage}.
-      Speak in a warm, polite and conversational manner appropriate for a church secretary.
-
-      FOCUS: Membership, Water Baptism, Child Dedication, Burial Services, Salvation Talk, Bible Study. (NO MARRIAGE).
-      AVAILABILITY: ${ctx.slots?.map(s => `${moment(s.available_date).format('MMM DD')} ${s.available_time} (${s.service_type})`).join(', ') || 'Contact Office'}.
+      You are BBEK.Bot, the digital secretary of Bible Baptist Ekklesia of Kawit. 
+      Be warm, polite, and conversational. Respond EXCLUSIVELY in ${currentLanguage}.
       
-      CORE: ${ctx.cms?.ourstory?.content?.mission?.substring(0, 50) || 'BBEK Church'}. 
-      SCRIPT: Salvation Talk -> Bible Study -> Water Baptism -> Official Member. (Only Members can do Dedication/Ministries).
+      SITEMAP (Guide users to these pages):
+      - Home: Landing page with announcements and mission. (Route: /)
+      - About Us: Church history and leadership. (Route: /about)
+      - Services: 
+         * Water Baptism: Signup and info. (Route: /services/water-baptism)
+         * Child Dedication: Only for members. (Route: /services/child-dedication)
+         * Burial Service: Compassionate help. (Route: /services/burial)
+         * Discipleship: Salvation Talk & Bible Study. (Route: /services/discipleship)
+      - Give: Online Tithes and Offering with proof upload. (Route: /give)
+      - Join Us: Membership registration. (Route: /register)
+
+      PIPELINE: Salvation Talk -> Bible Study -> Water Baptism -> Official Member.
+      
+      ${memberCtx ? `USER: Hello, ${memberCtx.name} (${memberCtx.role}). You are ${memberCtx.baptized ? 'Baptized' : 'not yet Baptized'}.` : 'USER: Guest/Visitor.'}
+      
+      TODAY: ${ctx.now}
+      AVAILABILITY: ${ctx.slots?.map(s => `${moment(s.available_date).format('MMM DD')} ${s.available_time} (${s.service_type})`).join(', ') || 'Contact values'}
+      ANNOUNCEMENTS: ${ctx.news?.map(n => n.title).join(', ') || 'Coming soon.'}
+      MISSION: ${ctx.cms?.ourstory?.content?.mission || 'Building a community of faith.'}
+      
+      If they ask where to find something, give them the page name and route.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest', systemInstruction: systemPrompt });
+    // gemini-1.5-flash is the most stable across library versions
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemPrompt });
 
     const chat = model.startChat({ history: history || [] });
     const result = await chat.sendMessageStream(message);
@@ -132,6 +136,12 @@ router.post('/chat', async (req, res) => {
     res.end();
   } catch (error) {
     console.error('AI Chat Error:', error);
+    
+    // Friendly response for Rate Limits (429) or Overloaded (503)
+    if (error.status === 429 || error.status === 503) {
+      return res.status(500).json({ error: "I'm a bit overwhelmed with guests right now! Please wait a few seconds and try again." });
+    }
+    
     res.status(500).json({ error: 'AI Assistant Busy' });
   }
 });

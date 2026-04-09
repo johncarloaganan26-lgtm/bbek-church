@@ -2,182 +2,135 @@
   <div class="admin-dashboard">
     <v-navigation-drawer 
       v-model="_drawerState"
+      :rail="isRail && !isMobile"
       :temporary="isMobile"
+      permanent
       width="280" 
       color="white"
+      class="elevation-1 sidebar-drawer"
     >
-      <div class="pa-4 cursor-pointer" @click="navigateTo('LandingPage')">
-        <div class="d-flex align-center mb-4">
-          <v-avatar size="40" color="primary" class="mr-3" >
-            <!-- <v-icon icon="mdi-church" color="white"></v-icon> -->
+      <div class="sidebar-header pa-4 cursor-pointer" @click="navigateTo('LandingPage')">
+        <div class="d-flex align-center" :class="{ 'justify-center': isRail && !isMobile, 'mb-4': !isRail || isMobile }">
+          <v-avatar size="40" color="primary" :class="{ 'mr-3': !isRail || isMobile }">
             <img :src="headerData.logo" :alt="headerData.fullname || 'BBEK Church'" width="40" height="40">
           </v-avatar>
-          <span class="text-h6 font-weight-bold">{{ headerData.acronym || 'BBEK' }} Church</span>
+          <span v-if="!isRail || isMobile" class="text-h6 font-weight-bold text-no-wrap">{{ headerData.acronym || 'BBEK' }} Church</span>
         </div>
-        <div class="text-uppercase text-caption grey--text mb-6">{{ isAdmin ? 'ADMIN PANEL' : 'STAFF PANEL' }}</div>
+        <div v-if="!isRail || isMobile" class="text-uppercase text-caption grey--text mb-0">{{ isAdmin ? 'ADMIN PANEL' : 'STAFF PANEL' }}</div>
       </div>
 
-      <v-list nav density="compact" class="pa-0" color="teal">
-        <!-- Dashboard -->
-        <v-list-item
-          prepend-icon="mdi-home"
-          title="DASHBOARD"
-          value="dashboard"
-          :active="$route.name === 'Dashboard'"
-          :to="{ name: 'Dashboard' }"
-          class="mb-2"
-          @click="closeDrawerOnMobile"
-        ></v-list-item>
+      <div class="sidebar-scroll-area">
+        <v-list v-model:opened="openedGroups" nav density="compact" class="pa-0 sidebar-list" color="teal">
+        <draggable 
+          v-model="sidebarItems" 
+          item-key="id"
+          ghost-class="ghost-item"
+          @change="saveSidebarOrder"
+          :animation="300"
+          :disabled="isRail && !isMobile"
+        >
+          <template #item="{ element }">
+            <div class="sidebar-item-wrapper" :class="{ 'no-drag': isRail && !isMobile }">
+              <!-- Drag Indicator (Visual only) - Hidden in Rail mode -->
+              <div v-if="!isRail || isMobile" class="drag-indicator">
+                <v-icon icon="mdi-drag-vertical" size="small" color="grey-lighten-1"></v-icon>
+              </div>
 
-        <!-- Church Records -->
-        <v-list-group value="church-records" prepend-icon="mdi-database">
-          <template v-slot:activator="{ props }">
-            <v-list-item v-bind="props" title="CHURCH RECORDS"></v-list-item>
-          </template>
-          <v-list-item 
-            prepend-icon="mdi-account" 
-            title="Accounts"
-            :to="{ name: 'Accounts' }"
-            :active="$route.name === 'Accounts'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-office-building" 
-            title="Departments"
-            :to="{ name: 'Departments' }"
-            :active="$route.name === 'Departments'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-account" 
-            title="Member Record"
-            :to="{ name: 'MemberRecord' }"
-            :active="$route.name === 'MemberRecord'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-calendar" 
-            title="Events Records"
-            :to="{ name: 'EventsRecords' }"
-            :active="$route.name === 'EventsRecords'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-gift" 
-            title="Tithes & Offerings"
-            :to="{ name: 'TithesOfferings' }"
-            :active="$route.name === 'TithesOfferings'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            prepend-icon="mdi-account-group" 
-            title="Ministries"
-            :to="{ name: 'Ministries' }"
-            :active="$route.name === 'Ministries'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-        </v-list-group>
+              <!-- Individual Item (e.g., Dashboard) - Hidden in Rail mode as requested -->
+              <v-list-item
+                v-if="(!isRail || isMobile) && element.type === 'item' && (!element.adminOnly || isAdmin)"
+                :prepend-icon="element.icon"
+                :title="element.title"
+                :value="element.id"
+                :active="$route.name === element.activeName"
+                :to="element.to"
+                class="mb-2"
+                @click="closeDrawerOnMobile"
+              ></v-list-item>
 
-        <!-- Services -->
-        <v-list-group value="services" prepend-icon="mdi-gift-outline">
-          <template v-slot:activator="{ props }">
-            <v-list-item v-bind="props" title="SERVICES"></v-list-item>
-          </template>
-           <v-list-item
-            prepend-icon="mdi-account-plus"
-            title="Salvation Requests"
-            :to="{ name: 'DiscipleshipAdmin' }"
-            :active="$route.name === 'DiscipleshipAdmin'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-book-open-variant"
-            title="Bible Study"
-            :to="{ name: 'BibleStudy' }"
-            :active="$route.name === 'BibleStudy'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-           <v-list-item
-            prepend-icon="mdi-water"
-            title="Water Baptism"
-            :to="{ name: 'WaterBaptism' }"
-            :active="$route.name === 'WaterBaptism'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-baby-face"
-            title="Child Dedication"
-            :to="{ name: 'ChildDedicationAdmin' }"
-            :active="$route.name === 'ChildDedicationAdmin'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item
-            prepend-icon="mdi-coffin"
-            title="Burial Service"
-            :to="{ name: 'BurialService' }"
-            :active="$route.name === 'BurialService'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-        </v-list-group>
+              <!-- Group (e.g., Church Records) -->
+              <template v-else-if="element.type === 'group'">
+                <!-- Rail Mode: Simple Icon with Floating Menu -->
+                <v-list-item
+                  v-if="isRail && !isMobile"
+                  :value="element.id"
+                  class="rail-group-activator pa-0"
+                  :class="{ 'activator-active': isGroupActive(element) }"
+                  @click.stop.prevent="handleRailClick"
+                >
+                  <div class="d-flex justify-center align-center w-100">
+                    <v-icon :icon="element.icon" size="24" :color="isGroupActive(element) ? 'teal' : 'grey-darken-1'"></v-icon>
+                  </div>
+                  
+                  <v-menu
+                    activator="parent"
+                    location="end top"
+                    :offset="[14, 0]"
+                    open-on-hover
+                    transition="slide-x-transition"
+                  >
+                    <v-paper class="pa-1 sidebar-popup-card">
+                      <v-list density="compact" class="pa-0">
+                        <v-list-item
+                          v-for="subItem in element.items.filter(si => !si.adminOnly || isAdmin)"
+                          :key="subItem.title"
+                          :prepend-icon="subItem.icon"
+                          :title="subItem.title"
+                          :to="subItem.to"
+                          @click="closeDrawerOnMobile"
+                          class="sidebar-popup-item"
+                        ></v-list-item>
+                      </v-list>
+                    </v-paper>
+                  </v-menu>
+                </v-list-item>
 
-        <!-- Communication -->
-        <v-list-group value="communication" prepend-icon="mdi-message">
-          <template v-slot:activator="{ props }">
-            <v-list-item v-bind="props" title="COMMUNICATION"></v-list-item>
+                <!-- Expanded Mode: Standard collapsible Group -->
+                <v-list-group 
+                  v-else
+                  :value="element.id" 
+                  :prepend-icon="element.icon"
+                >
+                  <template v-slot:activator="{ props }">
+                    <v-list-item v-bind="props" :title="element.title"></v-list-item>
+                  </template>
+                  
+                  <draggable
+                    v-if="!isRail || isMobile"
+                    v-model="element.items"
+                    item-key="title"
+                    group="modules"
+                    ghost-class="ghost-item"
+                    @change="saveSidebarOrder"
+                    :animation="250"
+                    class="nested-draggable"
+                    :disabled="true"
+                  >
+                    <template #item="{ element: subItem }">
+                      <div v-if="!subItem.adminOnly || isAdmin" class="nested-item-wrapper">
+                        <v-list-item 
+                          :prepend-icon="subItem.icon" 
+                          :title="subItem.title"
+                          :to="subItem.to"
+                          :active="$route.name === subItem.activeName"
+                          @click="closeDrawerOnMobile"
+                          class="sidebar-item"
+                        ></v-list-item>
+                      </div>
+                    </template>
+                  </draggable>
+                </v-list-group>
+              </template>
+            </div>
           </template>
-         <v-list-item 
-            prepend-icon="mdi-message-text" 
-            title="Messages"
-            :to="{ name: 'Messages' }"
-            :active="$route.name === 'Messages'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-        </v-list-group>
-
-        <!-- Maintenance -->
-        <v-list-group value="maintenance" prepend-icon="mdi-cog">
-          <template v-slot:activator="{ props }">
-            <v-list-item v-bind="props" title="MAINTENANCE"></v-list-item>
-          </template>
-          <v-list-item
-            v-if="isAdmin"
-            prepend-icon="mdi-folder"
-            title="Archives"
-            :to="{ name: 'Archive' }"
-            :active="$route.name === 'Archive'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item
-            v-if="isAdmin"
-            prepend-icon="mdi-file-document"
-            title="Audit Trail"
-            :to="{ name: 'AuditTrail' }"
-            :active="$route.name === 'AuditTrail'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          
-          <v-list-item
-            prepend-icon="mdi-cog"
-            title="Settings"
-            :to="{ name: 'Settings' }"
-            :active="$route.name === 'Settings'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-          <v-list-item 
-            v-if="userInfo?.account?.position === 'admin'" 
-            prepend-icon="mdi-file-document" 
-            title="Content Management" 
-            :to="{ name: 'ContentManagement' }" 
-            :active="$route.name === 'ContentManagement'"
-            @click="closeDrawerOnMobile"
-          ></v-list-item>
-        </v-list-group>
-      </v-list>
+        </draggable>
+        </v-list>
+      </div>
     </v-navigation-drawer>
 
     <v-app-bar color="white" elevation="1">
       <v-app-bar-nav-icon
-        @click="_drawerState = !_drawerState"
+        @click="toggleSidebar"
         class="menu-button"
       ></v-app-bar-nav-icon>
 
@@ -293,6 +246,7 @@ import { useCmsStore } from '@/stores/cmsStore'
 import { useDisplay } from 'vuetify'
 import NotificationIcon from '@/components/NotificationIcon.vue'
 import AvailabilityManager from '@/components/Admin/ServicesRecords/AvailabilityManager.vue'
+import draggable from 'vuedraggable'
 import axios from '@/api/axios'
 
 const availabilityManagerVisible = ref(false)
@@ -301,6 +255,156 @@ const route = useRoute()
 const router = useRouter()
 const cmsStore = useCmsStore()
 const { mobile } = useDisplay()
+
+// --- Sidebar Reordering Feature ---
+const SIDEBAR_STORAGE_KEY = 'bbek_sidebar_order'
+
+const defaultSidebarItems = [
+  {
+    id: 'dashboard',
+    type: 'item',
+    title: 'DASHBOARD',
+    icon: 'mdi-home',
+    to: { name: 'Dashboard' },
+    activeName: 'Dashboard'
+  },
+  {
+    id: 'church-records',
+    type: 'group',
+    title: 'CHURCH RECORDS',
+    icon: 'mdi-database',
+    items: [
+      { title: 'Accounts', icon: 'mdi-account', to: { name: 'Accounts' }, activeName: 'Accounts' },
+      { title: 'Departments', icon: 'mdi-office-building', to: { name: 'Departments' }, activeName: 'Departments' },
+      { title: 'Member Record', icon: 'mdi-account', to: { name: 'MemberRecord' }, activeName: 'MemberRecord' },
+      { title: 'Events Records', icon: 'mdi-calendar', to: { name: 'EventsRecords' }, activeName: 'EventsRecords' },
+      { title: 'Tithes & Offerings', icon: 'mdi-gift', to: { name: 'TithesOfferings' }, activeName: 'TithesOfferings' },
+      { title: 'Ministries', icon: 'mdi-account-group', to: { name: 'Ministries' }, activeName: 'Ministries' }
+    ]
+  },
+  {
+    id: 'services',
+    type: 'group',
+    title: 'SERVICES',
+    icon: 'mdi-gift-outline',
+    items: [
+      { title: 'Salvation Requests', icon: 'mdi-account-plus', to: { name: 'DiscipleshipAdmin' }, activeName: 'DiscipleshipAdmin' },
+      { title: 'Bible Study', icon: 'mdi-book-open-variant', to: { name: 'BibleStudy' }, activeName: 'BibleStudy' },
+      { title: 'Water Baptism', icon: 'mdi-water', to: { name: 'WaterBaptism' }, activeName: 'WaterBaptism' },
+      { title: 'Child Dedication', icon: 'mdi-baby-face', to: { name: 'ChildDedicationAdmin' }, activeName: 'ChildDedicationAdmin' },
+      { title: 'Burial Service', icon: 'mdi-coffin', to: { name: 'BurialService' }, activeName: 'BurialService' }
+    ]
+  },
+  {
+    id: 'communication',
+    type: 'group',
+    title: 'COMMUNICATION',
+    icon: 'mdi-message',
+    items: [
+      { title: 'Messages', icon: 'mdi-message-text', to: { name: 'Messages' }, activeName: 'Messages' }
+    ]
+  },
+  {
+    id: 'maintenance',
+    type: 'group',
+    title: 'MAINTENANCE',
+    icon: 'mdi-cog',
+    items: [
+      { title: 'Archives', icon: 'mdi-folder', to: { name: 'Archive' }, activeName: 'Archive', adminOnly: true },
+      { title: 'Audit Trail', icon: 'mdi-file-document', to: { name: 'AuditTrail' }, activeName: 'AuditTrail', adminOnly: true },
+      { title: 'Settings', icon: 'mdi-cog', to: { name: 'Settings' }, activeName: 'Settings' },
+      { title: 'Content Management', icon: 'mdi-file-document', to: { name: 'ContentManagement' }, activeName: 'ContentManagement', adminOnly: true }
+    ]
+  }
+]
+
+const sidebarItems = ref([])
+
+// Helper to find a module by title across all default items
+const findModuleByTitle = (title) => {
+  for (const group of defaultSidebarItems) {
+    if (group.items) {
+      const found = group.items.find(item => item.title === title)
+      if (found) return { ...found }
+    }
+  }
+  return null
+}
+
+const loadSidebarOrder = () => {
+  const savedOrder = localStorage.getItem(SIDEBAR_STORAGE_KEY)
+  if (savedOrder) {
+    try {
+      const parsed = JSON.parse(savedOrder)
+      
+      // 1. Reconstruct top-level structure
+      const merged = parsed.map(savedItem => {
+        const defItem = defaultSidebarItems.find(d => d.id === savedItem.id)
+        if (!defItem) return null
+        
+        // Use a copy to avoid mutating defaultSidebarItems
+        const newItem = JSON.parse(JSON.stringify(defItem))
+        
+        // 2. Restore custom sub-item order/grouping
+        if (newItem.type === 'group' && savedItem.itemsOrder) {
+          newItem.items = savedItem.itemsOrder.map(title => findModuleByTitle(title)).filter(Boolean)
+        }
+        
+        return newItem
+      }).filter(Boolean)
+      
+      // 3. Handle modules that were NOT in the saved order (new modules or default ones)
+      // Check which default modules are missing from the entire merged structure
+      const allActiveTitles = new Set()
+      merged.forEach(mi => {
+        if (mi.items) mi.items.forEach(si => allActiveTitles.add(si.title))
+      })
+      
+      defaultSidebarItems.forEach(defItem => {
+        // Add missing top-level categories
+        if (!merged.find(m => m.id === defItem.id)) {
+          merged.push(JSON.parse(JSON.stringify(defItem)))
+        }
+        
+        // Add missing modules to their default parent
+        if (defItem.items) {
+          defItem.items.forEach(si => {
+            if (!allActiveTitles.has(si.title)) {
+              const targetGroup = merged.find(m => m.id === defItem.id)
+              if (targetGroup && targetGroup.items) {
+                targetGroup.items.push({ ...si })
+              }
+            }
+          })
+        }
+      })
+      
+      sidebarItems.value = merged
+    } catch (e) {
+      console.warn('Failed to load sidebar order:', e)
+      sidebarItems.value = JSON.parse(JSON.stringify(defaultSidebarItems))
+    }
+  } else {
+    sidebarItems.value = JSON.parse(JSON.stringify(defaultSidebarItems))
+  }
+}
+
+const saveSidebarOrder = () => {
+  const orderToSave = sidebarItems.value.map(item => ({ 
+    id: item.id,
+    // Also save the order of inner items if it's a group
+    itemsOrder: item.items ? item.items.map(si => si.title) : []
+  }))
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(orderToSave))
+}
+
+const hasVisibleItems = (group) => {
+  return group.items.some(item => !item.adminOnly || isAdmin.value)
+}
+
+// Initialize sidebar
+loadSidebarOrder()
+// --- End Sidebar Reordering Feature ---
 
 // User info from token
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')) || null)
@@ -318,6 +422,32 @@ const isMobile = computed(() => mobile.value)
 
 // Drawer state - can be toggled on both mobile and desktop
 const _drawerState = ref(true) // Default to open
+const isRail = ref(false) // Mini sidebar state
+const openedGroups = ref([])
+
+const toggleSidebar = () => {
+  if (isMobile.value) {
+    _drawerState.value = !_drawerState.value
+  } else {
+    isRail.value = !isRail.value
+    // Auto-collapse groups when moving to rail mode
+    if (isRail.value) {
+      openedGroups.value = []
+    }
+  }
+}
+
+const isGroupActive = (group) => {
+  if (!group.items) return false
+  return group.items.some(item => route.name === item.activeName)
+}
+
+const handleRailClick = (e) => {
+  if (isRail.value && !isMobile.value) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+}
 
 const selectedAdminSearchItem = ref(null)
 const adminSearchQuery = ref('')
@@ -876,13 +1006,190 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* Sidebar Sticky Header Layout */
+:deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.sidebar-header {
+  flex-shrink: 0;
+  background: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 20;
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.sidebar-scroll-area {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 32px;
+}
+
+/* Custom Scrollbar for Sidebar */
+.sidebar-scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.sidebar-scroll-area:hover::-webkit-scrollbar-thumb {
+  background: rgba(20, 184, 166, 0.3);
+}
+
+/* Floating Rail Menu Styles */
+.rail-group-activator {
+  height: 48px !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  position: relative;
+  cursor: default !important;
+  padding: 0 !important;
+}
+
+.rail-group-activator :deep(.v-list-item__content),
+.rail-group-activator :deep(.v-list-item__spacer) {
+  display: none !important;
+}
+
+.activator-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  background: #14b8a6;
+  border-radius: 0 4px 4px 0;
+}
+
+.sidebar-popup-card {
+  background: white !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  min-width: 220px;
+}
+
+.sidebar-popup-item {
+  border-radius: 8px !important;
+  margin-bottom: 2px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-popup-item:hover {
+  background: rgba(20, 184, 166, 0.08) !important;
+  color: #0d9488 !important;
+}
+
+.sidebar-popup-item :deep(.v-list-item-title) {
+  font-size: 0.9rem !important;
+  font-weight: 500;
+}
+
+.category-activator {
+  transition: background 0.2s ease;
+}
+
+.sidebar-drawer :deep(.v-navigation-drawer--rail) .category-activator {
+  cursor: default !important;
+}
+
+.border-bottom {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 4px;
+}
+
+/* Sidebar Draggable Styles */
+.sidebar-list {
+  padding-top: 0 !important;
+}
+
+.sidebar-item-wrapper {
+  position: relative;
+  transition: all 0.2s ease;
+  cursor: grab;
+}
+
+.sidebar-item-wrapper.no-drag {
+  cursor: default !important;
+}
+
+.sidebar-item-wrapper:active {
+  cursor: grabbing;
+}
+
+.sidebar-item-wrapper.no-drag:active {
+  cursor: default !important;
+}
+
+.drag-indicator {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.3;
+  z-index: 10;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+}
+
+.sidebar-item-wrapper:hover .drag-indicator {
+  opacity: 0.8;
+}
+
+.nested-item-wrapper {
+  position: relative;
+  cursor: grab !important;
+}
+
+.nested-item-wrapper:active {
+  cursor: grabbing !important;
+}
+
+.sidebar-item {
+  margin-left: 0 !important;
+}
+
+.nested-draggable {
+  min-height: 20px;
+  padding-bottom: 4px;
+}
+
+.ghost-item {
+  opacity: 0.3;
+  background: rgba(20, 184, 166, 0.1) !important;
+  border: 1px dashed #14b8a6;
+  border-radius: 8px;
+}
+
 /* Premium Sidebar Active State */
 :deep(.v-list-item--active) {
   background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
   color: white !important;
   box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
-  margin-left: 8px !important;
-  margin-right: 8px !important;
+  margin-left: 4px !important;
+  margin-right: 4px !important;
   border-radius: 5px !important;
 }
 
