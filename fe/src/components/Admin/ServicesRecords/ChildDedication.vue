@@ -400,15 +400,14 @@
           <div class="mb-5">
             <div class="d-flex align-center mb-2">
               <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
-              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Date (Sundays Only)</span>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Date</span>
             </div>
             <el-date-picker
               v-model="completionDate"
               type="date"
-              placeholder="Select Sunday"
+              placeholder="Select date"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              :disabled-date="disableNonSundays"
               class="w-100 custom-date-picker"
               size="large"
               popper-class="bulk-complete-date-picker-popper"
@@ -772,11 +771,11 @@ const confirmBulkComplete = async () => {
   }
 };
 
-// Disable non-Sunday dates
-const disableNonSundays = (time) => {
-  const date = new Date(time);
-  const dayOfWeek = date.getDay();
-  return dayOfWeek !== 0; // 0 = Sunday
+// Disable based on Availability Manager? Currently allowing all past today
+const disablePastDates = (time) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return time < today;
 };
 
 const markIndividualComplete = async (dedication) => {

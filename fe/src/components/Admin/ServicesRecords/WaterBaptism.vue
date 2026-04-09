@@ -408,15 +408,14 @@
           <div class="mb-5">
             <div class="d-flex align-center mb-2">
               <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
-              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Date (Sundays Only)</span>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Baptism Date</span>
             </div>
             <el-date-picker
               v-model="completionDate"
               type="date"
-              placeholder="Select Sunday"
+              placeholder="Select Date"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              :disabled-date="disableNonSundays"
               class="w-100 custom-date-picker"
               size="large"
               popper-class="bulk-complete-date-picker-popper"
@@ -465,7 +464,7 @@
             
             <div class="text-caption text-grey mt-2 d-flex align-center">
               <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
-              Water baptism is held every Sunday at 1:00 PM.
+              Select an available baptism schedule from the slots manager.
             </div>
           </div>
         </v-card-text>

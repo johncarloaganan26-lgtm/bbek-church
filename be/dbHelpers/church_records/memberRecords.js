@@ -166,7 +166,7 @@ async function checkDuplicateMember(memberData, excludeMemberId = null) {
     const uniqueDuplicateFields = [...new Set(duplicateFields)];
 
     return {
-      isDuplicate: duplicateFields.includes('name_birthdate'),
+      isDuplicate: uniqueDuplicateFields.length > 0,
       duplicateFields: uniqueDuplicateFields,
       duplicateDetails: duplicateDetails
     };

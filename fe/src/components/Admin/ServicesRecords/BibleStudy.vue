@@ -351,33 +351,44 @@
             <div class="text-caption">Loading available slots...</div>
           </div>
 
-          <div v-else-if="availableSlots.length > 0" class="slots-selection-container mb-4 pa-4 bg-grey-lighten-5 rounded-xl border">
-            <div v-for="dateGroup in availableSlots.slice(0, 6)" :key="dateGroup.date" class="mb-4 pb-2 border-bottom">
-              <div class="d-flex align-center flex-wrap">
-                <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mr-3 mb-1" style="font-size: 0.7rem; letter-spacing: 0.5px; min-width: 140px;">
-                  <v-icon size="14" color="teal" class="mr-1">mdi-calendar</v-icon>
-                  {{ formatBibleStudyDate(dateGroup.date) }}:
-                </div>
-                <div class="d-flex flex-wrap gap-2 mb-1">
-                  <v-chip
-                    v-for="slot in dateGroup.timeSlots"
-                    :key="slot.datetime"
-                    size="small"
-                    variant="flat"
-                    :color="isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'teal' : 'white'"
-                    :class="['elevation-1 border-teal', isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'text-white' : 'text-teal font-weight-bold']"
-                    @click="selectSlot(slot.datetime)"
-                    style="cursor: pointer;"
-                  >
-                    <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                    {{ formatTime(slot.time) }}
-                    <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                      ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
-                    </span>
-                  </v-chip>
-                </div>
-              </div>
-            </div>
+          <div v-else-if="availableSlots.length > 0" class="slots-selection-container mb-4 font-sans">
+            <v-expansion-panels variant="accordion" class="rounded-xl overflow-hidden border">
+              <v-expansion-panel
+                v-for="dateGroup in availableSlots"
+                :key="dateGroup.date"
+                class="mb-0"
+              >
+                <v-expansion-panel-title class="py-3">
+                  <div class="d-flex align-center w-100">
+                    <v-icon color="teal" class="mr-3">mdi-calendar</v-icon>
+                    <div class="font-weight-bold text-subtitle-2">{{ formatBibleStudyDate(dateGroup.date) }}</div>
+                    <v-chip size="x-small" color="teal-lighten-4" class="ml-auto teal--text font-weight-bold">
+                      {{ dateGroup.timeSlots.length }} slots
+                    </v-chip>
+                  </div>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text class="bg-grey-lighten-5 pa-2">
+                  <div class="d-flex flex-wrap gap-2">
+                    <v-chip
+                      v-for="slot in dateGroup.timeSlots"
+                      :key="slot.datetime"
+                      size="small"
+                      variant="flat"
+                      :color="isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'teal' : 'white'"
+                      :class="['elevation-1 border-teal', isSameSchedule(editItem.scheduled_date, slot.datetime) ? 'text-white' : 'text-teal font-weight-bold']"
+                      @click="selectSlot(slot.datetime)"
+                      style="cursor: pointer;"
+                    >
+                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                      {{ formatTime(slot.time) }}
+                      <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
+                        ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
+                      </span>
+                    </v-chip>
+                  </div>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
           </div>
 
           <v-alert v-else type="info" variant="tonal" density="compact" class="mb-4">
@@ -532,31 +543,46 @@
                     <div class="text-subtitle-1 font-weight-bold grey--text">Loading baptism dates...</div>
                   </div>
 
-                  <div v-else-if="waterBaptismSlots.length > 0" class="slots-selection-container pa-4 bg-white rounded-xl border elevation-2" style="height: 400px; overflow-y: auto;">
-                    <div v-for="dateGroup in waterBaptismSlots" :key="dateGroup.date" class="mb-5 pb-2">
-                      <div class="text-subtitle-2 font-weight-bold grey--text text-uppercase mb-3 d-flex align-center">
-                        <v-icon size="18" color="teal" class="mr-2">mdi-calendar-range</v-icon>
-                        {{ dateGroup.displayDate }}
-                      </div>
-                      <div class="d-flex flex-wrap gap-3">
-                         <v-btn
-                          v-for="slot in dateGroup.timeSlots"
-                          :key="slot.datetime"
-                          variant="flat"
-                          size="large"
-                          :color="bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'teal-darken-1' : 'grey-lighten-4'"
-                          :class="['rounded-lg transition-swing', bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'text-white' : 'text-teal-darken-2 font-weight-bold shadow-sm']"
-                          @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time"
-                          style="min-width: 140px;"
-                        >
-                          <v-icon size="20" class="mr-2">mdi-clock-outline</v-icon>
-                          {{ formatTime(slot.time) }}
-                          <span class="ml-2 opacity-70 font-weight-medium" style="font-size: 0.7em !important;">
-                            ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
-                          </span>
-                        </v-btn>
-                      </div>
-                    </div>
+                  <div v-else-if="waterBaptismSlots.length > 0" class="slots-selection-container bg-white rounded-xl border elevation-2 overflow-hidden" style="max-height: 400px; overflow-y: auto;">
+                    <v-expansion-panels variant="accordion" class="rounded-lg">
+                      <v-expansion-panel
+                        v-for="dateGroup in waterBaptismSlots"
+                        :key="dateGroup.date"
+                        class="mb-0"
+                      >
+                        <v-expansion-panel-title class="py-4">
+                          <div class="d-flex align-center w-100">
+                            <v-icon color="teal" class="mr-3">mdi-calendar-check</v-icon>
+                            <div class="font-weight-bold text-subtitle-1">{{ dateGroup.displayDate }}</div>
+                            <v-chip size="small" color="teal-lighten-4" class="ml-auto teal--text px-3 font-weight-bold">
+                              {{ dateGroup.timeSlots.length }} available times
+                            </v-chip>
+                          </div>
+                        </v-expansion-panel-title>
+                        <v-expansion-panel-text class="bg-grey-lighten-5 pa-4">
+                          <div class="d-flex flex-wrap gap-3">
+                             <v-btn
+                              v-for="slot in dateGroup.timeSlots"
+                              :key="slot.datetime"
+                              variant="flat"
+                              size="large"
+                              :color="bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'teal-darken-1' : 'white'"
+                              :class="['rounded-lg transition-swing border-teal shadow-sm', bulkPromotionData.baptism_date === dateGroup.date && bulkPromotionData.baptism_time === slot.time ? 'text-white' : 'text-teal-darken-2 font-weight-bold']"
+                              @click="bulkPromotionData.baptism_date = dateGroup.date; bulkPromotionData.baptism_time = slot.time"
+                              style="min-width: 140px;"
+                            >
+                              <v-icon size="20" class="mr-2">mdi-clock-outline</v-icon>
+                              {{ formatTime(slot.time) }}
+                              <template v-slot:append>
+                                <span class="ml-2 opacity-70 font-weight-medium" style="font-size: 0.75em !important;">
+                                  ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
+                                </span>
+                              </template>
+                            </v-btn>
+                          </div>
+                        </v-expansion-panel-text>
+                      </v-expansion-panel>
+                    </v-expansion-panels>
                   </div>
 
                   <v-alert v-else type="info" variant="tonal" density="compact" class="mb-4 rounded-lg">
@@ -910,26 +936,34 @@
             </div>
             <div v-else class="mt-4">
                 <label class="text-caption font-weight-bold grey--text d-block mb-2">New Schedule (Daily)</label>
-                <div class="bg-grey-lighten-5 rounded pa-3 border shadow-inner overflow-y-auto" style="max-height: 300px;">
-                <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="mb-4">
-                    <div class="text-caption font-weight-bold teal--text mb-2">{{ formatBibleStudyDate(dateGroup.date) }}</div>
-                    <div class="d-flex flex-wrap gap-2">
-                    <v-chip
-                        v-for="slot in dateGroup.timeSlots" :key="slot.datetime"
-                        size="small" variant="flat"
-                        :color="bulkForm.scheduled_date === slot.datetime ? 'teal' : 'white'"
-                        :class="[bulkForm.scheduled_date === slot.datetime ? 'text-white' : 'text-teal border']"
-                        @click="bulkForm.scheduled_date = slot.datetime"
-                    >
-                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                      {{ formatTime(slot.time) }}
-                      <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
-                        ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
-                      </span>
-                    </v-chip>
-                    </div>
-                </div>
-                </div>
+                <v-expansion-panels variant="accordion" class="border rounded-lg overflow-hidden bg-white">
+                  <v-expansion-panel v-for="dateGroup in availableSlots" :key="dateGroup.date">
+                    <template #title>
+                      <div class="d-flex align-center justify-space-between w-100 pr-2">
+                        <span class="text-subtitle-2 font-weight-bold">{{ formatBibleStudyDate(dateGroup.date) }}</span>
+                        <v-chip size="x-small" color="teal" variant="flat" class="text-white">{{ dateGroup.timeSlots.length }} slots</v-chip>
+                      </div>
+                    </template>
+                    <v-expansion-panel-text class="bg-grey-lighten-5 pa-2">
+                      <div class="d-flex flex-wrap gap-2">
+                        <v-chip
+                          v-for="slot in dateGroup.timeSlots" :key="slot.datetime"
+                          size="small" variant="flat"
+                          :color="bulkForm.scheduled_date === slot.datetime ? 'teal' : 'white'"
+                          :class="[bulkForm.scheduled_date === slot.datetime ? 'text-white' : 'text-teal border']"
+                          @click="bulkForm.scheduled_date = slot.datetime"
+                          style="cursor: pointer;"
+                        >
+                          <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+                          {{ formatTime(slot.time) }}
+                          <span class="ml-1 opacity-70" style="font-size: 0.75em !important;">
+                            ({{ slot.bookedCount || 0 }}/{{ slot.maxCapacity || 10 }})
+                          </span>
+                        </v-chip>
+                      </div>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
             </div>
           </div>
         </v-card-text>
@@ -1784,11 +1818,6 @@ const handlePromotionTimeInput = (val) => {
     if (ampm === 'PM' && h < 12) h += 12;
     if (ampm === 'AM' && h === 12) h = 0;
     
-    if (h < 13) {
-      ElMessage.warning('Baptism time must be 1:00 PM onwards.');
-      bulkPromotionData.value.baptism_time = '13:00:00';
-      return;
-    }
     bulkPromotionData.value.baptism_time = `${String(h).padStart(2, '0')}:${minutes}:00`;
   }
 };
@@ -2196,55 +2225,15 @@ const handlePromotionSubmit = () => {
 };
 
 const disabledDate = (time) => {
-  const day = time.getDay();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Disable Sunday OR if date is today/past
-  return day === 0 || time <= today;
+  // Only restrict past dates/today; allow any day of the week since it depends on the Availability Manager
+  return time < today;
 };
 
 const disabledTime = (date) => {
-  if (!date) return {};
-
-  const day = date.getDay();
-  const disabledHours = [];
-
-  // Disallow all times on Sunday (safe fallback)
-  if (day === 0) {
-    for (let h = 0; h < 24; h++) disabledHours.push(h);
-  } else {
-    // Before 08:00
-    for (let h = 0; h < 8; h++) disabledHours.push(h);
-
-    // After 20:00 (start times)
-    for (let h = 21; h < 24; h++) disabledHours.push(h);
-
-    // Wednesday(3) and Saturday(6): disable evening hours (18:00+)
-    if (day === 3 || day === 6) {
-      for (let h = 18; h < 24; h++) {
-        if (!disabledHours.includes(h)) disabledHours.push(h);
-      }
-    }
-  }
-
-  return {
-    disabledHours: () => disabledHours,
-    disabledMinutes: (hour) => {
-      // Only allow 00 and 30 minutes for 30-min interval.
-      const allowedMinutes = new Set([0, 30]);
-
-      // For 20:00, only allow 00 (no 20:30 since our slot generator ends at 20:00).
-      if (hour === 20) allowedMinutes.delete(30);
-
-      const disabledMinutes = [];
-      for (let m = 0; m < 60; m++) {
-        if (!allowedMinutes.has(m)) disabledMinutes.push(m);
-      }
-      return disabledMinutes;
-    },
-    disabledSeconds: () => Array.from({ length: 60 }, (_, i) => i),
-  };
+  return {}; // No hardcoded time restrictions - rely on slot manager
 };
 
 const matchPastorId = (rawId) => {

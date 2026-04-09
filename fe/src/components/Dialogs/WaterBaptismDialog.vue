@@ -17,7 +17,7 @@
       <!-- LEFT COLUMN: Available Slots Panel -->
       <div v-if="showAvailableSlots" class="available-slots-panel">
         <div class="slots-header">
-          <h4>Available Sundays</h4>
+          <h4>Available Baptism Dates</h4>
           <el-button link type="primary" size="small" @click="showAvailableSlots = false">
             <i class="el-icon-arrow-left"></i> Hide
           </el-button>
@@ -27,18 +27,27 @@
           <p>Loading available dates...</p>
         </div>
         <div v-else-if="availableSlots && availableSlots.length > 0" class="slots-content custom-slots-list">
-          <div v-for="dateGroup in availableSlots" :key="dateGroup.date" class="date-group-item mb-4 pb-2 border-bottom">
-            <div class="d-flex align-items-center mb-2">
-              <span class="date-label font-weight-bold grey-darken-2 mr-3" style="min-width: 140px;">
-                {{ formatDate(dateGroup.date) }}:
-              </span>
-              <div class="time-slots-flex d-flex flex-wrap gap-2">
+          <el-collapse class="time-slots-accordion" accordion>
+            <el-collapse-item
+              v-for="dateGroup in availableSlots"
+              :key="dateGroup.date"
+              :name="dateGroup.date"
+            >
+              <template #title>
+                <div class="collapse-header">
+                  <i class="el-icon-calendar"></i>
+                  <span class="font-weight-bold">{{ formatDate(dateGroup.date) }}</span>
+                  <el-tag size="small" type="info" class="ml-2">{{ dateGroup.timeSlots.length }} times</el-tag>
+                </div>
+              </template>
+              <div class="time-slots-flex d-flex flex-wrap gap-2 pa-2">
                 <el-button
                   v-for="timeSlot in dateGroup.timeSlots"
                   :key="timeSlot.datetime"
                   size="small"
+                  :type="isSlotSelected(timeSlot.datetime) ? 'primary' : ''"
                   :title="timeSlot.bookedMembers?.length > 0 ? 'Booked by: ' + timeSlot.bookedMembers.join(', ') : 'No bookings yet'"
-                  @click="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display || formatTime(timeSlot.time))"
+                  @click.stop="selectAvailableSlot(dateGroup.date, timeSlot.time, timeSlot.display || formatTime(timeSlot.time))"
                   class="time-slot-button rounded-pill"
                 >
                   {{ timeSlot.display || formatTime(timeSlot.time) }}
@@ -47,8 +56,8 @@
                   </span>
                 </el-button>
               </div>
-            </div>
-          </div>
+            </el-collapse-item>
+          </el-collapse>
           <div v-if="selectedSlotDisplay" class="selected-slot-info mt-4">
             <el-tag type="success" closable @close="clearSlotSelection">
               Selected: {{ selectedSlotDisplay }}
@@ -296,10 +305,10 @@
             style="width: 100%"
             :disabled="loading"
             :disabled-date="(date) => {
+              // Only restrict past dates; allow any day of the week since it depends on the Slot Manager
               const today = new Date();
               today.setHours(0, 0, 0, 0);
-              const isPastOrToday = date <= today;
-              return isEditMode ? false : isPastOrToday;
+              return isEditMode ? false : date < today;
             }"
             @change="onDateTimeChange"
           />

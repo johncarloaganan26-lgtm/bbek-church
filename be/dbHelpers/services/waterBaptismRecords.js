@@ -44,11 +44,13 @@ async function checkDuplicateEmail(email) {
 }
 
 /**
- * Check if a time slot is available for water baptism
- * @param {String} baptismDate - Baptism date to check
- * @param {String} preferredBaptismTime - Preferred baptism time to check
- * @param {String} excludeBaptismId - Optional baptism_id to exclude from check (for updates)
- * @returns {Promise<Object>} Object with isBooked flag and conflicting baptism
+ * Check if a time slot is available for water baptism in the Availability Manager (tbl_service_slots)
+ * and ensure it hasn't exceeded its capacity.
+ * 
+ * @param {String} baptismDate - Baptism date to check (YYYY-MM-DD or datetime)
+ * @param {String} preferredBaptismTime - Preferred baptism time to check (HH:mm:ss)
+ * @param {String} excludeBaptismId - Optional baptism_id to exclude from capacity check
+ * @returns {Promise<Object>} Object with isBooked (true if unavailable or full) and message
  */
 async function checkTimeSlotAvailability(baptismDate, preferredBaptismTime, excludeBaptismId = null) {
   try {
@@ -56,74 +58,78 @@ async function checkTimeSlotAvailability(baptismDate, preferredBaptismTime, excl
       ? baptismDate
       : moment(baptismDate).format('YYYY-MM-DD');
 
-    // Normalize time format to HH:mm:ss for consistent comparison
+    // Normalize time format to HH:mm:ss
     let formattedTime = preferredBaptismTime;
     if (formattedTime) {
-      // Handle various time formats
       let timeMoment;
       if (formattedTime.includes(':')) {
-        // Try 24-hour formats first
-        timeMoment = moment(formattedTime, ['HH:mm:ss', 'HH:mm', 'H:mm'], true);
-        if (!timeMoment.isValid()) {
-          // Try 12-hour formats
-          timeMoment = moment(formattedTime, ['h:mm:ss A', 'h:mm A', 'h:mm:ss a', 'h:mm a'], true);
-        }
+        timeMoment = moment(formattedTime, ['HH:mm:ss', 'HH:mm', 'H:mm', 'h:mm A', 'h:mm a'], true);
       }
-
       if (timeMoment && timeMoment.isValid()) {
         formattedTime = timeMoment.format('HH:mm:ss');
       } else {
-        // Fallback: ensure it's in HH:mm:ss format
-        console.warn('Could not parse time format:', formattedTime, '- using as-is');
+        console.warn('Could not parse time format:', formattedTime);
+        return { isBooked: true, message: 'Invalid time format. Please select a valid time slot.' };
       }
     }
 
-    // Extract minutes from the formatted time
-    const minutes = formattedTime ? formattedTime.split(':')[1] : null;
+    // 1. Check if the slot exists in the Availability Manager (tbl_service_slots)
+    const slotSql = `
+      SELECT slot_id, max_slots, status 
+      FROM tbl_service_slots 
+      WHERE service_type = 'water_baptism' 
+        AND DATE(available_date) = ? 
+        AND TIME(available_time) = ?
+    `;
+    const [slots] = await query(slotSql, [formattedDate, formattedTime]);
 
-    if (!minutes) {
-      console.warn('Could not extract minutes from time:', formattedTime);
-      return {
-        isBooked: false,
-        conflictingBaptism: null
+    if (slots.length === 0) {
+      return { 
+        isBooked: true, 
+        message: `The selected schedule (${formattedDate} ${moment(formattedTime, 'HH:mm:ss').format('h:mm A')}) is not available in the church calendar. Please select an available slot from the Availability Manager.`
       };
     }
 
-    let sql = `
-      SELECT baptism_id, firstname, lastname, preferred_baptism_time, status
-      FROM tbl_waterbaptism
-      WHERE DATE(baptism_date) = ?
-      AND preferred_baptism_time LIKE CONCAT('%:', ?, ':%')
-      AND status = 'approved'
-    `;
-    const params = [formattedDate, minutes];
-
-    if (excludeBaptismId) {
-      sql += ' AND baptism_id != ?';
-      params.push(excludeBaptismId);
+    const slot = slots[0];
+    if (slot.status !== 'Available') {
+      return { 
+        isBooked: true, 
+        message: 'This time slot is currently marked as unavailable by the administrator.'
+      };
     }
 
-    const [rows] = await query(sql, params);
+    // 2. Check current bookings against capacity
+    let bookingSql = `
+      SELECT COUNT(*) as bookedCount
+      FROM tbl_waterbaptism
+      WHERE DATE(baptism_date) = ?
+      AND TIME(COALESCE(preferred_baptism_time, '00:00:00')) = ?
+      AND status IN ('approved', 'pending', 'scheduled')
+    `;
+    const bookingParams = [formattedDate, formattedTime];
 
-    console.log('Minute slot check - Water Baptism:', {
-      date: formattedDate,
-      minutes: minutes,
-      originalTime: preferredBaptismTime,
-      conflicts: rows.length,
-      status: rows.length > 0 ? 'BLOCKED' : 'ALLOWED'
-    });
+    if (excludeBaptismId) {
+      bookingSql += ' AND baptism_id != ?';
+      bookingParams.push(excludeBaptismId);
+    }
+
+    const [bookings] = await query(bookingSql, bookingParams);
+    const bookedCount = bookings[0].bookedCount || 0;
+
+    if (bookedCount >= slot.max_slots) {
+      return { 
+        isBooked: true, 
+        message: `This time slot is already full (Capacity: ${slot.max_slots}). Please select another schedule.`
+      };
+    }
 
     return {
-      isBooked: rows.length > 0,
-      conflictingBaptism: rows.length > 0 ? rows[0] : null
+      isBooked: false,
+      message: 'Time slot is available'
     };
   } catch (error) {
     console.error('Error checking time slot availability:', error);
-    // Don't throw - allow the operation to proceed if check fails
-    return {
-      isBooked: false,
-      conflictingBaptism: null
-    };
+    return { isBooked: true, message: 'Failed to verify time slot availability.' };
   }
 }
 
@@ -295,11 +301,12 @@ async function createWaterBaptism(baptismData) {
       }
     }
 
-    // Check for time slot conflicts
-    if (baptism_date && baptism_time) {
+    // Check for time slot conflicts against Availability Manager
+    if (baptism_date && baptism_time && status !== 'disapproved' && status !== 'cancelled') {
       const timeSlotCheck = await checkTimeSlotAvailability(baptism_date, baptism_time, null);
       if (timeSlotCheck.isBooked) {
-        timeSlotWarning = `Time slot conflict: ${baptism_date} at ${baptism_time} is already booked.`;
+        // We throw an error here to prevent registration if the slot is invalid/full in the Manager
+        throw new Error(timeSlotCheck.message || 'The selected time slot is not available.');
       }
     }
 
@@ -975,10 +982,10 @@ async function updateWaterBaptism(baptismId, baptismData) {
 
     // Only check conflicts if baptism_date or baptism_time is being updated
     if (baptism_date !== undefined || baptism_time !== undefined) {
-      if (finalBaptismDate && finalBaptismTime) {
+      if (finalBaptismDate && finalBaptismTime && newStatus !== 'disapproved' && newStatus !== 'cancelled') {
         const timeSlotCheck = await checkTimeSlotAvailability(finalBaptismDate, finalBaptismTime, baptismId);
         if (timeSlotCheck.isBooked) {
-          timeSlotWarning = `Time slot conflict: ${finalBaptismDate} at ${finalBaptismTime} is already booked.`;
+           throw new Error(timeSlotCheck.message || 'The selected time slot is not available based on the Church Calendar.');
         }
       }
     }
@@ -1644,213 +1651,121 @@ async function processBaptismCompletion(baptismId, customDateCreated = null) {
     console.log(`Processing completion for Baptism ${baptismId}. Current member_id: ${memberId}, Email: ${email}`);
 
     // Lazy load dependencies to avoid circular dependency
-    const { createMember, getSpecificMemberByEmailAndStatus, getMemberById } = require('../church_records/memberRecords');
+    const { createMember, getMemberById } = require('../church_records/memberRecords');
     const { getAccountByEmail } = require('../church_records/accountRecords');
 
     // PART 1: ENSURE MEMBER RECORD EXISTS
-    // Even if it's already a member, we check if they are in tbl_members
     if (!memberId || baptism.is_member === 0 || baptism.is_member === false) {
       console.log('Record is non-member or missing member_id. Checking for existing member record...');
-
       let existingMember = null;
-
-      // Try finding by email AND full name (now including middle name)
       if (email && baptism.firstname && baptism.lastname) {
         const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL))',
-          [email, baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null]
+          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))',
+          [email, baptism.firstname, baptism.lastname]
         );
-        if (rows.length > 0) {
-          existingMember = { member_id: rows[0].member_id };
-          console.log(`Found existing member by email and name: ${existingMember.member_id}`);
-        }
-      }
-
-      // Try finding by phone AND full name if not found yet
-      if (!existingMember && baptism.phone_number && baptism.firstname && baptism.lastname) {
-        const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE phone_number = ? AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL))',
-          [baptism.phone_number, baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null]
-        );
-        if (rows.length > 0) {
-          existingMember = { member_id: rows[0].member_id };
-          console.log(`Found existing member by phone and name: ${existingMember.member_id}`);
-        }
-      }
-
-      // Try finding by full name + birthdate (Existing fallback - now with middle name)
-      if (!existingMember && baptism.firstname && baptism.lastname && baptism.birthdate) {
-        const birthdateFormatted = moment(baptism.birthdate).format('YYYY-MM-DD');
-        const [rows] = await query(
-          'SELECT member_id FROM tbl_members WHERE LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?)) AND (LOWER(TRIM(middle_name)) = LOWER(TRIM(?)) OR (middle_name IS NULL AND ? IS NULL)) AND birthdate = ?',
-          [baptism.firstname, baptism.lastname, baptism.middle_name || null, baptism.middle_name || null, birthdateFormatted]
-        );
-        if (rows.length > 0) {
-          existingMember = { member_id: rows[0].member_id };
-          console.log(`Found existing member by name and birthdate: ${existingMember.member_id}`);
-        }
+        if (rows.length > 0) existingMember = { member_id: rows[0].member_id };
       }
 
       if (existingMember) {
         memberId = existingMember.member_id;
-        console.log(`Linking baptism ${baptismId} to existing member ${memberId}`);
         await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
       } else {
-        // Create new member record
         console.log('No existing member found. Creating new member record...');
         const memberData = {
           firstname: baptism.firstname || '',
           lastname: baptism.lastname || '',
           middle_name: baptism.middle_name || null,
           birthdate: baptism.birthdate ? moment(baptism.birthdate).format('YYYY-MM-DD') : null,
-          age: baptism.age || '',
-          gender: baptism.gender || '',
-          address: baptism.address || '',
           email: baptism.email || '',
           phone_number: baptism.phone_number || '',
-          civil_status: baptism.civil_status || null,
-          guardian_name: baptism.guardian_name || null,
-          guardian_contact: baptism.guardian_contact || null,
-          guardian_relationship: baptism.guardian_relationship || null,
           position: 'Member',
           date_created: customDateCreated || new Date()
         };
-
         const createResult = await createMember(memberData);
         if (createResult.success && createResult.data) {
           memberId = createResult.data.member_id;
-          console.log(`Member record created with ID: ${memberId}`);
           await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
-        } else if (createResult.duplicateDetails && createResult.duplicateDetails.length > 0) {
-          // If duplicate found during creation, ONLY link if names match to prevent merging different people
-          const duplicate = createResult.duplicateDetails[0];
-          const baptismName = `${baptism.firstname || ''} ${baptism.lastname || ''}`.trim().toLowerCase();
-          const duplicateName = (duplicate.name || '').trim().toLowerCase();
-
-          const mName1 = (baptism.middle_name || '').trim().toLowerCase();
-          const mName2 = (duplicate.middle_name || '').trim().toLowerCase();
-
-          if (baptismName === duplicateName && mName1 === mName2) {
-            memberId = duplicate.member_id;
-            console.log(`Duplicate confirmed as the same person. Linking to existing member ID: ${memberId}`);
-            await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
-          } else {
-            console.error(`Duplicate detected by phone/email but names do NOT match ("${baptismName}" vs "${duplicateName}"). Linking skipped to prevent data corruption.`);
-            // Note: memberId remains null, so this baptism won't be linked to a member. The user must fix the duplicate info.
-          }
-        } else {
-          console.error('Failed to create member record:', createResult.message);
         }
       }
     } else {
-      console.log('Record already has a member_id. Verifying member record exists...');
+      // Record has member_id - verify it exists
       const memberCheck = await getMemberById(memberId);
       if (!memberCheck.success || !memberCheck.data) {
-        console.warn(`Member ${memberId} assigned to baptism but record not found in tbl_members.`);
-        // Optional: Re-create member if missing? For now just log.
-      } else {
-        // Ensure email is synced if missing in baptism but present in member
-        if (!email && memberCheck.data.email) {
-          email = memberCheck.data.email;
+        console.warn(`Member ${memberId} assigned to baptism but record not found in tbl_members. Re-linking or creating...`);
+        let existingMember = null;
+        if (email && baptism.firstname && baptism.lastname) {
+          const [rows] = await query('SELECT member_id FROM tbl_members WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND LOWER(TRIM(firstname)) = LOWER(TRIM(?)) AND LOWER(TRIM(lastname)) = LOWER(TRIM(?))', [email, baptism.firstname, baptism.lastname]);
+          if (rows.length > 0) existingMember = { member_id: rows[0].member_id };
         }
+        
+        if (existingMember) {
+          memberId = existingMember.member_id;
+          await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
+        } else {
+          // CREATE NEW MEMBER
+          const memberData = {
+            firstname: baptism.firstname || '',
+            lastname: baptism.lastname || '',
+            middle_name: baptism.middle_name || null,
+            birthdate: baptism.birthdate ? moment(baptism.birthdate).format('YYYY-MM-DD') : null,
+            email: baptism.email || '',
+            phone_number: baptism.phone_number || '',
+            position: 'Member',
+            date_created: customDateCreated || new Date()
+          };
+          const createResult = await createMember(memberData);
+          if (createResult.success && createResult.data) {
+            memberId = createResult.data.member_id;
+            await query('UPDATE tbl_waterbaptism SET member_id = ?, is_member = 1 WHERE baptism_id = ?', [memberId, baptismId]);
+          }
+        }
+      } else if (!email && memberCheck.data.email) {
+        email = memberCheck.data.email;
       }
     }
 
-    // PART 2: ENSURE EMAIL IS PRESENT (If missing from baptism, fetch from member)
-    if (!email) {
-      console.log(`Email missing in baptism ${baptismId}. Fetching from member ${memberId}...`);
+    // PART 2: ENSURE EMAIL IS PRESENT
+    if (!email && memberId) {
       const memberCheck = await getMemberById(memberId);
-      if (memberCheck.success && memberCheck.data && memberCheck.data.email) {
-        email = memberCheck.data.email;
-        console.log(`Resolved email from member record: ${email}`);
-      }
+      if (memberCheck.success && memberCheck.data) email = memberCheck.data.email;
     }
 
     // PART 3: ENSURE ACCOUNT EXISTS
     if (email) {
       console.log(`Ensuring account exists for ${email}...`);
-      const tempPassword = Math.random().toString(36).slice(-12);
-
+      const accountResult = await getAccountByEmail(email);
       let accountId = null;
       let isNewAccount = false;
-      const accountResult = await getAccountByEmail(email);
+      let tempPassword = Math.random().toString(36).slice(-12);
 
       if (!accountResult.success || !accountResult.data) {
         console.log(`No account found for ${email}. Creating new account...`);
         const bcrypt = require('bcrypt');
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         isNewAccount = true;
-
-        try {
-          // Attempt insert with basic columns first for maximum compatibility
-          const [ins] = await query(
-            "INSERT INTO tbl_accounts (email, password, position, status, date_created) VALUES (?, ?, 'Member', 'active', NOW())",
-            [email.toLowerCase(), hashedPassword]
-          );
-          accountId = ins.insertId;
-          // Note: Removed acc_name update as the column does not exist in tbl_accounts
-        } catch (insertErr) {
-          console.error(`Failed to insert new account for ${email}:`, insertErr);
-          throw insertErr;
-        }
-
-        console.log(`New account created for ${email} with ID: ${accountId}`);
+        const [ins] = await query("INSERT INTO tbl_accounts (email, password, position, status, date_created) VALUES (?, ?, 'Member', 'active', NOW())", [email.toLowerCase(), hashedPassword]);
+        accountId = ins.insertId;
       } else {
         accountId = accountResult.data.acc_id;
-        console.log(`Existing account found for ${email} with ID: ${accountId}`);
       }
 
       // PART 4: SEND EMAILS
       if (accountId) {
         const baptismDataResult = await getWaterBaptismById(baptismId);
         const b = baptismDataResult.data;
-        const name = `${b.firstname || ''} ${b.middle_name ? b.middle_name + ' ' : ''}${b.lastname || ''}`.trim();
-
-        console.log(`Attempting to send completion emails to ${email}...`);
-
+        const name = `${b.firstname || ''} ${b.lastname || ''}`.trim();
         try {
-          // 1. Send Account Details (Welcome / Set Password)
-          // Always send this during completion to ensure they can log in
-          await sendAccountDetails({
-            acc_id: accountId,
-            email: email,
-            name: name || 'Valued Member',
-            type: 'new_account',
-            temporaryPassword: isNewAccount ? tempPassword : null
-          });
-          console.log(`- Account details email sent to ${email}`);
-
-          // 2. Send Baptism Completion Confirmation
+          await sendAccountDetails({ acc_id: accountId, email: email, name: name, type: 'new_account', temporaryPassword: isNewAccount ? tempPassword : null });
           await sendWaterBaptismDetails({
-            email: email,
-            status: 'completed',
-            recipientName: name || 'Valued Member',
-            memberName: name || 'Valued Member',
+            email: email, status: 'completed', recipientName: name, memberName: name, 
             baptismDate: b.baptism_date || moment().format('YYYY-MM-DD HH:mm'),
-            location: b.location || '',
-            pastorName: b.pastor_name || '',
-            isMember: true,
-            firstname: b.firstname || '',
-            middleName: b.middle_name || '',
-            lastname: b.lastname || '',
-            birthdate: b.birthdate || '',
-            age: b.age || null,
-            gender: b.gender || '',
-            address: b.address || '',
-            phoneNumber: b.phone_number || '',
-            civilStatus: b.civil_status || '',
-            profession: b.profession || ''
+            location: b.location || '', pastorName: b.pastor_name || '', isMember: true,
+            firstname: b.firstname || '', lastname: b.lastname || '', birthdate: b.birthdate || '',
+            phoneNumber: b.phone_number || '', address: b.address || ''
           });
-          console.log(`- Baptism completion email sent to ${email}`);
-          console.log('✅ All emails sent successfully');
-        } catch (emailErr) {
-          console.error(`❌ Error sending one or more emails for baptism ${baptismId}:`, emailErr);
-        }
-      } else {
-        console.error(`❌ Failed to resolve accountId for ${email}. Emails not sent.`);
+          console.log('✅ Emails sent successfully');
+        } catch (e) { console.error('Email error:', e); }
       }
-    } else {
-      console.warn(`⚠️ No email address found for baptism ${baptismId} or its member ${memberId}. Skipping account/email processing.`);
     }
 
     return { success: true };

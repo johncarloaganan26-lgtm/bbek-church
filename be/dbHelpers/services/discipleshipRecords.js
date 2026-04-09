@@ -289,14 +289,16 @@ async function getAllDiscipleshipRequests(options = {}) {
             }
         }
 
-        sql += ` ORDER BY ${orderBy}`;
+        sql += ` GROUP BY dr.request_id ORDER BY ${orderBy}`;
         
-        // Count total
+        // Count total - Use DISTINCT to avoid duplicate counts from joins
         let whereClause = sql.substring(sql.indexOf('WHERE'));
         let orderByIdx = whereClause.lastIndexOf('ORDER BY');
         if (orderByIdx > -1) whereClause = whereClause.substring(0, orderByIdx);
+        let groupByIdx = whereClause.lastIndexOf('GROUP BY');
+        if (groupByIdx > -1) whereClause = whereClause.substring(0, groupByIdx);
 
-        const [countResult] = await query(`SELECT COUNT(*) as total FROM tbl_discipleship_requests dr ${whereClause}`, params);
+        const [countResult] = await query(`SELECT COUNT(DISTINCT dr.request_id) as total FROM tbl_discipleship_requests dr ${whereClause}`, params);
         const totalCount = countResult[0]?.total || 0;
 
         const noPagination = options.noPagination === true;
@@ -468,11 +470,27 @@ async function updateDiscipleshipRequest(request_id, updateData) {
                     LEFT JOIN tbl_members m_direct ON (dr.pastor_id = m_direct.member_id OR (dr.pastor_id REGEXP '^[0-9]+$' AND CAST(dr.pastor_id AS UNSIGNED) = m_direct.member_id)) COLLATE utf8mb4_unicode_ci
                     WHERE dr.request_id = ?
                 `, [request_id]);
+                
                 if (reqRows.length > 0) {
-                    await sendDiscipleshipDetails(reqRows[0]);
+                    const updatedReq = reqRows[0];
+                    await sendDiscipleshipDetails(updatedReq);
+
+                    // AUTO-ARCHIVE if status is Rejected
+                    if (status === 'Rejected') {
+                        console.log(`[AutoArchive] Request ${request_id} status set to Rejected. Archiving...`);
+                        await archiveDiscipleshipRequest(request_id, {
+                            archived_by: 'system',
+                            archive_reason: 'Automatic archive due to Rejected status update'
+                        });
+                        return { 
+                            success: true, 
+                            message: 'Request updated to Rejected and automatically archived.',
+                            archived: true 
+                        };
+                    }
                 }
             } catch (emailError) {
-                console.error('Email update failed for discipleship request:', emailError);
+                console.error('Email update or auto-archive failed for discipleship request:', emailError);
             }
         }
 

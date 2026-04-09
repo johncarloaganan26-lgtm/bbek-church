@@ -231,10 +231,11 @@ async function getAllBibleStudyRequests(params = {}) {
             }
         }
 
-        sql += ` ORDER BY ${orderBy}`;
+        sql += ` GROUP BY b.request_id ORDER BY ${orderBy}`;
 
-        // Get total count
-        let countSql = 'SELECT COUNT(*) as total FROM tbl_biblestudy_requests WHERE 1=1';
+        // Get total count (using DISTINCT to avoid duplication if join counts were involved, 
+        // although current countSql is basic, it's safer for future-proofing)
+        let countSql = 'SELECT COUNT(DISTINCT request_id) as total FROM tbl_biblestudy_requests WHERE 1=1';
         const countParams = [];
         if (search) {
             countSql += ' AND (firstname LIKE ? OR lastname LIKE ? OR email LIKE ? OR request_id LIKE ?)';
@@ -350,6 +351,20 @@ async function updateBibleStudyRequest(id, data) {
         const sql = `UPDATE tbl_biblestudy_requests SET ${updates.join(', ')}, date_updated = NOW() WHERE request_id = ?`;
         
         await query(sql, params);
+
+        // AUTO-ARCHIVE if status is Rejected
+        if (status === 'Rejected') {
+            console.log(`[AutoArchive] Bible Study Request ${id} status set to Rejected. Archiving...`);
+            await archiveBibleStudyRequest(id, {
+                archived_by: 'system',
+                archive_reason: 'Automatic archive due to Rejected status update'
+            });
+            return {
+                success: true,
+                message: 'Bible Study updated to Rejected and automatically archived.',
+                archived: true
+            };
+        }
 
         return { success: true, message: 'Bible Study updated successfully' };
     } catch (error) {

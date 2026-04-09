@@ -43,6 +43,8 @@ function determineModule(reqPath, reqBaseUrl) {
     return 'Dashboard';
   } else if (fullPath.includes('/forms')) {
     return 'Forms';
+  } else if (fullPath.includes('/services/discipleship-requests') || fullPath.includes('/discipleship-requests') || fullPath.includes('/discipleship')) {
+    return 'Discipleship';
   }
   return 'System';
 }
@@ -74,7 +76,8 @@ function getPrimaryKeyField(tableName) {
     'tbl_transactions': 'transaction_id',
     'tbl_approval': 'approval_id',
     'tbl_announcements': 'announcement_id',
-    'tbl_cms_images': 'image_id'
+    'tbl_cms_images': 'image_id',
+    'tbl_discipleship_requests': 'request_id'
   };
   return primaryKeys[tableName] || 'id';
 }
@@ -126,7 +129,8 @@ const auditTrailMiddleware = async (req, res, next) => {
             'Transactions': 'tbl_transactions',
             'Approvals': 'tbl_approval',
             'Announcements': 'tbl_announcements',
-            'Content Management': 'tbl_cms_images'
+            'Content Management': 'tbl_cms_images',
+            'Discipleship': 'tbl_discipleship_requests'
           };
 
           const tableName = tableMap[module];
@@ -433,6 +437,10 @@ const auditTrailMiddleware = async (req, res, next) => {
       module = 'Announcements';
     } else if (fullPath.includes('/forms')) {
       module = 'Forms';
+    } else if (fullPath.includes('/services/discipleship-requests') || fullPath.includes('/discipleship-requests') || fullPath.includes('/discipleship')) {
+      module = 'Discipleship';
+      entityType = 'discipleship_request';
+      entityId = isId ? lastPart : null;
     } else if (fullPath.includes('/audit-trail')) {
       module = 'Audit Trail';
     } else if (fullPath.includes('/system-logs')) {
