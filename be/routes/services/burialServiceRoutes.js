@@ -15,6 +15,7 @@ const {
   getAvailableBurialDates
 } = require('../../dbHelpers/services/burialServiceRecords');
 const { query } = require('../../database/db');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -188,7 +189,7 @@ router.get('/check-member-burial/:memberId', async (req, res) => {
  * POST /api/church-records/burial-services/createBurialService
  * Body: { burial_id?, member_id, requestor, relationship, location, pastor_id, service_date, status?, date_created? }
  */
-router.post('/createBurialService', async (req, res) => {
+router.post('/createBurialService', authenticateToken, checkPermission('ServicesGroup:Create'), async (req, res) => {
   try {
     const result = await createBurialService(req.body);
 
@@ -232,7 +233,7 @@ router.post('/createBurialService', async (req, res) => {
  * POST /api/church-records/burial-services/getAllBurialServices (body payload)
  * Parameters: search, limit, offset, page, pageSize, status, sortBy
  */
-router.get('/getAllBurialServices', async (req, res) => {
+router.get('/getAllBurialServices', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from query string
     const {
@@ -281,7 +282,7 @@ router.get('/getAllBurialServices', async (req, res) => {
   }
 });
 
-router.post('/getAllBurialServices', async (req, res) => {
+router.post('/getAllBurialServices', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from request body (payload)
     const {
@@ -334,7 +335,7 @@ router.post('/getAllBurialServices', async (req, res) => {
  * READ - Get burial services by member_id
  * GET /api/church-records/burial-services/getBurialServicesByMemberId/:memberId
  */
-router.get('/getBurialServicesByMemberId/:memberId', async (req, res) => {
+router.get('/getBurialServicesByMemberId/:memberId', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { memberId } = req.params;
 
@@ -373,7 +374,7 @@ router.get('/getBurialServicesByMemberId/:memberId', async (req, res) => {
  * READ ONE - Get a single burial service by ID
  * GET /api/church-records/burial-services/getBurialServiceById/:id
  */
-router.get('/getBurialServiceById/:id', async (req, res) => {
+router.get('/getBurialServiceById/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -413,7 +414,7 @@ router.get('/getBurialServiceById/:id', async (req, res) => {
  * PUT /api/church-records/burial-services/updateBurialService/:id
  * Body: { member_id?, requestor?, relationship?, location?, pastor_id?, service_date?, status?, date_created? }
  */
-router.put('/updateBurialService/:id', async (req, res) => {
+router.put('/updateBurialService/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -480,7 +481,7 @@ router.put('/updateBurialService/:id', async (req, res) => {
  * DELETE /api/church-records/burial-services/deleteBurialService/:id
  * Body: { reason?: string }
  */
-router.delete('/deleteBurialService/:id', async (req, res) => {
+router.delete('/deleteBurialService/:id', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const { id } = req.params;
     const reason = req.body?.reason || null;
@@ -522,7 +523,7 @@ router.delete('/deleteBurialService/:id', async (req, res) => {
  * DELETE /api/church-records/burial-services/bulkDeleteBurialServices
  * Body: { burialIds: ["id1", "id2", "id3"], reason?: string }
  */
-router.delete('/bulkDeleteBurialServices', async (req, res) => {
+router.delete('/bulkDeleteBurialServices', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const burialIds = req.body?.burialIds || [];
     const reason = req.body?.reason || null;
@@ -567,7 +568,7 @@ router.delete('/bulkDeleteBurialServices', async (req, res) => {
  * PUT /api/church-records/burial-services/bulkCompleteBurialServices
  * Body: { burialIds: ["id1", "id2", "id3"] }
  */
-router.put('/bulkCompleteBurialServices', async (req, res) => {
+router.put('/bulkCompleteBurialServices', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { burialIds } = req.body;
 
@@ -658,7 +659,7 @@ router.put('/bulkCompleteBurialServices', async (req, res) => {
  * GET /api/church-records/burial-services/exportExcel (query params)
  * POST /api/church-records/burial-services/exportExcel (body payload)
  */
-router.get('/exportExcel', async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.query;
     const excelBuffer = await exportBurialServicesToExcel(options);
@@ -680,7 +681,7 @@ router.get('/exportExcel', async (req, res) => {
   }
 });
 
-router.post('/exportExcel', async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.body;
     const excelBuffer = await exportBurialServicesToExcel(options);
@@ -708,7 +709,7 @@ router.post('/exportExcel', async (req, res) => {
  * POST /api/church-records/burial-services/searchFulltext
  * Parameters: search (required), limit, offset, minRelevance
  */
-router.get('/searchFulltext', async (req, res) => {
+router.get('/searchFulltext', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const options = { ...req.query, useFulltext: true };
     const result = await searchBurialServicesFulltext(options);
@@ -739,7 +740,7 @@ router.get('/searchFulltext', async (req, res) => {
   }
 });
 
-router.post('/searchFulltext', async (req, res) => {
+router.post('/searchFulltext', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const options = { ...req.body, useFulltext: true };
     const result = await searchBurialServicesFulltext(options);
@@ -776,7 +777,7 @@ router.post('/searchFulltext', async (req, res) => {
  * POST /api/church-records/burial-services/analyzeAvailability
  * Parameters: startDate, endDate, location (optional), serviceDurationHours (optional), businessHours (optional)
  */
-router.get('/analyzeAvailability', async (req, res) => {
+router.get('/analyzeAvailability', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const options = req.query;
     const result = await analyzeBurialServiceAvailability(options);

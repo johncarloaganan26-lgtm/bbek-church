@@ -5,6 +5,7 @@
       <div class="d-flex gap-2">
         <div class="d-flex gap-2" v-if="selectedMembers.length > 0">
           <v-btn
+            v-if="can('Delete')"
             color="error"
             variant="flat"
             prepend-icon="mdi-delete-multiple"
@@ -20,7 +21,13 @@
             Clear Selection
           </v-btn>
         </div>
-        <v-btn color="success" prepend-icon="mdi-account-plus" size="small" @click="openMemberDialog">
+        <v-btn 
+          v-if="can('Create')"
+          color="success" 
+          prepend-icon="mdi-account-plus" 
+          size="small" 
+          @click="openMemberDialog"
+        >
           Add New Member
         </v-btn>
       </div>
@@ -102,7 +109,7 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="3" class="d-flex align-center gap-2">
-            <v-tooltip text="Print" location="top">
+            <v-tooltip v-if="can('Export')" text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn
                   icon="mdi-printer"
@@ -113,7 +120,7 @@
                 ></v-btn>
               </template>
             </v-tooltip>
-            <v-tooltip text="Export Excel" location="top">
+            <v-tooltip v-if="can('Export')" text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn
                   icon="mdi-download"
@@ -125,7 +132,7 @@
                 ></v-btn>
               </template>
             </v-tooltip>
-            <v-tooltip text="Import Members" location="top">
+            <v-tooltip v-if="can('Create')" text="Import Members" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn
                   icon="mdi-upload"
@@ -139,6 +146,39 @@
         </v-row>
       </v-card-text>
     </v-card>
+
+    <!-- Bulk Actions Row -->
+    <v-expand-transition>
+      <div v-if="selectedMembers.length > 0" class="bulk-actions-bar mb-4 pa-3 d-flex align-center gap-2 elevation-2 rounded-lg bg-blue-lighten-5">
+        <v-chip color="primary" size="small" class="mr-2 font-weight-bold px-3" label>
+          <v-icon start size="14">mdi-checkbox-marked</v-icon>
+          {{ selectedMembers.length }} SELECTED
+        </v-chip>
+        <v-btn
+          v-if="can('Delete')"
+          color="error"
+          variant="outlined"
+          size="small"
+          :loading="memberStore.loading"
+          class="bulk-action-btn font-weight-bold text-uppercase"
+          @click="bulkDeleteMembers"
+        >
+          <v-icon start size="16">mdi-archive</v-icon>
+          Archive Selected
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          variant="text"
+          size="small"
+          color="grey-darken-1"
+          class="text-none"
+          @click="selectedMembers = []"
+        >
+          <v-icon start size="14">mdi-close</v-icon>
+          Clear Selection
+        </v-btn>
+      </div>
+    </v-expand-transition>
 
     <!-- Table -->
     <v-card elevation="2">
@@ -194,7 +234,7 @@
             <td>{{ member.position }}</td>
             <td>{{ getDepartmentName(member) }}</td>
             <td>
-              <v-tooltip text="Edit Member" location="top">
+              <v-tooltip v-if="can('Edit')" text="Edit Member" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-pencil" 
@@ -206,7 +246,7 @@
               ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Archive Member" location="top">
+              <v-tooltip v-if="can('Delete')" text="Archive Member" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-delete" 
@@ -268,6 +308,23 @@ import { useDepartmentsStore } from '@/stores/ChurchRecords/departmentsStore'
 import MemberDialog from '../../Dialogs/MemberDialog.vue'
 import axios from '@/api/axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+// Permission Logic
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
+const userPermissions = computed(() => {
+  try {
+    const perms = userInfo.value?.account?.permissions || []
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    return []
+  }
+})
+
+const can = (action) => {
+  if (isAdmin.value) return true
+  return userPermissions.value.includes(`MemberRecord:${action}`)
+}
 
 const router = useRouter()
 
@@ -435,6 +492,37 @@ const deleteMember = async (member) => {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('Archive error:', error)
+    }
+  }
+}
+
+const bulkDeleteMembers = async () => {
+  if (selectedMembers.value.length === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `Are you sure you want to archive ${selectedMembers.value.length} selected members? This action can be undone in the Archives.`,
+      'Confirm Bulk Archive',
+      {
+        confirmButtonText: 'Archive Selected',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+    )
+
+    const memberIds = selectedMembers.value.map(m => m.member_id)
+    const result = await memberStore.bulkDeleteMembers(memberIds)
+
+    if (result.success) {
+      ElMessage.success(result.message || `Successfully archived ${selectedMembers.value.length} members`)
+      selectedMembers.value = []
+    } else {
+      ElMessage.error(result.error || 'Failed to archive selected members')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('Bulk archive error:', error)
+      ElMessage.error('An error occurred during bulk archival')
     }
   }
 }

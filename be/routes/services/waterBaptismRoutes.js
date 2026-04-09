@@ -17,6 +17,7 @@ const { checkDuplicateAccount } = require('../../dbHelpers/church_records/accoun
 const { getAccountByEmail, createAccount } = require('../../dbHelpers/church_records/accountRecords');
 const { sendAccountDetails, sendWaterBaptismDetails } = require('../../dbHelpers/emailHelper');
 const { query } = require('../../database/db');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -45,7 +46,7 @@ function validateBaptismDate(baptismDate) {
 /**
  * CREATE - Insert a new water baptism record
  */
-router.post('/createWaterBaptism', async (req, res) => {
+router.post('/createWaterBaptism', authenticateToken, checkPermission('ServicesGroup:Create'), async (req, res) => {
   try {
     if (req.body && req.body.baptism_date) {
       const dateValidation = validateBaptismDate(req.body.baptism_date);
@@ -69,7 +70,7 @@ router.post('/createWaterBaptism', async (req, res) => {
 /**
  * READ ALL - Get all water baptism records
  */
-router.get('/getAllWaterBaptisms', async (req, res) => {
+router.get('/getAllWaterBaptisms', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const result = await getAllWaterBaptisms(req.query);
     res.status(result.success ? 200 : 400).json(result);
@@ -78,7 +79,7 @@ router.get('/getAllWaterBaptisms', async (req, res) => {
   }
 });
 
-router.post('/getAllWaterBaptisms', async (req, res) => {
+router.post('/getAllWaterBaptisms', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const result = await getAllWaterBaptisms(req.body);
     res.status(result.success ? 200 : 400).json(result);
@@ -90,7 +91,7 @@ router.post('/getAllWaterBaptisms', async (req, res) => {
 /**
  * READ ONE - Get by ID
  */
-router.get('/getWaterBaptismById/:id', async (req, res) => {
+router.get('/getWaterBaptismById/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const result = await getWaterBaptismById(req.params.id);
     res.status(result.success ? 200 : 404).json(result);
@@ -102,7 +103,7 @@ router.get('/getWaterBaptismById/:id', async (req, res) => {
 /**
  * READ ONE - Get by Member ID
  */
-router.get('/getWaterBaptismByMemberId/:memberId', async (req, res) => {
+router.get('/getWaterBaptismByMemberId/:memberId', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const result = await getWaterBaptismByMemberId(req.params.memberId);
     res.status(result.success ? 200 : 404).json(result);
@@ -114,7 +115,7 @@ router.get('/getWaterBaptismByMemberId/:memberId', async (req, res) => {
 /**
  * UPDATE - Update an existing baptism record
  */
-router.put('/updateWaterBaptism/:id', async (req, res) => {
+router.put('/updateWaterBaptism/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, error: 'ID required' });
@@ -172,7 +173,7 @@ router.put('/updateWaterBaptism/:id', async (req, res) => {
 /**
  * DELETE
  */
-router.delete('/deleteWaterBaptism/:id', async (req, res) => {
+router.delete('/deleteWaterBaptism/:id', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const archivedBy = req.user?.acc_id || null;
     const result = await deleteWaterBaptism(req.params.id, archivedBy, req.body.reason);
@@ -185,7 +186,7 @@ router.delete('/deleteWaterBaptism/:id', async (req, res) => {
 /**
  * BULK DELETE
  */
-router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
+router.delete('/bulkDeleteWaterBaptisms', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const archivedBy = req.user?.acc_id || null;
     const result = await bulkDeleteWaterBaptisms(req.body.baptismIds, archivedBy, req.body.reason);
@@ -198,7 +199,7 @@ router.delete('/bulkDeleteWaterBaptisms', async (req, res) => {
 /**
  * EXPORT
  */
-router.get('/exportExcel', async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const buffer = await exportWaterBaptismsToExcel(req.query);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -209,7 +210,7 @@ router.get('/exportExcel', async (req, res) => {
   }
 });
 
-router.post('/exportExcel', async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const buffer = await exportWaterBaptismsToExcel(req.body);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -288,7 +289,7 @@ router.get('/check-time-slot', async (req, res) => {
 /**
  * BULK COMPLETE
  */
-router.put('/bulkCompleteWaterBaptisms', async (req, res) => {
+router.put('/bulkCompleteWaterBaptisms', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { baptismIds, completionDate, completionTime } = req.body;
     const result = await bulkCompleteWaterBaptismsWithAccount(baptismIds, completionDate, completionTime);
@@ -357,13 +358,20 @@ router.get('/available-slots', async (req, res) => {
       }
 
       const bookedCount = row.bookedCount || 0;
+      // Only include booked member names for authorized staff/admin
+      const canSeePII = req.user && (
+        (req.user.position || '').toLowerCase().includes('admin') || 
+        (req.user.position || '').toLowerCase().includes('staff') ||
+        (Array.isArray(req.user.permissions) && req.user.permissions.includes('ServicesGroup'))
+      );
+
       dateGroupsMap[date].timeSlots.push({
         time: row.time,
         display: momentTz(row.datetime).format('h:mm A'),
         datetime: row.datetime,
         maxCapacity: row.max_slots,
         bookedCount: bookedCount,
-        bookedMembers: row.bookedMembersList ? row.bookedMembersList.split(', ') : [],
+        bookedMembers: canSeePII ? (row.bookedMembersList ? row.bookedMembersList.split(', ') : []) : [],
         isFull: bookedCount >= row.max_slots
       });
     });

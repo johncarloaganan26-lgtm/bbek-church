@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../../database/db');
-const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkPermission } = require('../../middleware/authMiddleware');
 
 /**
  * GET all slots for a specific service (Admin)
  */
-router.get('/:serviceType', authenticateToken, checkAdminRole, async (req, res) => {
+router.get('/:serviceType', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const { serviceType } = req.params;
         const [rows] = await query(
@@ -22,7 +22,7 @@ router.get('/:serviceType', authenticateToken, checkAdminRole, async (req, res) 
 /**
  * POST create a slot for a specific service
  */
-router.post('/:serviceType', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/:serviceType', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { serviceType } = req.params;
         const { available_date, available_time, max_slots = 1 } = req.body;
@@ -41,7 +41,7 @@ router.post('/:serviceType', authenticateToken, checkAdminRole, async (req, res)
 /**
  * DELETE a slot
  */
-router.delete('/:serviceType/:id', authenticateToken, checkAdminRole, async (req, res) => {
+router.delete('/:serviceType/:id', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { serviceType, id } = req.params;
         await query('DELETE FROM tbl_service_slots WHERE slot_id = ? AND service_type = ?', [id, serviceType]);

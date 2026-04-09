@@ -99,7 +99,12 @@ async function getSpecificMemberByEmailAndPassword(email, password) {
 
     // Password is valid, proceed with authentication
     // Insert access token to the account
-    account.accessToken = jwt.sign({ email: account.email, position: account.position, acc_id: account.acc_id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    account.accessToken = jwt.sign({ 
+      email: account.email, 
+      position: account.position, 
+      acc_id: account.acc_id,
+      permissions: account.permissions // Include permissions in token
+    }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     if (account.position === 'member') {
       // Find the member by email
@@ -271,7 +276,7 @@ async function getAllAccounts(options = {}) {
     let countParams = [];
 
     // Build query for fetching records (exclude password field)
-    let sql = 'SELECT acc_id, email, position, status, date_created FROM tbl_accounts';
+    let sql = 'SELECT acc_id, email, position, status, date_created, permissions FROM tbl_accounts';
     const params = [];
 
     // Build WHERE conditions array
@@ -447,8 +452,8 @@ async function getAccountById(accId, includePassword = false) {
     }
 
     const fields = includePassword
-      ? 'acc_id, email, password, position, status, date_created'
-      : 'acc_id, email, position, status, date_created';
+      ? 'acc_id, email, password, position, status, date_created, permissions'
+      : 'acc_id, email, position, status, date_created, permissions';
 
     const sql = `SELECT ${fields} FROM tbl_accounts WHERE acc_id = ?`;
     const [rows] = await query(sql, [accId]);
@@ -487,8 +492,8 @@ async function getAccountByEmail(email, includePassword = false) {
     console.log('🔍 getAccountByEmail looking for:', email);
 
     const fields = includePassword
-      ? 'acc_id, email, password, position, status, date_created, reset_token, reset_token_expires'
-      : 'acc_id, email, position, status, date_created';
+      ? 'acc_id, email, password, position, status, date_created, reset_token, reset_token_expires, permissions'
+      : 'acc_id, email, position, status, date_created, permissions';
 
     const sql = `SELECT ${fields} FROM tbl_accounts WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))`;
     const [rows] = await query(sql, [email]);
@@ -540,7 +545,8 @@ async function updateAccount(accId, accountData) {
       email,
       password,
       position,
-      status
+      status,
+      permissions
     } = accountData;
 
     // Build dynamic update query based on provided fields
@@ -587,6 +593,12 @@ async function updateAccount(accId, accountData) {
     if (status !== undefined) {
       fields.push('status = ?');
       params.push(status);
+    }
+    
+    if (permissions !== undefined) {
+      fields.push('permissions = ?');
+      // Ensure it's stored as a stringified JSON if it's an object/array
+      params.push(typeof permissions === 'string' ? permissions : JSON.stringify(permissions));
     }
 
     if (fields.length === 0) {

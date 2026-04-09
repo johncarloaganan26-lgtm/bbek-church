@@ -213,7 +213,8 @@ const handleLogin = async () => {
         closeDialog()
         emit('update:modelValue', false)
 
-        if(result.data.account.position === 'admin') {
+        const position = result.data.account.position
+        if (position === 'admin' || position === 'staff') {
           router.push('/admin')
         } else {
           router.push('/')

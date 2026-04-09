@@ -67,11 +67,11 @@
         <div class="card-header">
           <span>Filters</span>
           <div class="header-actions">
-            <el-button type="success" @click="exportToCSV">
+            <el-button v-if="can('Export')" type="success" @click="exportToCSV">
               <el-icon><Download /></el-icon>
               Export CSV
             </el-button>
-            <el-button type="info" @click="printData">
+            <el-button v-if="can('Export')" type="info" @click="printData">
               <el-icon><Printer /></el-icon>
               Print
             </el-button>
@@ -171,6 +171,7 @@
           <span>{{ selectedArchives.length }} archive{{ selectedArchives.length > 1 ? 's' : '' }} selected</span>
           <div>
             <el-button
+              v-if="can('Restore')"
               type="success"
               size="small"
               :disabled="loading"
@@ -180,6 +181,7 @@
               Restore Selected
             </el-button>
             <el-button
+              v-if="can('DeletePermanently')"
               type="danger"
               size="small"
               :disabled="loading"
@@ -303,7 +305,7 @@
                   text
                 />
               </el-tooltip>
-              <el-tooltip v-if="!row.restored" content="Restore Record" placement="top">
+              <el-tooltip v-if="can('Restore') && !row.restored" content="Restore Record" placement="top">
                 <el-button
                   :icon="RefreshRight"
                   circle
@@ -314,7 +316,7 @@
                   text
                 />
               </el-tooltip>
-              <el-tooltip v-if="!row.restored" content="Delete Permanently" placement="top">
+              <el-tooltip v-if="can('DeletePermanently') && !row.restored" content="Delete Permanently" placement="top">
                 <el-button
                   :icon="Delete"
                   circle
@@ -402,7 +404,7 @@
         <span class="dialog-footer">
           <el-button @click="detailsDialog = false">Close</el-button>
           <el-button
-            v-if="selectedArchive && !selectedArchive.restored"
+            v-if="selectedArchive && !selectedArchive.restored && can('Restore')"
             type="success"
             @click="handleRestore(selectedArchive)"
             :loading="restoring"
@@ -481,6 +483,23 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArchiveStore } from '@/stores/archiveStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+// Permission Logic
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
+const userPermissions = computed(() => {
+  try {
+    const perms = userInfo.value?.account?.permissions || []
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    return []
+  }
+})
+
+const can = (action) => {
+  if (isAdmin.value) return true
+  return userPermissions.value.includes(`Archive:${action}`)
+}
 import {
   Document,
   RefreshRight,

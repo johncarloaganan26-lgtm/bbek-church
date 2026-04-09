@@ -62,6 +62,7 @@ router.get('/getAllAccounts', async (req, res) => {
         acc.position,
         acc.status,
         acc.date_created,
+        acc.permissions,
         m.member_id as member_id,
         m.firstname,
         m.middle_name,
@@ -284,7 +285,7 @@ router.post('/createAccount', async (req, res) => {
 router.put('/updateAccount/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, password, position, status, member_id } = req.body;
+    const { email, password, position, status, member_id, permissions } = req.body;
 
     // Check if account exists first
     const accountResult = await getAccountById(id);
@@ -304,7 +305,8 @@ router.put('/updateAccount/:id', async (req, res) => {
       password: password,
       position: position || currentAccount.position,
       status: status || currentAccount.status,
-      member_id: member_id !== undefined ? member_id : currentAccount.member_id
+      member_id: member_id !== undefined ? member_id : currentAccount.member_id,
+      permissions: permissions !== undefined ? permissions : currentAccount.permissions
     });
 
     if (result.success) {

@@ -34,7 +34,7 @@
       <v-card-text class="pa-6 bg-grey-lighten-4 no-scrollbar" style="overflow-x: hidden !important;">
         <v-row>
           <!-- Left: Creator Form (TEAL) -->
-          <v-col cols="12" md="5" class="availability-creator">
+          <v-col v-if="can('ManageAvailability')" cols="12" md="5" class="availability-creator">
             <v-card class="pa-6 rounded-xl elevation-2 bg-white h-100 border-teal flex-column d-flex no-scrollbar" style="overflow-y: auto;">
               <div class="d-flex align-center mb-6">
                 <v-avatar color="teal-lighten-4" class="mr-3" size="48">
@@ -156,7 +156,7 @@
           </v-col>
 
           <!-- Right: List (Grouped) -->
-          <v-col cols="12" md="7">
+          <v-col cols="12" :md="can('ManageAvailability') ? 7 : 12">
             <v-card class="rounded-xl border elevation-0 overflow-hidden bg-white h-100 flex-column d-flex">
               <!-- Header with Sorting & Multi-select Toggle -->
               <div class="pa-4 d-flex align-center justify-space-between border-b bg-grey-lighten-5">
@@ -173,7 +173,7 @@
                 
                 <div class="d-flex align-center gap-2">
                   <v-btn
-                    v-if="selectedSlotIds.length > 0"
+                    v-if="can('ManageAvailability') && selectedSlotIds.length > 0"
                     color="red-darken-2"
                     prepend-icon="mdi-trash-can"
                     size="small"
@@ -263,7 +263,7 @@
                             </div>
                           </div>
                           
-                          <div class="d-flex gap-2" v-show="selectedSlotIds.length === 0">
+                          <div v-if="can('ManageAvailability')" class="d-flex gap-2" v-show="selectedSlotIds.length === 0">
                             <v-btn icon variant="flat" color="teal-darken-1" size="small" class="rounded-lg shadow-sm" @click.stop="editSlot(slot)">
                               <v-icon color="white">mdi-pencil</v-icon>
                             </v-btn>
@@ -304,6 +304,23 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import moment from 'moment';
 import axios from '@/api/axios';
+
+// Permission Logic
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
+const userPermissions = computed(() => {
+  try {
+    const perms = userInfo.value?.account?.permissions || []
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    return []
+  }
+})
+
+const can = (action) => {
+  if (isAdmin.value) return true
+  return userPermissions.value.includes(`ServicesGroup:${action}`)
+}
 
 const props = defineProps({
   modelValue: Boolean,

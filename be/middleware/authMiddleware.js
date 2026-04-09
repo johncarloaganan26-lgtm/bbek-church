@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { query } = require('../database/db');
 
 /**
  * JWT Authentication Middleware
@@ -44,20 +45,11 @@ const publicRoutes = [
   '/api/member-registration/register/burial-service',
   // Water baptism non-member registration (public - no auth required)
   '/api/services/water-baptisms/register-non-member',
-  // Burial service routes (public for non-member requests)
-  '/api/church-records/burial-services/createBurialService',
-  '/api/church-records/burial-services/getAllBurialServices',
-  '/api/church-records/burial-services/getBurialServiceById',
-  '/api/church-records/burial-services/getAvailableBurialDates',
+  // Public registration and validation (retained)
   '/api/church-records/burial-services/check-duplicate',
   '/api/church-records/burial-services/check-member-burial',
-  // Notification routes (require authentication)
-  // '/api/notifications/unified',  // Commented out - should require auth
-  // '/api/notifications/mark-as-read',  // Commented out - should require auth
-  // '/api/notifications/mark-all-as-read',  // Commented out - should require auth
-  '/api/church-records/burial-services/exportExcel',
-  '/api/church-records/burial-services/searchFulltext',
-  '/api/church-records/burial-services/analyzeAvailability',
+  '/api/church-records/burial-services/getAvailableBurialDates',
+  '/api/church-records/burial-services/createBurialService', // Allowed for public/guest requests
   // Announcement routes (public for viewing)
   '/api/announcements/getActiveAnnouncementsForUser',
   '/api/announcements/markAsViewed',
@@ -134,7 +126,7 @@ const publicRoutes = [
   '/api/church-records/accounts/verifyResetToken',
   '/api/church-records/accounts/resetPasswordWithToken',
   '/api/church-records/accounts/createResetTokensTable',
-  // Child dedication routes (public for member creation)
+  // Child dedication public registration/check routes
   '/api/church-records/child-dedications/createChildDedication',
   '/api/church-records/child-dedications/check-duplicate',
   '/api/church-records/child-dedications/check-member-dedication',
@@ -290,8 +282,81 @@ const checkAdminRole = (req, res, next) => {
   next();
 };
 
+/**
+ * Granular Permission Check Middleware
+ * Allows access if user is admin OR has the specific permission
+ * @param {string} requiredPermission - Format: "Module:Action" (e.g., "ServicesGroup:ManageAvailability")
+ */
+const checkPermission = (requiredPermission) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required.'
+      });
+    }
+
+    const userPosition = (req.user.position || '').toLowerCase();
+    const adminRoles = ['admin', 'administrator', 'super admin', 'superadmin'];
+    
+    // Admins bypass all checks
+    if (adminRoles.includes(userPosition)) {
+      return next();
+    }
+
+    // Check permissions list from token
+    let rawPermissions = req.user.permissions;
+    let permissions = [];
+
+    const parsePermissions = (data) => {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        const trimmed = data.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            return JSON.parse(trimmed);
+          } catch (e) {
+            // If JSON parse fails, fall back to comma splitting
+            return trimmed.split(',').map(p => p.trim()).filter(p => p);
+          }
+        }
+        // Plain comma separated string
+        return trimmed.split(',').map(p => p.trim()).filter(p => p);
+      }
+      return [];
+    };
+
+    try {
+      if (rawPermissions) {
+        permissions = parsePermissions(rawPermissions);
+      } else {
+        // Fallback: fetch from database if token doesn't have it (stale token or just-updated)
+        const [rows] = await query('SELECT permissions FROM tbl_accounts WHERE acc_id = ? OR email = ?', [req.user.acc_id, req.user.email]);
+        if (rows.length > 0 && rows[0].permissions) {
+          permissions = parsePermissions(rows[0].permissions);
+        }
+      }
+    } catch (e) {
+      console.warn('Permission parsing error:', e.message);
+      permissions = [];
+    }
+
+    if (Array.isArray(permissions) && permissions.includes(requiredPermission)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `Access denied. Missing required permission: ${requiredPermission}`,
+      errorCode: 'PERMISSION_REQUIRED'
+    });
+  };
+};
+
 module.exports = {
   authenticateToken,
   isPublicRoute,
-  checkAdminRole
+  checkAdminRole,
+  checkPermission
 };

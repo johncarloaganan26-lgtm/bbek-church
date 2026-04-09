@@ -195,6 +195,20 @@
             </td>
             <td>{{ account.date_created }}</td>
             <td>
+              <v-tooltip v-if="account.position === 'staff'" text="Manage Permissions" location="top">
+                <template v-slot:activator="{ props }">
+                  <v-btn 
+                    icon="mdi-shield-lock" 
+                    variant="text" 
+                    size="small" 
+                    color="primary"
+                    class="mr-2" 
+                    :disabled="loading"
+                    v-bind="props"
+                    @click="openPermissionDialog(account)"
+                  ></v-btn>
+                </template>
+              </v-tooltip>
               <v-tooltip text="Edit Account" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
@@ -262,6 +276,11 @@
       @update:model-value="accountDialog = $event" 
       @submit="handleSubmit" 
     />
+    <PermissionDialog
+      v-model="permissionDialog"
+      :account="selectedAccount"
+      @save="handleSavePermissions"
+    />
   </div>
 </template>
 
@@ -269,6 +288,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AccountDialog from '../../Dialogs/AccountDialog.vue'
+import PermissionDialog from '../../Dialogs/PermissionDialog.vue'
 import { useAccountsStore } from '@/stores/ChurchRecords/accountsStore'
 
 const accountsStore = useAccountsStore()
@@ -276,6 +296,10 @@ const accountsStore = useAccountsStore()
 const accountDialog = ref(false)
 const accountData = ref(null)
 const selectedAccounts = ref([])
+
+// Permission Dialog State
+const permissionDialog = ref(false)
+const selectedAccount = ref(null)
 
 const handleDateRangeChange = () => {
   accountsStore.setFilters(filters.value)
@@ -414,6 +438,28 @@ const handleSubmit = async (data) => {
   } catch (error) {
     console.error('Error submitting account:', error)
     ElMessage.error('Failed to save account')
+  }
+}
+
+const openPermissionDialog = (account) => {
+  selectedAccount.value = account
+  permissionDialog.value = true
+}
+
+const handleSavePermissions = async ({ acc_id, permissions }) => {
+  try {
+    const result = await accountsStore.updateAccount(acc_id, { permissions })
+    if (result.success) {
+      ElMessage.success('Permissions updated successfully')
+      permissionDialog.value = false
+      // Refresh accounts list to get updated permissions
+      await accountsStore.fetchAccounts()
+    } else {
+      ElMessage.error(result.error || 'Failed to update permissions')
+    }
+  } catch (error) {
+    console.error('Error updating permissions:', error)
+    ElMessage.error('An error occurred while updating permissions')
   }
 }
 

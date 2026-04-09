@@ -82,6 +82,7 @@ router.post('/login', async (req, res) => {
         acc_id: user.acc_id,
         email: user.email,
         position: user.position,
+        permissions: user.permissions, // Added permissions to token
         member: memberInfo
       },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -96,6 +97,7 @@ router.post('/login', async (req, res) => {
         acc_id: user.acc_id,
         email: user.email,
         position: user.position,
+        permissions: user.permissions, // Added permissions to response
         member: memberInfo
       }
     });

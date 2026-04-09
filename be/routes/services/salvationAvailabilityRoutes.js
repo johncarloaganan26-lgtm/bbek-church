@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../../database/db');
-const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 
 /**
  * Helper to shorten service type if it exceeds 15 chars (database limit)
@@ -14,7 +14,7 @@ const getDBServiceType = (type) => {
 /**
  * GET all availability slots (Admin)
  */
-router.get('/salvation-slots', authenticateToken, checkAdminRole, async (req, res) => {
+router.get('/salvation-slots', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const serviceTypeRaw = req.query.service_type || 'salvation';
         const serviceType = getDBServiceType(serviceTypeRaw);
@@ -76,7 +76,7 @@ router.get('/salvation-slots', authenticateToken, checkAdminRole, async (req, re
  * POST create availability slot (Single or Bulk)
  * Includes check for duplicates to prevent same date/time for same service
  */
-router.post('/salvation-slots', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/salvation-slots', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { available_date, available_time, max_slots, isBulk, dates, times, service_type } = req.body;
         const targetService = getDBServiceType(service_type || 'salvation');
@@ -138,7 +138,7 @@ router.post('/salvation-slots', authenticateToken, checkAdminRole, async (req, r
 /**
  * PUT update availability slot
  */
-router.put('/salvation-slots/:id', authenticateToken, checkAdminRole, async (req, res) => {
+router.put('/salvation-slots/:id', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { id } = req.params;
         const { available_date, available_time, max_slots, status, service_type } = req.body;
@@ -157,7 +157,7 @@ router.put('/salvation-slots/:id', authenticateToken, checkAdminRole, async (req
 /**
  * POST bulk delete availability slots
  */
-router.post('/bulk-delete', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/bulk-delete', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { slotIds, service_type } = req.body;
         const targetService = getDBServiceType(service_type || 'salvation');
@@ -176,7 +176,7 @@ router.post('/bulk-delete', authenticateToken, checkAdminRole, async (req, res) 
 /**
  * DELETE availability slot
  */
-router.delete('/salvation-slots/:id', authenticateToken, checkAdminRole, async (req, res) => {
+router.delete('/salvation-slots/:id', authenticateToken, checkPermission('ServicesGroup:ManageAvailability'), async (req, res) => {
     try {
         const { id } = req.params;
         const serviceType = getDBServiceType(req.query.service_type || 'salvation');

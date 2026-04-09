@@ -11,6 +11,8 @@ const {
   exportMarriageServicesToExcel
 } = require('../../dbHelpers/services/marriageServiceRecords');
 
+const { authenticateToken, checkPermission } = require('../../middleware/authMiddleware');
+
 const router = express.Router();
 
 /**
@@ -18,7 +20,7 @@ const router = express.Router();
  * POST /api/services/marriage-services/createMarriageService
  * Body: { marriage_id?, groom_member_id, bride_member_id, guardians (array), pastor_id, location, marriage_date, status?, date_created? }
  */
-router.post('/createMarriageService', async (req, res) => {
+router.post('/createMarriageService', authenticateToken, checkPermission('ServicesGroup:Create'), async (req, res) => {
   try {
     const result = await createMarriageService(req.body);
     
@@ -50,7 +52,7 @@ router.post('/createMarriageService', async (req, res) => {
  * POST /api/services/marriage-services/getAllMarriageServices (body payload)
  * Parameters: search, limit, offset, page, pageSize, status, sortBy
  */
-router.get('/getAllMarriageServices', async (req, res) => {
+router.get('/getAllMarriageServices', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from query string
     const options = req.query;
@@ -81,7 +83,7 @@ router.get('/getAllMarriageServices', async (req, res) => {
   }
 });
 
-router.post('/getAllMarriageServices', async (req, res) => {
+router.post('/getAllMarriageServices', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from request body (payload)
     const options = req.body;
@@ -116,7 +118,7 @@ router.post('/getAllMarriageServices', async (req, res) => {
  * READ ONE - Get a single marriage service by ID
  * GET /api/services/marriage-services/getMarriageServiceById/:id
  */
-router.get('/getMarriageServiceById/:id', async (req, res) => {
+router.get('/getMarriageServiceById/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -155,7 +157,7 @@ router.get('/getMarriageServiceById/:id', async (req, res) => {
  * READ - Get marriage services by groom member ID
  * GET /api/services/marriage-services/getMarriageServicesByGroomMemberId/:groomMemberId
  */
-router.get('/getMarriageServicesByGroomMemberId/:groomMemberId', async (req, res) => {
+router.get('/getMarriageServicesByGroomMemberId/:groomMemberId', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { groomMemberId } = req.params;
 
@@ -194,7 +196,7 @@ router.get('/getMarriageServicesByGroomMemberId/:groomMemberId', async (req, res
  * READ - Get marriage services by bride member ID
  * GET /api/services/marriage-services/getMarriageServicesByBrideMemberId/:brideMemberId
  */
-router.get('/getMarriageServicesByBrideMemberId/:brideMemberId', async (req, res) => {
+router.get('/getMarriageServicesByBrideMemberId/:brideMemberId', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { brideMemberId } = req.params;
 
@@ -234,7 +236,7 @@ router.get('/getMarriageServicesByBrideMemberId/:brideMemberId', async (req, res
  * PUT /api/services/marriage-services/updateMarriageService/:id
  * Body: { groom_member_id?, bride_member_id?, guardians (array)?, pastor_id?, location?, marriage_date?, status?, date_created? }
  */
-router.put('/updateMarriageService/:id', async (req, res) => {
+router.put('/updateMarriageService/:id', authenticateToken, checkPermission('ServicesGroup:Edit'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -273,7 +275,7 @@ router.put('/updateMarriageService/:id', async (req, res) => {
  * DELETE - Delete a marriage service record
  * DELETE /api/services/marriage-services/deleteMarriageService/:id
  */
-router.delete('/deleteMarriageService/:id', async (req, res) => {
+router.delete('/deleteMarriageService/:id', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -314,7 +316,7 @@ router.delete('/deleteMarriageService/:id', async (req, res) => {
  * GET /api/services/marriage-services/exportExcel (query params)
  * POST /api/services/marriage-services/exportExcel (body payload)
  */
-router.get('/exportExcel', async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.query;
     const excelBuffer = await exportMarriageServicesToExcel(options);
@@ -336,7 +338,7 @@ router.get('/exportExcel', async (req, res) => {
   }
 });
 
-router.post('/exportExcel', async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.body;
     const excelBuffer = await exportMarriageServicesToExcel(options);

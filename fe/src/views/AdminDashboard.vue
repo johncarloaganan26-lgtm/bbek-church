@@ -38,7 +38,7 @@
 
               <!-- Individual Item (e.g., Dashboard) -->
               <v-list-item
-                v-if="element.type === 'item' && (!element.adminOnly || isAdmin)"
+                v-if="element.type === 'item' && canSeeModule(element)"
                 :prepend-icon="element.icon"
                 :title="element.title"
                 :value="element.id"
@@ -49,7 +49,7 @@
               ></v-list-item>
 
               <!-- Group (e.g., Church Records) -->
-              <template v-else-if="element.type === 'group'">
+              <template v-else-if="element.type === 'group' && hasVisibleItems(element)">
                 <!-- Rail Mode: Simple Icon with Floating Menu -->
                 <v-list-item
                   v-if="isRail && !isMobile"
@@ -69,7 +69,7 @@
                     <v-paper class="pa-1 sidebar-popup-card">
                       <v-list density="compact" class="pa-0">
                         <v-list-item
-                          v-for="subItem in element.items.filter(si => !si.adminOnly || isAdmin)"
+                          v-for="subItem in element.items.filter(si => canSeeModule(si))"
                           :key="subItem.title"
                           :prepend-icon="subItem.icon"
                           :title="subItem.title"
@@ -104,7 +104,7 @@
                     :disabled="isRail && !isMobile"
                   >
                     <template #item="{ element: subItem }">
-                      <div v-if="!subItem.adminOnly || isAdmin" class="nested-item-wrapper">
+                      <div v-if="canSeeModule(subItem)" class="nested-item-wrapper">
                         <v-list-item 
                           :prepend-icon="subItem.icon" 
                           :title="subItem.title"
@@ -131,7 +131,7 @@
         class="menu-button"
       ></v-app-bar-nav-icon>
 
-      <div class="admin-search-wrapper">
+      <div v-if="isAdmin" class="admin-search-wrapper">
         <v-autocomplete
           v-model="selectedAdminSearchItem"
           v-model:search="adminSearchQuery"
@@ -263,7 +263,8 @@ const defaultSidebarItems = [
     title: 'DASHBOARD',
     icon: 'mdi-home',
     to: { name: 'Dashboard' },
-    activeName: 'Dashboard'
+    activeName: 'Dashboard',
+    permissionKey: 'Dashboard'
   },
   {
     id: 'church-records',
@@ -271,12 +272,12 @@ const defaultSidebarItems = [
     title: 'CHURCH RECORDS',
     icon: 'mdi-database',
     items: [
-      { title: 'Accounts', icon: 'mdi-account', to: { name: 'Accounts' }, activeName: 'Accounts' },
-      { title: 'Departments', icon: 'mdi-office-building', to: { name: 'Departments' }, activeName: 'Departments' },
-      { title: 'Member Record', icon: 'mdi-account', to: { name: 'MemberRecord' }, activeName: 'MemberRecord' },
-      { title: 'Events Records', icon: 'mdi-calendar', to: { name: 'EventsRecords' }, activeName: 'EventsRecords' },
-      { title: 'Tithes & Offerings', icon: 'mdi-gift', to: { name: 'TithesOfferings' }, activeName: 'TithesOfferings' },
-      { title: 'Ministries', icon: 'mdi-account-group', to: { name: 'Ministries' }, activeName: 'Ministries' }
+      { title: 'Accounts', icon: 'mdi-account', to: { name: 'Accounts' }, activeName: 'Accounts', permissionKey: 'Accounts' },
+      { title: 'Departments', icon: 'mdi-office-building', to: { name: 'Departments' }, activeName: 'Departments', permissionKey: 'Departments' },
+      { title: 'Member Record', icon: 'mdi-account', to: { name: 'MemberRecord' }, activeName: 'MemberRecord', permissionKey: 'MemberRecord' },
+      { title: 'Events Records', icon: 'mdi-calendar', to: { name: 'EventsRecords' }, activeName: 'EventsRecords', permissionKey: 'EventsRecords' },
+      { title: 'Tithes & Offerings', icon: 'mdi-gift', to: { name: 'TithesOfferings' }, activeName: 'TithesOfferings', permissionKey: 'TithesOfferings' },
+      { title: 'Ministries', icon: 'mdi-account-group', to: { name: 'Ministries' }, activeName: 'Ministries', permissionKey: 'Ministries' }
     ]
   },
   {
@@ -285,11 +286,11 @@ const defaultSidebarItems = [
     title: 'SERVICES',
     icon: 'mdi-gift-outline',
     items: [
-      { title: 'Salvation Requests', icon: 'mdi-account-plus', to: { name: 'DiscipleshipAdmin' }, activeName: 'DiscipleshipAdmin' },
-      { title: 'Bible Study', icon: 'mdi-book-open-variant', to: { name: 'BibleStudy' }, activeName: 'BibleStudy' },
-      { title: 'Water Baptism', icon: 'mdi-water', to: { name: 'WaterBaptism' }, activeName: 'WaterBaptism' },
-      { title: 'Child Dedication', icon: 'mdi-baby-face', to: { name: 'ChildDedicationAdmin' }, activeName: 'ChildDedicationAdmin' },
-      { title: 'Burial Service', icon: 'mdi-coffin', to: { name: 'BurialService' }, activeName: 'BurialService' }
+      { title: 'Salvation Requests', icon: 'mdi-account-plus', to: { name: 'DiscipleshipAdmin' }, activeName: 'DiscipleshipAdmin', permissionKey: 'ServicesGroup' },
+      { title: 'Bible Study', icon: 'mdi-book-open-variant', to: { name: 'BibleStudy' }, activeName: 'BibleStudy', permissionKey: 'ServicesGroup' },
+      { title: 'Water Baptism', icon: 'mdi-water', to: { name: 'WaterBaptism' }, activeName: 'WaterBaptism', permissionKey: 'ServicesGroup' },
+      { title: 'Child Dedication', icon: 'mdi-baby-face', to: { name: 'ChildDedicationAdmin' }, activeName: 'ChildDedicationAdmin', permissionKey: 'ServicesGroup' },
+      { title: 'Burial Service', icon: 'mdi-coffin', to: { name: 'BurialService' }, activeName: 'BurialService', permissionKey: 'ServicesGroup' }
     ]
   },
   {
@@ -298,7 +299,7 @@ const defaultSidebarItems = [
     title: 'COMMUNICATION',
     icon: 'mdi-message',
     items: [
-      { title: 'Messages', icon: 'mdi-message-text', to: { name: 'Messages' }, activeName: 'Messages' }
+      { title: 'Messages', icon: 'mdi-message-text', to: { name: 'Messages' }, activeName: 'Messages', permissionKey: 'Messages' }
     ]
   },
   {
@@ -307,10 +308,10 @@ const defaultSidebarItems = [
     title: 'MAINTENANCE',
     icon: 'mdi-cog',
     items: [
-      { title: 'Archives', icon: 'mdi-folder', to: { name: 'Archive' }, activeName: 'Archive', adminOnly: true },
-      { title: 'Audit Trail', icon: 'mdi-file-document', to: { name: 'AuditTrail' }, activeName: 'AuditTrail', adminOnly: true },
-      { title: 'Settings', icon: 'mdi-cog', to: { name: 'Settings' }, activeName: 'Settings' },
-      { title: 'Content Management', icon: 'mdi-file-document', to: { name: 'ContentManagement' }, activeName: 'ContentManagement', adminOnly: true }
+      { title: 'Archives', icon: 'mdi-folder', to: { name: 'Archive' }, activeName: 'Archive', adminOnly: true, permissionKey: 'Archive' },
+      { title: 'Audit Trail', icon: 'mdi-file-document', to: { name: 'AuditTrail' }, activeName: 'AuditTrail', adminOnly: true, permissionKey: 'AuditTrail' },
+      { title: 'Announcement', icon: 'mdi-bullhorn', to: { name: 'Settings' }, activeName: 'Settings', permissionKey: 'Announcement' },
+      { title: 'Content Management', icon: 'mdi-file-document', to: { name: 'ContentManagement' }, activeName: 'ContentManagement', adminOnly: true, permissionKey: 'ContentManagement' }
     ]
   }
 ]
@@ -395,8 +396,31 @@ const saveSidebarOrder = () => {
   localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(orderToSave))
 }
 
+const canSeeModule = (item) => {
+  const currentPos = userInfo.value?.account?.position
+  const currentPerms = userPermissions.value
+  
+  // 1. Admin always has full access
+  if (isAdmin.value) return true;
+  
+  // 2. If item is explicitly admin-only and user is NOT admin (checked above), hide it
+  if (item.adminOnly) return false;
+  
+  // 3. For Staff, check their specific permissions
+  if (currentPos === 'staff') {
+    if (!item.permissionKey) return true; // Default to visible if no key
+    const hasPerm = currentPerms.includes(item.permissionKey);
+    return hasPerm;
+  }
+  
+  // 4. For regular members, we only show specific modules if any (usually dashboard)
+  // Ensure strict check: members should NOT see staff/admin modules unless they are in step 4
+  return false;
+}
+
 const hasVisibleItems = (group) => {
-  return group.items.some(item => !item.adminOnly || isAdmin.value)
+  const visible = group.items && group.items.some(item => canSeeModule(item))
+  return visible
 }
 
 // Initialize sidebar
@@ -406,9 +430,48 @@ loadSidebarOrder()
 // User info from token
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')) || null)
 
+// Session Refresh Feature
+const refreshUserInfo = async () => {
+  try {
+    const currentInfo = userInfo.value
+    if (!currentInfo?.account?.acc_id) return
+    
+    // Using the same axios and endpoint
+    const response = await axios.get(`/church-records/accounts/getAccountById/${currentInfo.account.acc_id}`)
+    if (response.data && response.data.success) {
+      const updatedAccount = response.data.data
+      
+      const updatedInfo = {
+        ...currentInfo,
+        account: {
+          ...currentInfo.account,
+          ...updatedAccount
+        }
+      }
+      localStorage.setItem('userInfo', JSON.stringify(updatedInfo))
+      userInfo.value = updatedInfo
+      console.log('Sidebar session data refreshed')
+    }
+  } catch (error) {
+    console.error('Failed to refresh sidebar session data:', error)
+  }
+}
+
 // Check if user is admin
 const isAdmin = computed(() => {
   return userInfo.value?.account?.position === 'admin'
+})
+
+// Parsed permissions for the current user
+const userPermissions = computed(() => {
+  const perms = userInfo.value?.account?.permissions
+  if (!perms) return []
+  try {
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    console.error('Failed to parse user permissions:', e)
+    return []
+  }
 })
 
 // Loading state for CMS data

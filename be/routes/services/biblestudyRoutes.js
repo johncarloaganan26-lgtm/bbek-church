@@ -7,7 +7,7 @@ const {
     createBibleStudyRequest,
     exportBibleStudyRequestsToExcel
 } = require('../../dbHelpers/services/biblestudyRecords');
-const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const { sendBibleStudyDetails, sendWaterBaptismInvitation, sendSalvationRejectionWithReason } = require('../../dbHelpers/emailHelper');
 const { query } = require('../../database/db');
@@ -163,7 +163,7 @@ router.post('/submit', async (req, res) => {
 });
 
 // ADMIN: Get all Bible Study requests
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const result = await getAllBibleStudyRequests(req.query);
         res.json(result);
@@ -173,7 +173,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Update Bible Study request
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -256,7 +256,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Send Baptism Invitation (From Bible Study)
-router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
+router.post('/invite-baptism/:id', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { id } = req.params;
         const [currentRows] = await query('SELECT firstname, lastname, email, status FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
@@ -315,7 +315,7 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Promote Bible Study to Baptism (Direct)
-router.post('/promote/:id', authenticateToken, async (req, res) => {
+router.post('/promote/:id', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { id } = req.params;
         const [candidateRows] = await query('SELECT status, firstname, lastname, email FROM tbl_biblestudy_requests WHERE request_id = ?', [id]);
@@ -353,7 +353,7 @@ router.post('/promote/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Reject Bible Study with Reason and Suggestions
-router.post('/reject/:id', authenticateToken, async (req, res) => {
+router.post('/reject/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
@@ -470,7 +470,7 @@ router.post('/reject/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Bulk Complete Bible Study requests
-router.post('/bulk-complete', authenticateToken, async (req, res) => {
+router.post('/bulk-complete', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { requestIds } = req.body;
 
@@ -542,7 +542,7 @@ router.post('/bulk-complete', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Bulk Archive Bible Study requests
-router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/bulk-archive', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
     try {
         const { requestIds, reason } = req.body;
 
@@ -626,7 +626,7 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
 });
 
 // ADMIN: Export Bible Study Requests to Excel
-router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
     try {
         const format = req.query.format || 'xlsx';
         const buffer = await exportBibleStudyRequestsToExcel(req.query);
@@ -647,7 +647,7 @@ router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) =
     }
 });
 
-router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
     try {
         const format = req.body.format || 'xlsx';
         const buffer = await exportBibleStudyRequestsToExcel(req.body);
@@ -669,7 +669,7 @@ router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) 
 });
 
 // ADMIN: Bulk Update Bible Study requests
-router.post('/bulk-update', authenticateToken, async (req, res) => {
+router.post('/bulk-update', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { requestIds, status, pastor_id, location, scheduled_date } = req.body;
         if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
@@ -734,7 +734,7 @@ router.post('/bulk-update', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Bulk Promote Bible Study (to Baptism)
-router.post('/bulk-promote', authenticateToken, async (req, res) => {
+router.post('/bulk-promote', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { requestIds, isDecided = false, overrides = {}, selectedCompanions = null } = req.body;
         if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {

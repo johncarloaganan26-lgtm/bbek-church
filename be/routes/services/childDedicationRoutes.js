@@ -15,6 +15,7 @@ const {
   getAvailableSundayDates
 } = require('../../dbHelpers/services/childDedicationRecords');
 const { query } = require('../../database/db');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 const dateFormattingMiddleware = require('../../middleware/dateFormattingMiddleware');
 
 const router = express.Router();
@@ -159,7 +160,7 @@ router.get('/check-member-dedication/:memberId', async (req, res) => {
  * POST /api/church-records/child-dedications/createChildDedication
  * Body: { requested_by, child_firstname, child_lastname, child_middle_name?, date_of_birth, place_of_birth, gender, preferred_dedication_date, contact_phone_number, contact_email?, contact_address, status?, date_created? }
  */
-router.post('/createChildDedication', async (req, res) => {
+router.post('/createChildDedication', authenticateToken, checkPermission('ServicesGroup:Create'), async (req, res) => {
   try {
     const result = await createChildDedication(req.body);
 
@@ -191,7 +192,7 @@ router.post('/createChildDedication', async (req, res) => {
  * POST /api/church-records/child-dedications/getAllChildDedications (body payload)
  * Parameters: search, limit, offset, page, pageSize, status, sortBy
  */
-router.get('/getAllChildDedications', async (req, res) => {
+router.get('/getAllChildDedications', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from query string
     const options = req.query;
@@ -222,7 +223,7 @@ router.get('/getAllChildDedications', async (req, res) => {
   }
 });
 
-router.post('/getAllChildDedications', async (req, res) => {
+router.post('/getAllChildDedications', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     // Get parameters from request body (payload)
     const options = req.body;
@@ -257,7 +258,7 @@ router.post('/getAllChildDedications', async (req, res) => {
  * READ ONE - Get a single child dedication by ID
  * GET /api/church-records/child-dedications/getChildDedicationById/:id
  */
-router.get('/getChildDedicationById/:id', async (req, res) => {
+router.get('/getChildDedicationById/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -296,7 +297,7 @@ router.get('/getChildDedicationById/:id', async (req, res) => {
  * READ - Get child dedication requests by requester member_id
  * GET /api/church-records/child-dedications/getChildDedicationsByRequester/:memberId
  */
-router.get('/getChildDedicationsByRequester/:memberId', async (req, res) => {
+router.get('/getChildDedicationsByRequester/:memberId', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const { memberId } = req.params;
 
@@ -336,7 +337,7 @@ router.get('/getChildDedicationsByRequester/:memberId', async (req, res) => {
  * PUT /api/church-records/child-dedications/updateChildDedication/:id
  * Body: { requested_by?, child_firstname?, child_lastname?, child_middle_name?, date_of_birth?, place_of_birth?, gender?, preferred_dedication_date?, contact_phone_number?, contact_email?, contact_address?, status?, date_created? }
  */
-router.put('/updateChildDedication/:id', async (req, res) => {
+router.put('/updateChildDedication/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -403,7 +404,7 @@ router.put('/updateChildDedication/:id', async (req, res) => {
  * DELETE /api/church-records/child-dedications/deleteChildDedication/:id
  * Body: { reason?: string }
  */
-router.delete('/deleteChildDedication/:id', async (req, res) => {
+router.delete('/deleteChildDedication/:id', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const { id } = req.params;
     const reason = req.body?.reason || null;
@@ -445,7 +446,7 @@ router.delete('/deleteChildDedication/:id', async (req, res) => {
  * DELETE /api/church-records/child-dedications/bulkDeleteChildDedications
  * Body: { childIds: ["id1", "id2", "id3"], reason?: string }
  */
-router.delete('/bulkDeleteChildDedications', async (req, res) => {
+router.delete('/bulkDeleteChildDedications', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
   try {
     const childIds = req.body?.childIds || [];
     const reason = req.body?.reason || null;
@@ -490,7 +491,7 @@ router.delete('/bulkDeleteChildDedications', async (req, res) => {
  * PUT /api/church-records/child-dedications/bulkCompleteChildDedications
  * Body: { childIds: ["id1", "id2", "id3"] }
  */
-router.put('/bulkCompleteChildDedications', async (req, res) => {
+router.put('/bulkCompleteChildDedications', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
   try {
     const { childIds } = req.body;
 
@@ -581,7 +582,7 @@ router.put('/bulkCompleteChildDedications', async (req, res) => {
  * GET /api/church-records/child-dedications/exportExcel (query params)
  * POST /api/church-records/child-dedications/exportExcel (body payload)
  */
-router.get('/exportExcel', async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.query;
     const excelBuffer = await exportChildDedicationsToExcel(options);
@@ -603,7 +604,7 @@ router.get('/exportExcel', async (req, res) => {
   }
 });
 
-router.post('/exportExcel', async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
   try {
     const options = req.body;
     const excelBuffer = await exportChildDedicationsToExcel(options);
@@ -633,7 +634,7 @@ router.post('/exportExcel', async (req, res) => {
  * This endpoint analyzes all child dedication records that are NOT approved/scheduled
  * and returns available Sunday dates between 8am-5pm for the next N weeks
  */
-router.get('/getAvailableSundayDates', async (req, res) => {
+router.get('/getAvailableSundayDates', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
   try {
     const weeksAhead = parseInt(req.query.weeksAhead) || 12;
     
@@ -715,12 +716,19 @@ router.get('/available-slots', async (req, res) => {
       }
 
       const bookedCount = row.bookedCount || 0;
+      // Only include booked member names for authorized staff/admin
+      const canSeePII = req.user && (
+        (req.user.position || '').toLowerCase().includes('admin') || 
+        (req.user.position || '').toLowerCase().includes('staff') ||
+        (Array.isArray(req.user.permissions) && req.user.permissions.includes('ServicesGroup'))
+      );
+
       dateMap[dateStr].timeSlots.push({
         datetime: row.datetime,
         time: row.time,
         display: momentTz(row.datetime).format('h:mm A'),
         bookedCount: bookedCount,
-        bookedMembers: row.bookedMembersList ? row.bookedMembersList.split(', ') : [],
+        bookedMembers: canSeePII ? (row.bookedMembersList ? row.bookedMembersList.split(', ') : []) : [],
         maxCapacity: row.max_slots,
         isManual: true,
         isFull: bookedCount >= row.max_slots

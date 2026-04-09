@@ -4,7 +4,7 @@
       <h1 class="text-h4 font-weight-bold">Bible Study Requests</h1>
       
       <!-- Global Completion Toggle -->
-      <v-card variant="outlined" class="pa-2 px-4 d-flex align-center" style="border-radius: 12px; border: 1px dashed #ccc;">
+      <v-card v-if="can('Settings')" variant="outlined" class="pa-2 px-4 d-flex align-center" style="border-radius: 12px; border: 1px dashed #ccc;">
         <div class="mr-4">
           <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
           <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
@@ -120,15 +120,15 @@
             <v-icon start size="14">mdi-checkbox-marked</v-icon>
             {{ selectedRows.length }} SELECTED
           </v-chip>
-          <v-btn v-if="hasPendingSelection" color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkReject">
+          <v-btn v-if="can('Process') && hasPendingSelection" color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkReject">
             <v-icon start size="16">mdi-close-octagon</v-icon>
             Reject Selected
           </v-btn>
-          <v-btn color="success" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkComplete">
+          <v-btn v-if="can('Process')" color="success" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkComplete">
             <v-icon start size="16">mdi-check-all</v-icon>
             Complete Selected
           </v-btn>
-          <v-btn color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkArchive">
+          <v-btn v-if="can('Delete')" color="error" variant="outlined" size="small" class="bulk-action-btn font-weight-bold text-uppercase" @click="handleBulkArchive">
             <v-icon start size="16">mdi-archive</v-icon>
             Archive Selected
           </v-btn>
@@ -233,7 +233,7 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="!isGroup(item)"
+                  v-if="can('Edit') && !isGroup(item)"
                   variant="outlined"
                   size="small"
                   color="primary"
@@ -244,7 +244,7 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="!isGroup(item) && ['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
+                  v-if="can('Process') && !isGroup(item) && ['Pending', 'Scheduled'].includes(item.status) && (item.status === 'Scheduled' || settings.allow_complete_without_schedule)"
                   variant="outlined"
                   size="small"
                   color="success"
@@ -255,7 +255,7 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="item.status === 'Completed' && !isGroup(item)"
+                  v-if="can('Promote') && item.status === 'Completed' && !isGroup(item)"
                   variant="outlined"
                   size="small"
                   color="teal-darken-3"
@@ -266,7 +266,7 @@
                 </v-btn>
 
                 <v-btn
-                  v-if="item.status === 'Pending'"
+                  v-if="can('Process') && item.status === 'Pending'"
                   variant="outlined"
                   size="small"
                   color="error"
@@ -737,32 +737,32 @@
               </v-chip>
               
               <div class="d-flex gap-2">
-                <v-btn v-if="allSelectedArePending" size="small" color="error" variant="outlined" @click="bulkActionInGroup('Rejected')" class="bulk-action-btn font-weight-bold text-uppercase">
+                <v-btn v-if="can('Process') && allSelectedArePending" size="small" color="error" variant="outlined" @click="bulkActionInGroup('Rejected')" class="bulk-action-btn font-weight-bold text-uppercase">
                   <v-icon start size="16">mdi-close-circle-outline</v-icon>
                   Reject
                 </v-btn>
                 <v-divider vertical class="mx-1"></v-divider>
-                <v-btn size="small" color="teal-darken-2" variant="outlined" @click="openBulkEdit" class="bulk-action-btn font-weight-bold text-uppercase">
+                <v-btn v-if="can('Edit')" size="small" color="teal-darken-2" variant="outlined" @click="openBulkEdit" class="bulk-action-btn font-weight-bold text-uppercase">
                   <v-icon start size="16">mdi-pencil-box-multiple</v-icon>
                   Bulk Edit
                 </v-btn>
                 <v-btn 
+                  v-if="can('Promote') && canBulkPromote"
                   size="small" 
                   color="teal-darken-2" 
                   variant="outlined" 
                   @click="handleConsoleBulkPromote" 
-                  v-if="canBulkPromote"
                   class="bulk-action-btn font-weight-bold text-uppercase"
                 >
                   <v-icon start size="16">mdi-water</v-icon>
                   Promote to Baptism
                 </v-btn>
                 <v-btn 
+                  v-if="can('Process') && canBulkCompleteInConsole"
                   size="small" 
                   color="success" 
                   variant="outlined" 
                   @click="bulkActionInGroup('Completed')" 
-                  v-if="canBulkCompleteInConsole"
                   class="bulk-action-btn font-weight-bold text-uppercase ml-1"
                 >
                   <v-icon start size="16">mdi-check-circle-outline</v-icon>
@@ -1009,6 +1009,23 @@ import AvailabilityManager from '@/components/Admin/ServicesRecords/Availability
 import { storeToRefs } from 'pinia';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from '@/api/axios';
+
+// Permission Logic
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
+const userPermissions = computed(() => {
+  try {
+    const perms = userInfo.value?.account?.permissions || []
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    return []
+  }
+})
+
+const can = (action) => {
+  if (isAdmin.value) return true
+  return userPermissions.value.includes(`ServicesGroup:${action}`)
+}
 
 const store = useAdminBibleStudyStore();
 const settingsStore = useSystemSettingsStore();

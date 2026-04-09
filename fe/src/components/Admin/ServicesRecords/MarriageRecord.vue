@@ -4,6 +4,7 @@
       <h1 class="text-h4 font-weight-bold">Marriage Records</h1>
       <div class="d-flex align-center gap-4">
         <v-btn 
+          v-if="can('Create')"
           color="success" 
           prepend-icon="mdi-plus" 
           size="small" 
@@ -115,7 +116,7 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="4" class="d-flex align-center gap-2">
-            <v-tooltip text="Print" location="top">
+            <v-tooltip v-if="can('Export')" text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
                   icon="mdi-printer"
@@ -126,7 +127,7 @@
                 ></v-btn>
               </template>
             </v-tooltip>
-            <v-tooltip text="Export Excel" location="top">
+            <v-tooltip v-if="can('Export')" text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
                   icon="mdi-download"
@@ -147,6 +148,7 @@
             {{ selectedMarriages.length }} SELECTED
           </v-chip>
           <v-btn
+            v-if="can('Delete')"
             color="error"
             variant="outlined"
             size="small"
@@ -244,7 +246,7 @@
             </td>
             <td>{{ formatDateTime(marriage.date_created) }}</td>
             <td>
-              <v-tooltip text="Edit Marriage Record" location="top">
+              <v-tooltip v-if="can('Edit')" text="Edit Marriage Record" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-pencil" 
@@ -257,7 +259,7 @@
               ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip text="Archive Marriage Record" location="top">
+              <v-tooltip v-if="can('Delete')" text="Archive Marriage Record" location="top">
                 <template v-slot:activator="{ props }">
               <v-btn 
                 icon="mdi-delete" 
@@ -304,6 +306,23 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useMarriageServiceStore } from '@/stores/ServicesRecords/marriageServiceStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MarriageServiceDialog from '@/components/Dialogs/MarriageServiceDialog.vue'
+
+// Permission Logic
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
+const userPermissions = computed(() => {
+  try {
+    const perms = userInfo.value?.account?.permissions || []
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    return []
+  }
+})
+
+const can = (action) => {
+  if (isAdmin.value) return true
+  return userPermissions.value.includes(`ServicesGroup:${action}`)
+}
 
 const marriageServiceStore = useMarriageServiceStore()
 

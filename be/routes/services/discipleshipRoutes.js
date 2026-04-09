@@ -12,7 +12,7 @@ const {
     bulkCompleteDiscipleshipRequests,
     exportDiscipleshipRequestsToExcel
 } = require('../../dbHelpers/services/discipleshipRecords');
-const { authenticateToken, checkAdminRole } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkAdminRole, checkPermission } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const archiveRecord = require('../../dbHelpers/archiveRecords').archiveRecord;
 const { query } = require('../../database/db');
@@ -601,7 +601,7 @@ router.post('/submit', async (req, res) => {
 // =============================================================================
 
 // ADMIN: Get All Requests
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const { page, pageSize, search, status, request_type, sortBy, startDate, endDate } = req.query;
         // For exports, we might not want pagination. Let's pass that flag.
@@ -628,7 +628,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Export Discipleship Requests to Excel
-router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+router.get('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
     try {
         const format = req.query.format || 'xlsx';
         const buffer = await exportDiscipleshipRequestsToExcel(req.query);
@@ -649,7 +649,7 @@ router.get('/exportExcel', authenticateToken, checkAdminRole, async (req, res) =
     }
 });
 
-router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/exportExcel', authenticateToken, checkPermission('ServicesGroup:Export'), async (req, res) => {
     try {
         const format = req.body.format || 'xlsx';
         const buffer = await exportDiscipleshipRequestsToExcel(req.body);
@@ -671,7 +671,7 @@ router.post('/exportExcel', authenticateToken, checkAdminRole, async (req, res) 
 });
 
 // ADMIN: Get Request Details
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const { id } = req.params;
         const [rows] = await query('SELECT * FROM tbl_discipleship_requests WHERE request_id = ?', [id]);
@@ -801,7 +801,7 @@ router.get('/registration-data/:id', async (req, res) => {
 });
 
 // ADMIN: Update Request (Schedule/Status)
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -1186,7 +1186,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
 // ADMIN: Promote from Salvation to Bible Study
 // This clears the salvation record (sets to Promoted) and creates a record in tbl_biblestudy_requests.
-router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) => {
+router.post('/promote-to-bible-study/:id', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { id } = req.params;
         const { 
@@ -1342,7 +1342,7 @@ router.post('/promote-to-bible-study/:id', authenticateToken, async (req, res) =
 });
 
 // ADMIN: Promote to Baptism (Direct)
-router.post('/promote/:id', authenticateToken, async (req, res) => {
+router.post('/promote/:id', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -1409,7 +1409,7 @@ router.post('/promote/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Send Baptism Invitation
-router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
+router.post('/invite-baptism/:id', authenticateToken, checkPermission('ServicesGroup:Promote'), async (req, res) => {
     try {
         const { id } = req.params;
         const { isDecided } = req.body;
@@ -1476,7 +1476,7 @@ router.post('/invite-baptism/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Reject Salvation Talk with Reason and Suggestions
-router.post('/reject/:id', authenticateToken, async (req, res) => {
+router.post('/reject/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
@@ -1682,7 +1682,7 @@ router.post('/biblestudy/reject/:id', authenticateToken, checkAdminRole, async (
 });
 
 // ADMIN: Archive Request (Soft Delete)
-router.delete('/:id', authenticateToken, checkAdminRole, async (req, res) => {
+router.delete('/:id', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body || {}; // DELETE requests may not have body
@@ -1738,7 +1738,7 @@ router.delete('/:id', authenticateToken, checkAdminRole, async (req, res) => {
 });
 
 // ADMIN: Bulk Archive Requests
-router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res) => {
+router.post('/bulk-archive', authenticateToken, checkPermission('ServicesGroup:Delete'), async (req, res) => {
     try {
         const { requestIds, reason } = req.body;
 
@@ -1839,7 +1839,7 @@ router.post('/bulk-archive', authenticateToken, checkAdminRole, async (req, res)
 });
 
 // ADMIN: Bulk Complete Requests
-router.post('/bulk-complete', authenticateToken, async (req, res) => {
+router.post('/bulk-complete', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { requestIds } = req.body;
 

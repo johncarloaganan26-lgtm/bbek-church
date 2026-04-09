@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../../database/db');
-const { authenticateToken } = require('../../middleware/authMiddleware');
+const { authenticateToken, checkPermission } = require('../../middleware/authMiddleware');
 const auditTrailRecords = require('../../dbHelpers/auditTrailRecords');
 const emailHelper = require('../../dbHelpers/emailHelper');
 const moment = require('moment-timezone');
@@ -12,7 +12,7 @@ const moment = require('moment-timezone');
  */
 
 // ADMIN: Schedule Promotion Visit
-router.post('/:id', authenticateToken, async (req, res) => {
+router.post('/:id', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
         const { visit_date, visit_time, location } = req.body;
@@ -79,7 +79,7 @@ router.post('/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Get Promotion Visit Details
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, checkPermission('ServicesGroup'), async (req, res) => {
     try {
         const { id } = req.params;
         const [rows] = await query('SELECT * FROM tbl_promotion_visits WHERE request_id = ?', [id]);
@@ -96,7 +96,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // ADMIN: Update Promotion Visit Status
-router.put('/:id/status', authenticateToken, async (req, res) => {
+router.put('/:id/status', authenticateToken, checkPermission('ServicesGroup:Process'), async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;

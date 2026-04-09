@@ -8,7 +8,7 @@
 
     <!-- Summary Cards -->
     <v-row class="mb-6">
-      <v-col cols="12" sm="6" md="3">
+      <v-col v-if="canSeeCard('MemberRecord')" cols="12" sm="6" md="3">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
             <div>
@@ -23,7 +23,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
+      <v-col v-if="canSeeCard('EventsRecords')" cols="12" sm="6" md="3">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
             <div>
@@ -38,7 +38,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
+      <v-col v-if="canSeeCard('TithesOfferings')" cols="12" sm="6" md="3">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
             <div>
@@ -53,7 +53,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
+      <v-col v-if="canSeeCard('Messages')" cols="12" sm="6" md="3">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
             <div>
@@ -70,7 +70,7 @@
     </v-row>
 
     <!-- Gender Breakdown Cards -->
-    <v-row class="mb-6">
+    <v-row v-if="canSeeCard('MemberRecord')" class="mb-6">
       <v-col cols="12" sm="6" md="6">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between">
@@ -103,8 +103,8 @@
     </v-row>
 
     <v-row>
-      <!-- Recent Activities (Admin Only) -->
-      <v-col v-if="isAdmin" cols="12" md="5">
+      <!-- Recent Activities -->
+      <v-col v-if="isAdmin || hasPermission('Dashboard', 'ViewRecentActivity')" cols="12" md="5">
         <v-card class="pa-4" elevation="2">
           <div class="d-flex align-center justify-space-between mb-4">
             <h2 class="text-h6 font-weight-bold">Recent Activities</h2>
@@ -156,7 +156,7 @@
           <h2 class="text-h6 font-weight-bold mb-4">Quick Actions</h2>
           <v-row>
             <v-col
-              v-for="action in quickActions"
+              v-for="action in filteredQuickActions"
               :key="action.title"
               cols="12"
               sm="6"
@@ -178,7 +178,7 @@
     </v-row>
 
     <!-- Church Services Overview -->
-    <v-row class="mt-6">
+    <v-row v-if="canSeeCard('ServicesGroup')" class="mt-6">
       <v-col cols="12">
         <h2 class="text-h6 font-weight-bold mb-4">Church Services Overview</h2>
         <v-row>
@@ -259,11 +259,41 @@ import TithesOfferingsDialog from '@/components/Dialogs/TithesOfferingsDialog.vu
 const router = useRouter()
 const auditTrailStore = useAuditTrailStore()
 
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+
 // Check if user is admin
 const isAdmin = computed(() => {
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-  return userInfo?.account?.position === 'admin'
+  return userInfo.value?.account?.position === 'admin'
 })
+
+const isStaff = computed(() => {
+  return userInfo.value?.account?.position === 'staff'
+})
+
+const userPermissions = computed(() => {
+  const perms = userInfo.value?.account?.permissions
+  if (!perms) return []
+  try {
+    return typeof perms === 'string' ? JSON.parse(perms) : perms
+  } catch (e) {
+    console.error('Failed to parse user permissions:', e)
+    return []
+  }
+})
+
+const hasPermission = (key, action = null) => {
+  if (isAdmin.value) return true
+  if (isStaff.value) {
+    if (!key) return true
+    const permissionKey = action ? `${key}:${action}` : key
+    return userPermissions.value.includes(permissionKey)
+  }
+  return false
+}
+
+const canSeeCard = (moduleKey) => {
+  return hasPermission(moduleKey) || hasPermission('Dashboard', 'ViewAllStats')
+}
 
 // Dashboard statistics
 const totalMembers = ref(0)
@@ -538,9 +568,46 @@ const fetchDashboardStats = async () => {
   }
 }
 
+const handleMessagesDialog = ( data ) => {
+  console.log('Messages dialog:', data)
+  router.push('/admin/messages')
+}
+
+// Session Refresh Feature
+const refreshUserInfo = async () => {
+  try {
+    const currentInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    if (!currentInfo?.account?.acc_id) return
+    
+    const response = await axios.get(`/church-records/accounts/getAccountById/${currentInfo.account.acc_id}`)
+    if (response.data && response.data.success) {
+      const updatedAccount = response.data.data
+      
+      // Update localStorage with latest permissions and data
+      const updatedInfo = {
+        ...currentInfo,
+        account: {
+          ...currentInfo.account,
+          ...updatedAccount
+        }
+      }
+      localStorage.setItem('userInfo', JSON.stringify(updatedInfo))
+      
+      // Update reactive userInfo ref
+      userInfo.value = updatedInfo
+      console.log('Session data refreshed successfully')
+    }
+  } catch (error) {
+    console.error('Failed to refresh session data:', error)
+  }
+}
+
 // Fetch activities and stats on mount
 onMounted(async () => {
   try {
+    // Refresh user info to get latest permissions
+    await refreshUserInfo()
+    
     // Fetch activities and stats in parallel
     await Promise.all([
       withTimeout(fetchRecentActivities(), 15000),
@@ -557,30 +624,43 @@ const quickActions = ref([
     description: 'Register a new church member',
     icon: 'mdi-account-plus',
     color: 'primary',
-    action: `handleMemberRecordDialog`
+    action: `handleMemberRecordDialog`,
+    permissionKey: 'MemberRecord',
+    actionKey: 'Create'
   },
   {
     title: 'Create Event',
     description: 'Schedule a new church event',
     icon: 'mdi-plus-circle',
     color: 'success',
-    action: `handleEventDialog`
+    action: `handleEventDialog`,
+    permissionKey: 'EventsRecords',
+    actionKey: 'Create'
   },
   {
     title: 'Record Donation',
     description: 'Add new tithe or offering',
     icon: 'mdi-gift',
     color: 'purple',
-    action: `handleTithesOfferingsDialog`
+    action: `handleTithesOfferingsDialog`,
+    permissionKey: 'TithesOfferings',
+    actionKey: 'Create'
   },
   {
     title: 'View Messages',
     description: 'Check member messages',
     icon: 'mdi-message',
     color: 'orange',
-    action: `handleMessagesDialog`
+    action: `handleMessagesDialog`,
+    permissionKey: 'Messages',
+    actionKey: 'Reply'
   }
 ])
+
+const filteredQuickActions = computed(() => {
+  if (!hasPermission('Dashboard', 'QuickActions')) return []
+  return quickActions.value.filter(action => hasPermission(action.permissionKey, action.actionKey))
+})
 
 const handleQuickAction = (action) => {
   console.log('Quick action:', action.title)
@@ -596,10 +676,6 @@ const handleViewAllActivities = () => {
 const handleEventDialog = ( data ) => {
   console.log('Event dialog:', data)
   router.push('/admin/events')
-}
-const handleMessagesDialog = ( data ) => {
-  console.log('Messages dialog:', data)
-  router.push('/admin/messages')
 }
 </script>
 
