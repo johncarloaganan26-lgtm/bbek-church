@@ -10,7 +10,7 @@
       
       <div class="d-flex align-center gap-4">
         <!-- Global Completion Toggle -->
-        <v-card v-if="can('Settings')" variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
+        <v-card variant="outlined" class="pa-2 px-4 d-flex align-center mr-2" style="border-radius: 12px; border: 1px dashed #ccc;">
           <div class="mr-4">
             <div class="text-caption font-weight-bold grey--text text-uppercase" style="font-size: 10px; letter-spacing: 1px;">Manual Completion</div>
             <div class="text-h6 font-weight-bold" :class="settings.allow_complete_without_schedule ? 'text-success' : 'text-grey'">{{ settings.allow_complete_without_schedule ? 'ON' : 'OFF' }}</div>
@@ -33,7 +33,6 @@
         </v-card>
 
         <v-btn 
-          v-if="can('Create')"
           color="success" 
           prepend-icon="mdi-file-document" 
           size="small" 
@@ -159,7 +158,7 @@
             ></v-select>
           </v-col>
           <v-col cols="12" md="5" class="d-flex align-center gap-2">
-            <v-tooltip v-if="can('Export')" text="Print" location="top">
+            <v-tooltip text="Print" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
                   icon="mdi-printer"
@@ -170,7 +169,7 @@
                 ></v-btn>
               </template>
             </v-tooltip>
-            <v-tooltip v-if="can('Export')" text="Export Excel" location="top">
+            <v-tooltip text="Export Excel" location="top">
               <template v-slot:activator="{ props }">
                 <v-btn 
                   icon="mdi-download"
@@ -191,7 +190,6 @@
             {{ selectedDedications.length }} SELECTED
           </v-chip>
           <v-btn
-            v-if="can('Process')"
             color="success"
             variant="outlined"
             size="small"
@@ -203,7 +201,6 @@
             Mark Completed
           </v-btn>
           <v-btn
-            v-if="can('Delete')"
             color="error"
             variant="outlined"
             size="small"
@@ -296,7 +293,7 @@
             </td>
             <td>{{ formatDateTime(dedication.date_created) }}</td>
             <td>
-              <v-tooltip v-if="can('Process') && ['pending', 'approved'].includes(dedication.status) && (dedication.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
+              <v-tooltip v-if="['pending', 'approved'].includes(dedication.status) && (dedication.status === 'approved' || settings.allow_complete_without_schedule)" text="Mark Completed" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-check" 
@@ -310,7 +307,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="can('Export') && dedication.status === 'completed'" text="Print Certificate" location="top">
+              <v-tooltip v-if="dedication.status === 'completed'" text="Print Certificate" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-certificate" 
@@ -323,7 +320,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="can('Edit')" text="Edit Child Dedication" location="top">
+              <v-tooltip text="Edit Child Dedication" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-pencil" 
@@ -336,7 +333,7 @@
                   ></v-btn>
                 </template>
               </v-tooltip>
-              <v-tooltip v-if="can('Delete')" text="Archive Child Dedication" location="top">
+              <v-tooltip text="Archive Child Dedication" location="top">
                 <template v-slot:activator="{ props }">
                   <v-btn 
                     icon="mdi-delete" 
@@ -403,14 +400,15 @@
           <div class="mb-5">
             <div class="d-flex align-center mb-2">
               <v-icon size="18" color="primary" class="mr-2">mdi-calendar</v-icon>
-              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Date</span>
+              <span class="text-subtitle-2 font-weight-bold text-uppercase" style="letter-spacing: 0.5px; font-size: 0.75rem;">Dedication Date (Sundays Only)</span>
             </div>
             <el-date-picker
               v-model="completionDate"
               type="date"
-              placeholder="Select date"
+              placeholder="Select Sunday"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
+              :disabled-date="disableNonSundays"
               class="w-100 custom-date-picker"
               size="large"
               popper-class="bulk-complete-date-picker-popper"
@@ -469,23 +467,6 @@ import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChildDedicationDialog from '@/components/Dialogs/ChildDedicationDialog.vue'
 import CertificateDialog from '@/components/Dialogs/CertificateDialog.vue'
-
-// Permission Logic
-const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
-const isAdmin = computed(() => userInfo.value?.account?.position === 'admin')
-const userPermissions = computed(() => {
-  try {
-    const perms = userInfo.value?.account?.permissions || []
-    return typeof perms === 'string' ? JSON.parse(perms) : perms
-  } catch (e) {
-    return []
-  }
-})
-
-const can = (action) => {
-  if (isAdmin.value) return true
-  return userPermissions.value.includes(`ServicesGroup:${action}`)
-}
 
 const childDedicationStore = useChildDedicationStore()
 const settingsStore = useSystemSettingsStore()
@@ -791,11 +772,11 @@ const confirmBulkComplete = async () => {
   }
 };
 
-// Disable based on Availability Manager? Currently allowing all past today
-const disablePastDates = (time) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return time < today;
+// Disable non-Sunday dates
+const disableNonSundays = (time) => {
+  const date = new Date(time);
+  const dayOfWeek = date.getDay();
+  return dayOfWeek !== 0; // 0 = Sunday
 };
 
 const markIndividualComplete = async (dedication) => {

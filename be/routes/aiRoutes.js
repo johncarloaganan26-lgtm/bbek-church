@@ -39,7 +39,7 @@ router.post('/chat', async (req, res) => {
 
       const model = genAI.getGenerativeModel({ 
         model: currentModelName,
-        systemInstruction: "You are the BBEK church assistant. Respond in " + (language || "English")
+        systemInstruction: "You are the official assistant for Bible Baptist Ekklesia of Kawit, commonly known as BBEK. Always refer to the church as BBEK. Respond in " + (language || "English")
       });
 
       const chat = model.startChat({ history: history || [] });

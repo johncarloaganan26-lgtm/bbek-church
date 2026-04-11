@@ -7,10 +7,10 @@
           <v-card :class="[adminMode ? 'pa-2' : 'pa-6', 'rounded-xl border-teal elevation-2 mb-6']" style="border-top: 6px solid #0d9488">
             <div class="d-flex align-center mb-4">
               <v-icon color="teal" class="mr-2">mdi-calendar-clock</v-icon>
-              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Baptism Slots</h3>
+              <h3 class="text-h6 font-weight-bold teal--text mb-0">Available Sunday Slots</h3>
             </div>
             <p class="text-body-2 grey--text mb-6">
-              Select one of the upcoming available schedules to automatically fill the form.
+              Select one of the upcoming Sunday schedules to automatically fill the form.
             </p>
             
             <div v-if="loadingSlots" class="text-center py-4">
@@ -18,53 +18,32 @@
             </div>
 
             <div v-else class="slots-list overflow-y-auto pr-1" style="max-height: 480px;">
-              <v-expansion-panels variant="accordion" class="dates-panel mb-4">
-                <v-expansion-panel
-                  v-for="group in groupedSlots"
-                  :key="group.date"
-                  class="date-panel mb-2 rounded-lg"
-                  elevation="1"
-                >
-                  <v-expansion-panel-title class="py-3">
-                    <div class="d-flex align-center w-100">
-                      <v-icon color="teal" class="mr-3">mdi-calendar</v-icon>
-                      <div>
-                        <div class="font-weight-bold text-subtitle-2">{{ group.displayDate }}</div>
-                        <div class="text-caption grey--text">{{ group.dayName }}</div>
-                      </div>
-                      <v-chip size="x-small" color="teal-lighten-4" class="ml-auto teal--text font-weight-bold">
-                        {{ group.timeSlots.length }} slots
-                      </v-chip>
-                    </div>
-                  </v-expansion-panel-title>
-                  <v-expansion-panel-text class="pa-0">
-                    <v-list density="compact" class="pa-0">
-                      <v-list-item
-                        v-for="slot in group.timeSlots"
-                        :key="slot.datetime"
-                        :value="slot"
-                        @click="selectSlot(slot)"
-                        class="slot-time-item mb-1 rounded-pill mx-2 my-2"
-                        :active="formData.baptism_date === slot.date && formData.baptism_time === slot.time"
-                        active-color="teal"
-                        variant="tonal"
-                      >
-                        <template v-slot:prepend>
-                          <v-icon icon="mdi-clock-outline" size="small"></v-icon>
-                        </template>
-                        <v-list-item-title class="font-weight-medium">{{ slot.timeDisplay }}</v-list-item-title>
-                        <template v-slot:append>
-                          <div class="text-caption grey--text">
-                            <span v-if="slot.bookingCount > 0">{{ slot.bookingCount }}/{{ slot.maxCapacity }} joined</span>
-                            <span v-else>Available</span>
-                          </div>
-                        </template>
-                      </v-list-item>
-                    </v-list>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
-              </v-expansion-panels>
-            </div>
+              <v-hover v-for="slot in availableSlots" :key="slot.date" v-slot="{ isHovering, props }">
+                <v-card
+                   v-bind="props"
+                   :elevation="isHovering ? 4 : 1"
+                   :class="['mb-4 pa-4 slot-item cursor-pointer transition-swing', formData.baptism_date === slot.date ? 'border-teal-active' : '']"
+                   @click="selectSlot(slot)"
+                 >
+                   <div class="d-flex justify-space-between align-center">
+                     <div>
+                       <div class="font-weight-bold text-subtitle-1">{{ slot.displayDate }}</div>
+                       <div class="text-caption teal--text font-weight-medium">Sunday at {{ slot.timeDisplay }}</div>
+                       <div class="text-caption grey--text mt-1 d-flex align-center">
+                       <v-icon size="14" class="mr-1">mdi-account-group</v-icon>
+                       <span v-if="slot.bookingCount && slot.bookingCount > 0">
+                         {{ slot.bookingCount }} {{ slot.bookingCount === 1 ? 'person' : 'people' }} joined
+                       </span>
+                       <span v-else class="italic">Be the first to join!</span>
+                     </div>
+                     </div>
+                     <v-icon :color="formData.baptism_date === slot.date ? 'teal' : 'grey-lighten-1'">
+                       {{ formData.baptism_date === slot.date ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                     </v-icon>
+                   </div>
+                 </v-card>
+               </v-hover>
+             </div>
             
             <v-alert
               type="info"
@@ -73,7 +52,7 @@
               class="mt-4 text-caption"
               color="teal"
             >
-              Please pick a slot that fits your schedule. All dates shown are approved church schedules.
+              Slots are set to 1:00 PM every Sunday.
             </v-alert>
           </v-card>
         </v-col>
@@ -171,40 +150,43 @@
                     label="Civil Status"
                     variant="outlined"
                     density="comfortable"
+                    required
+                    :rules="[v => !!v || 'Civil status is required']"
                   ></v-select>
                 </v-col>
               </v-row>
 
-              <v-text-field
-                v-model="formData.profession"
-                label="Profession"
-                variant="outlined"
-                density="comfortable"
-              ></v-text-field>
-
               <v-textarea
                 v-model="formData.address"
-                label="Complete Address"
+                label="Full Address"
                 variant="outlined"
-                density="comfortable"
                 rows="2"
+                density="comfortable"
                 required
                 :rules="[v => !!v || 'Address is required']"
               ></v-textarea>
+
+              <v-row>
+                <v-col cols="12">
+                  <v-text-field
+                    v-model="formData.profession"
+                    label="Profession"
+                    variant="outlined"
+                    density="comfortable"
+                    placeholder="Enter your profession/occupation"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
 
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.email"
                     label="Email Address"
-                    type="email"
                     variant="outlined"
                     density="comfortable"
                     required
-                    :rules="[
-                      v => !!v || 'Email is required',
-                      v => /.+@.+\..+/.test(v) || 'Email must be valid'
-                    ]"
+                    :rules="[v => !!v || 'Email is required', v => /.+@.+\..+/.test(v) || 'Email must be valid']"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -219,30 +201,39 @@
                 </v-col>
               </v-row>
 
-              <!-- Baptism Details -->
-              <h3 class="text-h6 mt-4 mb-4 teal--text">Baptism Schedule</h3>
+              <!-- Baptism Scheduling Section -->
+              <h3 class="text-h6 mt-2 mb-4 teal--text">Baptism Details</h3>
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.baptism_date"
-                    label="Baptism Date"
+                    label="Preferred Date"
                     type="date"
                     variant="outlined"
                     density="comfortable"
                     required
-                    readonly
-                    :rules="[v => !!v || 'Please select a date from the side panel']"
-                    prepend-inner-icon="mdi-calendar"
+                    :rules="[v => !!v || 'Baptism Date is required']"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.baptism_time"
-                    label="Prefered Time"
+                    label="Preferred Time"
+                    type="time"
                     variant="outlined"
                     density="comfortable"
-                    readonly
-                    prepend-inner-icon="mdi-clock"
+                    required
+                    :rules="[v => !!v || 'Baptism Time is required']"
+                  ></v-text-field>
+                </v-col>
+                <v-col v-if="adminMode" cols="12" md="6">
+                  <v-text-field
+                    v-model="formData.location"
+                    label="Address / Location (Admin Only)"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-map-marker"
+                    placeholder="e.g., Church Pool"
                   ></v-text-field>
                 </v-col>
                 <v-col v-if="adminMode" cols="12" md="6">
@@ -311,7 +302,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useWaterBaptismStore } from '@/stores/ServicesRecords/waterBaptismStore';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -369,60 +360,47 @@ const loadingSlots = ref(false);
 const churchLeaders = ref([]);
 const loadingChurchLeaders = ref(false);
 
-const groupedSlots = computed(() => {
-    const groups = {};
-    availableSlots.value.forEach(slot => {
-        if (!groups[slot.date]) {
-            groups[slot.date] = {
-                date: slot.date,
-                displayDate: slot.displayDate,
-                dayName: moment(slot.date).format('dddd'),
-                timeSlots: []
-            };
-        }
-        groups[slot.date].timeSlots.push(slot);
-    });
-    return Object.values(groups);
-});
-
-const selectSlot = (slot) => {
-    if (slot.bookingCount >= slot.maxCapacity) return;
-    formData.baptism_date = slot.date;
-    formData.baptism_time = slot.time;
-    ElMessage.success(`Selected: ${slot.displayDate}`);
-};
-
 const fetchSundaySlots = async () => {
     loadingSlots.value = true;
     try {
         console.log('[WaterBaptism] Fetching available slots...');
         const response = await publicAxios.get('/services/water-baptisms/available-slots', {
-            params: { days: 45 }
+            params: { days: 45 } // Fetch more days to find enough Sundays
         });
+        
+        console.log('[WaterBaptism] Available slots response:', response.data);
         
         if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
             const slots = [];
+            
             response.data.data.forEach(dateGroup => {
-                if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) return;
+                if (!dateGroup.timeSlots || !Array.isArray(dateGroup.timeSlots)) {
+                    console.warn('[WaterBaptism] Missing or invalid timeSlots for date:', dateGroup.date);
+                    return;
+                }
                 
-                dateGroup.timeSlots.forEach(s => {
-                    slots.push({
+                const onePmSlot = dateGroup.timeSlots.find(s => s.time === '13:00:00' || s.time === '13:00');
+                
+                if (onePmSlot) {
+                    const slotData = {
                         date: dateGroup.date,
                         displayDate: moment(dateGroup.date).format('MMMM D, YYYY'),
-                        time: s.time,
-                        timeDisplay: moment(dateGroup.date + ' ' + s.time).format('h:mm A'),
-                        datetime: s.datetime,
-                        bookingCount: typeof s.bookingCount === 'number' ? s.bookingCount : (s.bookedCount || 0),
-                        maxCapacity: s.maxCapacity || 10
-                    });
-                });
+                        time: '13:00:00',
+                        timeDisplay: '1:00 PM',
+                        bookingCount: typeof onePmSlot.bookingCount === 'number' ? onePmSlot.bookingCount : (onePmSlot.bookedCount || 0),
+                        maxCapacity: onePmSlot.maxCapacity || 10
+                    };
+                    slots.push(slotData);
+                }
             });
-            availableSlots.value = slots;
+            
+            availableSlots.value = slots.slice(0, 4); // Keep next 4 Sundays
         } else {
-            availableSlots.value = [];
+            generateFallbackSlots();
         }
     } catch (error) {
-        console.error('[WaterBaptism] Error fetching slots:', error);
+        console.error('[WaterBaptism] Error fetching Sunday slots:', error.message, error);
+        ElMessage.warning('Could not fetch available slots. Generating default schedule...');
         generateFallbackSlots();
     } finally {
         loadingSlots.value = false;
@@ -430,27 +408,35 @@ const fetchSundaySlots = async () => {
 };
 
 const generateFallbackSlots = () => {
-    const slots = [];
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    let current = new Date(tomorrow);
-    
-    for (let i = 0; i < 7; i++) {
-        const slotDate = new Date(current);
-        const dateStr = slotDate.toISOString().split('T')[0];
-        slots.push({
-            date: dateStr,
-            displayDate: slotDate.toLocaleDateString('en-US', {
-                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
-            }),
-            time: '13:00:00',
-            timeDisplay: '1:00 PM',
-            bookingCount: 0,
-            maxCapacity: 10
-        });
-        current.setDate(current.getDate() + 1);
-    }
-    availableSlots.value = slots;
+  const slots = [];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  let current = new Date(tomorrow);
+  const daysUntilSunday = (7 - tomorrow.getDay()) % 7;
+  current.setDate(tomorrow.getDate() + daysUntilSunday);
+  
+  for (let i = 0; i < 4; i++) {
+    const slotDate = new Date(current);
+    const dateStr = slotDate.toISOString().split('T')[0];
+    slots.push({
+      date: dateStr,
+      displayDate: slotDate.toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      }),
+      time: '13:00:00',
+      timeDisplay: '1:00 PM',
+      bookingCount: 0,
+      maxCapacity: 10
+    });
+    current.setDate(current.getDate() + 7);
+  }
+  availableSlots.value = slots;
+};
+
+const selectSlot = (slot) => {
+  formData.baptism_date = slot.date;
+  formData.baptism_time = slot.time;
+  ElMessage.success(`Selected Sunday: ${slot.displayDate}`);
 };
 
 const fetchChurchLeaders = async () => {
@@ -539,6 +525,21 @@ onMounted(async () => {
     }
   }
 });
+// Auto-calculate age from birthdate
+watch(() => formData.birthdate, (newDate) => {
+  if (newDate) {
+    const today = new Date();
+    const birthDate = new Date(newDate);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    formData.age = age;
+  } else {
+    formData.age = null;
+  }
+});
 
 const handleSubmit = async () => {
   const { valid } = await formRef.value.validate();
@@ -591,13 +592,9 @@ const handleSubmit = async () => {
 .registration-container {
   min-height: v-bind("adminMode ? '100%' : '100vh'");
   background: v-bind("adminMode ? 'transparent' : 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)'");
-  padding: v-bind("adminMode ? '0' : '120px 0 60px 0'");
+  padding: v-bind("adminMode ? '0' : '40px 0'");
   display: flex !important;
   flex-direction: column;
-}
-
-.border-teal {
-  border: 1px solid #0d9488 !important;
 }
 .registration-container :deep(.v-container) {
   padding: v-bind("adminMode ? '0 !important' : ''");
