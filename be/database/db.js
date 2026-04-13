@@ -189,7 +189,7 @@ const isMaxConnectionError = (error) => {
   if (errorCode === 'ER_CON_COUNT_ERROR' || errorCode === 1040 || errorCode === '1040' ||
     errorCode === 'ER_USER_LIMIT_REACHED' || errorCode === 1203 || errorCode === '1203' ||
     errorCode === 'ECONNRESET' || errorCode === 'PROTOCOL_CONNECTION_LOST' ||
-    errorCode === 'EPIPE' || errorCode === 'ETIMEDOUT') {
+    errorCode === 'EPIPE' || errorCode === 'ETIMEDOUT' || errorCode === 'ENOTFOUND' || errorCode === 'EAI_AGAIN') {
     return true;
   }
 

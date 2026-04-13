@@ -807,43 +807,8 @@ const fetchPastorOptions = async () => {
   }
 }
 
-// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
-const fetchUnavailableTimeSlots = async () => {
-  try {
-    // Get all child dedications with preferred dates and times (only approved status)
-    const response = await axios.get('/church-records/child-dedications/getAllChildDedications', {
-      params: {
-        status: 'approved', // Only get approved dedications to block time slots
-        limit: 1000 // Get enough records to cover scheduling
-      }
-    })
-
-    if (response.data.success && response.data.data) {
-      // Extract time slots that are already approved/scheduled
-      const scheduledTimeSlots = []
-
-      response.data.data.forEach(dedication => {
-        if (dedication.preferred_dedication_date && dedication.preferred_dedication_time && dedication.status === 'approved') {
-          // Add time slot for blocking (same day allowed, same time blocked)
-          scheduledTimeSlots.push({
-            date: dedication.preferred_dedication_date,
-            time: dedication.preferred_dedication_time,
-            id: dedication.child_id // For edit mode exception
-          })
-        }
-      })
-
-      // Store time slots for blocking logic
-      unavailableTimeSlots.value = scheduledTimeSlots
-
-      // Note: We don't block entire dates anymore - same day is allowed
-      unavailableDates.value = []
-    }
-  } catch (error) {
-    console.error('Error fetching unavailable time slots:', error)
-    // Don't show error to user, just allow all slots if fetch fails
-  }
-}
+// Availability logic is now handled by fetchAvailableSlots and the available-slots API.
+// Existing check-time-slot API can still be used for individual validation.
 
 // Enhanced time slot validation function
 const validateTimeSlot = async (date, time, excludeId = null) => {
@@ -1565,14 +1530,12 @@ watch(() => props.modelValue, async (isOpen) => {
   }
 })
 
-// Fetch member and pastor options when component mounts
 onMounted(async () => {
   // Initialize userInfo from localStorage
   userInfo.value = getUserFromStorage()
 
   await fetchMemberOptions()
   await fetchPastorOptions()
-  await fetchUnavailableTimeSlots()
   fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
 })
 

@@ -525,7 +525,6 @@ onMounted(async () => {
   await Promise.all([
     burialServiceStore.fetchMemberOptions(),
     burialServiceStore.fetchPastorOptions(),
-    fetchUnavailableTimeSlots(),
     fetchAvailableSlots(14)  // Fetch available slots for the next 14 days
   ])
 })
@@ -604,39 +603,8 @@ const disabledHours = () => {
   return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23]
 }
 
-// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
-const fetchUnavailableTimeSlots = async () => {
-  try {
-    // Get all burial services with approved status to block time slots
-    const response = await axios.get('/church-records/burial-services/getAllBurialServices', {
-      params: {
-        status: 'approved', // Only get approved burial services to block time slots
-        limit: 1000 // Get enough records to cover scheduling
-      }
-    })
-
-    if (response.data.success && response.data.data) {
-      // Extract time slots that are already approved/scheduled
-      const scheduledTimeSlots = []
-
-      response.data.data.forEach(burial => {
-        if (burial.service_date && burial.status === 'approved') {
-          // Add time slot for blocking (same day allowed, same time blocked)
-          scheduledTimeSlots.push({
-            date: burial.service_date.split(' ')[0], // Extract date part only
-            id: burial.burial_id // For edit mode exception
-          })
-        }
-      })
-
-      // Store time slots for blocking logic
-      unavailableTimeSlots.value = scheduledTimeSlots
-    }
-  } catch (error) {
-    console.error('Error fetching unavailable time slots:', error)
-    // Don't show error to user, just allow all slots if fetch fails
-  }
-}
+// Availability logic is now handled by fetchAvailableSlots and the available-slots API.
+// Existing check-time-slot API can still be used for individual validation.
 
 // Validate time slot availability
 const validateTimeSlot = async (dateTime, excludeId = null) => {

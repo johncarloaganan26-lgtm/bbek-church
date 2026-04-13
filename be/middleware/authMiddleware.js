@@ -189,6 +189,7 @@ const isPublicRoute = (path, originalUrl) => {
 const authenticateToken = (req, res, next) => {
   // Check if route is public (check both path and originalUrl for reliability)
   const isPublic = isPublicRoute(req.path, req.originalUrl);
+  req.isPublicRoute = isPublic;
 
   // Get token from Authorization header - safely handle undefined headers
   const authHeader = req.headers && req.headers['authorization'];
@@ -289,6 +290,11 @@ const checkAdminRole = (req, res, next) => {
  */
 const checkPermission = (requiredPermission) => {
   return async (req, res, next) => {
+    // If the route is explicitly public, allow access regardless of req.user
+    if (req.isPublicRoute) {
+      return next();
+    }
+
     if (!req.user) {
       return res.status(401).json({
         success: false,

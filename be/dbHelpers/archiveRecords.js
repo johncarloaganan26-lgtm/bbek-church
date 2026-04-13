@@ -116,6 +116,59 @@ function convertToPlainTextObject(obj) {
 }
 
 /**
+ * Extract a human-readable name from record data based on table type
+ * @param {String} tableName - Name of the table
+ * @param {Object} data - Record data
+ * @returns {String} Extracted name or null
+ */
+function extractRecordName(tableName, data) {
+  if (!data || typeof data !== 'object') return null;
+  
+  // Normalize keys to lowercase for matching
+  const keys = Object.keys(data);
+  const findKey = (search) => keys.find(k => k.toLowerCase() === search.toLowerCase());
+
+  // Table-specific name extraction
+  switch (tableName.toLowerCase()) {
+    case 'tbl_members':
+    case 'tbl_waterbaptism':
+    case 'tbl_baptism_records':
+      const fname = data[findKey('firstname')] || '';
+      const lname = data[findKey('lastname')] || '';
+      return `${fname} ${lname}`.trim() || null;
+      
+    case 'tbl_burialservice':
+    case 'tbl_burial_services':
+      return data[findKey('deceased_name')] || data[findKey('requester_name')] || null;
+      
+    case 'tbl_childdedication':
+    case 'tbl_child_dedications':
+      return data[findKey('child_name')] || data[findKey('parent_names')] || null;
+      
+    case 'tbl_marriageservice':
+    case 'tbl_wedding_records':
+      const groom = data[findKey('groom_name')] || '';
+      const bride = data[findKey('bride_name')] || '';
+      return groom && bride ? `${groom} & ${bride}` : (groom || bride || null);
+      
+    case 'tbl_events':
+      return data[findKey('title')] || data[findKey('event_name')] || null;
+      
+    case 'tbl_accounts':
+      return data[findKey('email')] || data[findKey('username')] || null;
+
+    default:
+      // Generic fallback: look for common name fields
+      const commonFields = ['name', 'title', 'full_name', 'email', 'label'];
+      for (const field of commonFields) {
+        const key = findKey(field);
+        if (key && data[key]) return String(data[key]);
+      }
+      return null;
+  }
+}
+
+/**
  * Archive Records CRUD Operations
  * Based on tbl_archives schema:
  * - archive_id (INT, PK, AI, NN) - Auto-incrementing
@@ -165,15 +218,17 @@ async function archiveRecord(originalTable, originalId, recordData, archivedBy =
 
     const sql = `
       INSERT INTO tbl_archives 
-        (original_table, original_id, archived_data, archived_by, archived_at, reason)
-      VALUES (?, ?, ?, ?, ?, ?)
+        (original_table, original_id, record_name, archived_data, archived_by, archived_at, reason)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
+    const recordName = extractRecordName(originalTable, recordData);
 
     const params = [
       toPlainText(originalTable),
       toPlainText(originalId),
+      toPlainText(recordName),
       archivedDataText,
       toPlainText(archivedBy),
       formattedDate,
@@ -213,10 +268,10 @@ async function bulkArchiveRecords(originalTable, recordsToArchive, archivedBy = 
     }
 
     const formattedDate = moment().format('YYYY-MM-DD HH:mm:ss');
-    const placeholders = recordsToArchive.map(() => '(?, ?, ?, ?, ?)').join(',');
+    const placeholders = recordsToArchive.map(() => '(?, ?, ?, ?, ?, ?)').join(',');
     const sql = `
       INSERT INTO tbl_archives 
-        (original_table, original_id, archived_data, archived_by, archived_at)
+        (original_table, original_id, record_name, archived_data, archived_by, archived_at)
       VALUES ${placeholders}
     `;
 
@@ -231,9 +286,12 @@ async function bulkArchiveRecords(originalTable, recordsToArchive, archivedBy = 
         archivedDataText = String(item.data);
       }
 
+      const recordName = extractRecordName(originalTable, item.data);
+
       params.push(
         toPlainText(originalTable),
         toPlainText(item.id),
+        toPlainText(recordName),
         archivedDataText,
         toPlainText(archivedBy),
         formattedDate
@@ -282,6 +340,7 @@ async function getAllArchives(options = {}) {
         a.archive_id,
         a.original_table,
         a.original_id,
+        a.record_name,
         a.archived_by,
         a.archived_at,
         a.restored,
@@ -313,12 +372,12 @@ async function getAllArchives(options = {}) {
     // Searching JSON fields with LIKE is very inefficient and causes sort memory issues
     const searchValue = search && search.trim() !== '' ? search.trim() : null;
     if (searchValue) {
-      const searchCondition = `(a.original_table LIKE ? OR a.original_id LIKE ?)`;
+      const searchCondition = `(a.original_table LIKE ? OR a.original_id LIKE ? OR a.record_name LIKE ?)`;
       const searchPattern = `%${searchValue}%`;
 
       whereConditions.push(searchCondition);
-      countParams.push(searchPattern, searchPattern);
-      params.push(searchPattern, searchPattern);
+      countParams.push(searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern);
       hasWhere = true;
     }
 

@@ -255,14 +255,20 @@
               {{ formatDateTime(row.archived_at) }}
             </template>
           </el-table-column>
-          <el-table-column prop="original_table" label="Original Table" min-width="150" width="180">
+          <el-table-column prop="original_table" label="Source Table" min-width="150" width="180">
             <template #default="{ row }">
-              <el-tag type="info" size="small">
+              <el-tag type="info" size="small" effect="plain" class="table-tag">
                 {{ formatTableName(row.original_table) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="original_id" label="Original ID" min-width="100" width="120" />
+          <el-table-column prop="record_name" label="Record Name" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.record_name" style="font-weight: 600;">{{ row.record_name }}</span>
+              <span v-else class="text-grey" style="font-style: italic;">Unknown Record</span>
+              <div style="font-size: 0.75rem; color: #909399;">ID: {{ row.original_id }}</div>
+            </template>
+          </el-table-column>
           <el-table-column prop="archived_by" label="Archived By" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               <div v-if="row.archived_by_name">{{ row.archived_by_name }}</div>

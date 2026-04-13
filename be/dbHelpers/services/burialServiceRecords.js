@@ -82,34 +82,10 @@ async function checkTimeSlotAvailability(serviceDate, excludeBurialId = null) {
 }
 
 /**
- * Validate that a service time is within night hours (6 PM - 10 PM)
- * @param {String} serviceDateTime - Service date/time to validate
- * @returns {Object} Object with isValid flag and error message
+ * (REMOVED) Validate that a service time is within night hours
+ * Keeping function signature as empty bypass to prevent breaking references if any
  */
 function validateNightHours(serviceDateTime) {
-  if (!serviceDateTime) {
-    return { isValid: true, message: null }; // Allow null/undefined times
-  }
-
-  const momentTime = moment(serviceDateTime, 'YYYY-MM-DD HH:mm:ss', true);
-  if (!momentTime.isValid()) {
-    // Try parsing with just date format
-    const momentDate = moment(serviceDateTime);
-    if (!momentDate.isValid()) {
-      return { isValid: true, message: null }; // Allow if we can't parse
-    }
-  }
-
-  const hour = momentTime.hour();
-
-  // Night hours: 18:00 (6 PM) to 22:00 (10 PM)
-  if (hour < 18 || hour >= 22) {
-    return {
-      isValid: false,
-      message: 'Burial services can only be scheduled between 6:00 PM and 10:00 PM (night shift hours).'
-    };
-  }
-
   return { isValid: true, message: null };
 }
 
@@ -230,6 +206,7 @@ async function createBurialService(burialData) {
       if (memberData && memberData.length > 0) {
         const memberAge = memberData[0].age;
         if (memberAge < 18) {
+          console.warn(`createBurialService: Member ${member_id} is underage (${memberAge})`);
           return {
             success: false,
             message: 'Burial service is only available for members who are 18 years old or older.'
@@ -253,6 +230,7 @@ async function createBurialService(burialData) {
 
     const [duplicateRows] = await query(duplicateCheckSql, duplicateParams);
     if (duplicateRows && duplicateRows.length > 0) {
+      console.warn('createBurialService: Duplicate record found', { linkedMemberId, requester_email, deceased_name });
       return {
         success: false,
         message: 'A burial service record already exists for this member with the same deceased name and birthdate.'
@@ -265,6 +243,7 @@ async function createBurialService(burialData) {
       requester_email ? String(requester_email).trim() : null
     );
     if (pendingApprovalCheck.hasPendingApproval) {
+      console.warn('createBurialService: Pending approval exists', { linkedMemberId, requester_email });
       return {
         success: false,
         message: 'You have a pending burial service request. Please wait for approval or contact the administrator to reject it first.',
@@ -285,6 +264,7 @@ async function createBurialService(burialData) {
       );
       
       if (existingSlotBooking && existingSlotBooking.length > 0) {
+        console.warn('createBurialService: Time slot already booked', { timeSlotDate });
         return {
           success: false,
           message: `This burial service time slot for ${timeSlotDate} at 8:00 PM is already booked. Please select another date.`
@@ -292,10 +272,11 @@ async function createBurialService(burialData) {
       }
     }
 
-    // Validate that service date/time is within night hours (6 PM - 10 PM)
+    // Optional: Validate that service date/time is within valid hours (RESTRICTION REMOVED)
     if (finalServiceDate) {
       const nightHourValidation = validateNightHours(finalServiceDate);
       if (!nightHourValidation.isValid) {
+        console.warn('createBurialService: Service hour validation failed', { finalServiceDate, message: nightHourValidation.message });
         return {
           success: false,
           message: nightHourValidation.message
