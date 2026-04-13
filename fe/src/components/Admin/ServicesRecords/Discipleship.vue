@@ -2475,28 +2475,32 @@ const handleBibleStudyAction = async (isDecided) => {
     let companions = [];
     
     if (isConsoleBulk) {
-      companions = getCompanions(lead).map(c => {
-        const isSelected = selectedInGroup.value.some(idx => {
+      // ONLY include companions that were actually selected for promotion
+      companions = getCompanions(lead).filter(c => {
+        return selectedInGroup.value.some(idx => {
           const p = companionsInGroup.value[idx];
           return p.type === 'companion' && p.email === c.email;
         });
-        
-        if (isSelected) {
-          return { 
-            ...c, 
-            status: isDecided ? 'Scheduled' : 'Promoted',
-            pastor_id: promotionForm.value.pastor_id,
-            location: promotionForm.value.location,
-            scheduled_date: promotionForm.value.scheduled_date
-          };
-        }
-        return c;
+      }).map(c => {
+        return { 
+          ...c, 
+          status: isDecided ? 'Scheduled' : 'Promoted',
+          pastor_id: promotionForm.value.pastor_id,
+          location: promotionForm.value.location,
+          scheduled_date: promotionForm.value.scheduled_date
+        };
       });
     }
 
+    // Rule: Two or more people = GROUP. One person = SOLO.
+    // The group_size includes the lead + the proceeding companions.
+    // We check if the lead of this record is actually among the selected targets.
+    const leadSelected = targets.some(t => t.email === lead.email);
+    const totalProceeding = companions.length + (leadSelected ? 1 : 0);
+
     const groupNotes = {
-      is_group: companions.length > 0,
-      group_size: companions.length + 1,
+      is_group: totalProceeding >= 2,
+      group_size: totalProceeding,
       companions: companions
     };
 
@@ -2558,9 +2562,31 @@ const handleBibleStudyAction = async (isDecided) => {
     } else if (!isBulkPromotion.value) {
       // Single Promotion
       const target = bibleStudyItem.value;
-      const payload = isDecided 
-        ? { ...promotionForm.value, isDecided: true }
-        : { firstname: target.firstname, lastname: target.lastname, email: target.email, isDecided: false };
+      
+      // If promoting a single person (lead or companion) as Scheduled, 
+      // ensure we send their identity and strip old group notes to make them "Solo"
+      let finalNotes = promotionForm.value.notes;
+      try {
+        let notesObj = typeof finalNotes === 'string' ? JSON.parse(finalNotes) : finalNotes;
+        if (notesObj && typeof notesObj === 'object') {
+          // Rule: If promoting alone, it's Solo
+          notesObj.is_group = false;
+          notesObj.companions = [];
+          notesObj.group_size = 1;
+          finalNotes = JSON.stringify(notesObj);
+        }
+      } catch (e) {
+        // Not JSON, leave as is
+      }
+
+      const payload = {
+        ...promotionForm.value,
+        firstname: target.firstname,
+        lastname: target.lastname,
+        email: target.email,
+        notes: finalNotes,
+        isDecided: isDecided
+      };
 
       const success = await store.promoteToBibleStudy(target.request_id, payload);
       

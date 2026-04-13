@@ -1986,7 +1986,7 @@ const sendWaterBaptismInvitation = async (details) => {
     const transporter = createTransporter();
     const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
     // Link to the registration page for the candidate to fill up details
-    const registrationUrl = `${frontendUrl}/services/water-baptism/registration?reqId=${details.request_id}`;
+    const registrationUrl = `${frontendUrl}/services/water-baptism/registration?reqId=${details.request_id}${details.email ? `&email=${encodeURIComponent(details.email)}` : ''}`;
 
     const recipientName = details.firstname || 'Valued Member';
     const isDecided = details.isDecided || false;

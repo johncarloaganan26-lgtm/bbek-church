@@ -300,7 +300,10 @@ const hydrateFromReference = async () => {
   if (!referenceId.value) return
 
   try {
-    const response = await axios.get(`/services/discipleship-requests/registration-data/${referenceId.value}`)
+    const params = {}
+    if (route.query.email) params.email = route.query.email
+
+    const response = await axios.get(`/services/discipleship-requests/registration-data/${referenceId.value}`, { params })
 
     if (response.data?.success) {
       const d = response.data.data || {}
@@ -406,7 +409,7 @@ const handleSubmit = async () => {
 <style scoped>
 .bible-study-page {
   min-height: 100vh;
-  margin-top: 64px;
+  margin-top: 80px;
 }
 .hero-section {
   position: relative;

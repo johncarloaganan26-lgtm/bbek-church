@@ -229,17 +229,48 @@ router.post('/register-non-member', async (req, res) => {
     if (req.body.baptism_date) {
       const dateValidation = validateBaptismDate(req.body.baptism_date);
       if (!dateValidation.valid) return res.status(400).json(dateValidation);
-      
-      // Sunday check removed
     }
 
-    const { firstname, lastname, email } = req.body;
+    const { firstname, lastname, email, request_id } = req.body;
     if (!firstname || !lastname || !email) return res.status(400).json({ success: false, message: 'Required fields missing' });
 
     const baptismData = { ...req.body, is_member: false, status: 'pending' };
     const result = await createWaterBaptism(baptismData);
     
     if (result.success) {
+      // HANDLE AUTO-PROMOTION from Bible Study
+      if (request_id) {
+         try {
+           const [bsRows] = await query('SELECT notes FROM tbl_biblestudy_requests WHERE request_id = ?', [request_id]);
+           if (bsRows.length > 0) {
+             let notes;
+             try {
+               notes = typeof bsRows[0].notes === 'string' ? JSON.parse(bsRows[0].notes) : bsRows[0].notes;
+             } catch (e) { notes = null; }
+
+             if (notes && notes.companions) {
+               let found = false;
+               notes.companions = notes.companions.map(comp => {
+                 // Match by email if provided, otherwise by name
+                 const match = email ? comp.email === email : (comp.firstname === firstname && comp.lastname === lastname);
+                 if (match) {
+                   comp.status = 'Promoted';
+                   found = true;
+                 }
+                 return comp;
+               });
+
+               if (found) {
+                 await query('UPDATE tbl_biblestudy_requests SET notes = ? WHERE request_id = ?', [JSON.stringify(notes), request_id]);
+                 console.log(`✅ Auto-promoted companion ${email || firstname} in Bible Study ${request_id}`);
+               }
+             }
+           }
+         } catch (promoErr) {
+           console.error('Auto-promotion failed for water baptism:', promoErr.message);
+         }
+      }
+
       // Send email
       try {
         await sendWaterBaptismDetails({

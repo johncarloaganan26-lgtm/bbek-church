@@ -64,15 +64,45 @@ router.post('/submit', async (req, res) => {
                     return res.status(400).json({ success: false, message: 'Invalid Salvation reference ID. Please use the link from your email.' });
                 }
                 
-                // Auto-promote if Undecided status: mark Salvation Talk as Promoted
-                if (rows[0].status === 'Undecided') {
+                // Auto-promote if status is Undecided, Scheduled, or Completed: mark Salvation Talk as Promoted
+                const currentStatus = rows[0].status;
+                if (currentStatus === 'Undecided' || currentStatus === 'Scheduled' || currentStatus === 'Completed') {
                     try {
-                        await query(
-                            'UPDATE tbl_discipleship_requests SET status = ?, date_updated = NOW() WHERE request_id = ?',
-                            ['Promoted', salvation_id]
-                        );
+                        // 1. Fetch full record for notes parsing
+                        const [fullRows] = await query('SELECT notes FROM tbl_discipleship_requests WHERE request_id = ?', [salvation_id]);
+                        if (fullRows.length > 0 && fullRows[0].notes) {
+                            let notesData = typeof fullRows[0].notes === 'string' ? JSON.parse(fullRows[0].notes) : fullRows[0].notes;
+                            let updated = false;
+
+                            // 2. Identify and update companion status in JSON
+                            if (notesData.companions && Array.isArray(notesData.companions)) {
+                                const compIdx = notesData.companions.findIndex(c => 
+                                    String(c.email).toLowerCase() === String(email).toLowerCase()
+                                );
+                                if (compIdx !== -1) {
+                                    notesData.companions[compIdx].status = 'Promoted';
+                                    updated = true;
+                                }
+                            }
+
+                            // 3. Save updated notes
+                            if (updated) {
+                                await query(
+                                    'UPDATE tbl_discipleship_requests SET notes = ?, date_updated = NOW() WHERE request_id = ?',
+                                    [JSON.stringify(notesData), salvation_id]
+                                );
+                            }
+                        }
+
+                        // 4. Optionally promote the primary status if it was Undecided
+                        if (currentStatus === 'Undecided') {
+                            await query(
+                                'UPDATE tbl_discipleship_requests SET status = ?, date_updated = NOW() WHERE request_id = ?',
+                                ['Promoted', salvation_id]
+                            );
+                        }
                     } catch (promoteError) {
-                        console.warn(`Failed to auto-promote Salvation Talk ${salvation_id}:`, promoteError.message);
+                        console.warn(`Failed to process auto-promotion for ${salvation_id}:`, promoteError.message);
                     }
                 }
             } else if (salvation_id.startsWith('BSR')) {

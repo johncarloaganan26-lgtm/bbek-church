@@ -705,13 +705,48 @@ router.get('/registration-data/:id', async (req, res) => {
             // Fetch from Discipleship/Salvation table
             const [rows] = await query(
                 `SELECT request_id, firstname, lastname, middle_name, email, phone_number, address, birthdate, age, gender, civil_status, profession, 
-                        spouse_name, marriage_date, children, guardian_name, guardian_contact, guardian_relationship
+                        spouse_name, marriage_date, children, guardian_name, guardian_contact, guardian_relationship, notes
                  FROM tbl_discipleship_requests 
                  WHERE request_id = ? LIMIT 1`,
                 [id]
             );
             if (rows.length > 0) {
-                userData = rows[0];
+                const primaryData = rows[0];
+                const targetEmail = req.query.email;
+
+                if (targetEmail) {
+                    // Try to find companion with this email in notes
+                    try {
+                        const notesData = typeof primaryData.notes === 'string' 
+                            ? JSON.parse(primaryData.notes) 
+                            : primaryData.notes;
+                        
+                        if (notesData && notesData.companions && Array.isArray(notesData.companions)) {
+                            const companion = notesData.companions.find(c => 
+                                String(c.email).toLowerCase() === String(targetEmail).toLowerCase()
+                            );
+                            
+                            if (companion) {
+                                // Return companion data instead of primary
+                                userData = {
+                                    ...companion,
+                                    salvation_id: primaryData.request_id,
+                                    // Map common fields if they exist in primary but not companion (fallback)
+                                    address: companion.address || primaryData.address,
+                                    phone_number: companion.phone_number || primaryData.phone_number,
+                                    birthdate: companion.birthdate || null,
+                                    age: companion.age || null
+                                };
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse notes for companion lookup:', e.message);
+                    }
+                }
+
+                if (!userData) {
+                    userData = primaryData;
+                }
             }
         } else if (id.startsWith('BSR')) {
             // Fetch from Bible Study table, joined with original Salvation record
@@ -1282,7 +1317,7 @@ router.post('/promote-to-bible-study/:id', authenticateToken, checkPermission('S
             const targetEmail = req.body.email || current.email;
             if (targetEmail && targetEmail.trim() !== '') {
                 const frontendUrl = process.env.FRONTEND_URL1 || 'http://localhost:5173';
-                const bibleStudyLink = `${frontendUrl}/beoneofus/bible-study?ref=${id}`;
+                const bibleStudyLink = `${frontendUrl}/beoneofus/bible-study?ref=${id}${targetEmail ? '&email=' + encodeURIComponent(targetEmail) : ''}`;
                 await emailHelper.sendBibleStudyFormLink({
                     email: targetEmail,
                     firstname: req.body.firstname || current.firstname,
