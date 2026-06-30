@@ -807,6 +807,40 @@ const fetchPastorOptions = async () => {
   }
 }
 
+// Fetch unavailable time slots for scheduling (same day allowed, same time blocked)
+const fetchUnavailableTimeSlots = async () => {
+  try {
+    const response = await axios.get('/church-records/child-dedications/getAllChildDedications', {
+      params: {
+        status: 'approved', // Only get approved child dedications to block time slots
+        limit: 1000 // Get enough records to cover scheduling
+      }
+    })
+
+    if (response.data.success && response.data.data) {
+      // Extract time slots that are already approved/scheduled
+      const scheduledTimeSlots = []
+
+      response.data.data.forEach(dedication => {
+        if (dedication.preferred_dedication_date && dedication.preferred_dedication_time && dedication.status === 'approved') {
+          // Format date and time safely
+          scheduledTimeSlots.push({
+            date: dedication.preferred_dedication_date.split(' ')[0], // Extract date part only (YYYY-MM-DD)
+            time: dedication.preferred_dedication_time.substring(0, 5), // Keep only HH:mm
+            id: dedication.child_id // For edit mode exception
+          })
+        }
+      })
+
+      // Store time slots for blocking logic
+      unavailableTimeSlots.value = scheduledTimeSlots
+    }
+  } catch (error) {
+    console.error('Error fetching unavailable time slots:', error)
+    // Don't show error to user, just allow all slots if fetch fails
+  }
+}
+
 // Availability logic is now handled by fetchAvailableSlots and the available-slots API.
 // Existing check-time-slot API can still be used for individual validation.
 
